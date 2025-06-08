@@ -1,11 +1,10 @@
 # Global options for shellcheck (each flag on its own line)
 
-# Ignore “missing shebang” inside hooks & sourced helper scripts
--e SC2148   # shebang mismatch
--e SC1091   # cannot follow sourced file
+# Ignore missing shebang inside hooks & sourced helper scripts
+exclude=SC2148,SC1091
 
-# Treat cosmetic issues as warnings (default is ‘style’)
--S warning
+# Treat cosmetic issues as warnings (default is style)
+severity=warning
 
 # Allow following files referenced with relative paths
---external-sources
+external-sources=true
