@@ -1,0 +1,31 @@
+name: Create and Publish Release            # This workflow runs on every push to the 'main' branch
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest                  # Use the latest version of Ubuntu to run the job
+    permissions:                            # This job needs permission to write back to the repository
+      contents: write                       # to create the release commit and tag.
+    
+    steps:                                  # Step 1: Check out your repository's code
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                    # We need to fetch all history and tags for semantic-release to work
+
+      - name: Set up Python 3.13            # Step 2: Set up the correct Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Nox                   # Step 3: Install Nox using pipx for a clean installation
+        run: pipx install nox
+
+      - name: Run Semantic Release          # Step 4: This is the magic command. It runs the "release" session 
+        env:                                # from the noxfile.py Nox handles installing all the necessary tools.
+          GH_TOKEN: ${{ secrets.GH_TOKEN }} # This is a secret token that gives the action permission to publish
+        run: nox -s release
