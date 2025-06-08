@@ -174,8 +174,6 @@
   mdformat-frontmatter = "^2.0.8"    # Frontmatter support for mdformat
   ruff                 = "^0.11.13"  # Extremely fast Python linter and code formatter
   shellcheck-py        = "^0.10.0.1" # Static binary of shellcheck
-  shfmt                = "^3.11.0.2" # Go binary wrapper
-  taplo-cli            = "^0.1.2"    # TOML formatter/linter
   toml-sort            = ">=0.24.2"  # Sort TOML files in a consistent order
   yamllint             = ">=1.37.1"  # YAML linter
 
