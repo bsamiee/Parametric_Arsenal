@@ -421,13 +421,13 @@
   patch_tags           = [ "fix", "perf", "docs", "style", "refactor", "build", "ci", "revert" ]
 
 [tool.semantic_release.hooks] # Defines the commands to run at different stages of the release process
-  before_publish = [ # Runs before the release is published
-    "git-cliff --tag ${next_version} --output CHANGELOG.md",
-  ]
+#  before_publish = [ # Runs before the release is published
+#    "git-cliff --tag ${next_version} --output CHANGELOG.md",
+#  ]
 
 [tool.semantic_release.changelog] # Defines how the changelog is generated
-  changelog_file    = "CHANGELOG.md" # Points to the changelog file made via git-cliff
-  check_consistency = true           # This setting just checks if the changelog file was changed, which our hook does
+#  changelog_file    = "CHANGELOG.md" # Points to the changelog file made via git-cliff
+#  check_consistency = true           # This setting just checks if the changelog file was changed, which our hook does
 
 [tool.semantic_release.publish] # Defines what happens during the 'publish' step
   build_command      = "poetry build" # Command to build package distributions (sdist and wheel)
