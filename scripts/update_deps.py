@@ -76,16 +76,17 @@ def iter_dependency_tables(parsed: Mapping) -> Iterable[tuple[str, Mapping]]:
 
 
 def get_python_version_from_pyproject() -> str:
-    """Extract the python version specifier from pyproject.toml."""
-    # This assumes [tool.poetry.dependencies] python = "^3.13" or similar
+    """Return the project's primary Python version (major.minor)."""
+    # We expect a line like: python = ">=3.13,<3.14"
     with PYPROJECT.open("r", encoding="utf-8") as f:
         for line in f:
-            if line.strip().startswith("python"):
-                # e.g. python = "^3.13"
-                version = line.split("=")[1].strip().strip('"')
-                # Remove ^ or >= if present
-                version = version.lstrip("^>=")
-                return version
+            if line.strip().startswith("python ="):
+                version_spec = line.split("=", 1)[1].strip().strip('"')
+                match = re.search(r"\d+\.\d+", version_spec)
+                if match:
+                    return match.group(0)
+                # Fallback to trimmed value if regex fails
+                return version_spec.lstrip("^>=")
     return "3.13"  # fallback
 
 
