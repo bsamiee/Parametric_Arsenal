@@ -9,7 +9,6 @@
 # (e.g., *.3dm, *.gh, *.ghuser).
 
 # --- General -------------------------------------------------------------------
-poetry.lock
 todo.txt
 placeholder.txt
 
