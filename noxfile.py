@@ -1,66 +1,73 @@
 # noxfile.py
+from pathlib import Path
+
 import nox
 
 
-# A list of all source code paths to be checked.
-SOURCE_PATHS = ("libs", "tests", "noxfile.py")
-
-# Set the default sessions to run when you just type 'nox'
+# Set default sessions to run when no specific sessions are chosen
 nox.options.sessions = ["lint", "mypy", "tests"]
 
-# Define the default Python version
-DEFAULT_PYTHON_VERSION = "3.13"
+# Reuse virtual environments for faster consecutive runs
+nox.options.reuse_existing_virtualenvs = True
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
-def tests(session: nox.Session) -> None:
+# Define constants for source paths and Python versions to test against
+SOURCE_PATHS = ("libs", "tests", "noxfile.py")
+PYTHON_VERSIONS = ["3.13"]  # Add other Python versions like "3.12" if needed
+
+
+def install_poetry_deps(session: nox.Session) -> None:
     """
-    Run the test suite with pytest and generate a coverage report.
+    Install project dependencies using Poetry.
 
-    Installs all project dependencies from poetry.lock before running.
+    This function installs all dependencies, including dev dependencies,
+    from the poetry.lock file into the Nox session's virtual environment.
+    The --sync option ensures the environment matches the lock file exactly.
     """
     session.install("poetry")
-    # The --sync option ensures the venv is identical to the lock file
     session.run("poetry", "install", "--sync", external=True)
-    # The --cov arguments activate coverage reporting.
-    # The rest of the arguments are passed directly to pytest.
-    session.run("pytest", "--cov=libs", "--cov-report=term-missing", *session.posargs)
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
+@nox.session(python=PYTHON_VERSIONS)
+def tests(session: nox.Session) -> None:
+    """Run the test suite with pytest and generate a coverage report."""
+    install_poetry_deps(session)
+    session.run(
+        "pytest",
+        "--cov=libs",
+        "--cov-report=term-missing",
+        "--cov-report=xml",  # For coverage reports in CI
+        *session.posargs,
+    )
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
 def lint(session: nox.Session) -> None:
-    """
-    Lint the code with ruff.
-
-    Installs ruff independently of the project dependencies.
-    """
+    """Check code for style issues and formatting using Ruff."""
     session.install("ruff")
-    # Run the linter
     session.run("ruff", "check", *SOURCE_PATHS)
-    # Run the formatter in check mode
     session.run("ruff", "format", "--check", *SOURCE_PATHS)
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
-def mypy(session: nox.Session) -> None:
-    """
-    Run the static type checker mypy.
+@nox.session(python=PYTHON_VERSIONS[0])
+def format_code(session: nox.Session) -> None:
+    """Format the code using Ruff and sort pyproject.toml."""
+    session.install("ruff", "toml-sort")
+    session.run("ruff", "check", *SOURCE_PATHS, "--fix")
+    session.run("ruff", "format", *SOURCE_PATHS)
+    session.run("toml-sort", "pyproject.toml", "--all", "--in-place")
 
-    Installs all project dependencies from poetry.lock to resolve types.
-    """
-    session.install("poetry")
-    session.run("poetry", "install", "--sync", external=True)
+
+@nox.session(python=PYTHON_VERSIONS[0])
+def mypy(session: nox.Session) -> None:
+    """Run the static type checker mypy."""
+    install_poetry_deps(session)
     session.run("mypy", *SOURCE_PATHS)
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
+@nox.session(python=PYTHON_VERSIONS[0])
 def security(session: nox.Session) -> None:
-    """
-    Run a security audit with pip-audit.
-
-    Exports the full dependency list from poetry to check for vulnerabilities.
-    """
+    """Run a security audit with pip-audit."""
     session.install("poetry", "pip-audit")
-    # Exporting dependencies to a requirements file for pip-audit
     session.run(
         "poetry",
         "export",
@@ -71,39 +78,72 @@ def security(session: nox.Session) -> None:
         external=True,
     )
     session.run("pip-audit", "-r", "requirements.txt")
-    session.run("rm", "requirements.txt", external=True)
+    Path("requirements.txt").unlink()
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
+@nox.session(python=PYTHON_VERSIONS[0])
 def dependencies(session: nox.Session) -> None:
     """Check for unused, missing, or transitive dependencies with deptry."""
     session.install("deptry")
     session.run("deptry", ".")
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
+@nox.session(python=PYTHON_VERSIONS[0])
+def analysis(session: nox.Session) -> None:
+    """Run static analysis tools to check for dead code and code complexity."""
+    session.install("radon", "vulture")
+    session.run("vulture", *SOURCE_PATHS, "--min-confidence", "80")
+    session.run("radon", "mi", *SOURCE_PATHS, "-s")  # Maintainability Index
+    session.run("radon", "cc", *SOURCE_PATHS, "-s", "-a")  # Cyclomatic Complexity
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
 def docs(session: nox.Session) -> None:
     """
     Build the documentation with MkDocs.
 
-    Pass '--serve' to the session to run a live-reloading server.
+    Pass '--serve' to run a live-reloading server.
     Example: nox -s docs -- --serve
     """
     session.install("mkdocs", "mkdocs-material")
-    # Build the documentation
-    build_command = ["mkdocs", "build", "--clean"]
     if "--serve" in session.posargs:
-        # Run the live-reloading server
-        session.log("Running mkdocs serve, press Ctrl+C to exit.")
         session.run("mkdocs", "serve")
     else:
-        # Build the static site
-        session.run(*build_command)
-        session.log("Documentation built in site/ directory.")
+        session.run("mkdocs", "build", "--clean")
+        session.log("Documentation built in site/")
 
 
-@nox.session(python=DEFAULT_PYTHON_VERSION)
-def analysis(session: nox.Session) -> None:
-    """Run static analysis tools to check for dead code and code complexity."""
-    session.install("radon", "vulture")
-    # Check for dead code
+@nox.session(python=PYTHON_VERSIONS[0])
+def pre_commit(session: nox.Session) -> None:
+    """Run all pre-commit hooks."""
+    session.install("pre-commit")
+    session.run("pre-commit", "run", "--all-files")
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
+def build(session: nox.Session) -> None:
+    """Build the source and wheel distributions."""
+    session.install("poetry")
+    session.run("poetry", "build", external=True)
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
+def release(session: nox.Session) -> None:
+    """
+    Create a new release using python-semantic-release.
+
+    This session is designed to be run in a CI/CD environment.
+    It reads the GH_TOKEN from the environment variables.
+    """
+    session.install("python-semantic-release")
+    session.run("semantic-release", "publish")
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
+def clean(session: nox.Session) -> None:
+    """Remove all temporary files and build artifacts."""
+    session.run("rm", "-rf", ".mypy_cache", "dist", "build", external=True)
+    session.run("rm", "-rf", "site", ".pytest_cache", "coverage.xml", external=True)
+    session.run("find", ".", "-name", "'__pycache__'", "-exec", "rm", "-rf", "{}", "+", external=True)
+    session.run("find", ".", "-name", "'*.pyc'", "-exec", "rm", "-rf", "{}", "+", external=True)
+    session.log("Cleaned up the project directory.")

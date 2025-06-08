@@ -1,4 +1,5 @@
 # --- Metadata -----------------------------------------------------------------
+
 # Title           : .gitignore
 # Author          : Bardia Samiee
 # Project         : Parametric Arsenal
@@ -6,7 +7,6 @@
 # Purpose: Keep the repository clean of OS noise, build artifacts and transient
 # files while *not* ignoring domain assets that should go through Git LFS
 # (e.g., *.3dm, *.gh, *.ghuser).
-# ==============================================================================
 
 # --- General -------------------------------------------------------------------
 poetry.lock
@@ -33,6 +33,7 @@ __pycache__/
 *$py.class
 
 # --- Virtual environments -----------------------------------------------------
+.env
 .env/
 .venv/
 env/
@@ -69,13 +70,11 @@ htmlcov/
 *.userosscache
 *.sln.docstates
 
-
 # --- Test results & coverage ----------------
 TestResults/
 *.coverage
 *.coveragexml
 *.testresults
-
 
 # --- Documentation build outputs ---------------------------------------------
 _site/

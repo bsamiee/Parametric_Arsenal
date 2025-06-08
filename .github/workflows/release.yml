@@ -25,7 +25,7 @@ jobs:
       - name: Install Nox                   # Step 3: Install Nox using pipx for a clean installation
         run: pipx install nox
 
-      - name: Run Semantic Release          # Step 4: This is the magic command. It runs the "release" session 
+      - name: Run Semantic Release          # Step 4: This is the magic command. It runs the "release" session
         env:                                # from the noxfile.py Nox handles installing all the necessary tools.
           GH_TOKEN: ${{ secrets.GH_TOKEN }} # This is a secret token that gives the action permission to publish
         run: nox -s release
