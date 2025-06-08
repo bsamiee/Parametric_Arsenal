@@ -52,6 +52,7 @@ pip-wheel-metadata/
 .pytest_cache/
 .ruff_cache/
 .coverage
+.nox/
 coverage.xml
 htmlcov/
 
