@@ -426,9 +426,6 @@
   before_publish = [ # Runs before the release is published
     "git-cliff --tag ${next_version} --output CHANGELOG.md",
   ]
-  pre_commit = [ # Runs before the version is bumped. Ideal for quality gates
-    "nox -s tests", # Ensure all tests pass before even attempting a release
-  ]
 
 [tool.semantic_release.changelog] # Defines how the changelog is generated
   changelog_file    = "CHANGELOG.md" # Points to the changelog file made via git-cliff

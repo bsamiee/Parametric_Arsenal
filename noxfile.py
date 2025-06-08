@@ -135,7 +135,11 @@ def release(session: nox.Session) -> None:
     This session is designed to be run in a CI/CD environment.
     It reads the GH_TOKEN from the environment variables.
     """
-    session.install("python-semantic-release")
+    session.install(
+        "python-semantic-release",
+        "git-cliff",  # For the changelog generation hook
+        "poetry",  # For the build command
+    )
     session.run("semantic-release", "publish")
 
 
