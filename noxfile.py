@@ -143,7 +143,7 @@ def release(session: nox.Session) -> None:
         "git-cliff",  # For the changelog generation hook
         "poetry",  # For the build command
     )
-    session.run("semantic-release", "publish")
+    session.run("semantic-release", "--verbose", "publish")
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
