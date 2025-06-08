@@ -3,7 +3,7 @@ name: Create and Publish Release            # This workflow runs on every push t
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   release:

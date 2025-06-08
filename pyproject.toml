@@ -324,7 +324,7 @@ name = "cz_conventional_commits"    # prompt for creating commits that follow th
 
 # --- Python-Semtanic Configuration -------
 [tool.semantic_release]
-branch = "main"                     # The VCS push command will be run for the files configured in version_files
+branch = "master"                     # The VCS push command will be run for the files configured in version_files
 tag_format = "v{version}"           # Use the tag_format from commitizen for consistency
 major_on_zero = true                # Set this to true so a 'feat!' or 'BREAKING CHANGE' on v0.5.0 becomes v1.0.0
 sources = [                         # Specifies which files to update with the new version number
