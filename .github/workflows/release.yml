@@ -22,6 +22,8 @@ jobs:
               run: pipx install nox
 
             - name: Run tests
+              env:
+                  PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
               run: nox -s tests
 
     release:

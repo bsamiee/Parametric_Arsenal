@@ -24,7 +24,7 @@ def install_poetry_deps(session: nox.Session) -> None:
     The --sync option ensures the environment matches the lock file exactly.
     """
     session.install("poetry")
-    session.run("poetry", "install", "--sync", "-vvv", external=True)
+    session.run("poetry", "install", "sync", "-vvv", external=True)
 
 
 @nox.session(python=PYTHON_VERSIONS)
