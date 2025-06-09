@@ -11,7 +11,7 @@ requires = ["poetry-core"]
 
 [project]
 name = "parametric_arsenal"
-version = "0.0.0"
+version = "0.1.0"
 description = "Architectural/Parametric monorepo"
 readme = "README.md"
 license = "MIT"
@@ -472,6 +472,7 @@ tag_format = "v{version}"                         # The tag format PSR will crea
 initial_version = "0.0.0"
 allow_zero_version = true                         # Correct for starting at 0.0.0
 major_on_zero = true                              # Correct for 0.y.z releases
+commit_message = "bump: release v{version}"
 
 # --- Hooks (for Changelog Generation) ---
 [tool.semantic_release.hooks]
