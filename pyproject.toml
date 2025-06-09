@@ -37,164 +37,161 @@ pa = "mzn_cli.main:cli"
 [project.optional-dependencies]
 rhinogh = ["rhino3dm", "rhinoinside"]
 
-# --- Dependencies -------------------------------------------------------------
+# --- Runtime Dependencies -----------------------------------------------------
 [tool.poetry.dependencies]
 python = ">=3.13,<3.14"
 
 # --- Core Utilities -------------------------
-boltons = ">=25.0.0" # Collection of pure-Python utilities
-dynaconf = "^3.2.11" # Settings management with environment support
-pydantic = { extras = [
-  "email",
-], version = "^2.11.5" } # Data validation, settings, serialization
-pydantic-settings = "^2.9.1" # Typed settings management
-python-dateutil = "^2.9.0.post0" # Robust datetime parsing utilities
-toolz = "^1.0.0" # Functional iterator helpers suite
+boltons = ">=25.0.0"
+dynaconf = "^3.2.11"
+pydantic = { extras = ["email"], version = "^2.11.5" }
+pydantic-settings = "^2.9.1"
+python-dateutil = "^2.9.0.post0"
+toolz = "^1.0.0"
 
 # --- Logging & Metrics ----------------------
-prometheus-client = "^0.22.1" # Export metrics for Prometheus scraping
-structlog = "^25.4.0"         # Context-rich structured JSON logging
+prometheus-client = "^0.22.1"
+structlog = "^25.4.0"
 
 # --- Debugging ------------------------------
-icecream = "^2.1.4" # Pretty context debug printouts
-ipdb = "^0.13.13"   # IPython interactive breakpoints
-pudb = "^2025.1"    # Full-screen TUI step debugger
+icecream = "^2.1.4"
+ipdb = "^0.13.13"
+pudb = "^2025.1"
 
 # --- CLI & TUI ------------------------------
-prompt_toolkit = "^3.0.51" # Interactive inputs, autocompletion
-rich = "^14.0.0"           # Colorful text, tables, progress
-tabulate = "^0.9.0"        # Pretty text table formatting
-textual = "^3.3.0"         # TUI apps with reactive widgets
-tqdm = "^4.67.1"           # Quick progress bars for iterables
-typer = ">=0.16.0"         # Typed CLI generator
+prompt_toolkit = "^3.0.51"
+rich = "^14.0.0"
+tabulate = "^0.9.0"
+textual = "^3.3.0"
+tqdm = "^4.67.1"
+typer = ">=0.16.0"
 
 # --- Concurrency & Tasking ------------------
-anyio = "^4.9.0"        # Async API bridging Trio/asyncio
-apscheduler = "^3.11.0" # In-process cron-like scheduler
-celery = "^5.5.3"       # Distributed task queue, retries
-psutil = ">=7.0.0"      # Cross-platform process and system monitoring.
-sh = ">=2.2.2"          # Subprocess interface for shell commands
-tenacity = "^9.1.2"     # Robust retry with backoff
-watchdog = "^6.0.0"     # Filesystem events observer
+anyio = "^4.9.0"
+apscheduler = "^3.11.0"
+celery = "^5.5.3"
+psutil = ">=7.0.0"
+sh = ">=2.2.2"
+tenacity = "^9.1.2"
+watchdog = "^6.0.0"
 
 # --- Caching --------------------------------
-aiocache = "^0.12.3" # Async in-memory cache with TTL
-cachetools = "^6.0.0" # Lightweight in-memory cache utilities
-diskcache = "^5.6.3" # Fast disk-backed cache store
-dogpile-cache = "^1.1.8" # Caching library with support for multiple backends
-redis = { extras = [
-  "hiredis",
-], version = "^6.2.0" } # Remote in-memory datastore cache
+aiocache = "^0.12.3"
+cachetools = "^6.0.0"
+diskcache = "^5.6.3"
+dogpile-cache = "^1.1.8"
+redis = { extras = ["hiredis"], version = "^6.2.0" }
 
 # --- Data Handling, Serialization & I/O -----
-beautifulsoup4 = ">=4.13.4" # For pulling data out of HTML/XML
-lxml = ">=5.4.0" # Powerful and Pythonic XML/HTML toolkit
-openpyxl = "^3.1.5" # Read/write Excel xlsx files
-orjson = "^3.10.18" # Blazing-fast JSON encoder/decoder
-pillow = "^11.2.1" # Image open, edit, save formats
-pymupdf = ">=1.26.0" # Ultra-fast PDF/XPS processing
-pypdf = "^5.6.0" # Split, merge, extract PDFs
-python-docx = ">=1.1.2" # Create and update Microsoft Word files
-python-magic = "^0.4.27" # Detect file type signatures
-python-pptx = ">=1.0.2" # Create and update PowerPoint files
-ruamel-yaml = "^0.18.13" # Round-trip safe YAML parser
-thefuzz = { extras = [
-  "speedup",
-], version = "^0.22.1" } # Fuzzy string matching library
-tomlkit = "^0.13.3" # Preserve-format TOML read/write
+beautifulsoup4 = ">=4.13.4"
+lxml = ">=5.4.0"
+openpyxl = "^3.1.5"
+orjson = "^3.10.18"
+pillow = "^11.2.1"
+pymupdf = ">=1.26.0"
+pypdf = "^5.6.0"
+python-docx = ">=1.1.2"
+python-magic = "^0.4.27"
+python-pptx = ">=1.0.2"
+ruamel-yaml = "^0.18.13"
+thefuzz = { extras = ["speedup"], version = "^0.22.1" }
+tomlkit = "^0.13.3"
 
 # --- Database & Data Stores -----------------
-Alembic = ">=1.16.1"    # Database migrations for SQLAlchemy
-DVC = ">=3.60.0"        # Data Version Control for data science projects
-DuckDB = ">=1.3.0"      # In-process SQL OLAP database
-SQLAlchemy = ">=2.0.41" # SQL toolkit and ORM
-SQLModel = ">=0.0.24"   # Pydantic + SQLAlchemy ORM
-asyncpg = ">=0.30.0"    # PostgreSQL database adapter for Python
-jsonschema = ">=4.24.0" # An implementation of JSON Schema
+Alembic = ">=1.16.1"
+DVC = ">=3.60.0"
+DuckDB = ">=1.3.0"
+SQLAlchemy = ">=2.0.41"
+SQLModel = ">=0.0.24"
+asyncpg = ">=0.30.0"
+jsonschema = ">=4.24.0"
 
 # --- Security & Encryption ------------------
-argon2-cffi = "^25.1.0"  # Argon2 password hashing library
-cryptography = "^45.0.3" # Secure cryptographic recipes and primitives
-passlib = "^1.7.4"       # Password hashing library
-python-jose = "^3.5.0"   # JSON Web Token (JWT) implementation
+argon2-cffi = "^25.1.0"
+cryptography = "^45.0.3"
+passlib = "^1.7.4"
+python-jose = "^3.5.0"
 
 # --- Data & Science -------------------------
-dask = "^2025.5.1"        # Parallel out-of-core computing
-geopandas = "^1.1.0"      # Geospatial dataframe extensions
-h5py = "^3.14.0"          # HDF5 binary dataset interface
-networkx = "^3.5"         # Graph theory algorithms library
-numpy = "^2.2.6"          # Fundamental package for scientific computing
-pandas = "^2.3.0"         # Tabular data frames analysis
-polars = "^1.30.0"        # Lightning-fast modern DataFrame library
-pyarrow = "^20.0.0"       # Arrow columnar memory interface
-pyspark = "^4.0.0"        # Distributed data processing engine
-scipy = "^1.15.3"         # Scientific algorithms toolbox
-sympy = ">=1.14.0"        # Symbolic maths and calculus
-uncertainties = ">=3.2.3" # Transparent calculations with uncertainties
-xarray = "^2025.4.0"      # N-D labelled scientific arrays
+dask = "^2025.5.1"
+geopandas = "^1.1.0"
+h5py = "^3.14.0"
+networkx = "^3.5"
+numpy = "^2.2.6"
+pandas = "^2.3.0"
+polars = "^1.30.0"
+pyarrow = "^20.0.0"
+pyspark = "^4.0.0"
+scipy = "^1.15.3"
+sympy = ">=1.14.0"
+uncertainties = ">=3.2.3"
+xarray = "^2025.4.0"
 
 # --- Visualization --------------------------
-altair = "^5.5.0"      # Declarative statistical graphics
-matplotlib = "^3.10.3" # Core static plotting library
-plotly = "^6.1.2"      # Interactive browser-ready charts
-qrcode = ">=8.2"       # QR code image generator.
-seaborn = ">=0.13.2"   # Statistical data visualization
-
-# --- Documentation & Reporting --------------
-mkdocs = ">=1.6.1"           # Fast, simple static site generator
-mkdocs-material = ">=9.6.14" # A powerful Material Design theme
-reportlab = "^4.4.1"         # Programmatic PDF generation
-sphinx = "^8.2.3"            # Generate docs from code comments
-weasyprint = ">=65.1"        # Convert HTML/CSS to PDF reports
+altair = "^5.5.0"
+matplotlib = "^3.10.3"
+plotly = "^6.1.2"
+qrcode = ">=8.2"
+seaborn = ">=0.13.2"
 
 # --- Web / Networking -----------------------
-fabric = "^3.2.2"               # High-level remote SSH automation
-fastapi = "^0.115.12"           # Async high-performance API framework
-httpx = ">=0.28.1"              # Fully featured async/sync HTTP client
-paramiko = "^3.5.1"             # SSH, SFTP client-server library
-pyserial = ">=3.5"              # Serial port access library
-python-multipart = "^0.0.20"    # Multipart form data parsing for web frameworks
-strawberry-graphql = "^0.271.0" # Dataclass-based GraphQL framework
-uvicorn = "^0.34.3"             # ASGI server for FastAPI
-websockets = "^15.0.1"          # Async WebSocket server + client
+fabric = "^3.2.2"
+fastapi = "^0.115.12"
+httpx = ">=0.28.1"
+paramiko = "^3.5.1"
+pyserial = ">=3.5"
+python-multipart = "^0.0.20"
+strawberry-graphql = "^0.271.0"
+uvicorn = "^0.34.3"
+websockets = "^15.0.1"
 
 # --- Automation & Scraping ------------------
-cloudscraper = "^1.2.71" # Circumvent Cloudflare anti-bots
-playwright = "^1.52.0"   # Modern headless browser control
-pyautogui = "^0.9.54"    # GUI mouse-keyboard automation
-scrapy = "^2.13.1"       # Full web crawling framework
+cloudscraper = "^1.2.71"
+playwright = "^1.52.0"
+pyautogui = "^0.9.54"
+scrapy = "^2.13.1"
 
 # --- Rhino/Grasshopper ----------------------
-rhino3dm = { version = "^8.17.0", optional = true }   # Rhino 3D model reader/writer
-rhinoinside = { version = "^0.8.2", optional = true } # Rhino Inside for Grasshopper
+rhino3dm = { version = "^8.17.0", optional = true }
+rhinoinside = { version = "^0.8.2", optional = true }
 
-# --- Development Dependencies -------------------------------------------------
+# -------------------------------------------------------------------------------
+# Dependency Groups
+# -------------------------------------------------------------------------------
+
+# --- Core development utilities ------------------------------------------------
 [tool.poetry.group.dev.dependencies]
-# --- Management --------------------------
-commitizen = ">=4.8.2"               # Standardized commit messages
-jinja2 = "^3.1.6"                    # Templating engine for Python
-git-cliff = ">=2.9.1"                # Generate changelogs from commit messages
-nox = "^2025.5.1"                    # Automation tool for testing in isolated environments
-python-semantic-release = ">=10.0.2" # Automate versioning and changelog generation
-pre-commit = "^4.2.0"                # Framework for managing and maintaining multi-language pre-commit hooks
 
-# --- Linting & Formatting ----------------
-jsonlint = "^0.1"               # JSON linter
-mdformat = "^0.7.22"            # Markdown formatter with plugins
-mdformat-frontmatter = "^2.0.8" # Frontmatter support for mdformat
-ruff = "^0.11.13"               # Extremely fast Python linter and code formatter
-shellcheck-py = "^0.10.0.1"     # Static binary of shellcheck
-toml-sort = ">=0.24.2"          # Sort TOML files in a consistent order
-yamllint = ">=1.37.1"           # YAML linter
-docformatter = "^1.7.7"         # Auto-format Python docstrings to PEP 257, 120 chars
+# Management
+commitizen = ">=4.8.2"
+jinja2 = "^3.1.6"
+git-cliff = ">=2.9.1"
+nox = "^2025.5.1"
+python-semantic-release = ">=10.0.2"
+pre-commit = "^4.2.0"
 
-# --- Static Analysis ---------------------
-mypy = "^1.16.0"            # Static type checker for Python
+# Linting & Formatting
+jsonlint = "^0.1"
+mdformat = "^0.7.22"
+mdformat-frontmatter = "^2.0.8"
+ruff = "^0.11.13"
+shellcheck-py = "^0.10.0.1"
+toml-sort = ">=0.24.2"
+yamllint = ">=1.37.1"
+docformatter = "^1.7.7"
+
+# Static analysis helpers kept here for convenience
+radon = ">=6.0.1"
+vulture = ">=2.14"
+
+# --- Type-checking only --------------------------------------------------------
+[tool.poetry.group.type.dependencies]
+mypy = "^1.16.0"
 mypy-extensions = ">=1.1.0"
-radon = ">=6.0.1"           # Code complexity analysis tool
 
-# --- Testing & Profiling -----------------
-Faker = ">=37.3.0"             # Fake data generation
+# --- Test suite & profiling ----------------------------------------------------
+[tool.poetry.group.test.dependencies]
+Faker = ">=37.3.0"
 coverage = ">=7.8.2"
 hypothesis = ">=6.135.1"
 line-profiler = ">=4.2.0"
@@ -202,9 +199,15 @@ memory-profiler = ">=0.61.0"
 pyinstrument = ">=5.0.2"
 pytest = "^8.4.0"
 pytest-cov = ">=6.1.1"
-pytest-json-report = ">=1.5.0" # JSON report for pytest
+pytest-json-report = ">=1.5.0"
 pytest-mock = ">=3.14.1"
-vulture = ">=2.14"
+
+# --- Documentation toolchain ---------------------------------------------------
+[tool.poetry.group.docs.dependencies]
+mkdocs = ">=1.6.1"
+mkdocs-material = ">=9.6.14"
+sphinx = "^8.2.3"
+weasyprint = ">=65.1"
 
 # --- Tool Configurations ------------------------------------------------------
 

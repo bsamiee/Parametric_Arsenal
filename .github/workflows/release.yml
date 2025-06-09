@@ -4,48 +4,80 @@ name: Create and Publish Release
 on:
     push:
         branches:
-            - master
+            - master # release from the protected default branch
+
+permissions:
+    contents: write # allow tag + GitHub Release upload
 
 jobs:
-    test: # New job to run tests first
+    # ────────────────────────────────────────
+    test:
         runs-on: ubuntu-latest
-        steps:
-            - name: Check out code
-              uses: actions/checkout@v4
 
-            - name: Set up Python 3.13
-              uses: actions/setup-python@v5
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
 
+            - uses: snok/install-poetry@v1
+              with:
+                  version: 1.8.2
+
+            - uses: actions/cache@v4
+              with:
+                  path: |
+                      .cache/nox
+                      ~/.cache/pip
+                      ~/.cache/pypoetry
+                  key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
             - name: Install Nox
-              run: pipx install nox
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install nox
 
             - name: Run tests
               env:
                   PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
               run: nox -s tests
 
+    # ────────────────────────────────────────
     release:
-        needs: test # This job will only run if the 'test' job succeeds
+        needs: test # only publish if the suite passed
         runs-on: ubuntu-latest
         permissions:
-            contents: write # Needed to push new commits and tags
-        steps:
-            - name: Check out code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Fetches all history for semantic-release
+            contents: write
 
-            - name: Set up Python 3.13
-              uses: actions/setup-python@v5
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # full history for semantic-release
+
+            - uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
 
-            - name: Install Nox
-              run: pipx install nox
+            - uses: snok/install-poetry@v1
+              with:
+                  version: 1.8.2
 
-            - name: Run Semantic Release
+            - uses: actions/cache@v4
+              with:
+                  path: |
+                      .cache/nox
+                      ~/.cache/pip
+                      ~/.cache/pypoetry
+                  key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+            - name: Install Nox
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install nox
+
+            - name: Semantic Release
               env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Use the built-in, more secure token
+                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+                  PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
               run: nox -s release
