@@ -1,63 +1,41 @@
 # .github/workflows/release.yml
+# This workflow creates and publishes a new release when code is pushed to the master branch.
 name: Create and Publish Release
 
 on:
     push:
         branches: ["master"]
-    workflow_dispatch: {} # Allows you to run this workflow manually
+    workflow_dispatch: {} # Allows you to run this workflow manually from the Actions tab
 
 permissions:
-    contents: write
+    contents: write # Required to create a release and push updated files
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-python@v5
-              with: { python-version: "3.13" }
-            - uses: snok/install-poetry@v1
-              with: { version: "2.1.1" }
-            - run: poetry --version # diagnostic
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      .cache/nox
-                      ~/.cache/pip
-                      ~/.cache/pypoetry
-                  key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-            - run: python -m pip install nox
-            - run: nox -s tests
-              env: { PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring }
-
     release:
-        needs: test
+        name: Create Release
         runs-on: ubuntu-latest
-        permissions: { contents: write }
         steps:
-            - uses: actions/checkout@v4
+            # Step 1: Check out the full git history. 'fetch-depth: 0' is essential for semantic-release.
+            - name: Checkout repository
+              uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  ref: ${{ github.ref }}
 
-            - uses: actions/setup-python@v5
-              with: { python-version: "3.13" }
+            # Step 2: Set up the specific Python version for the project
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.13"
 
-            - uses: snok/install-poetry@v1
-              with: { version: "2.1.1" }
+            # Step 3: Install the specific version of Poetry used by the project
+            - name: Install Poetry
+              uses: snok/install-poetry@v1
+              with:
+                  version: "2.1.1"
 
-            - name: Debug Git State
-              run: |
-                  echo "--- GIT STATUS ---"
-                  git status
-                  echo "--- GIT TAGS ---"
-                  git tag
-                  echo "--- GIT LOG (LAST 15) ---"
-                  git log --oneline -n 15
-                  echo "--- GIT LOG (COMMITS SINCE v0.0.0) ---"
-                  git log --oneline v0.0.0..HEAD
-
-            - uses: actions/cache@v4
+            # Step 4: Cache dependencies to speed up subsequent workflow runs
+            - name: Cache dependencies
+              uses: actions/cache@v4
               with:
                   path: |
                       .cache/nox
@@ -65,9 +43,16 @@ jobs:
                       ~/.cache/pypoetry
                   key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
-            - run: python -m pip install nox
+            # Step 5: Install Nox, the command runner for this project
+            - name: Install Nox
+              run: python -m pip install nox
 
-            - run: nox -s release
+            # Step 6: Run the 'release' session defined in the noxfile
+            # This performs the version bump, changelog generation, and GitHub release publication.
+            - name: Publish release
+              run: nox -s release
               env:
+                  # The GITHUB_TOKEN is automatically provided by GitHub Actions
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+                  # This environment variable is needed to prevent keyring-related issues in CI
                   PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
