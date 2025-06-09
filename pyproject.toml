@@ -469,6 +469,7 @@ sources = [ # Specifies which files to update with the new version number
   { path = "pyproject.toml", search = "version = \"{version}\"" },
 ]
 tag_format = "v{version}" # Use the tag_format from commitizen for consistency
+starting_version = "0.0.0"
 
 [tool.semantic_release.commit_parser_options]
 breaking_description = "BREAKING CHANGE"
