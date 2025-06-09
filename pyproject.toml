@@ -469,11 +469,12 @@ ignore_regex = "bump: release \\d+\\.\\d+\\.\\d+" # Ignore PSR's commit messages
 branch = "master"
 version_toml = ["pyproject.toml:project.version"]
 version_source = "file"
-tag_format = "v{version}"                         # The tag format PSR will create
+tag_format = "v{version}"                                                   # The tag format PSR will create
 initial_version = "0.0.0"
-allow_zero_version = true                         # Correct for starting at 0.0.0
-major_on_zero = true                              # Correct for 0.y.z releases
+allow_zero_version = true                                                   # Correct for starting at 0.0.0
+major_on_zero = true                                                        # Correct for 0.y.z releases
 commit_message = "bump: release v{version}"
+changelog_generator_class = "semantic_release.changelog.noop.NoopChangelog"
 
 # --- Hooks (for Changelog Generation) ---
 [tool.semantic_release.hooks]
