@@ -490,9 +490,9 @@ before_publish = [ # Runs before the release is published
   "git-cliff --unreleased --tag v${NEW_VERSION} --output CHANGELOG.md",
 ]
 
-[tool.semantic_release.changelog] # Defines how the changelog is generated
-changelog_file = "CHANGELOG.md" # Points to the changelog file made via git-cliff
-check_consistency = true        # This setting just checks if the changelog file was changed, which our hook does
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md" #  Points to the changelog file made via git-cliff
+check_consistency = true        #  This setting just checks if the changelog file was changed, which our hook does
 
 [tool.semantic_release.publish] # Defines what happens during the 'publish' step
 build_command = "poetry build" # Command to build package distributions (sdist and wheel)
