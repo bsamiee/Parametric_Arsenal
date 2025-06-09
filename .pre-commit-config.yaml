@@ -8,6 +8,8 @@ repos:
           - id: check-toml
           - id: end-of-file-fixer
           - id: trailing-whitespace
+          - id: check-added-large-files
+            args: ["--maxkb=512"] # warn on files > 512 KB (default 500 KB)
 
     - repo: https://github.com/astral-sh/ruff-pre-commit
       rev: v0.11.13

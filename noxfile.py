@@ -39,6 +39,9 @@ HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
 
 def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
     """Synchronise the venv with poetry.lock (Poetry ≥ 2.1)."""
+    # --------------------------------------------------------------------------
+    # ── NEW: prevent Poetry from creating its own nested .venv ────────────────
+    session.env["POETRY_VIRTUALENVS_CREATE"] = "false"
     session.run("poetry", "--version", external=True)  # diagnostic
     cmd = ["poetry", "-vv", "sync", "--no-interaction", "--ansi"]
     if groups:
