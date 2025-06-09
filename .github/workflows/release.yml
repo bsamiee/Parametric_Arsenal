@@ -32,10 +32,10 @@ jobs:
                   python-version: "3.13"
 
             # 4. Install Poetry
-            - name: Install Poetry
+            - name: Install Poetry 2.1.1
               uses: snok/install-poetry@v1
               with:
-                  version: "1.8.2"
+                  version: "2.1.1"
 
             # 5. Set up dependency cache for faster installs
             - name: Set up dependency cache
