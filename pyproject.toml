@@ -14,7 +14,7 @@ name = "parametric_arsenal"
 version = "0.1.0"
 description = "Architectural/Parametric monorepo"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Bardia Samiee", email = "b.samiee93@gmail.com" }]
 keywords = ["rhino", "grasshopper", "automation"]
 classifiers = [

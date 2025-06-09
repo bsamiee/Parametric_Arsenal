@@ -16,17 +16,20 @@ jobs:
             # 1 - Checkout
             - uses: actions/checkout@v4
 
-            # 2 - Python toolchain
+            # 2 - Python
             - uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
 
-            # 3 - Install Poetry once (outside Nox virtualenvs)
+            # 3 - Poetry 2.1.1 (system-wide, once per job)
             - uses: snok/install-poetry@v1
               with:
-                  version: 1.8.2 # keep in sync with your local version
+                  version: "2.1.1"
 
-            # 4 - Cache: finished Nox venvs + Poetry & pip wheels
+            # 4 - Show the Poetry version (diagnostic)
+            - run: poetry --version
+
+            # 5 - Cache ready-made Nox envs + wheels
             - uses: actions/cache@v4
               with:
                   path: |
@@ -35,13 +38,12 @@ jobs:
                       ~/.cache/pypoetry
                   key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
-            # 5 - Install Nox itself
-            - name: Install Nox
-              run: |
+            # 6 - Install Nox
+            - run: |
                   python -m pip install --upgrade pip
                   python -m pip install nox
 
-            # 6 - Run lint, MyPy, pre-commit, and test sessions
+            # 7 - Run the QA matrix
             - name: Run Nox QA suite
               env:
                   PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
