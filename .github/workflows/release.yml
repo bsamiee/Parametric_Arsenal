@@ -1,55 +1,47 @@
-# .github/workflows/release.yml
-name: Create and Publish Release
+name: Release
 
 on:
     push:
-        branches: ["master"]
-    workflow_dispatch: {}
-
-# These permissions are essential for the workflow to be able to
-# create releases and push changes back to the repository.
-permissions:
-    contents: write
+        branches:
+            - master
 
 jobs:
     release:
-        name: Create Release
         runs-on: ubuntu-latest
-        steps:
-            # Step 1: Check out the repository
-            # We provide the GITHUB_TOKEN to ensure this step has write permissions
-            # to push tags and commits back to the repo.
-            # fetch-depth: 0 is required to fetch all history for a full analysis.
-            - name: Checkout repository
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  token: ${{ secrets.GH_TOKEN }}
 
-            # Step 2: Set up the specific Python version
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # semantic-release needs full history
+
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
 
-            # Step 3: Install the release tools directly
-            # We install them here instead of using Nox to simplify the process.
-            - name: Install release dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  python -m pip install python-semantic-release git-cliff pendulum
+            - name: Cache pip, Poetry & Nox envs
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/pip
+                      ~/.cache/pypoetry
+                      .cache/nox
+                  key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+                  restore-keys: |
+                      nox-${{ runner.os }}-
 
-            # Step 4: Run the semantic-release command
-            # This single command will:
-            #  - Analyze commits
-            #  - Determine the new version
-            #  - Update pyproject.toml
-            #  - Run your git-cliff hook to generate a changelog
-            #  - Commit the updated files
-            #  - Create a new git tag
-            #  - Create a GitHub release with the changelog and assets
-            - name: Publish release
-              run: semantic-release publish
+            - name: Install Poetry 2.1.1
+              run: pip install --upgrade "poetry==2.1.1"
+
+            - name: Install Nox
+              run: pip install --upgrade nox
+
+            # ---------- single test pass ----------
+            - name: Run test suite
+              run: nox -s tests
+
+            # ---------- version bump, changelog, release ----------
+            - name: Run semantic-release
               env:
-                  # The GH_TOKEN is used by semantic-release to authenticate with GitHub
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+              run: nox -s release

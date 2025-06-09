@@ -38,9 +38,10 @@ render_always = true
 
 # --- git Processing Configuration ---------------------------------------------
 [git] # This section configures how git-cliff processes the git history
-conventional_commits = true                                # Use Conventional Commits specifications
-filter_unconventional = true                               # Ignore commits that do not follow the conventional commit format
-repo_url = "https://github.com/bsamiee/Parametric_Arsenal"
+conventional_commits = true  # Use Conventional Commits specifications
+filter_unconventional = true # Ignore commits that do not follow the conventional commit format
+require_conventional = false
+split_commits = false
 
 commit_parsers = [ # This section maps commit types from Conventional Commits to changelog groups
     { message = "^feat", group = "Features" },

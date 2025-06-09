@@ -458,19 +458,28 @@ strict = true
 # --- Publishing Configurations ------------------------------------------------
 
 # --- Commitizen Configuration ------------
-[tool.commitizen] # The sole purpose of this tool in the workflow is to provide an interactive
-name = "cz_conventional_commits" # prompt for creating commits that follow the Conventional Commits specification
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"         # Consistent tag format, but PSR controls tagging.
+update_changelog_on_bump = false # CRITICAL: git-cliff handles the changelog.
 
 # --- Python-Semtanic Configuration -------
 [tool.semantic_release]
 branch = "master"
-major_on_zero = true # Set this to true so a 'feat!' or 'BREAKING CHANGE' on v0.5.0 becomes v1.0.0
-sources = [ # Specifies which files to update with the new version number
-  { path = "pyproject.toml", search = "version = \"{version}\"" },
-]
-tag_format = "v{version}" # Use the tag_format from commitizen for consistency
-starting_version = "0.0.0"
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"                         # The tag format PSR will create
+allow_zero_version = true                         # Correct for starting at 0.0.0
+major_on_zero = true                              # Correct for 0.y.z releases
 
+# --- Changelog & Build ---
+build_command = "poetry build --no-interaction" # Command only builds the package; the changelog is generated in the hook.
+commit_additional_files = ["CHANGELOG.md"]
+
+# --- Hooks (for Changelog Generation) ---
+[tool.semantic_release.hooks]
+before_commit = ["git cliff --tag v${NEW_VERSION} -o CHANGELOG.md"]
+
+# --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]
 breaking_description = "BREAKING CHANGE"
 major_tags = ["feat!", "breaking"]
@@ -486,19 +495,14 @@ patch_tags = [
   "revert",
 ]
 
-[tool.semantic_release.hooks] # Defines the commands to run at different stages of the release process
-before_publish = [ # Runs before the release is published
-  "git-cliff --unreleased --tag v${NEW_VERSION} --output CHANGELOG.md",
-]
+# --- Publishing ---
+[tool.semantic_release.publish]
+upload_to_vcs_release = true    # Creates a GitHub release and uploads assets
+dist_glob_patterns = ["dist/*"] # Which files from the build to upload
 
-[tool.semantic_release.changelog.default_templates]
-changelog_file = "CHANGELOG.md" #  Points to the changelog file made via git-cliff
-check_consistency = true        #  This setting just checks if the changelog file was changed, which our hook does
+# --- Remote & Author Identity ---
+[tool.semantic_release.remote]
+token_env = "GH_TOKEN"
 
-[tool.semantic_release.publish] # Defines what happens during the 'publish' step
-build_command = "poetry build" # Command to build package distributions (sdist and wheel)
-dist_glob_patterns = [
-  "dist/*",
-] # Command to build package distributions (sdist and wheel)
-upload_to_pypi = false # Do NOT upload to PyPI by default
-upload_to_release = true # Uploads assets to a GitHub release
+[tool.semantic_release.commit_author]
+env = "GIT_COMMIT_AUTHOR" # A single env var: "Your Name <your.email@example.com>"
