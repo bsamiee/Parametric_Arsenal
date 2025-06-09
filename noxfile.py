@@ -6,9 +6,8 @@ License       : MIT
 Path          : ROOT/noxfile.py
 
 Automates linting, type-checking, tests, docs, builds, and releases in
-re-usable virtual-envs under .cache/nox.  Uses Poetry 2.x's `poetry sync`
-to create lean, reproducible environments that install only the dependency
-groups each session needs.
+re-usable virtual-envs under .cache/nox.  Uses Poetry 2.1's `poetry sync`
+with --only so each session pulls exactly the dependency group(s) it needs.
 """
 
 from __future__ import annotations
@@ -17,11 +16,11 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import nox
+
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-import nox
 
 
 # --- Global Nox Options -------------------------------------------------------
@@ -38,16 +37,21 @@ HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
 
 
 def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
-    """Synchronise the venv with poetry.lock (Poetry ≥ 2.1)."""
-    # --------------------------------------------------------------------------
-    # ── NEW: prevent Poetry from creating its own nested .venv ────────────────
+    """
+    Synchronise the venv with poetry.lock (Poetry ≥ 2.1).
+
+    Installs *only* the requested groups plus the project's runtime code.
+    """
+    # ── prevent nested .venv ---------------------------------------------------
     session.env["POETRY_VIRTUALENVS_CREATE"] = "false"
-    session.run("poetry", "--version", external=True)  # diagnostic
-    cmd = ["poetry", "-vv", "sync", "--no-interaction", "--ansi"]
+
+    cmd = ["poetry", "sync", "--no-interaction", "--ansi"]
     if groups:
-        cmd += ["--with", ",".join(groups)]
+        # install exclusively these groups
+        cmd += ["--only", ",".join(groups)]
     if not root:
         cmd.append("--no-root")
+
     session.run(*cmd, external=True)
 
 
@@ -76,20 +80,20 @@ def pre_commit(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS)
 def tests(session: nox.Session) -> None:
     """Run the test suite using pytest."""
-    poetry_sync(session, "test", root=True)
+    poetry_sync(session, "main", "test", root=True)
 
-    # ── Conditional skip ───────────────────────────────────────────────
+    # ── Conditional skip ────────────────────────────────────────────────────
     if not any(Path("tests").rglob("test_*.py")):
         session.log("🔎  No test files found - skipping pytest run.")
         return
-    # ───────────────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────────────────
 
     session.log("▶️  Running pytest …")
     session.run(
         "pytest",
         "-vv",
         "-ra",
-        "--durations=25",  # very verbose output
+        "--durations=25",
         *session.posargs,
     )
 
@@ -98,21 +102,21 @@ def tests(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """Run Ruff for linting and formatting checks on the source code."""
     session.install("ruff")
-    session.run("ruff", "check", "-vv", *SOURCE_PATHS)
-    session.run("ruff", "format", "--check", "-vv", *SOURCE_PATHS)
+    session.run("ruff", "check", "-v", *SOURCE_PATHS)
+    session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def mypy(session: nox.Session) -> None:
     """Run MyPy for type-checking on the source code."""
-    poetry_sync(session, "type")
-    session.run("mypy", "-vvv", *SOURCE_PATHS)
+    poetry_sync(session, "main", "type")
+    session.run("mypy", "-vv", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def docs(session: nox.Session) -> None:
     """Build or serve the documentation using MkDocs."""
-    poetry_sync(session, "docs")
+    poetry_sync(session, "main", "docs")
     if "--serve" in session.posargs:
         session.run("mkdocs", "serve", "-v")
     else:
@@ -125,8 +129,7 @@ def docs(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def build(session: nox.Session) -> None:
     """Build the project using Poetry."""
-    session.run("poetry", "--version", external=True)
-    session.run("poetry", "build", "-vv", external=True)
+    session.run("poetry", "build", external=True)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
@@ -136,13 +139,23 @@ def release(session: nox.Session) -> None:
     session.run("semantic-release", "--verbose", "publish")
 
 
-# --- House keeping ------------------------------------------------------------
+# --- House-keeping ------------------------------------------------------------
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def clean(session: nox.Session) -> None:
-    """Clean up temporary files and directories created during the build and test processes."""
-    session.run("rm", "-rf", ".mypy_cache", "dist", "build", "site", ".pytest_cache", "coverage.xml", external=True)
+    """Remove caches, build artefacts, and other temporary files."""
+    session.run(
+        "rm",
+        "-rf",
+        ".mypy_cache",
+        "dist",
+        "build",
+        "site",
+        ".pytest_cache",
+        "coverage.xml",
+        external=True,
+    )
     session.run("find", ".", "-name", "__pycache__", "-delete", external=True)
     session.run("find", ".", "-name", "*.pyc", "-delete", external=True)
     session.log("Workspace cleaned.")
