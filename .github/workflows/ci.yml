@@ -21,4 +21,4 @@ jobs:
               run: pipx install nox
 
             - name: Run Nox Sessions
-              run: nox -s lint mypy tests
+              run: nox -s lint mypy pre_commit tests

@@ -1,21 +1,57 @@
+# .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: check-yaml
-      - id: check-toml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
-    hooks:
-      - id: mypy
-        additional_dependencies:
-          - "pydantic"
-          - "types-requests"
+    # --- Core ------------------------------------------------------------------
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: check-yaml
+          - id: check-toml
+          - id: end-of-file-fixer
+          - id: trailing-whitespace
+
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.11.13
+      hooks:
+          - id: ruff
+            args: [--fix, --exit-non-zero-on-fix]
+          - id: ruff-format
+
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.16.0
+      hooks:
+          - id: mypy
+            additional_dependencies:
+                - pydantic
+                - types-requests
+
+    - repo: https://github.com/executablebooks/mdformat
+      rev: 0.7.22
+      hooks:
+          - id: mdformat
+            additional_dependencies: [mdformat-frontmatter]
+
+    - repo: https://github.com/adrienverge/yamllint
+      rev: v1.37.1
+      hooks:
+          - id: yamllint
+
+    - repo: https://github.com/shellcheck-py/shellcheck-py
+      rev: v0.10.0.1
+      hooks:
+          - id: shellcheck
+
+    # --- Conventional-Commit enforcement ---------------------------------------
+    - repo: https://github.com/commitizen-tools/commitizen
+      rev: v4.8.2
+      hooks:
+          - id: commitizen # validates every commit message (commit-msg stage)
+
+    # --- Local helpers ----------------------------------------------------------
+    - repo: local
+      hooks:
+          - id: update-python-headers
+            name: Update Python script headers
+            entry: .tools/scripts/quality/update_header.py
+            language: python
+            types: [python]
+            additional_dependencies: [jinja2]

@@ -6,361 +6,392 @@
 
 # --- Build System -------------------------------------------------------------
 [build-system]
-  build-backend = "poetry.core.masonry.api"
-  requires      = [ "poetry-core" ]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
 
-[tool.poetry]
-  authors     = [ "Bardia Samiee <b.samiee93@gmail.com>" ]
-  classifiers = [ "Development Status :: 4 - Beta", "Programming Language :: Python :: 3 :: Only" ]
-  description = "Architectural/Parametric monorepo"
-  keywords    = [ "rhino", "grasshopper", "automation" ]
-  license     = "MIT"
-  name        = "parametric_arsenal"
-  packages    = [ { include = "mzn", from = "libs" }, { include = "mzn_cli", from = "libs" } ]
-  readme      = "README.md"
-  version     = "0.1.0"
+[project]
+name = "parametric_arsenal"
+version = "0.1.0"
+description = "Architectural/Parametric monorepo"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Bardia Samiee", email = "b.samiee93@gmail.com" }]
+keywords = ["rhino", "grasshopper", "automation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = ">=3.13,<3.14"
+dynamic = ["dependencies"]
 
-[tool.poetry.scripts] # CLI entry points
-  pa = "mzn_cli.main:cli"
+[[tool.poetry.packages]]
+include = "libs/mzn"
+
+[[tool.poetry.packages]]
+include = "libs/mzn_cli"
+
+[project.scripts]
+pa = "mzn_cli.main:cli"
+
+# --- Option Dependencies ------------------------------------------------------
+[project.optional-dependencies]
+rhinogh = ["rhino3dm", "rhinoinside"]
 
 # --- Dependencies -------------------------------------------------------------
 [tool.poetry.dependencies]
-  python = ">=3.13,<3.14"
+python = ">=3.13,<3.14"
 
-  # --- Core Utilities -------------------------
-  boltons           = ">=25.0.0"                                    # Collection of pure-Python utilities
-  dynaconf          = "^3.2.11"                                     # Settings management with environment support
-  pydantic          = { extras = [ "email" ], version = "^2.11.5" } # Data validation, settings, serialization
-  pydantic-settings = "^2.9.1"                                      # Typed settings management
-  python-dateutil   = "^2.9.0.post0"                                # Robust datetime parsing utilities
-  toolz             = "^1.0.0"                                      # Functional iterator helpers suite
+# --- Core Utilities -------------------------
+boltons = ">=25.0.0" # Collection of pure-Python utilities
+dynaconf = "^3.2.11" # Settings management with environment support
+pydantic = { extras = [
+  "email",
+], version = "^2.11.5" } # Data validation, settings, serialization
+pydantic-settings = "^2.9.1" # Typed settings management
+python-dateutil = "^2.9.0.post0" # Robust datetime parsing utilities
+toolz = "^1.0.0" # Functional iterator helpers suite
 
-  # --- Logging & Metrics ----------------------
-  prometheus-client = "^0.22.1" # Export metrics for Prometheus scraping
-  structlog         = "^25.4.0" # Context-rich structured JSON logging
+# --- Logging & Metrics ----------------------
+prometheus-client = "^0.22.1" # Export metrics for Prometheus scraping
+structlog = "^25.4.0"         # Context-rich structured JSON logging
 
-  # --- Debugging ------------------------------
-  icecream = "^2.1.4"   # Pretty context debug printouts
-  ipdb     = "^0.13.13" # IPython interactive breakpoints
-  pudb     = "^2025.1"  # Full-screen TUI step debugger
+# --- Debugging ------------------------------
+icecream = "^2.1.4" # Pretty context debug printouts
+ipdb = "^0.13.13"   # IPython interactive breakpoints
+pudb = "^2025.1"    # Full-screen TUI step debugger
 
-  # --- CLI & TUI ------------------------------
-  prompt_toolkit = "^3.0.51"  # Interactive inputs, autocompletion
-  rich           = "^14.0.0"  # Colorful text, tables, progress
-  tabulate       = "^0.9.0"   # Pretty text table formatting
-  textual        = "^3.3.0"   # TUI apps with reactive widgets
-  tqdm           = "^4.67.1"  # Quick progress bars for iterables
-  typer          = ">=0.16.0" # Typed CLI generator
+# --- CLI & TUI ------------------------------
+prompt_toolkit = "^3.0.51" # Interactive inputs, autocompletion
+rich = "^14.0.0"           # Colorful text, tables, progress
+tabulate = "^0.9.0"        # Pretty text table formatting
+textual = "^3.3.0"         # TUI apps with reactive widgets
+tqdm = "^4.67.1"           # Quick progress bars for iterables
+typer = ">=0.16.0"         # Typed CLI generator
 
-  # --- Concurrency & Tasking ------------------
-  anyio       = "^4.9.0"  # Async API bridging Trio/asyncio
-  apscheduler = "^3.11.0" # In-process cron-like scheduler
-  celery      = "^5.5.3"  # Distributed task queue, retries
-  psutil      = ">=7.0.0" # Cross-platform process and system monitoring.
-  sh          = ">=2.2.2" # Subprocess interface for shell commands
-  tenacity    = "^9.1.2"  # Robust retry with backoff
-  watchdog    = "^6.0.0"  # Filesystem events observer
+# --- Concurrency & Tasking ------------------
+anyio = "^4.9.0"        # Async API bridging Trio/asyncio
+apscheduler = "^3.11.0" # In-process cron-like scheduler
+celery = "^5.5.3"       # Distributed task queue, retries
+psutil = ">=7.0.0"      # Cross-platform process and system monitoring.
+sh = ">=2.2.2"          # Subprocess interface for shell commands
+tenacity = "^9.1.2"     # Robust retry with backoff
+watchdog = "^6.0.0"     # Filesystem events observer
 
-  # --- Caching --------------------------------
-  aiocache      = "^0.12.3"                                      # Async in-memory cache with TTL
-  cachetools    = "^6.0.0"                                       # Lightweight in-memory cache utilities
-  diskcache     = "^5.6.3"                                       # Fast disk-backed cache store
-  dogpile-cache = "^1.1.8"                                       # Caching library with support for multiple backends
-  redis         = { extras = [ "hiredis" ], version = "^6.2.0" } # Remote in-memory datastore cache
+# --- Caching --------------------------------
+aiocache = "^0.12.3" # Async in-memory cache with TTL
+cachetools = "^6.0.0" # Lightweight in-memory cache utilities
+diskcache = "^5.6.3" # Fast disk-backed cache store
+dogpile-cache = "^1.1.8" # Caching library with support for multiple backends
+redis = { extras = [
+  "hiredis",
+], version = "^6.2.0" } # Remote in-memory datastore cache
 
-  # --- Data Handling, Serialization & I/O -----
-  beautifulsoup4 = ">=4.13.4"                                      # For pulling data out of HTML/XML
-  lxml           = ">=5.4.0"                                       # Powerful and Pythonic XML/HTML toolkit
-  openpyxl       = "^3.1.5"                                        # Read/write Excel xlsx files
-  orjson         = "^3.10.18"                                      # Blazing-fast JSON encoder/decoder
-  pillow         = "^11.2.1"                                       # Image open, edit, save formats
-  pymupdf        = ">=1.26.0"                                      # Ultra-fast PDF/XPS processing
-  pypdf          = "^5.6.0"                                        # Split, merge, extract PDFs
-  python-docx    = ">=1.1.2"                                       # Create and update Microsoft Word files
-  python-magic   = "^0.4.27"                                       # Detect file type signatures
-  python-pptx    = ">=1.0.2"                                       # Create and update PowerPoint files
-  ruamel-yaml    = "^0.18.13"                                      # Round-trip safe YAML parser
-  thefuzz        = { extras = [ "speedup" ], version = "^0.22.1" } # Fuzzy string matching library
-  tomlkit        = "^0.13.3"                                       # Preserve-format TOML read/write
+# --- Data Handling, Serialization & I/O -----
+beautifulsoup4 = ">=4.13.4" # For pulling data out of HTML/XML
+lxml = ">=5.4.0" # Powerful and Pythonic XML/HTML toolkit
+openpyxl = "^3.1.5" # Read/write Excel xlsx files
+orjson = "^3.10.18" # Blazing-fast JSON encoder/decoder
+pillow = "^11.2.1" # Image open, edit, save formats
+pymupdf = ">=1.26.0" # Ultra-fast PDF/XPS processing
+pypdf = "^5.6.0" # Split, merge, extract PDFs
+python-docx = ">=1.1.2" # Create and update Microsoft Word files
+python-magic = "^0.4.27" # Detect file type signatures
+python-pptx = ">=1.0.2" # Create and update PowerPoint files
+ruamel-yaml = "^0.18.13" # Round-trip safe YAML parser
+thefuzz = { extras = [
+  "speedup",
+], version = "^0.22.1" } # Fuzzy string matching library
+tomlkit = "^0.13.3" # Preserve-format TOML read/write
 
-  # --- Database & Data Stores -----------------
-  Alembic    = ">=1.16.1" # Database migrations for SQLAlchemy
-  DVC        = ">=3.60.0" # Data Version Control for data science projects
-  DuckDB     = ">=1.3.0"  # In-process SQL OLAP database
-  SQLAlchemy = ">=2.0.41" # SQL toolkit and ORM
-  SQLModel   = ">=0.0.24" # Pydantic + SQLAlchemy ORM
-  asyncpg    = ">=0.30.0" # PostgreSQL database adapter for Python
-  jsonschema = ">=4.24.0" # An implementation of JSON Schema
+# --- Database & Data Stores -----------------
+Alembic = ">=1.16.1"    # Database migrations for SQLAlchemy
+DVC = ">=3.60.0"        # Data Version Control for data science projects
+DuckDB = ">=1.3.0"      # In-process SQL OLAP database
+SQLAlchemy = ">=2.0.41" # SQL toolkit and ORM
+SQLModel = ">=0.0.24"   # Pydantic + SQLAlchemy ORM
+asyncpg = ">=0.30.0"    # PostgreSQL database adapter for Python
+jsonschema = ">=4.24.0" # An implementation of JSON Schema
 
-  # --- Security & Encryption ------------------
-  argon2-cffi  = "^25.1.0" # Argon2 password hashing library
-  cryptography = "^45.0.3" # Secure cryptographic recipes and primitives
-  passlib      = "^1.7.4"  # Password hashing library
-  python-jose  = "^3.5.0"  # JSON Web Token (JWT) implementation
+# --- Security & Encryption ------------------
+argon2-cffi = "^25.1.0"  # Argon2 password hashing library
+cryptography = "^45.0.3" # Secure cryptographic recipes and primitives
+passlib = "^1.7.4"       # Password hashing library
+python-jose = "^3.5.0"   # JSON Web Token (JWT) implementation
 
-  # --- Data & Science -------------------------
-  dask          = "^2025.5.1" # Parallel out-of-core computing
-  geopandas     = "^1.1.0"    # Geospatial dataframe extensions
-  h5py          = "^3.14.0"   # HDF5 binary dataset interface
-  networkx      = "^3.5"      # Graph theory algorithms library
-  numpy         = "^2.2.6"    # Fundamental package for scientific computing
-  pandas        = "^2.3.0"    # Tabular data frames analysis
-  polars        = "^1.30.0"   # Lightning-fast modern DataFrame library
-  pyarrow       = "^20.0.0"   # Arrow columnar memory interface
-  pyspark       = "^4.0.0"    # Distributed data processing engine
-  scipy         = "^1.15.3"   # Scientific algorithms toolbox
-  sympy         = ">=1.14.0"  # Symbolic maths and calculus
-  uncertainties = ">=3.2.3"   # Transparent calculations with uncertainties
-  xarray        = "^2025.4.0" # N-D labelled scientific arrays
+# --- Data & Science -------------------------
+dask = "^2025.5.1"        # Parallel out-of-core computing
+geopandas = "^1.1.0"      # Geospatial dataframe extensions
+h5py = "^3.14.0"          # HDF5 binary dataset interface
+networkx = "^3.5"         # Graph theory algorithms library
+numpy = "^2.2.6"          # Fundamental package for scientific computing
+pandas = "^2.3.0"         # Tabular data frames analysis
+polars = "^1.30.0"        # Lightning-fast modern DataFrame library
+pyarrow = "^20.0.0"       # Arrow columnar memory interface
+pyspark = "^4.0.0"        # Distributed data processing engine
+scipy = "^1.15.3"         # Scientific algorithms toolbox
+sympy = ">=1.14.0"        # Symbolic maths and calculus
+uncertainties = ">=3.2.3" # Transparent calculations with uncertainties
+xarray = "^2025.4.0"      # N-D labelled scientific arrays
 
-  # --- Visualization --------------------------
-  altair     = "^5.5.0"   # Declarative statistical graphics
-  matplotlib = "^3.10.3"  # Core static plotting library
-  plotly     = "^6.1.2"   # Interactive browser-ready charts
-  qrcode     = ">=8.2"    # QR code image generator.
-  seaborn    = ">=0.13.2" # Statistical data visualization
+# --- Visualization --------------------------
+altair = "^5.5.0"      # Declarative statistical graphics
+matplotlib = "^3.10.3" # Core static plotting library
+plotly = "^6.1.2"      # Interactive browser-ready charts
+qrcode = ">=8.2"       # QR code image generator.
+seaborn = ">=0.13.2"   # Statistical data visualization
 
-  # --- Documentation & Reporting --------------
-  mkdocs          = ">=1.6.1"  # Fast, simple static site generator
-  mkdocs-material = ">=9.6.14" # A powerful Material Design theme
-  reportlab       = "^4.4.1"   # Programmatic PDF generation
-  sphinx          = "^8.2.3"   # Generate docs from code comments
-  weasyprint      = ">=65.1"   # Convert HTML/CSS to PDF reports
+# --- Documentation & Reporting --------------
+mkdocs = ">=1.6.1"           # Fast, simple static site generator
+mkdocs-material = ">=9.6.14" # A powerful Material Design theme
+reportlab = "^4.4.1"         # Programmatic PDF generation
+sphinx = "^8.2.3"            # Generate docs from code comments
+weasyprint = ">=65.1"        # Convert HTML/CSS to PDF reports
 
-  # --- Web / Networking -----------------------
-  fabric             = "^3.2.2"    # High-level remote SSH automation
-  fastapi            = "^0.115.12" # Async high-performance API framework
-  httpx              = ">=0.28.1"  # Fully featured async/sync HTTP client
-  paramiko           = "^3.5.1"    # SSH, SFTP client-server library
-  pyserial           = ">=3.5"     # Serial port access library
-  python-multipart   = "^0.0.20"   # Multipart form data parsing for web frameworks
-  strawberry-graphql = "^0.271.0"  # Dataclass-based GraphQL framework
-  uvicorn            = "^0.34.3"   # ASGI server for FastAPI
-  websockets         = "^15.0.1"   # Async WebSocket server + client
+# --- Web / Networking -----------------------
+fabric = "^3.2.2"               # High-level remote SSH automation
+fastapi = "^0.115.12"           # Async high-performance API framework
+httpx = ">=0.28.1"              # Fully featured async/sync HTTP client
+paramiko = "^3.5.1"             # SSH, SFTP client-server library
+pyserial = ">=3.5"              # Serial port access library
+python-multipart = "^0.0.20"    # Multipart form data parsing for web frameworks
+strawberry-graphql = "^0.271.0" # Dataclass-based GraphQL framework
+uvicorn = "^0.34.3"             # ASGI server for FastAPI
+websockets = "^15.0.1"          # Async WebSocket server + client
 
-  # --- Automation & Scraping ------------------
-  cloudscraper = "^1.2.71" # Circumvent Cloudflare anti-bots
-  playwright   = "^1.52.0" # Modern headless browser control
-  pyautogui    = "^0.9.54" # GUI mouse-keyboard automation
-  scrapy       = "^2.13.1" # Full web crawling framework
+# --- Automation & Scraping ------------------
+cloudscraper = "^1.2.71" # Circumvent Cloudflare anti-bots
+playwright = "^1.52.0"   # Modern headless browser control
+pyautogui = "^0.9.54"    # GUI mouse-keyboard automation
+scrapy = "^2.13.1"       # Full web crawling framework
 
-  # --- Rhino/Grasshopper ----------------------
-  rhino3dm    = { version = "^8.17.0", optional = true } # Rhino 3D model reader/writer
-  rhinoinside = { version = "^0.8.2", optional = true }  # Rhino Inside for Grasshopper
-
-# --- Optional Dependencies ----------------------------------------------------
-[tool.poetry.extras]
-  rhinogh = [ "rhino3dm", "rhinoinside" ]
+# --- Rhino/Grasshopper ----------------------
+rhino3dm = { version = "^8.17.0", optional = true }   # Rhino 3D model reader/writer
+rhinoinside = { version = "^0.8.2", optional = true } # Rhino Inside for Grasshopper
 
 # --- Development Dependencies -------------------------------------------------
 [tool.poetry.group.dev.dependencies]
+# --- Management --------------------------
+commitizen = ">=4.8.2"               # Standardized commit messages
+jinja2 = "^3.1.6"                    # Templating engine for Python
+git-cliff = ">=2.9.1"                # Generate changelogs from commit messages
+nox = "^2025.5.1"                    # Automation tool for testing in isolated environments
+python-semantic-release = ">=10.0.2" # Automate versioning and changelog generation
+pre-commit = "^4.2.0"                # Framework for managing and maintaining multi-language pre-commit hooks
 
-  # --- Management --------------------------
-  commitizen              = ">=4.8.2"   # Standardized commit messages
-  jinja2                  = "^3.1.6"    # Templating engine for Python
-  git-cliff               = ">=2.9.1"   # Generate changelogs from commit messages
-  nox                     = "^2025.5.1" # Automation tool for testing in isolated environments
-  python-semantic-release = ">=10.0.2"  # Automate versioning and changelog generation
+# --- Linting & Formatting ----------------
+jsonlint = "^0.1"               # JSON linter
+mdformat = "^0.7.22"            # Markdown formatter with plugins
+mdformat-frontmatter = "^2.0.8" # Frontmatter support for mdformat
+ruff = "^0.11.13"               # Extremely fast Python linter and code formatter
+shellcheck-py = "^0.10.0.1"     # Static binary of shellcheck
+toml-sort = ">=0.24.2"          # Sort TOML files in a consistent order
+yamllint = ">=1.37.1"           # YAML linter
+docformatter = "^1.7.7"         # Auto-format Python docstrings to PEP 257, 120 chars
 
-  # --- Linting & Formatting ----------------
-  jsonlint             = "^0.1"      # JSON linter
-  mdformat             = "^0.7.22"   # Markdown formatter with plugins
-  mdformat-frontmatter = "^2.0.8"    # Frontmatter support for mdformat
-  ruff                 = "^0.11.13"  # Extremely fast Python linter and code formatter
-  shellcheck-py        = "^0.10.0.1" # Static binary of shellcheck
-  toml-sort            = ">=0.24.2"  # Sort TOML files in a consistent order
-  yamllint             = ">=1.37.1"  # YAML linter
+# --- Static Analysis ---------------------
+mypy = "^1.16.0"            # Static type checker for Python
+mypy-extensions = ">=1.1.0"
+radon = ">=6.0.1"           # Code complexity analysis tool
 
-  # --- Static Analysis ---------------------
-  mypy            = "^1.16.0" # Static type checker for Python
-  mypy-extensions = ">=1.1.0"
-  radon           = ">=6.0.1" # Code complexity analysis tool
+# --- Testing & Profiling -----------------
+Faker = ">=37.3.0"             # Fake data generation
+coverage = ">=7.8.2"
+hypothesis = ">=6.135.1"
+line-profiler = ">=4.2.0"
+memory-profiler = ">=0.61.0"
+pyinstrument = ">=5.0.2"
+pytest = "^8.4.0"
+pytest-cov = ">=6.1.1"
+pytest-json-report = ">=1.5.0" # JSON report for pytest
+pytest-mock = ">=3.14.1"
+vulture = ">=2.14"
 
-  # --- Testing & Profiling -----------------
-  Faker              = ">=37.3.0"  # Fake data generation
-  coverage           = ">=7.8.2"
-  hypothesis         = ">=6.135.1"
-  line-profiler      = ">=4.2.0"
-  memory-profiler    = ">=0.61.0"
-  pyinstrument       = ">=5.0.2"
-  pytest             = "^8.4.0"
-  pytest-cov         = ">=6.1.1"
-  pytest-json-report = ">=1.5.0"   # JSON report for pytest
-  pytest-mock        = ">=3.14.1"
-  vulture            = ">=2.14"
-
-  # --- Tool Configurations ------------------------------------------------------
+# --- Tool Configurations ------------------------------------------------------
 
 # --- ruff Configuration ------------------
 [tool.ruff]
-  cache-dir = ".cache/ruff"
-  exclude = [ "node_modules", ".venv", ".cache", "package-lock.json" ]
-  extend-ignore = [
-    "D203",
-    "D212",
-    "D400",
-    "D415",
-    "D413",
-    "D405",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D410",
-    "D411",
-    "D414",
-    "D416",
-  ]
-  extend-select = [
-    "A",
-    "B",
-    "D",
-    "E",
-    "F",
-    "N",
-    "S",
-    "G",
-    "I",
-    "Q",
-    "W",
-    "C4",
-    "TC",
-    "TD",
-    "UP",
-    "PL",
-    "PT",
-    "AIR",
-    "ERA",
-    "FAST",
-    "ANN",
-    "ASYNC",
-    "FBT",
-    "BLE",
-    "COM",
-    "DTZ",
-    "EM",
-    "EXE",
-    "FA",
-    "INT",
-    "ISC",
-    "ICN",
-    "LOG",
-    "PIE",
-    "T20",
-    "PYI",
-    "RET",
-    "SLF",
-    "SIM",
-    "SLOT",
-    "TID",
-    "ARG",
-    "PTH",
-    "FLY",
-    "PERF",
-    "DOC",
-    "PGH",
-    "PLC",
-    "PLE",
-    "PLR",
-    "PLW",
-    "FURB",
-    "TRY",
-    "RUF",
-  ]
-  line-length = 120
-  src = [ "." ]
-  target-version = "py313"
-
-[tool.ruff.format]
-  docstring-code-format = true
-  indent-style          = "space"
-  line-ending           = "lf"
-  quote-style           = "double"
+cache-dir = ".cache/ruff"
+exclude = ["node_modules", ".venv", ".cache", "package-lock.json"]
+line-length = 120
+src = ["."]
+target-version = "py313"
 
 [tool.ruff.lint]
-  fixable = [ "ALL" ] #aggressive autofixing
+extend-ignore = [
+  "D203",
+  "D205", # Ignore blank line required between summary and description
+  "D212",
+  "D400",
+  "D415",
+  "D413",
+  "D405",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D410",
+  "D411",
+  "D414",
+  "D416",
+]
+extend-select = [
+  "A",
+  "B",
+  "D",
+  "E",
+  "F",
+  "N",
+  "S",
+  "G",
+  "I",
+  "Q",
+  "W",
+  "C4",
+  "TC",
+  "TD",
+  "UP",
+  "PL",
+  "PT",
+  "AIR",
+  "ERA",
+  "FAST",
+  "ANN",
+  "ASYNC",
+  "FBT",
+  "BLE",
+  "COM",
+  "DTZ",
+  "EM",
+  "EXE",
+  "FA",
+  "INT",
+  "ISC",
+  "ICN",
+  "LOG",
+  "PIE",
+  "T20",
+  "PYI",
+  "RET",
+  "SLF",
+  "SIM",
+  "SLOT",
+  "TID",
+  "ARG",
+  "PTH",
+  "FLY",
+  "PERF",
+  "DOC",
+  "PGH",
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  "FURB",
+  "TRY",
+  "RUF",
+]
+fixable = ["ALL"] #aggressive autofixing
 
 [tool.ruff.lint.pylint]
-  allow-magic-value-types = [ "int", "str" ]
+allow-magic-value-types = ["int", "str"]
 
 [tool.ruff.lint.pydocstyle]
-  convention = "google"
+convention = "google"
 
 [tool.ruff.lint.isort]
-  combine-as-imports  = true
-  force-single-line   = false
-  known-first-party   = [ "mzn", "mzn_cli" ]
-  lines-after-imports = 2
+combine-as-imports = true
+force-single-line = false
+known-first-party = ["mzn", "mzn_cli"]
+lines-after-imports = 2
 
 [tool.ruff.lint.flake8-annotations]
-  allow-star-arg-any      = true
-  mypy-init-return        = true
-  suppress-none-returning = true
+allow-star-arg-any = true
+mypy-init-return = true
+suppress-none-returning = true
 
 [tool.ruff.lint.flake8-pytest-style]
-  fixture-parentheses = true
-  mark-parentheses    = true
+fixture-parentheses = true
+mark-parentheses = true
 
-[tool.ruff.per-file-ignores]
-  "tests/*" = [ "S101" ] # Ignore `assert` usage in tests
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"] # Ignore `assert` usage in tests
+
+# --- docformatter Configuration ----------
+[tool.docformatter]
+wrap-summaries = 120
+wrap-descriptions = 120
+pre-summary-newline = true
+make-summary-multi-line = false
+blank = true
+in-place = true
+recursive = true
+black = false
+force-wrap = true
 
 # --- mypy Configuration ------------------
 [tool.mypy]
-  cache_dir              = ".cache/mypy"
-  exclude                = '(^node_modules/|^\\.venv/|^\\.cache/|^package-lock\\.json$)'
-  explicit_package_bases = true
-  mypy_path              = [ ".", "libs" ]
-  namespace_packages     = true
-  plugins                = [ "pydantic.mypy", "sqlalchemy.ext.mypy.plugin", "mypy_extensions" ]
-  python_version         = "3.13"
-  strict                 = true
-  warn_redundant_casts   = true
-  warn_unused_ignores    = true
+cache_dir = ".cache/mypy"
+exclude = '(^node_modules/|^\\.venv/|^\\.cache/|^package-lock\\.json$)'
+explicit_package_bases = true
+mypy_path = [".", "libs"]
+namespace_packages = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin", "mypy_extensions"]
+python_version = "3.13"
+strict = true
+warn_redundant_casts = true
+warn_unused_ignores = true
 
 [[tool.mypy.overrides]] # For third-party libraries that have NO type stubs available
-  ignore_missing_imports = true
-  module = [
-    "libs.*",
-    "boltons.*",
-    "cloudscraper.*",
-    "fabric.*",
-    "icecream.*",
-    "pudb.*",
-    "rhino3dm.*",
-    "rhinoinside.*",
-    "sh.*",
-    "thefuzz.*",
-  ]
+ignore_missing_imports = true
+module = [
+  "libs.*",
+  "boltons.*",
+  "cloudscraper.*",
+  "fabric.*",
+  "icecream.*",
+  "pudb.*",
+  "rhino3dm.*",
+  "rhinoinside.*",
+  "sh.*",
+  "thefuzz.*",
+]
 
 # --- radon Configuration -----------------
 [tool.radon]
-  mi = { min = "A" }
+mi = { min = "A" }
 
 # --- coverage Configuration --------------
 [tool.coverage.run]
-  branch    = true
-  data_file = ".cache/coverage"
-  omit      = [ "node_modules/*", ".venv/*", "package-lock.json", ".cache/*", "tests/*", "*/__main__.py" ]
-  source    = [ "libs/mzn", "libs/mzn_cli" ]                                                               # Source code to measure coverage for
+branch = true
+data_file = ".cache/coverage"
+omit = [
+  "node_modules/*",
+  ".venv/*",
+  "package-lock.json",
+  ".cache/*",
+  "tests/*",
+  "*/__main__.py",
+]
+source = ["libs/mzn", "libs/mzn_cli"] # Source code to measure coverage for
 
 [tool.coverage.report]
-  exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "pass",
-    "raise ImportError",
-  ]
-  fail_under = 85
-  show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "pass",
+  "raise ImportError",
+]
+fail_under = 85
+show_missing = true
 
 [tool.coverage.html]
-  directory = ".cache/coverage/html" # HTML report output directory
+directory = ".cache/coverage/html" # HTML report output directory
 
 # --- pytest Configuration ----------------
 [tool.pytest.ini_options]
-  addopts = """
+addopts = """
     --import-mode=importlib
     -ra
     --cov=libs
@@ -368,63 +399,74 @@
     --cov-fail-under=80
     --no-cov-on-fail
     """
-  cache_dir = ".cache/pytest"
-  markers = [ "asyncio" ]
-  minversion = "8.0"
-  norecursedirs = [ "node_modules", ".venv", "package-lock.json", ".cache" ]
-  python_classes = "Test*"
-  python_files = "test_*.py"
-  python_functions = "test_*"
-  pythonpath = [ "." ]
-  testpaths = [ "tests", "libs/mzn", "libs/mzn_cli" ]
+cache_dir = ".cache/pytest"
+markers = ["asyncio"]
+minversion = "8.0"
+norecursedirs = ["node_modules", ".venv", "package-lock.json", ".cache"]
+python_classes = "Test*"
+python_files = "test_*.py"
+python_functions = "test_*"
+pythonpath = ["."]
+testpaths = ["tests", "libs/mzn", "libs/mzn_cli"]
 
 # --- mdformat Configuration --------------
 [tool.mdformat]
-  number = true
-  wrap   = 120
+number = true
+wrap = 120
 
 # --- tomlsort Configuration --------------
 [tool.tomlsort]
-  multiline-style = "preserve"
-  sort-order      = "case-sensitive"
+multiline-style = "preserve"
+sort-order = "case-sensitive"
 
 # --- yamllint Configuration --------------
 [tool.yamllint]
-  rules.line-length.max = 120
-  strict                = true
+rules.line-length.max = 120
+strict = true
 
-  # --- Publishing Configurations ------------------------------------------------
+# --- Publishing Configurations ------------------------------------------------
 
 # --- Commitizen Configuration ------------
 [tool.commitizen] # The sole purpose of this tool in the workflow is to provide an interactive
-  name = "cz_conventional_commits" # prompt for creating commits that follow the Conventional Commits specification
+name = "cz_conventional_commits" # prompt for creating commits that follow the Conventional Commits specification
 
 # --- Python-Semtanic Configuration -------
 [tool.semantic_release]
-  branch = "master"
-  major_on_zero = true # Set this to true so a 'feat!' or 'BREAKING CHANGE' on v0.5.0 becomes v1.0.0
-  sources = [ # Specifies which files to update with the new version number
-    { path = "pyproject.toml", search = "version = \"{version}\"" },
-  ]
-  tag_format = "v{version}" # Use the tag_format from commitizen for consistency
+branch = "master"
+major_on_zero = true # Set this to true so a 'feat!' or 'BREAKING CHANGE' on v0.5.0 becomes v1.0.0
+sources = [ # Specifies which files to update with the new version number
+  { path = "pyproject.toml", search = "version = \"{version}\"" },
+]
+tag_format = "v{version}" # Use the tag_format from commitizen for consistency
 
 [tool.semantic_release.commit_parser_options]
-  breaking_description = "BREAKING CHANGE"
-  major_tags           = [ "feat!", "breaking" ]
-  minor_tags           = [ "feat", "feature" ]
-  patch_tags           = [ "fix", "perf", "docs", "style", "refactor", "build", "ci", "revert" ]
+breaking_description = "BREAKING CHANGE"
+major_tags = ["feat!", "breaking"]
+minor_tags = ["feat", "feature"]
+patch_tags = [
+  "fix",
+  "perf",
+  "docs",
+  "style",
+  "refactor",
+  "build",
+  "ci",
+  "revert",
+]
 
 [tool.semantic_release.hooks] # Defines the commands to run at different stages of the release process
-  before_publish = [ # Runs before the release is published
-    "git-cliff --tag ${next_version} --output CHANGELOG.md",
-  ]
+before_publish = [ # Runs before the release is published
+  "git-cliff --tag ${next_version} --output CHANGELOG.md",
+]
 
 [tool.semantic_release.changelog] # Defines how the changelog is generated
-  changelog_file    = "CHANGELOG.md" # Points to the changelog file made via git-cliff
-  check_consistency = true           # This setting just checks if the changelog file was changed, which our hook does
+changelog_file = "CHANGELOG.md" # Points to the changelog file made via git-cliff
+check_consistency = true        # This setting just checks if the changelog file was changed, which our hook does
 
 [tool.semantic_release.publish] # Defines what happens during the 'publish' step
-  build_command      = "poetry build" # Command to build package distributions (sdist and wheel)
-  dist_glob_patterns = [ "dist/*" ]   # Command to build package distributions (sdist and wheel)
-  upload_to_pypi     = false          # Do NOT upload to PyPI by default
-  upload_to_release  = true           # Uploads assets to a GitHub release
+build_command = "poetry build" # Command to build package distributions (sdist and wheel)
+dist_glob_patterns = [
+  "dist/*",
+] # Command to build package distributions (sdist and wheel)
+upload_to_pypi = false # Do NOT upload to PyPI by default
+upload_to_release = true # Uploads assets to a GitHub release
