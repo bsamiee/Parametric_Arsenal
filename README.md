@@ -10,4 +10,4 @@
 
 # Parametric Arsenal
 
-A curated and version-controlled library of custom Grasshopper and Rhino assets for architectural and parametric design workflows.
+A curated and version-controlled mono-repo namespaced library powering architectural workflows and projects, including custom Grasshopper and Rhino parametric design workflows.
