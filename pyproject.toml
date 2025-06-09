@@ -511,4 +511,5 @@ dist_glob_patterns = ["dist/*"] # Which files from the build to upload
 token_env = "GH_TOKEN"
 
 [tool.semantic_release.commit_author]
-env = "GIT_COMMIT_AUTHOR" # A single env var: "Your Name <your.email@example.com>"
+env = "GIT_COMMIT_AUTHOR"                        # A single env var: "Your Name <your.email@example.com>"
+default = "Bardia Samiee <b.samiee93@gmail.com>"
