@@ -67,5 +67,5 @@ jobs:
 
             - run: nox -s release
               env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
                   PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
