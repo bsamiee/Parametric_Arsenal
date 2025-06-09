@@ -3,7 +3,7 @@ Title         : noxfile.py
 Author        : Bardia Samiee
 Project       : parametric_arsenal
 License       : MIT
-Path          : ROOT/noxfile.py
+Path          : noxfile.py
 
 Automates linting, type-checking, tests, docs, builds, and releases in
 re-usable virtual-envs under .cache/nox.  Uses Poetry 2.1's `poetry sync`
