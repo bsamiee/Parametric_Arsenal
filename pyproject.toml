@@ -470,6 +470,7 @@ version_toml = ["pyproject.toml:project.version"]
 tag_format = "v{version}"                         # The tag format PSR will create
 allow_zero_version = true                         # Correct for starting at 0.0.0
 major_on_zero = true                              # Correct for 0.y.z releases
+initial_version = "0.0.0"
 
 # --- Changelog & Build ---
 build_command = "poetry build --no-interaction" # Command only builds the package; the changelog is generated in the hook.
@@ -477,7 +478,7 @@ commit_additional_files = ["CHANGELOG.md"]
 
 # --- Hooks (for Changelog Generation) ---
 [tool.semantic_release.hooks]
-before_commit = ["git cliff --tag v${NEW_VERSION} -o CHANGELOG.md"]
+before_commit = ["git", "cliff", "--tag", "v{{version}}", "-o", "CHANGELOG.md"]
 
 # --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]

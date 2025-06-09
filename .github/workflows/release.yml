@@ -1,51 +1,59 @@
+# .github/workflows/release.yml
 name: Release
-
 on:
     push:
-        branches:
-            - master
+        branches: [master] # adjust if you release from another branch
+
+permissions: # PSR needs write-access for tags & releases
+    contents: write
 
 jobs:
     release:
         runs-on: ubuntu-latest
-
         steps:
-            # --- checkout full history so semantic-release can see all tags
+            # ------------------------------------------------------------------ #
+            # 1. checkout *full* history so PSR can see every commit & tag
+            # ------------------------------------------------------------------ #
             - uses: actions/checkout@v4
               with:
-                  fetch-depth: 0
+                  fetch-depth: 0 # REQUIRED – PSR builds the changelog from history
                   fetch-tags: true
 
-            # --- toolchain ---------------------------------------------------------
-            - name: Set up Python
-              uses: actions/setup-python@v5
+            # ------------------------------------------------------------------ #
+            # 2. (optional) generate / update CHANGELOG.md with git-cliff
+            #    – installs the official CLI binary into the runner, runs it,
+            #    – commits the file so that PSR can include it in its version-bump
+            # ------------------------------------------------------------------ #
+            - name: Generate CHANGELOG with git-cliff
+              run: |
+                  curl -Ls https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-$(uname -m)-unknown-linux-musl.tar.gz \
+                    | tar -xz -C /usr/local/bin --strip-components=1 git-cliff
+                  git cliff --tag v0.0.0 -o CHANGELOG.md        # first tag is 0.0.0
+                  if [ -n "$(git status --porcelain CHANGELOG.md)" ]; then
+                    git add CHANGELOG.md
+                    git commit -m "docs: bootstrap changelog [skip ci]"
+                  fi
+
+            # ------------------------------------------------------------------ #
+            # 3. run the **Docker action** – this makes the version bump commit,
+            #    creates the tag and the GitHub release in one shot
+            # ------------------------------------------------------------------ #
+            - name: Semantic-release ✨
+              id: release
+              uses: python-semantic-release/python-semantic-release@v10.0.2
               with:
-                  python-version: "3.13"
+                  github_token: ${{ secrets.GH_TOKEN }}
+                  # any PSR CLI flag can be mirrored here, e.g.
+                  # changelog: false
+                  # commit: false
+                  # force: patch
 
-            - name: Cache pip, Poetry & Nox envs
-              uses: actions/cache@v4
+            # ------------------------------------------------------------------ #
+            # 4. (optional) attach your artefacts to the GH release
+            # ------------------------------------------------------------------ #
+            - name: Publish artefacts (if any)
+              uses: python-semantic-release/publish-action@v10.0.2
+              if: steps.release.outputs.released == 'true'
               with:
-                  path: |
-                      ~/.cache/pip
-                      ~/.cache/pypoetry
-                      .cache/nox
-                  key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-                  restore-keys: |
-                      nox-${{ runner.os }}-
-
-            - name: Install Poetry 2.1.1
-              run: pip install --upgrade "poetry==2.1.1"
-
-            - name: Install Nox
-              run: pip install --upgrade nox
-
-            # --- single test pass --------------------------------------------------
-            - name: Run test suite
-              run: nox -s tests
-
-            # --- version bump • changelog • GitHub Release -------------------------
-            - name: Run semantic-release
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # token for pushing tags / releases
-                  GIT_COMMIT_AUTHOR: ${{ secrets.GIT_COMMIT_AUTHOR }} # "Name <email>"
-              run: nox -s release
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  tag: ${{ steps.release.outputs.tag }}
