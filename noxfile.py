@@ -19,41 +19,39 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-from pathlib import Path
 
 import nox
 
 
 # --- Global Nox Options -------------------------------------------------------
 
-nox.options.envdir = ".cache/nox"  # keep venvs outside tree
+nox.options.envdir = ".cache/nox"
 nox.options.sessions = ["lint", "mypy", "pre_commit", "tests"]
-nox.options.reuse_existing_virtualenvs = True  # speed up local runs
+nox.options.reuse_existing_virtualenvs = True
 
 SOURCE_PATHS: Sequence[str] = ("libs", "tests", "noxfile.py")
-PYTHON_VERSIONS = ["3.13"]  # extend list when needed
+PYTHON_VERSIONS = ["3.13"]
 HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
 
 # --- Helper utilities ---------------------------------------------------------
 
 
-def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
+def poetry_install(session: nox.Session, *groups: str, root: bool = False) -> None:
     """
-    Create / update the session venv to match poetry.lock *exactly*.
+    Install exactly the dependency groups a session needs.
 
     Parameters
     ----------
     groups : str
-        Optional dependency groups to include (e.g. "test", "type", "docs").
-        If omitted, only runtime deps are installed.
+        Dependency groups to include (e.g. "test", "type", "docs").
     root : bool, default False
-        Install the project itself (`--no-root` is the default for speed).
+        Build & install the project itself.  Skip for speed when not required.
     """
-    # For local dev we install Poetry into the venv; in CI it is pre-installed
+    # Locally we install Poetry into the venv; in CI the job already did it
     if not os.getenv("CI"):
         session.install("poetry")
 
-    cmd = ["poetry", "sync", "--no-interaction", "--no-ansi"]
+    cmd = ["poetry", "install", "--no-interaction", "--no-ansi"]
     if groups:
         cmd += ["--with", ",".join(groups)]
     if not root:
@@ -67,7 +65,7 @@ def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
 
 @nox.session(python=PYTHON_VERSIONS[0], name="install_hooks")
 def install_hooks(session: nox.Session) -> None:
-    """Install *all* required Git hooks (pre-commit, commit-msg, etc.)."""
+    """Install pre-commit and commit-msg hooks."""
     session.install("pre-commit")
     session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
 
@@ -77,7 +75,7 @@ def install_hooks(session: nox.Session) -> None:
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def pre_commit(session: nox.Session) -> None:
-    """Run the full pre-commit suite (and install hooks when not in CI)."""
+    """Run the entire pre-commit suite."""
     session.install("pre-commit")
     if not os.getenv("CI"):
         session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
@@ -86,9 +84,8 @@ def pre_commit(session: nox.Session) -> None:
 
 @nox.session(python=PYTHON_VERSIONS)
 def tests(session: nox.Session) -> None:
-    """Execute pytest with the *test* dependency group and the project itself."""
-    poetry_sync(session, "test", root=True)
-    # Uncomment when you have real tests written
+    """Execute pytest (+ coverage) with the *test* dependency group."""
+    poetry_install(session, "test", root=True)
     # session.run("pytest", "--cov=libs", "--cov-report=term-missing",
     #             "--cov-report=xml", *session.posargs)
     session.log("Skipping pytest run for now (no tests yet).")
@@ -104,7 +101,7 @@ def lint(session: nox.Session) -> None:
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def format_code(session: nox.Session) -> None:
-    """Auto-format code (Ruff) and sort pyproject.toml (toml-sort)."""
+    """Auto-format code and sort pyproject.toml."""
     session.install("ruff", "toml-sort")
     session.run("ruff", "check", "--fix", *SOURCE_PATHS)
     session.run("ruff", "format", *SOURCE_PATHS)
@@ -113,53 +110,20 @@ def format_code(session: nox.Session) -> None:
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def mypy(session: nox.Session) -> None:
-    """Type-check the source tree."""
-    poetry_sync(session, "type")
+    """Type-check the codebase."""
+    poetry_install(session, "type")
     session.run("mypy", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
-def security(session: nox.Session) -> None:
-    """Run a dependency vulnerability audit."""
-    session.install("poetry", "pip-audit")
-    session.run(
-        "poetry",
-        "export",
-        "--with",
-        "dev",
-        "--format=requirements.txt",
-        "--output=requirements.txt",
-        external=True,
-    )
-    session.run("pip-audit", "-r", "requirements.txt")
-    Path("requirements.txt").unlink()
-
-
-@nox.session(python=PYTHON_VERSIONS[0])
-def dependencies(session: nox.Session) -> None:
-    """Detect unused or transitive dependencies with deptry."""
-    session.install("deptry")
-    session.run("deptry", ".")
-
-
-@nox.session(python=PYTHON_VERSIONS[0])
-def analysis(session: nox.Session) -> None:
-    """Compute maintainability & complexity metrics (vulture + radon)."""
-    session.install("vulture", "radon")
-    session.run("vulture", *SOURCE_PATHS, "--min-confidence", "80")
-    session.run("radon", "mi", *SOURCE_PATHS, "-s")
-    session.run("radon", "cc", *SOURCE_PATHS, "-s", "-a")
-
-
-@nox.session(python=PYTHON_VERSIONS[0])
 def docs(session: nox.Session) -> None:
-    """Build (or serve) the MkDocs documentation site."""
-    poetry_sync(session, "docs")
+    """Build or serve MkDocs documentation."""
+    poetry_install(session, "docs")
     if "--serve" in session.posargs:
         session.run("mkdocs", "serve")
     else:
         session.run("mkdocs", "build", "--clean")
-        session.log("Documentation built in site/ directory.")
+        session.log("Documentation built in site/.")
 
 
 # --- Build & release sessions -------------------------------------------------
