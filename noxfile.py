@@ -136,7 +136,7 @@ def build(session: nox.Session) -> None:
 def release(session: nox.Session) -> None:
     """Publish a new release using semantic-release and generate changelogs."""
     session.install("python-semantic-release", "git-cliff")
-    session.run("semantic-release", "--verbose", "--debug", "publish")
+    session.run("semantic-release", "--verbose", "publish")
 
 
 # --- House-keeping ------------------------------------------------------------
