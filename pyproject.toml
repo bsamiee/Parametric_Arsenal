@@ -467,6 +467,7 @@ update_changelog_on_bump = false # CRITICAL: git-cliff handles the changelog.
 [tool.semantic_release]
 branch = "master"
 version_toml = ["pyproject.toml:project.version"]
+version_source = "file"
 tag_format = "v{version}"                         # The tag format PSR will create
 initial_version = "0.0.0"
 allow_zero_version = true                         # Correct for starting at 0.0.0
@@ -497,6 +498,7 @@ patch_tags = [
   "build",
   "ci",
   "revert",
+  "chore",
 ]
 
 # --- Publishing ---
