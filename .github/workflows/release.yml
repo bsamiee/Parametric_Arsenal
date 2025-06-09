@@ -21,24 +21,9 @@ jobs:
                   ref: master
                   persist-credentials: false
 
-            # 2. Install git-cliff for changelog generation
+            # 2. Install git-cliff using the official action
             - name: Install git-cliff
-              run: |
-                  # Pinning to a specific version for reproducible builds
-                  CLIFF_VERSION="2.2.2"
-
-                  # Download the release tarball from GitHub
-                  curl -L "https://github.com/orhun/git-cliff/releases/download/v${CLIFF_VERSION}/git-cliff-${CLIFF_VERSION}-x86_64-unknown-linux-gnu.tar.gz" --output git-cliff.tar.gz
-
-                  # Extract the tarball
-                  tar -xf git-cliff.tar.gz
-
-                  # Move the git-cliff binary to a directory in the system's PATH
-                  sudo mv git-cliff /usr/local/bin/
-
-                  # Verify the installation and print the version
-                  echo "Successfully installed git-cliff version:"
-                  git-cliff --version
+              uses: orhun/git-cliff-action@v2
 
             # 3. Set up Python 3.13
             - name: Set up Python
@@ -50,8 +35,7 @@ jobs:
             - name: Install Poetry
               uses: snok/install-poetry@v1
               with:
-                  # Pinning poetry version for consistency
-                  version: "1.8.2" # Note: 2.1.1 is not a valid version for this action, using a recent stable version.
+                  version: "1.8.2"
 
             # 5. Set up dependency cache for faster installs
             - name: Set up dependency cache
@@ -77,4 +61,5 @@ jobs:
               env:
                   # The GITHUB_TOKEN is provided by GitHub Actions
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
               run: poetry run semantic-release publish
