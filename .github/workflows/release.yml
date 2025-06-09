@@ -24,8 +24,8 @@ jobs:
             # 2. Install git-cliff for changelog generation
             - name: Install git-cliff
               run: |
-                  curl -Ls https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-$(uname -m)-unknown-linux-musl.tar.gz \
-                    | tar -xz -C /usr/local/bin --strip-components=1 git-cliff
+                  sudo apt-get update
+                  sudo apt-get install -y git-cliff
 
             # 3. Set up Python 3.13
             - name: Set up Python
