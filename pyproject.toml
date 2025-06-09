@@ -460,8 +460,9 @@ strict = true
 # --- Commitizen Configuration ------------
 [tool.commitizen]
 name = "cz_conventional_commits"
-tag_format = "v$version"         # Consistent tag format, but PSR controls tagging.
-update_changelog_on_bump = false # CRITICAL: git-cliff handles the changelog.
+tag_format = "v$version"                          # Consistent tag format, but PSR controls tagging.
+update_changelog_on_bump = false                  # CRITICAL: git-cliff handles the changelog.
+ignore_regex = "bump: release \\d+\\.\\d+\\.\\d+" # Ignore PSR's commit messages
 
 # --- Python-Semtanic Configuration -------
 [tool.semantic_release]

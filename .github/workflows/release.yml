@@ -19,7 +19,7 @@ jobs:
                   fetch-depth: 0 # Required for semantic-release to analyze history
                   fetch-tags: true # fetch *all* tags
                   ref: master
-                  persist-credentials: false
+                  persist-credentials: true # Use the GITHUB_TOKEN for authentication
 
             # 2. Install git-cliff using the official action
             - name: Install git-cliff
