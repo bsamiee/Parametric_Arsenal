@@ -4,6 +4,7 @@ name: Create and Publish Release
 on:
     push:
         branches: ["master"]
+    workflow_dispatch: {} # Allows you to run this workflow manually
 
 permissions:
     contents: write
