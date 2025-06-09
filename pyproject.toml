@@ -478,7 +478,7 @@ changelog_generator_class = "semantic_release.changelog.cliff.CliffChangelog"
 changelog_file = "CHANGELOG.md"
 
 # --- Hooks (for Changelog Generation) ---
-[tool.semantic_release.hooks]
+# [tool.semantic_release.hooks]
 #before_commit = [
 #  "bash",                                                # Use bash to run a small script
 #  "-c",
