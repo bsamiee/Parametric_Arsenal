@@ -4,7 +4,7 @@ on:
     pull_request:
     push:
         branches-ignore:
-            - master # master is handled by release.yml
+            - master
 
 jobs:
     qa:

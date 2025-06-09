@@ -468,17 +468,20 @@ update_changelog_on_bump = false # CRITICAL: git-cliff handles the changelog.
 branch = "master"
 version_toml = ["pyproject.toml:project.version"]
 tag_format = "v{version}"                         # The tag format PSR will create
+initial_version = "0.0.0"
 allow_zero_version = true                         # Correct for starting at 0.0.0
 major_on_zero = true                              # Correct for 0.y.z releases
-initial_version = "0.0.0"
-
-# --- Changelog & Build ---
-build_command = "poetry build --no-interaction" # Command only builds the package; the changelog is generated in the hook.
-commit_additional_files = ["CHANGELOG.md"]
 
 # --- Hooks (for Changelog Generation) ---
 [tool.semantic_release.hooks]
-before_commit = ["git", "cliff", "--tag", "v{{version}}", "-o", "CHANGELOG.md"]
+before_commit = [
+  "bash",                                                # Use bash to run a small script
+  "-c",
+  "git-cliff --tag v{{version}} --prepend CHANGELOG.md", # Prepend the new release notes to the top of the changelog
+]
+
+build_command = "poetry build --no-interaction"
+commit_additional_files = ["CHANGELOG.md"]
 
 # --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]

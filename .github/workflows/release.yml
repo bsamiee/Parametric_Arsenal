@@ -1,59 +1,66 @@
 # .github/workflows/release.yml
-name: Release
+name: Create and Publish Release
+
 on:
     push:
-        branches: [master] # adjust if you release from another branch
-
-permissions: # PSR needs write-access for tags & releases
-    contents: write
+        branches: ["master"]
+    workflow_dispatch: {} # Allows you to run this workflow manually from the Actions tab
 
 jobs:
     release:
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # Required to push tags and create releases
         steps:
-            # ------------------------------------------------------------------ #
-            # 1. checkout *full* history so PSR can see every commit & tag
-            # ------------------------------------------------------------------ #
-            - uses: actions/checkout@v4
+            # 1. Checkout repository with full history
+            - name: Checkout repository
+              uses: actions/checkout@v4
               with:
-                  fetch-depth: 0 # REQUIRED – PSR builds the changelog from history
-                  fetch-tags: true
+                  fetch-depth: 0 # Required for semantic-release to analyze history
+                  fetch-tags: true # ← fetch *all* tags
+                  ref: master # (optional) make sure we are on master
+                  persist-credentials: false
 
-            # ------------------------------------------------------------------ #
-            # 2. (optional) generate / update CHANGELOG.md with git-cliff
-            #    – installs the official CLI binary into the runner, runs it,
-            #    – commits the file so that PSR can include it in its version-bump
-            # ------------------------------------------------------------------ #
-            - name: Generate CHANGELOG with git-cliff
+            # 2. Install git-cliff for changelog generation
+            - name: Install git-cliff
               run: |
                   curl -Ls https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-$(uname -m)-unknown-linux-musl.tar.gz \
                     | tar -xz -C /usr/local/bin --strip-components=1 git-cliff
-                  git cliff --tag v0.0.0 -o CHANGELOG.md        # first tag is 0.0.0
-                  if [ -n "$(git status --porcelain CHANGELOG.md)" ]; then
-                    git add CHANGELOG.md
-                    git commit -m "docs: bootstrap changelog [skip ci]"
-                  fi
 
-            # ------------------------------------------------------------------ #
-            # 3. run the **Docker action** – this makes the version bump commit,
-            #    creates the tag and the GitHub release in one shot
-            # ------------------------------------------------------------------ #
-            - name: Semantic-release ✨
-              id: release
-              uses: python-semantic-release/python-semantic-release@v10.0.2
+            # 3. Set up Python 3.13
+            - name: Set up Python
+              uses: actions/setup-python@v5
               with:
-                  github_token: ${{ secrets.GH_TOKEN }}
-                  # any PSR CLI flag can be mirrored here, e.g.
-                  # changelog: false
-                  # commit: false
-                  # force: patch
+                  python-version: "3.13"
 
-            # ------------------------------------------------------------------ #
-            # 4. (optional) attach your artefacts to the GH release
-            # ------------------------------------------------------------------ #
-            - name: Publish artefacts (if any)
-              uses: python-semantic-release/publish-action@v10.0.2
-              if: steps.release.outputs.released == 'true'
+            # 4. Install Poetry 2.1.1
+            - name: Install Poetry
+              uses: snok/install-poetry@v1
               with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  tag: ${{ steps.release.outputs.tag }}
+                  version: "2.1.1"
+
+            # 5. Set up dependency cache for faster installs
+            - name: Set up dependency cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pypoetry/virtualenvs
+                  key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+                  restore-keys: |
+                      poetry-${{ runner.os }}-
+
+            # 6 bis. Configure git user (optional, avoids tag-author warnings)
+            - name: Configure git user
+              run: |
+                  git config --global user.name  "Bardia Samiee"
+                  git config --global user.email "b.samiee93@gmail.com"
+
+            # 7. Install project dependencies
+            - name: Install dependencies
+              run: poetry install --no-interaction
+
+            # 8. Execute the release process
+            - name: Perform release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
+              run: poetry run semantic-release publish
