@@ -107,6 +107,18 @@ def lint(session: nox.Session) -> None:
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
+def code_quality(session: nox.Session) -> None:
+    """Run additional code quality checks like dead code detection."""
+    session.install("vulture")
+    session.run("vulture", "--min-confidence", "80", *SOURCE_PATHS)
+
+    # Optionally run detect-secrets if baseline exists
+    if Path(".secrets.baseline").exists():
+        session.install("detect-secrets")
+        session.run("detect-secrets", "scan", "--baseline", ".secrets.baseline")
+
+
+@nox.session(python=PYTHON_VERSIONS[0])
 def mypy(session: nox.Session) -> None:
     """Run MyPy for type-checking on the source code."""
     poetry_sync(session, "main", "type")

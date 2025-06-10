@@ -50,6 +50,25 @@ repos:
       hooks:
           - id: shellcheck
 
+    - repo: https://github.com/jendrikseipp/vulture
+      rev: v2.14
+      hooks:
+          - id: vulture
+            args: ["--min-confidence", "80"]
+
+    - repo: https://github.com/Yelp/detect-secrets
+      rev: v1.5.0
+      hooks:
+          - id: detect-secrets
+            args: ["--baseline", ".secrets.baseline"]
+            exclude: "poetry.lock"
+
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.16.0
+      hooks:
+          - id: mypy
+            additional_dependencies: ["pydantic", "sqlalchemy", "mypy-extensions"]
+
     # --- Local helpers ----------------------------------------------------------
     - repo: local
       hooks:

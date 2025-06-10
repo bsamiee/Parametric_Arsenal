@@ -211,6 +211,7 @@ docformatter = "^1.7.7"
 # Static analysis helpers kept here for convenience
 radon = ">=6.0.1"
 vulture = ">=2.14"
+detect-secrets = "^1.5.0"
 
 # --- Type-checking only --------------------------------------------------------
 [tool.poetry.group.type.dependencies]
@@ -232,12 +233,16 @@ pytest-mock = ">=3.14.1"
 
 # --- Documentation toolchain ---------------------------------------------------
 [tool.poetry.group.docs.dependencies]
-mkdocs = ">=1.6.1"
-mkdocs-material = ">=9.6.14"
 sphinx = "^8.2.3"
 weasyprint = ">=65.1"
 
 # --- Tool Configurations ------------------------------------------------------
+
+# --- Sphinx Configuration -----------------
+[tool.sphinx]
+project = "Parametric Arsenal"
+copyright = "2025, Bardia Samiee"
+author = "Bardia Samiee"
 
 # --- ruff Configuration ------------------
 [tool.ruff]

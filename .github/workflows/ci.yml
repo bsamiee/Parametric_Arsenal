@@ -36,8 +36,12 @@ jobs:
               run: pip install --upgrade "poetry==2.1.1"
 
             - name: Install Nox
-              run: pip install --upgrade nox # <-- not pinned
+              run: pip install --upgrade "nox==2025.5.1" # Pinned to match project
 
             - name: Run QA suite
               run: |
-                  nox -s lint mypy pre_commit tests
+                  # Run all quality checks except tests (which are conditionally skipped if no tests exist)
+                  nox -s lint mypy pre_commit code_quality
+
+                  # Run tests session separately - it will be skipped if no test files exist
+                  nox -s tests
