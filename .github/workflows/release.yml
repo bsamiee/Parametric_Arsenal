@@ -1,64 +1,37 @@
 # .github/workflows/release.yml
-name: Create and Publish Release
-
+name: Release
 on:
     push:
-        branches: ["master"]
-    workflow_dispatch: {} # Allows you to run this workflow manually from the Actions tab
+        branches: [master]
+    workflow_dispatch:
 
 jobs:
     release:
         runs-on: ubuntu-latest
         permissions:
-            contents: write # Required to push tags and create releases
+            contents: write # allow tag+commit
+            packages: write # if you ever upload wheels
         steps:
-            # 1. Checkout repository with full history
-            - name: Checkout repository
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
               with:
-                  fetch-depth: 0 # Required for semantic-release to analyze history
+                  fetch-depth: 0 # get full history & tags
                   fetch-tags: true # fetch *all* tags
                   ref: master
 
-            # 2. Install git-cliff using the official action
-            - name: Install git-cliff
-              uses: orhun/git-cliff-action@v2
-
-            # 3. Set up Python 3.13
-            - name: Set up Python
-              uses: actions/setup-python@v5
+            - uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
+                  cache: "poetry"
 
-            # 4. Install Poetry
-            - name: Install Poetry 2.1.1
-              uses: snok/install-poetry@v1
-              with:
-                  version: "2.1.1"
-
-            # 5. Set up dependency cache for faster installs
-            - name: Set up dependency cache
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cache/pypoetry/virtualenvs
-                  key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-                  restore-keys: |
-                      poetry-${{ runner.os }}-
-
-            # 6. Configure git user
-            - name: Configure git user
+            - name: Install Poetry + deps
               run: |
-                  git config --global user.name  "Bardia Samiee"
-                  git config --global user.email "b.samiee93@gmail.com"
+                  pip install poetry
+                  poetry install --no-interaction --with dev
+                  poetry run poetry --version
 
-            # 7. Install project dependencies
-            - name: Install dependencies
-              run: poetry install --no-interaction
-
-            # 8. Execute the release process
-            - name: Perform release
+            - name: Perform release (version, tag, changelog, GH Release)
               env:
-                  # The GITHUB_TOKEN is provided by GitHub Actions
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
-              run: poetry run semantic-release publish
+              run: |
+                  poetry run semantic-release publish --log-level=DEBUG
