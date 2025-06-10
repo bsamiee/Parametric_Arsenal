@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Trigger release workflow ([`7774dd4`](https://github.com/bsamiee/Parametric_Arsenal/commit/7774dd46ad81ba45d90d40cb37603c40d977af6a))
+
+- Enhance changelog for v0.1.0 ([`13e0583`](https://github.com/bsamiee/Parametric_Arsenal/commit/13e05839b833f37996c4b79f841eaba8dede4ccb))
+
 - Enhance changelog for v0.1.0 ([`7f844e9`](https://github.com/bsamiee/Parametric_Arsenal/commit/7f844e9456d4a2f05b97b362b4e607c978bda66d))
 
 
