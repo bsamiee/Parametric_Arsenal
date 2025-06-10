@@ -57,20 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- Enhance changelog for v0.1.0 ([`b017a14`](https://github.com/bsamiee/Parametric_Arsenal/commit/b017a14f506555bfc2996da628da0aa5981a9dcd))
-
-- Enhance changelog for v0.1.0 ([`2c0b620`](https://github.com/bsamiee/Parametric_Arsenal/commit/2c0b62005e835e1d20d1c518d04b1ce1a674a3e4))
-
 - Trigger release workflow ([`7774dd4`](https://github.com/bsamiee/Parametric_Arsenal/commit/7774dd46ad81ba45d90d40cb37603c40d977af6a))
-
-- Enhance changelog for v0.1.0 ([`13e0583`](https://github.com/bsamiee/Parametric_Arsenal/commit/13e05839b833f37996c4b79f841eaba8dede4ccb))
-
-- Enhance changelog for v0.1.0 ([`7f844e9`](https://github.com/bsamiee/Parametric_Arsenal/commit/7f844e9456d4a2f05b97b362b4e607c978bda66d))
 
 
 ### Features
 
 - Full debug of release workflow ([`dd7c4b5`](https://github.com/bsamiee/Parametric_Arsenal/commit/dd7c4b5a70c0afc52291a6f1754588417ce9a22b))
+
+
+### Refactor
+
+- Improve release workflow and simplify commitizen config ([`cf799e5`](https://github.com/bsamiee/Parametric_Arsenal/commit/cf799e52237e3209e50af455040729c67d2b3155))
 
 
 
