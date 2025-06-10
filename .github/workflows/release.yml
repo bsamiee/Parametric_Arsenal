@@ -59,9 +59,9 @@ jobs:
             # 7 - Run the release (version bump, tag, changelog, GH Release)
             - name: Perform release
               env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
                   LOG_LEVEL: DEBUG
               run: |
-                  # Run a simple, non-network command to test execution
-                  $(poetry env info --path)/bin/semantic-release version --print
+                  # Directly call the executable to avoid potential issues with `poetry run` in CI
+                  $(poetry env info --path)/bin/semantic-release publish
