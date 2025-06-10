@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update PSR config ([`42c5d57`](https://github.com/bsamiee/Parametric_Arsenal/commit/42c5d57af4a9a663edc4cb7022c79279a9eccd70))
 
 
+### Documentation
+
+- Enhance changelog for v0.1.0 ([`7f844e9`](https://github.com/bsamiee/Parametric_Arsenal/commit/7f844e9456d4a2f05b97b362b4e607c978bda66d))
+
+
 ### Features
 
 - Full debug of release workflow ([`dd7c4b5`](https://github.com/bsamiee/Parametric_Arsenal/commit/dd7c4b5a70c0afc52291a6f1754588417ce9a22b))
