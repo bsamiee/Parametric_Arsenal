@@ -502,8 +502,8 @@ patch_tags = [
 
 # --- Publishing ---
 [tool.semantic_release.publish]
-upload_to_vcs_release = true                    # Creates a GitHub release and uploads assets
-dist_glob_patterns = ["dist/*"]                 # Which files from the build to upload
+upload_to_vcs_release = true    # Creates a GitHub release and uploads assets
+dist_glob_patterns = ["dist/*"] # Which files from the build to upload
 
 # --- Remote & Author Identity ---
 [tool.semantic_release.remote]

@@ -106,9 +106,24 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  # Run PSR - changelog is already disabled in pyproject.toml
-                  if ! poetry run semantic-release publish; then
+                  # Show what PSR sees before running
+                  echo "=== PSR Pre-run Debug ==="
+                  echo "Current version: $(poetry version --short)"
+                  echo "Git status:"
+                  git status --porcelain
+                  echo "Recent commits:"
+                  git log --oneline -5
+                  echo "Existing tags:"
+                  git tag --sort=-version:refname | head -5
+
+                  # Use 'version' command with verbose output and explicit flags
+                  echo "=== Running PSR Version Command ==="
+                  if ! poetry run semantic-release -vv version --no-changelog --commit --tag --push --vcs-release; then
                     echo "❌ PSR failed - aborting workflow"
+                    echo "=== PSR Failure Debug ==="
+                    echo "Exit code: $?"
+                    echo "Current version after failure: $(poetry version --short)"
+                    git status
                     exit 1
                   fi
 
