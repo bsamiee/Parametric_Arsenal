@@ -4,10 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2025-06-10
 
 
 ### Bug Fixes
+
+- Remove invalid --no-changelog flag from PSR publish command ([`cfae81b`](https://github.com/bsamiee/Parametric_Arsenal/commit/cfae81bef2cb9a6ddecd93d7b424a1ffae02e5da))
 
 - Update release workflow ([`dd840b5`](https://github.com/bsamiee/Parametric_Arsenal/commit/dd840b5ee8d349894c59dc751a9a0686271a7384))
 
@@ -62,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Fix release workflow and add test feature ([`c7590fd`](https://github.com/bsamiee/Parametric_Arsenal/commit/c7590fd3c24bd0f0ddbb66d4354fa6562428b29d))
+
 - Full debug of release workflow ([`dd7c4b5`](https://github.com/bsamiee/Parametric_Arsenal/commit/dd7c4b5a70c0afc52291a6f1754588417ce9a22b))
 
 
@@ -71,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [0.1.0] - 2025-06-09
+## [0.1.0] - 2025-06-10
 
 
 ### Bug Fixes
