@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-06-10
+
+
+### Bug Fixes
+
+- Improve test feature documentation ([`e5d6221`](https://github.com/bsamiee/Parametric_Arsenal/commit/e5d622118a3df518241b36f82b7aa82158397005))
+
+- Improve test feature documentation formatting ([`9235f1f`](https://github.com/bsamiee/Parametric_Arsenal/commit/9235f1fd147ca1e6e28968b82b8c30f3c5ea45f0))
+
+
+### Chores
+
+- Remove docs from PSR patch tags ([`cdb5663`](https://github.com/bsamiee/Parametric_Arsenal/commit/cdb566390eb9676f575f1ee6eaabdfda6de06924))
+
+
+
 ## [1.0.0] - 2025-06-10
 
 
