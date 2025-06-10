@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2025-06-10
+
+
+### Features
+
+- Completely rewrite release workflow for simplicity and reliability ([`422c823`](https://github.com/bsamiee/Parametric_Arsenal/commit/422c823f423d1e012e2f633e426d7ae016c4603d))
+
+
+
 ## [0.2.0] - 2025-06-10
 
 
