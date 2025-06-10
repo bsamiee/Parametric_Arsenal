@@ -1,10 +1,9 @@
 name: Weekly Pre-Commit Autoupdate
 
 on:
-    schedule:
-        # Every Monday at 08:00 UTC
+    schedule: # Every Monday at 08:00 UTC
         - cron: "0 8 * * MON"
-    workflow_dispatch: # allows you to trigger it manually
+    workflow_dispatch:
 
 permissions:
     contents: write # needed to push the update commit
@@ -19,8 +18,8 @@ jobs:
 
             - name: Set Git author
               run: |
-                  git config --global user.name  "${{ secrets.RELEASE_AUTHOR_NAME }}"
-                  git config --global user.email "${{ secrets.RELEASE_AUTHOR_EMAIL }}"
+                  git config --global user.name  "github-actions[bot]"
+                  git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
             - uses: actions/setup-python@v5
               with:
