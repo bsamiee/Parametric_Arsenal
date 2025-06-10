@@ -479,13 +479,17 @@ match = "master"
 
 [tool.semantic_release.hooks]
 before_commit = [
-  "bash",
-  "-c",
-  "git-cliff --tag v{{version}} --prepend CHANGELOG.md",
+  "poetry",
+  "run",
+  "git-cliff",
+  "--tag",
+  "v{{version}}",
+  "--prepend",
+  "CHANGELOG.md",
 ]
 
 build_command = "poetry build --no-interaction"
-commit_additional_files = ["CHANGELOG.md"]
+commit_additional_files = ["CHANGELOG.md", "pyproject.toml"]
 
 # --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]
