@@ -27,7 +27,7 @@ jobs:
                   python-version: "3.13"
                   cache: "pip"
 
-            # 3 - Install the exact Poetry you want
+            # 3 - Install exact Poetry version
             - name: Install Poetry 2.1.1
               uses: snok/install-poetry@v1
               with:
@@ -53,7 +53,7 @@ jobs:
             # 6 - Install ALL deps, including dev, in one shot
             - name: Install dependencies
               run: |
-                  poetry install --no-interaction --with dev
+                  poetry install --no-interaction --only main,dev
                   poetry --version
 
             # 7 - Run the release (version bump, tag, changelog, GH Release)
@@ -62,4 +62,4 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
               run: |
-                  poetry run semantic-release -v DEBUG publish
+                  poetry run semantic-release publish
