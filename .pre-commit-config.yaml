@@ -42,12 +42,6 @@ repos:
       hooks:
           - id: shellcheck
 
-    # --- Conventional-Commit enforcement ---------------------------------------
-    - repo: https://github.com/commitizen-tools/commitizen
-      rev: v4.8.2
-      hooks:
-          - id: commitizen # validates every commit message (commit-msg stage)
-
     # --- Local helpers ----------------------------------------------------------
     - repo: local
       hooks:

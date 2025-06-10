@@ -55,6 +55,7 @@ commit_parsers = [
     { message = "^Merge", skip = true },
     { message = "^bump:", skip = true },
     { message = "^chore\\(changelog\\)", skip = true },
+    { message = "^docs: enhance changelog", skip = true },
     { message = "^Update.*\\.md$", skip = true },
     # Regular conventional commits
     { message = "^feat", group = "Features" },
