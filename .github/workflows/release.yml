@@ -10,9 +10,8 @@ jobs:
     release:
         runs-on: ubuntu-latest
         permissions:
-            id-token: write # for authentication
-            contents: write # for tagging and committing
-            packages: write # for publishing to PyPI
+            contents: write # allow tag + CHANGELOG commit
+            packages: write # allow publishing to PyPI
 
         steps:
             # 1 - full history so PSR can see every tag / commit
@@ -64,6 +63,5 @@ jobs:
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
                   LOG_LEVEL: DEBUG
               run: |
-                  # Directly call the executable to avoid potential issues with `poetry run` in CI
-                  # The path is derived from the `poetry env info` command
-                  $(poetry env info --path)/bin/semantic-release publish
+                  # Run a simple, non-network command to test execution
+                  $(poetry env info --path)/bin/semantic-release version --print
