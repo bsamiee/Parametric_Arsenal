@@ -472,7 +472,7 @@ initial_version = "0.0.0"
 allow_zero_version = true
 major_on_zero = true
 commit_message = "bump: release v{version}"
-changelog_file = "CHANGELOG.md"
+changelog_file = ""
 
 [tool.semantic_release.branches.master]
 match = "master"

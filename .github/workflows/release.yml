@@ -62,4 +62,4 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
               run: |
-                  poetry run semantic-release -v publish
+                  poetry run semantic-release --debug version
