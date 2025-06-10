@@ -11,7 +11,7 @@ requires = ["poetry-core"]
 
 [project]
 name = "parametric_arsenal"
-version = "0.2.0"
+version = "1.0.0"
 description = "Architectural/Parametric monorepo"
 readme = "README.md"
 license = "MIT"
