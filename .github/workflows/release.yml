@@ -106,8 +106,8 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  # Run PSR with specific flags to ensure it works properly
-                  if ! poetry run semantic-release publish --no-changelog; then
+                  # Run PSR - changelog is already disabled in pyproject.toml
+                  if ! poetry run semantic-release publish; then
                     echo "❌ PSR failed - aborting workflow"
                     exit 1
                   fi
