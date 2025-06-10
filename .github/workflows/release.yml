@@ -56,11 +56,22 @@ jobs:
                   poetry install --no-interaction --only main,dev
                   poetry --version
 
-            # 7 - Run the release (version bump, tag, changelog, GH Release)
+            # 7 - Debugging steps
+            - name: Show Git History
+              run: git log --graph --oneline --decorate -n 20
+
+            - name: Show Poetry Env
+              run: poetry env info
+
+            - name: Check for semantic-release executable
+              run: poetry run which semantic-release
+
+            # 8 - Run the release (version bump, tag, changelog, GH Release)
             - name: Perform release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
                   LOG_LEVEL: DEBUG
               run: |
+                  set -x
                   poetry run semantic-release publish
