@@ -23,7 +23,7 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}\
     ### {{ group | upper_first }}
     {% for commit in commits %}\
-        - {% if commit.scope %}(**{{ commit.scope }}**){% endif %} {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`]({{ repo_url }}/commit/{{ commit.id }}))\
+        - {% if commit.scope %}(**{{ commit.scope }}**){% endif %} {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/bsamiee/Parametric_Arsenal/commit/{{ commit.id }}))\
     {% endfor %}\
 {% endfor %}\n
 """
@@ -38,11 +38,14 @@ render_always = true
 
 # --- git Processing Configuration ---------------------------------------------
 [git] # This section configures how git-cliff processes the git history
-conventional_commits = true                                # Use Conventional Commits specifications
-filter_unconventional = true                               # Ignore commits that do not follow the conventional commit format
+conventional_commits = true  # Use Conventional Commits specifications
+filter_unconventional = true # Ignore commits that do not follow the conventional commit format
 require_conventional = false
 split_commits = false
-repo_url = "https://github.com/bsamiee/Parametric_Arsenal"
+
+[git.remote]
+name = "origin"
+url = "https://github.com/bsamiee/Parametric_Arsenal"
 
 commit_parsers = [ # This section maps commit types from Conventional Commits to changelog groups
     { message = "^feat", group = "Features" },

@@ -460,11 +460,11 @@ strict = true
 # --- Commitizen Configuration ------------
 [tool.commitizen]
 name = "cz_conventional_commits"
-tag_format = "v$version"                            # Consistent tag format, but PSR controls tagging.
-update_changelog_on_bump = false                    # CRITICAL: git-cliff handles the changelog.
-ignore_regex = "bump: release v?\\d+\\.\\d+\\.\\d+" # Ignore PSR's commit messages
+tag_format = "v$version"                                  # Consistent tag format, but PSR controls tagging.
+update_changelog_on_bump = false                          # CRITICAL: git-cliff handles the changelog.
+ignore_regex = "^(bump: release|docs: enhance changelog)" # Ignore PSR's commit messages and changelog commits
 
-# --- Python-Semtanic Configuration -------
+# --- Python-Semantic-Release Configuration -------
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 tag_format = "v{version}"
@@ -472,24 +472,13 @@ initial_version = "0.0.0"
 allow_zero_version = true
 major_on_zero = true
 commit_message = "bump: release v{version}"
-changelog_file = ""
+changelog_file = ""                               # Disable PSR's changelog - git-cliff handles this
+vcs_release = true                                # Create GitHub releases
+upload_to_vcs_release = true
 
 [tool.semantic_release.branches.master]
 match = "master"
-
-[tool.semantic_release.hooks]
-before_commit = [
-  "poetry",
-  "run",
-  "git-cliff",
-  "--tag",
-  "v{{version}}",
-  "--prepend",
-  "CHANGELOG.md",
-]
-
-build_command = "poetry build --no-interaction"
-commit_additional_files = ["CHANGELOG.md", "pyproject.toml"]
+prerelease = false
 
 # --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]
@@ -512,6 +501,9 @@ patch_tags = [
 [tool.semantic_release.publish]
 upload_to_vcs_release = true    # Creates a GitHub release and uploads assets
 dist_glob_patterns = ["dist/*"] # Which files from the build to upload
+
+# --- Build Command ---
+build_command = "poetry build --no-interaction"
 
 # --- Remote & Author Identity ---
 [tool.semantic_release.remote]

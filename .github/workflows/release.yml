@@ -2,7 +2,7 @@
 name: Create and Publish Release
 
 on:
-    push: # automatic on every push to master
+    push:
         branches: [master]
     workflow_dispatch:
 
@@ -10,58 +10,103 @@ jobs:
     release:
         runs-on: ubuntu-latest
         permissions:
-            contents: write # allow tag + CHANGELOG commit
-            packages: write # allow publishing to PyPI
+            contents: write # needed to push commits and tags
+            id-token: write # needed for authentication
 
         steps:
-            # 1 - full history so PSR can see every tag / commit
-            - uses: actions/checkout@v4
+            - name: "Checkout code"
+              uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  fetch-tags: true
-                  ref: master
+                  token: ${{ secrets.GH_TOKEN }}
 
-            # 2 - Python first (cache plain pip wheels, not Poetry yet)
-            - uses: actions/setup-python@v5
+            - name: "Set up Python"
+              uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
                   cache: "pip"
 
-            # 3 - Install exact Poetry version
-            - name: Install Poetry 2.1.1
+            - name: "Install Poetry"
               uses: snok/install-poetry@v1
               with:
                   version: "2.1.1"
                   virtualenvs-create: true
-                  virtualenvs-in-project: true # keeps .venv in repo root
+                  virtualenvs-in-project: true
 
-            # 4 - Optional: reuse Poetry's venv cache
-            - name: Poetry venv cache
+            - name: "Cache Poetry virtualenv"
               uses: actions/cache@v4
               with:
-                  path: ~/.cache/pypoetry/virtualenvs
+                  path: .venv
                   key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
                   restore-keys: |
                       poetry-${{ runner.os }}-
 
-            # 5 - Configure git author (needed for PSR commit)
-            - name: Configure git user
-              run: |
-                  git config --global user.name  "Bardia Samiee"
-                  git config --global user.email "b.samiee93@gmail.com"
+            - name: "Install dependencies"
+              run: poetry install --no-interaction
 
-            # 6 - Install ALL deps, including dev, in one shot
-            - name: Install dependencies
+            - name: "Check if release is needed"
+              id: check_release
               run: |
-                  poetry install --no-interaction --only main,dev
-                  poetry --version
+                  set -x
+                  # Check if there are any commits that would trigger a release
+                  if poetry run semantic-release version --print | grep -q '^[0-9]'; then
+                    echo "release_needed=true" >> $GITHUB_OUTPUT
+                    echo "Release is needed"
+                  else
+                    echo "release_needed=false" >> $GITHUB_OUTPUT
+                    echo "No release needed"
+                  fi
 
-            # 7 - Run the release (version bump, tag, changelog, GH Release)
-            - name: Perform release
+            - name: "Run semantic-release"
+              if: steps.check_release.outputs.release_needed == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-                  GIT_COMMIT_AUTHOR: "Bardia Samiee <b.samiee93@gmail.com>"
-                  LOG_LEVEL: DEBUG
               run: |
-                  # Directly call the executable to avoid potential issues with `poetry run` in CI
-                  $(poetry env info --path)/bin/semantic-release publish
+                  set -x
+                  echo "Running PSR to bump version and create tag..."
+                  poetry run semantic-release publish
+
+            - name: "Get current version"
+              if: steps.check_release.outputs.release_needed == 'true'
+              id: get_version
+              run: |
+                  set -x
+                  VERSION=$(poetry version --short)
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "Current version after PSR: $VERSION"
+
+            - name: "Generate enhanced changelog with git-cliff"
+              if: steps.check_release.outputs.release_needed == 'true'
+              run: |
+                  set -x
+                  echo "Generating enhanced changelog with git-cliff..."
+                  poetry run git-cliff -vv --tag v${{ steps.get_version.outputs.version }} --prepend CHANGELOG.md
+
+            - name: "Commit enhanced changelog"
+              if: steps.check_release.outputs.release_needed == 'true'
+              run: |
+                  set -x
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  # Check if changelog was actually modified
+                  if ! git diff --quiet CHANGELOG.md; then
+                    echo "Changelog was modified, committing changes..."
+                    git add CHANGELOG.md
+                    git commit -m "docs: enhance changelog for v${{ steps.get_version.outputs.version }}"
+                    git push origin master
+                  else
+                    echo "No changelog changes detected"
+                  fi
+
+            - name: "Debug: Show final state"
+              if: steps.check_release.outputs.release_needed == 'true'
+              run: |
+                  set -x
+                  echo "=== Final Debug Information ==="
+                  echo "Current version: $(poetry version --short)"
+                  echo "Latest git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')"
+                  echo "Last 5 commits:"
+                  git log --oneline -5
+                  echo "Git status:"
+                  git status
