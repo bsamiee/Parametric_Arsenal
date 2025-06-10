@@ -192,6 +192,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Testing
 
 - Increased noxfile debuf verbosity ([`61d80d0`](https://github.com/bsamiee/Parametric_Arsenal/commit/61d80d0159771def2683d27627eecff1b6e3eb63))
-
-
-
