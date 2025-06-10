@@ -491,7 +491,6 @@ minor_tags = ["feat", "feature"]
 patch_tags = [
   "fix",
   "perf",
-  "docs",
   "style",
   "refactor",
   "build",
