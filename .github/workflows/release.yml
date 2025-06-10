@@ -24,7 +24,6 @@ jobs:
               uses: actions/setup-python@v5
               with:
                   python-version: "3.13"
-                  # Note: Poetry manages dependencies, but pip cache may still help with Poetry's internal operations
 
             - name: "Install Poetry"
               uses: snok/install-poetry@v1
@@ -44,214 +43,74 @@ jobs:
             - name: "Install dependencies"
               run: poetry install --no-interaction
 
-            - name: "Check if release is needed"
-              id: check_release
+            - name: "Run Python Semantic Release"
               env:
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
                   set -x
-                  echo "=== Release Check Debug ==="
-
-                  # Get the last commit message for debugging
-                  LAST_COMMIT_MSG=$(git log -1 --pretty=%s)
-                  echo "Last commit message: '$LAST_COMMIT_MSG'"
-
-                  # Skip if last commit is from our release process
-                  if [[ "$LAST_COMMIT_MSG" =~ ^(bump:|docs:\ enhance\ changelog) ]]; then
-                    echo "release_needed=false" >> $GITHUB_OUTPUT
-                    echo "⏭️ No release needed - last commit is from release process"
-                    exit 0
-                  fi
-
-                  # Check current version vs what PSR calculates
-                  CURRENT_VERSION=$(poetry version --short)
-                  echo "Current version: $CURRENT_VERSION"
-
-                  # Run PSR version calculation with error handling
-                  if PSR_VERSION=$(poetry run semantic-release version --print 2>&1); then
-                    echo "PSR calculated version: $PSR_VERSION"
-                  else
-                    echo "❌ PSR version calculation failed: $PSR_VERSION"
-                    echo "release_needed=false" >> $GITHUB_OUTPUT
-                    echo "⏭️ No release needed - PSR failed to calculate version"
-                    exit 0
-                  fi
-
-                  # Release needed if PSR returns a different version
-                  if [[ -z "$PSR_VERSION" ]]; then
-                    echo "release_needed=false" >> $GITHUB_OUTPUT
-                    echo "⏭️ No release needed - PSR returned empty version"
-                  elif [[ "$PSR_VERSION" == "$CURRENT_VERSION" ]]; then
-                    echo "release_needed=false" >> $GITHUB_OUTPUT
-                    echo "⏭️ No release needed - versions match ($CURRENT_VERSION)"
-                  elif [[ "$PSR_VERSION" == "0.0.0" ]]; then
-                    echo "release_needed=false" >> $GITHUB_OUTPUT
-                    echo "⏭️ No release needed - PSR returned 0.0.0 (no changes)"
-                  else
-                    echo "release_needed=true" >> $GITHUB_OUTPUT
-                    echo "new_version=$PSR_VERSION" >> $GITHUB_OUTPUT
-                    echo "✅ Release needed: $CURRENT_VERSION → $PSR_VERSION"
-                  fi
-
-            - name: "Run semantic-release"
-              if: steps.check_release.outputs.release_needed == 'true'
-              env:
-                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
-              run: |
-                  set -x
-                  echo "=== Running Python Semantic Release ==="
-                  echo "🚀 PSR will: bump version in pyproject.toml → create git tag → push tag → create GitHub release"
+                  echo "=== Python Semantic Release ==="
 
                   # Configure git for PSR
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  # Show what PSR sees before running
-                  echo "=== PSR Pre-run Debug ==="
-                  echo "Current version: $(poetry version --short)"
-                  echo "Git status:"
-                  git status --porcelain
-                  echo "Recent commits:"
-                  git log --oneline -5
-                  echo "Existing tags:"
-                  git tag --sort=-version:refname | head -5
+                  # Let PSR handle the complete release process:
+                  # - Analyze commits since last release
+                  # - Calculate next version (if needed)
+                  # - Update pyproject.toml
+                  # - Create commit with version bump
+                  # - Create annotated git tag
+                  # - Push commit and tag
+                  # - Create GitHub release
+                  echo "🚀 Running PSR..."
+                  poetry run semantic-release -vv version --no-changelog
 
-                  # Use 'version' command with verbose output and explicit flags
-                  echo "=== Running PSR Version Command ==="
-                  if ! poetry run semantic-release -vv version --no-changelog --commit --tag --push --vcs-release; then
-                    echo "❌ PSR failed - aborting workflow"
-                    echo "=== PSR Failure Debug ==="
-                    echo "Exit code: $?"
-                    echo "Current version after failure: $(poetry version --short)"
-                    git status
-                    exit 1
-                  fi
-
-                  echo "✅ PSR completed successfully"
-
-            - name: "Get new version after PSR"
-              if: steps.check_release.outputs.release_needed == 'true'
-              id: get_version
-              run: |
-                  set -x
-                  # Get the version that PSR just set
-                  VERSION=$(poetry version --short)
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  echo "📦 New version after PSR: $VERSION"
-
-                  # Ensure we have the latest tags and commits from PSR
-                  git fetch origin --tags
-                  git fetch origin master
-
-                  # Verify the tag was created
-                  LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')
-                  echo "🏷️ Latest git tag: $LATEST_TAG"
-
-                  # Verify the specific tag exists
-                  if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-                    echo "✅ Tag v$VERSION confirmed to exist"
-                  else
-                    echo "⚠️ Tag v$VERSION not found - this may cause git-cliff issues"
-                    # Wait a bit and try again
-                    sleep 3
-                    git fetch origin --tags
-                    if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-                      echo "✅ Tag v$VERSION found after retry"
-                    else
-                      echo "❌ Tag v$VERSION still not found"
-                    fi
-                  fi
-
-            - name: "Generate and commit enhanced changelog"
-              if: steps.check_release.outputs.release_needed == 'true'
+            - name: "Generate enhanced changelog with git-cliff"
               run: |
                   set -x
                   echo "=== Generating Enhanced Changelog ==="
 
-                  # Ensure we have the latest state from PSR
+                  # Ensure we have the latest state after PSR
                   git fetch origin --tags
                   git fetch origin master
 
-                  VERSION="${{ steps.get_version.outputs.version }}"
-                  echo "Working with version: $VERSION"
+                  # Get current version and latest tag
+                  VERSION=$(poetry version --short)
+                  LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')
+                  echo "Current version: $VERSION"
+                  echo "Latest tag: $LATEST_TAG"
 
-                  # Create CHANGELOG.md if it doesn't exist
-                  if [ ! -f CHANGELOG.md ]; then
-                    echo "CHANGELOG.md not found, creating it..."
-                    cat > CHANGELOG.md << 'EOF'
-                  # Changelog
+                  # Only generate changelog if we have a matching tag (indicates a new release was made)
+                  if [[ "$LATEST_TAG" == "v$VERSION" ]]; then
+                    echo "✅ New release detected (v$VERSION), generating enhanced changelog..."
+                    
+                    # Backup existing changelog
+                    cp CHANGELOG.md CHANGELOG.md.backup 2>/dev/null || true
 
-                  All notable changes to this project will be documented in this file.
-                  The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-                  and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-                  <!-- generated by git-cliff -->
-                  EOF
-                  fi
-
-                  # Backup existing changelog
-                  cp CHANGELOG.md CHANGELOG.md.backup
-
-                  echo "🔧 Running git-cliff to generate enhanced changelog..."
-
-                  # Verify tag exists before running git-cliff
-                  if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
-                    echo "⚠️ Tag v$VERSION not found, attempting to find it..."
-                    git fetch origin --tags
-                    sleep 2
-                    if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
-                      echo "❌ Tag v$VERSION still not found, using current HEAD"
-                      # Use current HEAD instead of the missing tag
-                      if ! poetry run git-cliff -vv --output CHANGELOG.md; then
-                        echo "❌ git-cliff failed even with HEAD - restoring backup"
-                        mv CHANGELOG.md.backup CHANGELOG.md
-                        exit 1
+                    # Generate complete changelog with git-cliff
+                    if poetry run git-cliff -vv --output CHANGELOG.md; then
+                      # Check if changelog was actually modified
+                      if ! git diff --quiet CHANGELOG.md 2>/dev/null; then
+                        echo "📝 Changelog updated, committing changes..."
+                        git add CHANGELOG.md
+                        git commit -m "docs: enhance changelog for v$VERSION [skip ci]"
+                        git push origin master
+                        echo "✅ Enhanced changelog committed and pushed"
+                      else
+                        echo "ℹ️ No changelog changes detected"
                       fi
                     else
-                      echo "✅ Tag v$VERSION found, proceeding with git-cliff"
-                      if ! poetry run git-cliff -vv --tag "v$VERSION" --output CHANGELOG.md; then
-                        echo "⚠️ git-cliff with tag failed, trying without tag"
-                        if ! poetry run git-cliff -vv --output CHANGELOG.md; then
-                          echo "❌ git-cliff fallback failed - restoring backup"
-                          mv CHANGELOG.md.backup CHANGELOG.md
-                          exit 1
-                        fi
-                      fi
+                      echo "⚠️ git-cliff failed, restoring backup"
+                      mv CHANGELOG.md.backup CHANGELOG.md 2>/dev/null || true
                     fi
                   else
-                    echo "✅ Tag v$VERSION exists, running git-cliff with tag"
-                    if ! poetry run git-cliff -vv --tag "v$VERSION" --output CHANGELOG.md; then
-                      echo "⚠️ git-cliff with tag failed, trying without tag"
-                      if ! poetry run git-cliff -vv --output CHANGELOG.md; then
-                        echo "❌ git-cliff fallback failed - restoring backup"
-                        mv CHANGELOG.md.backup CHANGELOG.md
-                        exit 1
-                      fi
-                    fi
+                    echo "ℹ️ No new release made (latest tag: $LATEST_TAG, version: $VERSION)"
                   fi
 
-                  # Remove backup if we got here successfully
-                  rm -f CHANGELOG.md.backup
-
-                  # Check if changelog actually changed
-                  if ! git diff --quiet CHANGELOG.md; then
-                    echo "📝 Changelog was modified, committing and pushing changes..."
-                    git add CHANGELOG.md
-                    git commit -m "docs: enhance changelog for v$VERSION [skip ci]"
-                    git push origin master
-                    echo "✅ Enhanced changelog committed and pushed"
-                  else
-                    echo "ℹ️ No changelog changes detected"
-                  fi
-
-            - name: "Debug: Show final state"
-              if: steps.check_release.outputs.release_needed == 'true'
+            - name: "Show final state"
               run: |
-                  set -x
-                  echo "=== Final Debug Information ==="
-                  echo "Current version: $(poetry version --short)"
-                  echo "Latest git tag: $(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')"
-                  echo "Last 5 commits:"
-                  git log --oneline -5
-                  echo "Git status:"
-                  git status
+                  echo "=== Release Summary ==="
+                  echo "Version: $(poetry version --short)"
+                  echo "Latest tag: $(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')"
+                  echo "Recent commits:"
+                  git log --oneline -3

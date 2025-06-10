@@ -4,10 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2025-06-10
+## [0.2.0] - 2025-06-10
 
 
 ### Bug Fixes
+
+- Add verbose PSR output and explicit flags ([`17b3f30`](https://github.com/bsamiee/Parametric_Arsenal/commit/17b3f30a2b636b6ce9cdd5518c892a3dfac228b8))
 
 - Remove invalid --no-changelog flag from PSR publish command ([`cfae81b`](https://github.com/bsamiee/Parametric_Arsenal/commit/cfae81bef2cb9a6ddecd93d7b424a1ffae02e5da))
 
@@ -54,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update changelog and pyproject from previous workflow runs ([`003de1d`](https://github.com/bsamiee/Parametric_Arsenal/commit/003de1d369cb72a7f24474ae5866967ca183ec10))
+
 - Update PSR config ([`42c5d57`](https://github.com/bsamiee/Parametric_Arsenal/commit/42c5d57af4a9a663edc4cb7022c79279a9eccd70))
 
 
@@ -75,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [0.1.0] - 2025-06-10
+## [0.1.0] - 2025-06-09
 
 
 ### Bug Fixes
@@ -192,3 +196,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Testing
 
 - Increased noxfile debuf verbosity ([`61d80d0`](https://github.com/bsamiee/Parametric_Arsenal/commit/61d80d0159771def2683d27627eecff1b6e3eb63))
+
+
+
