@@ -234,6 +234,7 @@ pytest-mock = ">=3.14.1"
 # --- Documentation toolchain ---------------------------------------------------
 [tool.poetry.group.docs.dependencies]
 sphinx = "^8.2.3"
+sphinx-autobuild = "^2024.10.3"
 weasyprint = ">=65.1"
 
 # --- Tool Configurations ------------------------------------------------------

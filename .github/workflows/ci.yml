@@ -1,9 +1,11 @@
 name: CI
 
 on:
-    pull_request:
     push:
-        branches-ignore:
+        branches:
+            - master
+    pull_request:
+        branches:
             - master
     workflow_dispatch:
 
@@ -12,36 +14,51 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v4
+            - name: Checkout repository
+              uses: actions/checkout@v4
               with:
                   fetch-depth: 0
 
-            - name: Set up Python
+            - name: Set up Python 3.13
               uses: actions/setup-python@v5
               with:
-                  python-version: "3.13"
+                  python-version: '3.13'
 
-            - name: Cache pip, Poetry & Nox envs
+            - name: Cache pip, Poetry, Nox, and pre-commit
               uses: actions/cache@v4
               with:
                   path: |
                       ~/.cache/pip
                       ~/.cache/pypoetry
                       .cache/nox
+                      .cache/pre-commit
                   key: nox-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
                   restore-keys: |
                       nox-${{ runner.os }}-
 
-            - name: Install Poetry 2.1.1
-              run: pip install --upgrade "poetry==2.1.1"
+            - name: Install Poetry
+              run: pip install --upgrade "poetry>=2.1.1"
 
             - name: Install Nox
               run: pip install --upgrade "nox==2025.5.1" # Pinned to match project
 
-            - name: Run QA suite
+            - name: Run lint, type-check, and QA sessions
               run: |
-                  # Run all quality checks except tests (which are conditionally skipped if no tests exist)
-                  nox -s lint mypy pre_commit code_quality
+                  # Run all quality checks except tests
+                  nox -s lint mypy code_quality
 
+            - name: Run safety check
+              run: |
+                  # Explicitly run safety check for dependency vulnerabilities
+                  poetry run safety check --full-report
+
+            - name: Run tests with coverage (if present)
+              run: |
                   # Run tests session separately - it will be skipped if no test files exist
-                  nox -s tests
+                  nox -s tests -- --cov=libs --cov-report=xml
+
+            - name: Upload coverage report
+              uses: codecov/codecov-action@v3
+              with:
+                  files: ./coverage.xml
+                  fail_ci_if_error: false

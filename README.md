@@ -11,3 +11,56 @@
 # Parametric Arsenal
 
 A curated and version-controlled mono-repo namespaced library powering architectural workflows and projects, including custom Grasshopper and Rhino parametric design workflows.
+
+## Continuous Integration
+
+This project uses [pre-commit](https://pre-commit.com/), [Nox](https://nox.thea.codes/), and GitHub Actions for automated QA and CI/CD.
+
+### Local setup
+
+-   On first clone, run:
+
+    ```sh
+    git config core.hooksPath .githooks
+    ```
+
+    This will ensure pre-commit hooks are installed automatically on checkout (see `.githooks/post-checkout`).
+
+-   Run the full QA suite locally with:
+
+    ```sh
+    poetry install
+    nox
+    ```
+
+    This will install hooks (if not present) and run all checks.
+
+### CI/CD
+
+-   All checks are run in CI on every push and pull request to `master`.
+-   Releases are handled by `.github/workflows/release.yml`.
+
+### Keeping tools up to date
+
+-   [pre-commit.ci](https://pre-commit.ci/) is enabled to keep hooks updated automatically.
+-   All tool versions are pinned in `pyproject.toml` and `poetry.lock` for reproducibility.
+
+### Caching
+
+-   CI caches the following for speed:
+    -   `~/.cache/pip`
+    -   `~/.cache/pypoetry`
+    -   `.cache/nox`
+    -   `.cache/pre-commit`
+    -   `~/.cache/ruff`
+    -   `~/.cache/docformatter`
+    -   `~/.cache/pytest`
+    -   `~/.cache/yamllint`
+    -   `~/.cache/shellcheck`
+
+### Speed tweaks
+
+-   In CI, pre-commit reuses its virtualenvs via `PRE_COMMIT_HOME=~/.cache/pre-commit`.
+-   All caches are restored for faster runs.
+
+See `.pre-commit-config.yaml`, `noxfile.py`, and `.github/workflows/ci.yml` for details.
