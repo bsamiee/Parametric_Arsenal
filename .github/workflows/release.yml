@@ -56,6 +56,13 @@ jobs:
                   LAST_COMMIT_MSG=$(git log -1 --pretty=%s)
                   echo "Last commit message: '$LAST_COMMIT_MSG'"
 
+                  # Skip if last commit is from our release process
+                  if [[ "$LAST_COMMIT_MSG" =~ ^(bump:|docs:\ enhance\ changelog) ]]; then
+                    echo "release_needed=false" >> $GITHUB_OUTPUT
+                    echo "⏭️ No release needed - last commit is from release process"
+                    exit 0
+                  fi
+
                   # Check current version vs what PSR calculates
                   CURRENT_VERSION=$(poetry version --short)
                   echo "Current version: $CURRENT_VERSION"
@@ -82,6 +89,7 @@ jobs:
                     echo "⏭️ No release needed - PSR returned 0.0.0 (no changes)"
                   else
                     echo "release_needed=true" >> $GITHUB_OUTPUT
+                    echo "new_version=$PSR_VERSION" >> $GITHUB_OUTPUT
                     echo "✅ Release needed: $CURRENT_VERSION → $PSR_VERSION"
                   fi
 
@@ -98,8 +106,8 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  # Run PSR - this will bump version, create tag, and push
-                  if ! poetry run semantic-release publish; then
+                  # Run PSR with specific flags to ensure it works properly
+                  if ! poetry run semantic-release publish --no-changelog; then
                     echo "❌ PSR failed - aborting workflow"
                     exit 1
                   fi
@@ -116,8 +124,9 @@ jobs:
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
                   echo "📦 New version after PSR: $VERSION"
 
-                  # Ensure we have the latest tags from PSR
+                  # Ensure we have the latest tags and commits from PSR
                   git fetch origin --tags
+                  git fetch origin master
 
                   # Verify the tag was created
                   LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')
@@ -128,6 +137,14 @@ jobs:
                     echo "✅ Tag v$VERSION confirmed to exist"
                   else
                     echo "⚠️ Tag v$VERSION not found - this may cause git-cliff issues"
+                    # Wait a bit and try again
+                    sleep 3
+                    git fetch origin --tags
+                    if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+                      echo "✅ Tag v$VERSION found after retry"
+                    else
+                      echo "❌ Tag v$VERSION still not found"
+                    fi
                   fi
 
             - name: "Generate and commit enhanced changelog"
@@ -136,8 +153,12 @@ jobs:
                   set -x
                   echo "=== Generating Enhanced Changelog ==="
 
-                  # Fetch latest remote state to ensure we have PSR's tag (already done in previous step)
-                  # git fetch origin --tags
+                  # Ensure we have the latest state from PSR
+                  git fetch origin --tags
+                  git fetch origin master
+
+                  VERSION="${{ steps.get_version.outputs.version }}"
+                  echo "Working with version: $VERSION"
 
                   # Create CHANGELOG.md if it doesn't exist
                   if [ ! -f CHANGELOG.md ]; then
@@ -153,31 +174,55 @@ jobs:
                   EOF
                   fi
 
-                  # Generate the full changelog using the tag PSR created
+                  # Backup existing changelog
+                  cp CHANGELOG.md CHANGELOG.md.backup
+
                   echo "🔧 Running git-cliff to generate enhanced changelog..."
 
                   # Verify tag exists before running git-cliff
-                  if ! git rev-parse "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
-                    echo "⚠️ Tag v${{ steps.get_version.outputs.version }} not found, waiting and retrying..."
-                    sleep 2
+                  if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+                    echo "⚠️ Tag v$VERSION not found, attempting to find it..."
                     git fetch origin --tags
-                  fi
-
-                  if ! poetry run git-cliff -vv --tag "v${{ steps.get_version.outputs.version }}" --output CHANGELOG.md; then
-                    echo "⚠️ git-cliff failed, but continuing workflow..."
-                    echo "📋 Attempting fallback: regenerate entire changelog..."
-                    if ! poetry run git-cliff -vv --output CHANGELOG.md; then
-                      echo "❌ git-cliff fallback also failed - changelog may be incomplete"
+                    sleep 2
+                    if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+                      echo "❌ Tag v$VERSION still not found, using current HEAD"
+                      # Use current HEAD instead of the missing tag
+                      if ! poetry run git-cliff -vv --output CHANGELOG.md; then
+                        echo "❌ git-cliff failed even with HEAD - restoring backup"
+                        mv CHANGELOG.md.backup CHANGELOG.md
+                        exit 1
+                      fi
+                    else
+                      echo "✅ Tag v$VERSION found, proceeding with git-cliff"
+                      if ! poetry run git-cliff -vv --tag "v$VERSION" --output CHANGELOG.md; then
+                        echo "⚠️ git-cliff with tag failed, trying without tag"
+                        if ! poetry run git-cliff -vv --output CHANGELOG.md; then
+                          echo "❌ git-cliff fallback failed - restoring backup"
+                          mv CHANGELOG.md.backup CHANGELOG.md
+                          exit 1
+                        fi
+                      fi
+                    fi
+                  else
+                    echo "✅ Tag v$VERSION exists, running git-cliff with tag"
+                    if ! poetry run git-cliff -vv --tag "v$VERSION" --output CHANGELOG.md; then
+                      echo "⚠️ git-cliff with tag failed, trying without tag"
+                      if ! poetry run git-cliff -vv --output CHANGELOG.md; then
+                        echo "❌ git-cliff fallback failed - restoring backup"
+                        mv CHANGELOG.md.backup CHANGELOG.md
+                        exit 1
+                      fi
                     fi
                   fi
 
-                  # Git already configured in previous step, no need to reconfigure
+                  # Remove backup if we got here successfully
+                  rm -f CHANGELOG.md.backup
 
-                  # Commit and push changelog if it was modified
+                  # Check if changelog actually changed
                   if ! git diff --quiet CHANGELOG.md; then
                     echo "📝 Changelog was modified, committing and pushing changes..."
                     git add CHANGELOG.md
-                    git commit -m "docs: enhance changelog for v${{ steps.get_version.outputs.version }} [skip ci]"
+                    git commit -m "docs: enhance changelog for v$VERSION [skip ci]"
                     git push origin master
                     echo "✅ Enhanced changelog committed and pushed"
                   else

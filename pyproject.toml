@@ -477,6 +477,7 @@ commit_message = "bump: release v{version}"
 changelog_file = ""                               # Disable PSR's changelog - git-cliff handles this
 vcs_release = true                                # Create GitHub releases
 upload_to_vcs_release = true
+build_command = "poetry build --no-interaction"
 
 [tool.semantic_release.branches.master]
 match = "master"
@@ -503,7 +504,6 @@ patch_tags = [
 [tool.semantic_release.publish]
 upload_to_vcs_release = true                    # Creates a GitHub release and uploads assets
 dist_glob_patterns = ["dist/*"]                 # Which files from the build to upload
-build_command = "poetry build --no-interaction"
 
 # --- Remote & Author Identity ---
 [tool.semantic_release.remote]
