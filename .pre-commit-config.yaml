@@ -52,8 +52,9 @@ repos:
       hooks:
           - id: prettier
             files: \.(json|yaml|yml|md)$
+            exclude: '^CHANGELOG\.md$'
             types: [json, yaml, markdown]
-            description: Formats JSON, YAML, and Markdown files
+            description: Formats JSON, YAML, and Markdown files (excludes auto-generated CHANGELOG)
     # - repo: https://github.com/jorisroovers/shfmt
     #   rev: v3.7.0
     #   hooks:
@@ -69,7 +70,8 @@ repos:
           - id: markdownlint
             args: [--config, .markdownlint.json]
             files: \.md$
-            description: Validates Markdown files after mdformat formatting
+            exclude: '^CHANGELOG\.md$'
+            description: Validates Markdown files after prettier formatting (excludes auto-generated CHANGELOG)
     # - repo: https://github.com/Julian/jsonlint
     #   rev: v0.1
     #   hooks:
