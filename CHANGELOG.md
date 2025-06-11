@@ -4,37 +4,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.6] - 2025-06-11
+
+
+### Bug Fixes
+
+- Update poetry lock ([`570e5d0`](https://github.com/bsamiee/Parametric_Arsenal/commit/570e5d04c46f4e105ffd00baa3dc59226e81c6f9))
+
+- Exclude auto-generated CHANGELOG.md from formatters and linters ([`aa05df5`](https://github.com/bsamiee/Parametric_Arsenal/commit/aa05df5d98f63942f985764a11e18e5c370fda76))
+
+- Resolve pre-commit hook configuration issues ([`bb42fe8`](https://github.com/bsamiee/Parametric_Arsenal/commit/bb42fe8b73b50e2efb3395f925bc180d35cb0694))
+
 
 ### Documentation
 
 - Readme change ([`a129d49`](https://github.com/bsamiee/Parametric_Arsenal/commit/a129d49c3f81a09a716268d7ba775aac63ff51da))
 
+
+
 ## [1.0.5] - 2025-06-10
+
 
 ### Chores
 
 - Remove deprecated scripts ([`357f988`](https://github.com/bsamiee/Parametric_Arsenal/commit/357f98851c1c7f0cefdb56ab32a860e21858c6bb))
 
+
+
 ## [1.0.4] - 2025-06-10
+
 
 ### Continuous Integration
 
 - Add new pre commit hooks, remove mkdocs, add secrets baseline ([`28a6c6e`](https://github.com/bsamiee/Parametric_Arsenal/commit/28a6c6eb0ef20043b339dab289f41c2bed9b5ebf))
 
+
+
 ## [1.0.3] - 2025-06-10
+
 
 ### Continuous Integration
 
 - Nea pre commit hooks, add dispatch to workflows ([`31a23a9`](https://github.com/bsamiee/Parametric_Arsenal/commit/31a23a9db6e89181a5d5d0802567f1c2e208bef9))
 
+
+
 ## [1.0.2] - 2025-06-10
+
 
 ### Chores
 
 - Remove test_feature ([`43225ac`](https://github.com/bsamiee/Parametric_Arsenal/commit/43225acc0de99cbb7e22b68203db2d6e85757896))
 
+
+
 ## [1.0.1] - 2025-06-10
+
 
 ### Bug Fixes
 
@@ -42,17 +67,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improve test feature documentation formatting ([`9235f1f`](https://github.com/bsamiee/Parametric_Arsenal/commit/9235f1fd147ca1e6e28968b82b8c30f3c5ea45f0))
 
+
 ### Chores
 
 - Remove docs from PSR patch tags ([`cdb5663`](https://github.com/bsamiee/Parametric_Arsenal/commit/cdb566390eb9676f575f1ee6eaabdfda6de06924))
 
+
+
 ## [1.0.0] - 2025-06-10
+
 
 ### Features
 
 - Completely rewrite release workflow for simplicity and reliability ([`422c823`](https://github.com/bsamiee/Parametric_Arsenal/commit/422c823f423d1e012e2f633e426d7ae016c4603d))
 
+
+
 ## [0.2.0] - 2025-06-10
+
 
 ### Bug Fixes
 
@@ -100,15 +132,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix release.yml to persist credentials ([`cd6bf39`](https://github.com/bsamiee/Parametric_Arsenal/commit/cd6bf3920e7bb9d2060a8e6ffa356c7b740fd068))
 
+
 ### Chores
 
 - Update changelog and pyproject from previous workflow runs ([`003de1d`](https://github.com/bsamiee/Parametric_Arsenal/commit/003de1d369cb72a7f24474ae5866967ca183ec10))
 
 - Update PSR config ([`42c5d57`](https://github.com/bsamiee/Parametric_Arsenal/commit/42c5d57af4a9a663edc4cb7022c79279a9eccd70))
 
+
 ### Documentation
 
 - Trigger release workflow ([`7774dd4`](https://github.com/bsamiee/Parametric_Arsenal/commit/7774dd46ad81ba45d90d40cb37603c40d977af6a))
+
 
 ### Features
 
@@ -116,11 +151,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Full debug of release workflow ([`dd7c4b5`](https://github.com/bsamiee/Parametric_Arsenal/commit/dd7c4b5a70c0afc52291a6f1754588417ce9a22b))
 
+
 ### Refactor
 
 - Improve release workflow and simplify commitizen config ([`cf799e5`](https://github.com/bsamiee/Parametric_Arsenal/commit/cf799e52237e3209e50af455040729c67d2b3155))
 
+
+
 ## [0.1.0] - 2025-06-09
+
 
 ### Bug Fixes
 
@@ -164,9 +203,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix for release workflow, sync flag change ([`a028a29`](https://github.com/bsamiee/Parametric_Arsenal/commit/a028a29c6b1ab517270287f0c06e59a2e13229e9))
 
+
 ### Build System
 
 - Initial project structure and automation setup ([`bd2a748`](https://github.com/bsamiee/Parametric_Arsenal/commit/bd2a748da757d52abc8bbc5a49dcdafde4872366))
+
 
 ### Chores
 
@@ -175,6 +216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add starting_version ([`3a8d48b`](https://github.com/bsamiee/Parametric_Arsenal/commit/3a8d48b5dbb9cfc702465d58e838e1f0592312d1))
 
 - Configure release branch to master ([`e16dd6b`](https://github.com/bsamiee/Parametric_Arsenal/commit/e16dd6bad5fb266d4b7200b025e2261dcb2269a5))
+
 
 ### Continuous Integration
 
@@ -222,12 +264,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New tool configs, new workflows ([`702dfc5`](https://github.com/bsamiee/Parametric_Arsenal/commit/702dfc57ca25eae9687a6051ffb99f27e655ee40))
 
+
 ### Features
 
 - (**noxfile.py**) Finalized venv testing suite workflow ([`518f062`](https://github.com/bsamiee/Parametric_Arsenal/commit/518f06254e6a5ab7292b54733fd7e80b47e8a747))
 
 - Re-enable changelog generation ([`113f062`](https://github.com/bsamiee/Parametric_Arsenal/commit/113f06209ce654958f40dadaf3c7cf9bb431b1a3))
 
+
 ### Testing
 
 - Increased noxfile debuf verbosity ([`61d80d0`](https://github.com/bsamiee/Parametric_Arsenal/commit/61d80d0159771def2683d27627eecff1b6e3eb63))
+
+
+
