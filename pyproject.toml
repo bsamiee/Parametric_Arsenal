@@ -15,7 +15,7 @@ license = "MIT"
 name = "parametric_arsenal"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
-version = "1.0.9"
+version = "1.0.10"
 
 # --- Optional Dependencies ----------------------------------------------------
 [project.optional-dependencies]
@@ -429,7 +429,7 @@ allow-magic-value-types = ["int", "str"]
 allow_zero_version = true
 build_command = "poetry build --no-interaction"
 changelog_file = "" # Disable PSR's changelog - git-cliff handles this
-commit_message = "bump: release v{version}"
+commit_message = "bump: release v{version} [skip ci]"
 initial_version = "0.0.0"
 major_on_zero = true
 tag_format = "v{version}"
