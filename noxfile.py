@@ -18,7 +18,8 @@ import nox
 
 nox.options.envdir = ".cache/nox"
 nox.options.sessions = [
-    "install_hooks",  # Ensure hooks are always installed first
+    "setup",  # Ensure dependencies are installed first
+    "install_hooks",
     "lint",
     "mypy",
     "pre_commit",
@@ -27,40 +28,21 @@ nox.options.sessions = [
     "docs",
 ]
 nox.options.reuse_existing_virtualenvs = True
+nox.options.default_venv_backend = "virtualenv"
 
 PYTHON_VERSIONS = ["3.13"]  # single-version matrix for now
-SOURCE_PATHS = ("libs", "noxfile.py")  # Removed 'tests' to avoid mypy error
+SOURCE_PATHS = ("libs", "noxfile.py")
 HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Dependency setup ──────────────────────────────────────────────────────────
 
 
-def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
-    """
-    Sync the venv with *poetry.lock* (Poetry ≥ 2.1).
-
-    Only the requested dependency *groups* plus runtime code (``main``) are installed, keeping environments lean. Each
-    nox session gets its own isolated virtual environment, avoiding nested .venv creation.
-
-    """
-    cmd = ["poetry", "sync", "--no-interaction", "--ansi"]
-
-    if groups:
-        cmd += ["--only", ",".join(groups)]
-
-    if not root:
-        cmd.append("--no-root")
-
-    # Set environment variables only for this specific command execution
-    env = {
-        "POETRY_VIRTUALENVS_CREATE": "false",
-        "POETRY_VIRTUALENVS_IN_PROJECT": "false",
-        "VIRTUAL_ENV": session.virtualenv.location,
-        "POETRY_ACTIVE": "1",
-    }
-
-    session.run(*cmd, external=True, env=env)
+@nox.session(python=PYTHON_VERSIONS[0], name="setup")
+def setup(session: nox.Session) -> None:
+    """Install all dependencies using Poetry into the Nox venv."""
+    session.run("poetry", "install", "--no-interaction", external=True)
+    session.log("✅  All dependencies installed in the Nox venv.")
 
 
 # ── Git-hook bootstrap ────────────────────────────────────────────────────────
@@ -79,7 +61,6 @@ def install_hooks(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def pre_commit(session: nox.Session) -> None:
     """Run *pre-commit* hooks on the entire repo."""
-    poetry_sync(session, "dev")
     if not os.getenv("CI"):  # ensure hooks are available locally
         session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
     session.run("pre-commit", "run", "--all-files", "--show-diff-on-failure", "-v")
@@ -88,7 +69,6 @@ def pre_commit(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def lint(session: nox.Session) -> None:
     """Run all formatters and then linters/checkers for code and file hygiene."""
-    poetry_sync(session, "dev")
     # --- Formatters ---
     session.run("ruff", "check", "--fix", "-v", *SOURCE_PATHS)
     session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
@@ -137,21 +117,18 @@ def lint(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def mypy(session: nox.Session) -> None:
     """Type-check the codebase using MyPy with strict settings."""
-    poetry_sync(session, "main", "type")
     session.run("mypy", "-vv", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def tests(session: nox.Session) -> None:
     """Dummy test session placeholder."""
-    poetry_sync(session, "main", "test")
     session.log("🔎  Dummy test session: pytest not yet configured.")
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def code_quality(session: nox.Session) -> None:
     """Dummy code quality session placeholder."""
-    poetry_sync(session, "dev")
     session.log("🔎  Dummy code quality session: vulture/secrets not yet configured.")
 
 
@@ -166,7 +143,6 @@ def docs(session: nox.Session) -> None:
     Uses sphinx-autobuild for live reload if '--serve' is passed.
 
     """
-    poetry_sync(session, "main", "docs", root=True)
     if "--serve" in session.posargs:
         session.run(
             "sphinx-autobuild",
@@ -207,7 +183,6 @@ def release(session: nox.Session) -> None:
     Ensures all dev tools are installed and uses verbose output.
 
     """
-    poetry_sync(session, "dev")
     session.run("semantic-release", "--verbose", "publish")
 
 

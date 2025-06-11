@@ -38,6 +38,9 @@ jobs:
             - name: Install Nox
               run: pip install --upgrade "nox==2025.5.1" # Pinned to match project
 
+            - name: Run setup (install dependencies)
+              run: nox -s setup
+
             - name: Run lint
               run: nox -s lint
 
@@ -48,6 +51,4 @@ jobs:
               run: nox -s code_quality
 
             - name: Run tests (if present)
-              run: |
-                  # Run tests session separately - it will be skipped if no test files exist
-                  nox -s tests
+              run: nox -s tests
