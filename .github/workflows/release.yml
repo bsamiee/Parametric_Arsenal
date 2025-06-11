@@ -50,51 +50,26 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
-                  set -x
                   echo "=== Python Semantic Release ==="
-
-                  # Configure git for PSR
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-                  # Let PSR handle the complete release process:
-                  # - Analyze commits since last release
-                  # - Calculate next version (if needed)
-                  # - Update pyproject.toml
-                  # - Create commit with version bump (force [skip ci] in message)
-                  # - Create annotated git tag
-                  # - Push commit and tag
-                  # - Create GitHub release
-                  echo "🚀 Running PSR..."
                   # Patch semantic-release to always add [skip ci] to version bump commit
                   sed -i.bak 's/commit_message = .*/commit_message = "bump: release v{version} [skip ci]"/' pyproject.toml || true
-                  poetry run semantic-release -vv version --no-changelog
+                  poetry run semantic-release version --no-changelog
 
             - name: 'Generate enhanced changelog with git-cliff'
               run: |
-                  set -x
                   echo "=== Generating Enhanced Changelog ==="
-
-                  # Ensure we have the latest state after PSR
                   git fetch origin --tags
                   git fetch origin master
-
-                  # Get current version and latest tag
                   VERSION=$(poetry version --short)
                   LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'No tags found')
                   echo "Current version: $VERSION"
                   echo "Latest tag: $LATEST_TAG"
-
-                  # Only generate changelog if we have a matching tag (indicates a new release was made)
                   if [[ "$LATEST_TAG" == "v$VERSION" ]]; then
                     echo "✅ New release detected (v$VERSION), generating enhanced changelog..."
-
-                    # Backup existing changelog
                     cp CHANGELOG.md CHANGELOG.md.backup 2>/dev/null || true
-
-                    # Generate complete changelog with git-cliff
-                    if poetry run git-cliff -vv --output CHANGELOG.md; then
-                      # Check if changelog was actually modified
+                    if poetry run git-cliff --output CHANGELOG.md; then
                       if ! git diff --quiet CHANGELOG.md 2>/dev/null; then
                         echo "📝 Changelog updated, committing changes..."
                         git add CHANGELOG.md
