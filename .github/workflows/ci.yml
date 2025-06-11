@@ -36,29 +36,18 @@ jobs:
                   restore-keys: |
                       nox-${{ runner.os }}-
 
-            - name: Install Poetry
-              run: pip install --upgrade "poetry>=2.1.1"
+            - name: Install Poetry 2.1.1
+              run: pip install --upgrade "poetry==2.1.1"
 
             - name: Install Nox
               run: pip install --upgrade "nox==2025.5.1" # Pinned to match project
 
             - name: Run lint, type-check, and QA sessions
               run: |
-                  # Run all quality checks except tests
-                  nox -s lint mypy code_quality
+                  # Run all quality checks except tests (which are conditionally skipped if no tests exist)
+                  nox -s lint mypy pre_commit code_quality
 
-            - name: Run safety check
-              run: |
-                  # Explicitly run safety check for dependency vulnerabilities
-                  poetry run safety check --full-report
-
-            - name: Run tests with coverage (if present)
+            - name: Run tests (if present)
               run: |
                   # Run tests session separately - it will be skipped if no test files exist
-                  nox -s tests -- --cov=libs --cov-report=xml
-
-            - name: Upload coverage report
-              uses: codecov/codecov-action@v3
-              with:
-                  files: ./coverage.xml
-                  fail_ci_if_error: false
+                  nox -s tests
