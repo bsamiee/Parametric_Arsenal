@@ -1,0 +1,21 @@
+# Cache directories
+.cache/
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+docs/_build/
+
+# Git
+.git/
+
+# Auto-generated files
+CHANGELOG.md
+poetry.lock
+package-lock.json

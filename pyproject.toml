@@ -7,10 +7,7 @@ requires = ["poetry-core"]
 
 [project]
 authors = [{email = "b.samiee93@gmail.com", name = "Bardia Samiee"}]
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python :: 3 :: Only"
-]
+classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python :: 3 :: Only"]
 description = "Architectural/Parametric monorepo"
 dynamic = ["dependencies"]
 keywords = ["automation", "grasshopper", "rhino"]
@@ -82,14 +79,7 @@ show_missing = true
 [tool.coverage.run]
 branch = true
 data_file = ".cache/coverage"
-omit = [
-  "*/__main__.py",
-  ".cache/*",
-  ".venv/*",
-  "node_modules/*",
-  "package-lock.json",
-  "tests/*"
-]
+omit = ["*/__main__.py", ".cache/*", ".venv/*", "node_modules/*", "package-lock.json", "tests/*"]
 source = ["libs/mzn", "libs/mzn_cli"] # Source code to measure coverage for
 
 # --- docformatter Configuration ----------
@@ -308,10 +298,7 @@ addopts = """
     --no-cov-on-fail
     """
 cache_dir = ".cache/pytest"
-markers = [
-  "asyncio",
-  "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
-]
+markers = ["asyncio", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"]
 minversion = "8.0"
 norecursedirs = [".cache", ".venv", "node_modules", "package-lock.json"]
 python_classes = "Test*"
@@ -427,13 +414,8 @@ known-first-party = ["mzn", "mzn_cli"]
 lines-after-imports = 2
 
 [tool.ruff.lint.per-file-ignores]
-"libs/mzn_cli/main.py" = [
-  "PLC0415",
-  "S404"
-] # Allow subprocess and conditional imports for CLI
-"noxfile.py" = [
-  "ANN201"
-] # Ignore missing return type annotations for nox sessions
+"libs/mzn_cli/main.py" = ["PLC0415", "S404"] # Allow subprocess and conditional imports for CLI
+"noxfile.py" = ["ANN201"] # Ignore missing return type annotations for nox sessions
 "tests/*" = ["S101"] # Ignore `assert` usage in tests
 
 [tool.ruff.lint.pydocstyle]
@@ -468,16 +450,7 @@ env = "GIT_COMMIT_AUTHOR" # A single env var: "Your Name <your.email@example.com
 breaking_description = "BREAKING CHANGE"
 major_tags = ["breaking", "feat!"]
 minor_tags = ["feat", "feature"]
-patch_tags = [
-  "build",
-  "chore",
-  "ci",
-  "fix",
-  "perf",
-  "refactor",
-  "revert",
-  "style"
-]
+patch_tags = ["build", "chore", "ci", "fix", "perf", "refactor", "revert", "style"]
 
 # --- Publishing ---
 [tool.semantic_release.publish]

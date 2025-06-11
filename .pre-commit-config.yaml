@@ -1,6 +1,9 @@
 # .pre-commit-config.yaml
 ci:
     autoupdate_schedule: weekly
+    skip_commits:
+        # Skip pre-commit for CI/bot commits
+        message: ".*\\[skip ci\\].*|.*github-actions\\[bot\\].*"
 
 default_stages: [pre-commit]
 default_language_version:
@@ -52,9 +55,9 @@ repos:
       hooks:
           - id: prettier
             files: \.(json|yaml|yml|md)$
-            exclude: '^CHANGELOG\.md$'
+            exclude: '^(CHANGELOG\.md|\.cache/.*|node_modules/.*)$'
             types: [json, yaml, markdown]
-            description: Formats JSON, YAML, and Markdown files (excludes auto-generated CHANGELOG)
+            description: Formats JSON, YAML, and Markdown files (excludes auto-generated CHANGELOG and cache directories)
     # - repo: https://github.com/jorisroovers/shfmt
     #   rev: v3.7.0
     #   hooks:
@@ -70,8 +73,8 @@ repos:
           - id: markdownlint
             args: [--config, .markdownlint.json]
             files: \.md$
-            exclude: '^CHANGELOG\.md$'
-            description: Validates Markdown files after prettier formatting (excludes auto-generated CHANGELOG)
+            exclude: '^(CHANGELOG\.md|\.cache/.*|node_modules/.*)$'
+            description: Validates Markdown files after prettier formatting (excludes auto-generated CHANGELOG and cache directories)
     # - repo: https://github.com/Julian/jsonlint
     #   rev: v0.1
     #   hooks:
@@ -86,7 +89,8 @@ repos:
           - id: yamllint
             types: [yaml]
             files: \.yml|yaml$
-            description: Validates YAML files for correctness
+            exclude: '^(\.cache/.*|node_modules/.*)$'
+            description: Validates YAML files for correctness (excludes cache directories)
     - repo: https://github.com/shellcheck-py/shellcheck-py
       rev: v0.10.0.1
       hooks:

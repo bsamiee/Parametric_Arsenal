@@ -8,31 +8,34 @@ on:
 
 jobs:
     release:
+        if: |
+            !contains(github.event.head_commit.message, '[skip ci]') &&
+            github.actor != 'github-actions[bot]'
         runs-on: ubuntu-latest
         permissions:
             contents: write # needed to push commits and tags
             id-token: write # needed for authentication
 
         steps:
-            - name: "Checkout code"
+            - name: 'Checkout code'
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
                   token: ${{ secrets.GH_TOKEN }}
 
-            - name: "Set up Python"
+            - name: 'Set up Python'
               uses: actions/setup-python@v5
               with:
-                  python-version: "3.13"
+                  python-version: '3.13'
 
-            - name: "Install Poetry"
+            - name: 'Install Poetry'
               uses: snok/install-poetry@v1
               with:
-                  version: "2.1.1"
+                  version: '2.1.1'
                   virtualenvs-create: true
                   virtualenvs-in-project: true
 
-            - name: "Cache Poetry virtualenv"
+            - name: 'Cache Poetry virtualenv'
               uses: actions/cache@v4
               with:
                   path: .venv
@@ -40,10 +43,10 @@ jobs:
                   restore-keys: |
                       poetry-${{ runner.os }}-
 
-            - name: "Install dependencies"
+            - name: 'Install dependencies'
               run: poetry install --no-interaction
 
-            - name: "Run Python Semantic Release"
+            - name: 'Run Python Semantic Release'
               env:
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
@@ -65,7 +68,7 @@ jobs:
                   echo "🚀 Running PSR..."
                   poetry run semantic-release -vv version --no-changelog
 
-            - name: "Generate enhanced changelog with git-cliff"
+            - name: 'Generate enhanced changelog with git-cliff'
               run: |
                   set -x
                   echo "=== Generating Enhanced Changelog ==="
@@ -107,7 +110,7 @@ jobs:
                     echo "ℹ️ No new release made (latest tag: $LATEST_TAG, version: $VERSION)"
                   fi
 
-            - name: "Show final state"
+            - name: 'Show final state'
               run: |
                   echo "=== Release Summary ==="
                   echo "Version: $(poetry version --short)"
