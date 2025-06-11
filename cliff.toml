@@ -60,17 +60,17 @@ commit_parsers = [
     # Regular conventional commits
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
-    { message = "^docs", group = "Documentation" },
     { message = "^perf", group = "Performance" },
     { message = "^refactor", group = "Refactor" },
-    { message = "^style", group = "Styling" },
-    { message = "^test", group = "Testing" },
+    { message = "^revert", group = "Reverts" },
     { message = "^build", group = "Build System" },
     { message = "^ci", group = "Continuous Integration" },
-    { message = "^revert", group = "Reverts" },
+    { message = "^docs", group = "Documentation" },
     { message = "^chore", group = "Chores" },
+    { message = "^style", group = "Styling" },
+    { message = "^breaking", group = "Breaking Changes" },
 ]
 
-[git.remote]
-name = "origin"
-url = "https://github.com/bsamiee/Parametric_Arsenal"
+    [git.remote]
+    name = "origin"
+    url = "https://github.com/bsamiee/Parametric_Arsenal"

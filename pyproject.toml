@@ -55,9 +55,10 @@ pa = "mzn_cli.main:cli"
 # --- Commitizen Configuration ------------
 [tool.commitizen]
 name = "cz_conventional_commits"
-tag_format = "v$version" # Consistent tag format, but PSR controls tagging.
-update_changelog_on_bump = false # CRITICAL: git-cliff handles the changelog.
+tag_format = "v$version"
+update_changelog_on_bump = false
 
+# --- Coverage Configuration --------------
 [tool.coverage]
 
 [tool.coverage.html]
@@ -126,43 +127,32 @@ module = [
 [tool.poetry]
 
 [tool.poetry.dependencies]
-# --- Database & Data Stores -----------------
 Alembic = ">=1.16.1"
 DVC = ">=3.60.0"
 DuckDB = ">=1.3.0"
 SQLAlchemy = ">=2.0.41"
 SQLModel = ">=0.0.24"
-# --- Caching --------------------------------
 aiocache = "^0.12.3"
-# --- Visualization --------------------------
 altair = {optional = true, version = "^5.5.0"}
-# --- Concurrency & Tasking ------------------
 anyio = "^4.9.0"
 apscheduler = "^3.11.0"
-# --- Security & Encryption ------------------
 argon2-cffi = "^25.1.0"
 asyncpg = ">=0.30.0"
-# --- Data Handling, Serialization & I/O -----
 beautifulsoup4 = ">=4.13.4"
-# --- Core Utilities -------------------------
 boltons = ">=25.0.0"
 cachetools = "^6.0.0"
 celery = "^5.5.3"
-# --- Automation & Scraping ------------------
 cloudscraper = {optional = true, version = "^1.2.71"}
 cryptography = "^45.0.3"
-# --- Data & Science -------------------------
 dask = {optional = true, version = "^2025.5.1"}
 diskcache = "^5.6.3"
 dogpile-cache = "^1.1.8"
 dynaconf = "^3.2.11"
-# --- Web / Networking -----------------------
 fabric = {optional = true, version = "^3.2.2"}
 fastapi = {optional = true, version = "^0.115.12"}
 geopandas = {optional = true, version = "^1.1.0"}
 h5py = {optional = true, version = "^3.14.0"}
 httpx = {optional = true, version = ">=0.28.1"}
-# --- Debugging ------------------------------
 icecream = "^2.1.4"
 ipdb = "^0.13.13"
 jsonschema = ">=4.24.0"
@@ -179,9 +169,7 @@ pillow = "^11.2.1"
 playwright = {optional = true, version = "^1.52.0"}
 plotly = {optional = true, version = "^6.1.2"}
 polars = {optional = true, version = "^1.30.0"}
-# --- Logging & Metrics ----------------------
 prometheus-client = "^0.22.1"
-# --- CLI & TUI ------------------------------
 prompt_toolkit = "^3.0.51"
 psutil = ">=7.0.0"
 pudb = "^2025.1"
@@ -202,7 +190,6 @@ python-multipart = {optional = true, version = "^0.0.20"}
 python-pptx = ">=1.0.2"
 qrcode = {optional = true, version = ">=8.2"}
 redis = {extras = ["hiredis"], version = "^6.2.0"}
-# --- Rhino/Grasshopper ----------------------
 rhino3dm = {optional = true, version = "^8.17.0"}
 rhinoinside = {optional = true, version = "^0.8.2"}
 rich = "^14.0.0"
@@ -448,9 +435,9 @@ env = "GIT_COMMIT_AUTHOR" # A single env var: "Your Name <your.email@example.com
 # --- Commit Parsing ---
 [tool.semantic_release.commit_parser_options]
 breaking_description = "BREAKING CHANGE"
-major_tags = ["breaking", "feat!"]
-minor_tags = ["feat", "feature"]
-patch_tags = ["build", "chore", "ci", "fix", "perf", "refactor", "revert", "style"]
+major_tags = ["breaking"]
+minor_tags = ["feat"]
+patch_tags = ["build", "ci", "fix", "perf", "refactor", "revert"]
 
 # --- Publishing ---
 [tool.semantic_release.publish]
