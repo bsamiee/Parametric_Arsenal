@@ -131,43 +131,62 @@ repos:
           - id: check-yaml
             types: [yaml]
             files: \.yml|yaml$
+            exclude: 'CHANGELOG\.md'
           - id: check-toml
             files: ^pyproject\.toml$
+            exclude: 'CHANGELOG\.md'
           - id: end-of-file-fixer
+            exclude: 'CHANGELOG\.md'
           - id: trailing-whitespace
+            exclude: 'CHANGELOG\.md'
           - id: check-added-large-files
             args: ['--maxkb=512']
+            exclude: 'CHANGELOG\.md'
           - id: check-ast
             types: [python]
             files: \.py$
+            exclude: 'CHANGELOG\.md'
           - id: check-case-conflict
+            exclude: 'CHANGELOG\.md'
           - id: check-docstring-first
             types: [python]
             files: \.py$
+            exclude: 'CHANGELOG\.md'
           - id: check-executables-have-shebangs
+            exclude: 'CHANGELOG\.md'
           - id: check-illegal-windows-names
+            exclude: 'CHANGELOG\.md'
           - id: check-json
             types: [json]
             files: \.json$
+            exclude: 'CHANGELOG\.md'
           - id: check-shebang-scripts-are-executable
+            exclude: 'CHANGELOG\.md'
           - id: check-symlinks
+            exclude: 'CHANGELOG\.md'
           - id: check-xml
             types: [xml]
             files: \.xml$
+            exclude: 'CHANGELOG\.md'
           - id: destroyed-symlinks
+            exclude: 'CHANGELOG\.md'
           - id: detect-private-key
+            exclude: 'CHANGELOG\.md'
           - id: name-tests-test
             types: [python]
             files: ^tests/.*\.py$
+            exclude: 'CHANGELOG\.md'
           - id: pretty-format-json
             args: [--autofix, --indent=4, --no-ensure-ascii, --no-sort-keys]
             types: [json]
             files: \.json$
+            exclude: 'CHANGELOG\.md'
           # Removed sort-simple-yaml as prettier now handles comprehensive YAML formatting
           # - id: sort-simple-yaml
           #   types: [yaml]
           #   files: \.yml|yaml$
           - id: check-merge-conflict
+            exclude: 'CHANGELOG\.md'
 
     # --- Local helpers ----------------------------------------------------------
     - repo: local

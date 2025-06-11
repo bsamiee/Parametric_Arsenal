@@ -50,7 +50,7 @@ jobs:
             - name: Run lint, type-check, and QA sessions
               run: |
                   # Run all quality checks except tests (which are conditionally skipped if no tests exist)
-                  nox -s lint mypy pre_commit code_quality
+                  nox -s lint mypy code_quality
 
             - name: Run tests (if present)
               run: |

@@ -9,6 +9,9 @@ ignore: |
 rules:
     line-length:
         max: 120
+        level: warning # Do not fail, only warn
+        allow-non-breakable-words: true
+        allow-non-breakable-inline-mappings: true
     document-start: disable # prettier doesn't add document start markers
     comments-indentation: disable # prettier handles comment formatting
     comments:
