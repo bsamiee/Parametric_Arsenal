@@ -1,0 +1,10 @@
+---
+extends: default
+
+rules:
+    line-length:
+        max: 120
+    document-start: disable # prettier doesn't add document start markers
+    comments-indentation: disable # prettier handles comment formatting
+    comments:
+        min-spaces-from-content: 1 # allow 1 space instead of 2

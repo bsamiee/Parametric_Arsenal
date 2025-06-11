@@ -1,19 +1,9 @@
 """
-Project helper file executed by **Nox**.
+Title         : noxfile.py Author        : Bardia Samiee Project       : parametric_arsenal License       : MIT Path :
+noxfile.py.
 
-It spins-up throw-away virtual-envs (under ``.cache/nox``) to run:
+Description ------- A concise 1-3 sentence summary telling a new reader why this script exists.
 
-• pre-commit hooks
-• linters / formatters
-• type-checker
-• test-suite (placeholder - skipped while no tests exist)
-• Sphinx docs builder / live-server
-• build / release helpers
-• clean-up tasks
-
-The environments are populated straight from *poetry.lock* via
-``poetry sync --only <groups>`` so every session gets exactly the
-dependencies it needs - nothing more.
 """
 
 from __future__ import annotations
@@ -55,10 +45,17 @@ def poetry_sync(session: nox.Session, *groups: str, root: bool = False) -> None:
     """
     Sync the venv with *poetry.lock* (Poetry ≥ 2.1).
 
-    Only the requested dependency *groups* plus runtime code (``main``) are
-    installed, keeping environments lean.
+    Only the requested dependency *groups* plus runtime code (``main``) are installed, keeping environments lean. Each
+    nox session gets its own isolated virtual environment, avoiding nested .venv creation.
+
     """
-    session.env.setdefault("POETRY_VIRTUALENVS_CREATE", "false")  # avoid nested .venv
+    # Prevent Poetry from creating any virtual environments - nox handles this
+    session.env["POETRY_VIRTUALENVS_CREATE"] = "false"
+    session.env["POETRY_VIRTUALENVS_IN_PROJECT"] = "false"
+    # Ensure Poetry uses the nox session's virtual environment
+    session.env["VIRTUAL_ENV"] = session.virtualenv.location
+    session.env["POETRY_ACTIVE"] = "1"  # Tell Poetry we're already in a virtual environment
+
     cmd = ["poetry", "sync", "--no-interaction", "--ansi"]
 
     if groups:
@@ -108,9 +105,10 @@ def tests(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """
     Run all formatters and then linters/checkers for code and file hygiene.
-    Formatters: ruff (autofix), docformatter, mdformat, toml-sort, jsonlint, pyupgrade.
-    Linters: ruff (check), yamllint, shellcheck.
-    Only runs file-type tools if relevant files exist.
+
+    Formatters: ruff (autofix), docformatter, mdformat, toml-sort, jsonlint, pyupgrade. Linters: ruff (check), yamllint,
+    shellcheck. Only runs file-type tools if relevant files exist.
+
     """
     poetry_sync(session, "dev")
     # --- Formatters ---
@@ -154,7 +152,9 @@ def lint(session: nox.Session) -> None:
 def code_quality(session: nox.Session) -> None:
     """
     Run extra QA: dead-code detection (vulture) and secrets scan (detect-secrets).
+
     Only runs secrets scan if .secrets.baseline exists.
+
     """
     poetry_sync(session, "dev")
     session.run("vulture", "--min-confidence", "80", *SOURCE_PATHS)
@@ -166,7 +166,9 @@ def code_quality(session: nox.Session) -> None:
 def mypy(session: nox.Session) -> None:
     """
     Type-check the codebase using MyPy with strict settings.
+
     Installs the project for import-based checking.
+
     """
     poetry_sync(session, "main", "type", root=True)
     session.run("mypy", "-vv", *SOURCE_PATHS)
@@ -179,7 +181,9 @@ def mypy(session: nox.Session) -> None:
 def docs(session: nox.Session) -> None:
     """
     Build or serve the documentation with Sphinx.
+
     Uses sphinx-autobuild for live reload if '--serve' is passed.
+
     """
     poetry_sync(session, "main", "docs", root=True)
     if "--serve" in session.posargs:
@@ -218,7 +222,9 @@ def build(session: nox.Session) -> None:
 def release(session: nox.Session) -> None:
     """
     Publish a new version using python-semantic-release.
+
     Ensures all dev tools are installed and uses verbose output.
+
     """
     poetry_sync(session, "dev")
     session.run("semantic-release", "--verbose", "publish")

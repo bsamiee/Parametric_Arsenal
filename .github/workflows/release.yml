@@ -83,7 +83,7 @@ jobs:
                   # Only generate changelog if we have a matching tag (indicates a new release was made)
                   if [[ "$LATEST_TAG" == "v$VERSION" ]]; then
                     echo "✅ New release detected (v$VERSION), generating enhanced changelog..."
-                    
+
                     # Backup existing changelog
                     cp CHANGELOG.md CHANGELOG.md.backup 2>/dev/null || true
 

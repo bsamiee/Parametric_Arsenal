@@ -1,16 +1,13 @@
 """
-Title         : main.py
-Author        : Bardia Samiee
-Project       : parametric_arsenal
-License       : MIT
-Path          : libs/mzn_cli/main.py
+Title         : main.py Author        : Bardia Samiee Project       : parametric_arsenal License       : MIT Path :
+libs/mzn_cli/main.py.
 
-Description
--------
-A concise 1-3 sentence summary telling a new reader why this script exists.
+Description ------- A concise 1-3 sentence summary telling a new reader why this script exists.
+
 """
 
 import importlib
+import shutil
 import subprocess
 
 import typer
@@ -21,16 +18,28 @@ cli = typer.Typer(name="mzn", help="Mazan Group CLI")
 
 
 @cli.command()
-def commit():
+def commit() -> None:
     """Run pre-commit hooks, then cz commit if hooks pass."""
+    # Check if required tools are available
+    pre_commit_path = shutil.which("pre-commit")
+    cz_path = shutil.which("cz")
+
+    if not pre_commit_path:
+        typer.secho("pre-commit not found in PATH", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not cz_path:
+        typer.secho("cz (commitizen) not found in PATH", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
     try:
         typer.echo("Running pre-commit hooks...")
-        result = subprocess.run(["pre-commit", "run", "--hook-stage", "commit"], check=False, shell=False)
+        result = subprocess.run([pre_commit_path, "run", "--hook-stage", "commit"], check=False)  # noqa: S603
         if result.returncode != 0:
             typer.secho("Pre-commit hooks failed. Please fix the issues above.", fg=typer.colors.RED)
             raise typer.Exit(1)
         typer.echo("Pre-commit hooks passed. Launching Commitizen...")
-        cz_result = subprocess.run(["cz", "commit"], check=False, shell=False)
+        cz_result = subprocess.run([cz_path, "commit"], check=False)  # noqa: S603
         if cz_result.returncode != 0:
             typer.secho("Commitizen failed.", fg=typer.colors.RED)
             raise typer.Exit(1)

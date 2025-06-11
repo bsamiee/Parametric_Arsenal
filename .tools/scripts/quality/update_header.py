@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """
-Title         : update_header.py
-Author        : Bardia Samiee
-Project       : Parametric_Arsenal
-License       : MIT
-Path          : .tools/scripts/quality/update_header.py
+Title         : update_header.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
+Path          : .tools/scripts/quality/update_header.py.
 
-Description
--------
-A script to automatically add or update copyright/license headers in Python
-files. It reads metadata from the root pyproject.toml and is designed to
-be run via a pre-commit hook.
+Description ------- A script to automatically add or update copyright/license headers in Python files. It reads metadata
+from the root pyproject.toml and is designed to be run via a pre-commit hook.
+
 """
 
 import argparse
@@ -83,6 +78,7 @@ def process_file(file_path: Path, metadata: dict[str, str]) -> bool:
     Adds or replaces the header in a single Python file, preserving the description.
 
     Returns True if the file was modified, False otherwise.
+
     """
     try:
         original_content = file_path.read_text(encoding="utf-8")
@@ -98,15 +94,23 @@ def process_file(file_path: Path, metadata: dict[str, str]) -> bool:
             end_of_header_idx = original_content.index('"""', 3)
             header_content = original_content[3:end_of_header_idx]
 
-            # Find the description within the block
-            desc_marker = "Description\n-------\n"
-            desc_start_idx = header_content.index(desc_marker) + len(desc_marker)
-            description_to_use = header_content[desc_start_idx:].strip()
+            # Find the description within the block (try multiple formats)
+            description_markers = ["Description\n-------\n", "Description\n-------"]
+            description_to_use = NEW_FILE_DESCRIPTION_PLACEHOLDER
+
+            for desc_marker in description_markers:
+                try:
+                    desc_start_idx = header_content.index(desc_marker) + len(desc_marker)
+                    description_to_use = header_content[desc_start_idx:].strip()
+                    break
+                except ValueError:
+                    continue
+
             # Find the end of the docstring to separate it from the code
             end_of_docstring_idx = end_of_header_idx + 3
         except ValueError:
-            # Header is malformed or doesn't have a description; use placeholder
-            end_of_docstring_idx = 0
+            # Header is malformed; remove it entirely
+            end_of_docstring_idx = 3  # Just remove the opening """
 
         rest_of_file = original_content[end_of_docstring_idx:].lstrip()
     else:
