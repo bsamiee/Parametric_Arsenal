@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.11] - 2025-06-11
+
+
+### Bug Fixes
+
+- Release workflow ([`597a186`](https://github.com/bsamiee/Parametric_Arsenal/commit/597a18676c0514c6b1c0543a06394440b8b14977))
 
 
 ### Chore
@@ -317,7 +322,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-enable changelog generation ([`113f062`](https://github.com/bsamiee/Parametric_Arsenal/commit/113f06209ce654958f40dadaf3c7cf9bb431b1a3))
 
 
-### Testing
+### Test
 
 - Increased noxfile debuf verbosity ([`61d80d0`](https://github.com/bsamiee/Parametric_Arsenal/commit/61d80d0159771def2683d27627eecff1b6e3eb63))
 
