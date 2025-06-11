@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+
+### Chore
+
+- Fix workflow circular errors ([`9f16911`](https://github.com/bsamiee/Parametric_Arsenal/commit/9f1691187d39df6ca200e7f9e39a8ecc16971e45))
+
+
+
 ## [1.0.10] - 2025-06-11
 
 
