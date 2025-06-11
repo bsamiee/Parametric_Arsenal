@@ -61,11 +61,13 @@ jobs:
                   # - Analyze commits since last release
                   # - Calculate next version (if needed)
                   # - Update pyproject.toml
-                  # - Create commit with version bump
+                  # - Create commit with version bump (force [skip ci] in message)
                   # - Create annotated git tag
                   # - Push commit and tag
                   # - Create GitHub release
                   echo "🚀 Running PSR..."
+                  # Patch semantic-release to always add [skip ci] to version bump commit
+                  sed -i.bak 's/commit_message = .*/commit_message = "bump: release v{version} [skip ci]"/' pyproject.toml || true
                   poetry run semantic-release -vv version --no-changelog
 
             - name: 'Generate enhanced changelog with git-cliff'
