@@ -1,6 +1,9 @@
 # .pre-commit-config.yaml
 ci:
     autoupdate_schedule: 'weekly'
+    autoupdate_commit_msg: 'chore: update pre-commit hooks'
+    autoupdate_branch: 'pre-commit-auto-update'
+    skip: []  # Don't skip any hooks during CI
     skip_commits:
         # Skip pre-commit for CI/bot commits
         message: >-
