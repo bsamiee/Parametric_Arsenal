@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+
+### Breaking Changes
+
+- Implement foundational library packages ([`eb3edec`](https://github.com/bsamiee/Parametric_Arsenal/commit/eb3edecd3be95baee3f084634f7d01990d24227b))
+
+
+
 ## [1.0.13] - 2025-06-11
 
 
