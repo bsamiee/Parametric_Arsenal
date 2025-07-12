@@ -11,6 +11,9 @@
 # --- General -------------------------------------------------------------------
 todo.txt
 placeholder.txt
+.claude/
+claude.md
+gemini.md
 
 # --- macOS & Editor cruft -----------------------------------------------------
 .DS_Store
@@ -53,6 +56,8 @@ pip-wheel-metadata/
 .ruff_cache/
 .coverage
 .nox/
+.hypothesis/
+.benchmarks/
 coverage.xml
 htmlcov/
 

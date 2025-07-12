@@ -1,0 +1,49 @@
+from collections.abc import Callable
+from typing import TypeVar, overload
+
+_F = TypeVar("_F", bound=Callable[..., object])
+
+@overload
+def memoize[T, R](func: Callable[[T], R], /) -> Callable[[T], R]: ...
+@overload
+def memoize[R](func: Callable[..., R], /) -> Callable[..., R]: ...
+@overload
+def memoize(
+    cache: dict[tuple[object, ...], object] | None = None,
+    key: Callable[..., object] | None = None,
+) -> Callable[[_F], _F]: ...
+
+# Function composition
+def compose(*funcs: Callable[..., object]) -> Callable[..., object]: ...
+def pipe(data: object, *funcs: Callable[..., object]) -> object: ...
+
+# Iteration functions
+def partition(n: int, seq: object) -> object: ...
+def partition_all(n: int, seq: object) -> object: ...
+def sliding_window(n: int, seq: object) -> object: ...
+def groupby[T](key: Callable[[T], object], seq: object) -> dict[object, list[T]]: ...
+
+# Other commonly used functions
+def identity[T](x: T) -> T: ...
+def first(seq: object) -> object: ...
+def second(seq: object) -> object: ...
+def nth(n: int, seq: object) -> object: ...
+def last(seq: object) -> object: ...
+def get(ind: object, seq: object, default: object = None) -> object: ...
+
+# Re-export all functions for wildcard import
+__all__ = [
+    "compose",
+    "first",
+    "get",
+    "groupby",
+    "identity",
+    "last",
+    "memoize",
+    "nth",
+    "partition",
+    "partition_all",
+    "pipe",
+    "second",
+    "sliding_window",
+]

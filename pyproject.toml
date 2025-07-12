@@ -1,12 +1,10 @@
-# --- Metadata -----------------------------------------------------------------
-
 # --- Build System -------------------------------------------------------------
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
 
 [project]
-authors = [{email = "b.samiee93@gmail.com", name = "Bardia Samiee"}]
+authors = [{ email = "b.samiee93@gmail.com", name = "Bardia Samiee" }]
 classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python :: 3 :: Only"]
 description = "Architectural/Parametric monorepo"
 dynamic = ["dependencies"]
@@ -17,40 +15,238 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 version = "1.0.13"
 
-# --- Optional Dependencies ----------------------------------------------------
-[project.optional-dependencies]
-autoscape = ["cloudscraper", "playwright", "pyautogui", "scrapy"]
-datascience = [
-  "dask",
-  "geopandas",
-  "h5py",
-  "networkx",
-  "numpy",
-  "pandas",
-  "polars",
-  "pyarrow",
-  "pyspark",
-  "scipy",
-  "sympy",
-  "uncertainties",
-  "xarray"
-]
-rhinogh = ["rhino3dm", "rhinoinside"]
-viz = ["altair", "matplotlib", "plotly", "qrcode", "seaborn"]
-webnet = [
-  "fabric",
-  "fastapi",
-  "httpx",
-  "paramiko",
-  "pyserial",
-  "python-multipart",
-  "strawberry-graphql",
-  "uvicorn",
-  "websockets"
-]
+  [project.scripts]
+  pa = "mzn_cli.main:cli"
 
-[project.scripts]
-pa = "mzn_cli.main:cli"
+
+  # --- Optional Dependencies ----------------------------------------------------
+  [project.optional-dependencies]
+  autoscape = ["cloudscraper", "playwright", "pyautogui", "scrapy"]
+  datascience = [
+    "dask",
+    "geopandas",
+    "h5py",
+    "networkx",
+    "numpy",
+    "pandas",
+    "polars",
+    "pyarrow",
+    "pyspark",
+    "scipy",
+    "sympy",
+    "uncertainties",
+    "xarray",
+  ]
+  rhinogh = ["rhino3dm", "rhinoinside"]
+  viz = ["altair", "matplotlib", "plotly", "qrcode", "seaborn"]
+  webnet = [
+    "fabric",
+    "fastapi",
+    "httpx",
+    "paramiko",
+    "pyserial",
+    "python-multipart",
+    "strawberry-graphql",
+    "uvicorn",
+    "websockets",
+  ]
+
+# --- Runtime Dependencies -----------------------------------------------------
+[tool.poetry]
+packages = [{ include = "mzn", from = "libs" }, { include = "mzn_cli", from = "libs" }]
+
+  [tool.poetry.dependencies]
+
+  # Rhinogh dependencies
+  rhino3dm = { optional = true, version = "^8.17.0" }
+  rhinoinside = { optional = true, version = "^0.8.2" }
+
+  # Datascience dependencies
+  dask = { optional = true, version = "^2025.5.1" }
+  geopandas = { optional = true, version = "^1.1.0" }
+  h5py = { optional = true, version = "^3.14.0" }
+  networkx = { optional = true, version = "^3.5" }
+  numpy = { optional = true, version = "^2.2.6" }
+  pandas = { optional = true, version = "^2.3.0" }
+  polars = { optional = true, version = "^1.30.0" }
+  pyarrow = { optional = true, version = "^20.0.0" }
+  pyspark = { optional = true, version = "^4.0.0" }
+  scipy = { optional = true, version = "^1.15.3" }
+  sympy = { optional = true, version = ">=1.14.0" }
+  uncertainties = { optional = true, version = ">=3.2.3" }
+  xarray = { optional = true, version = "^2025.4.0" }
+
+  # Viz dependencies
+  altair = { optional = true, version = "^5.5.0" }
+  matplotlib = { optional = true, version = "^3.10.3" }
+  plotly = { optional = true, version = "^6.1.2" }
+  qrcode = { optional = true, version = ">=8.2" }
+  seaborn = { optional = true, version = ">=0.13.2" }
+
+  # Autoscape dependencies
+  cloudscraper = { optional = true, version = "^1.2.71" }
+  playwright = { optional = true, version = "^1.52.0" }
+  pyautogui = { optional = true, version = "^0.9.54" }
+  scrapy = { optional = true, version = "^2.13.1" }
+
+  # Webnet dependencies
+  fabric = { optional = true, version = "^3.2.2" }
+  httpx = { optional = true, version = ">=0.28.1" }
+  paramiko = { optional = true, version = "^3.5.1" }
+  pyserial = { optional = true, version = ">=3.5" }
+  python-multipart = { optional = true, version = "^0.0.20" }
+  strawberry-graphql = { optional = true, version = "^0.271.0" }
+  uvicorn = { optional = true, version = "^0.34.3" }
+  websockets = { optional = true, version = "^15.0.1" }
+
+  # Type system dependencies
+  mypy-extensions = ">=1.1.0"
+  pydantic = { extras = ["email"], version = "^2.11.5" }
+  pydantic-settings = "^2.9.1"
+  aenum = "^3.1.16"
+  returns = "^0.25.0"
+  phantom-types = "^3.0.2"
+  beartype = "^0.21.0"
+
+  # Utility dependencies
+  boltons = ">=25.0.0"             # Utility functions and data structures
+  cytoolz = "^1.0.1"               # Functional programming utilities
+  wrapt = "^1.17.2"                # Decorators and wrappers for Python functions
+  python-dateutil = "^2.9.0.post0" # Date and time handling library
+  python-magic = "^0.4.27"         # File type detection library
+
+  # Debugging dependencies
+  icecream = "^2.1.4" # Debugging utility
+  ipdb = "^0.13.13"   # Interactive Python Debugger
+  pudb = "^2025.1"    # Full-screen console debugger
+
+  # Log dependencies
+  structlog = "^25.4.0"         # Structured logging library
+  opentelemetry-api = "^1.34.1" # OpenTelemetry API for distributed tracing
+  opentelemetry-sdk = "^1.34.1" # OpenTelemetry SDK for distributed tracing
+
+  # CLI dependencies
+  prompt_toolkit = "^3.0.51" # Interactive command line library
+  tabulate = "^0.9.0"        # Pretty-print tabular data
+  typer = ">=0.16.0"         # Command line interface library
+  sh = ">=2.2.2"             # Shell command execution library
+  tqdm = "^4.67.1"           # Progress bar library
+  rich = "^14.0.0"           # Rich text and beautiful formatting in the terminal
+  textual = "^3.3.0"         # Terminal UI toolkit
+
+  # Cache dependencies
+  aiocache = "^0.12.3"
+  cachetools = "^6.0.0"
+  redis = { extras = ["hiredis"], version = "^6.2.0" }
+  cachebox = "^5.0.1"
+
+  # Compression dependencies
+  brotli = "^1.1.0" # Brotli compression library
+  lz4 = "^4.4.4"    # LZ4 compression library
+
+  # Standard dependencies
+  Alembic = ">=1.16.1"                                    # Database migration tool
+  DVC = ">=3.60.0"                                        # Data Version Control
+  DuckDB = ">=1.3.0"                                      # Analytical database management system
+  SQLAlchemy = ">=2.0.41"                                 # SQL toolkit and ORM
+  SQLModel = ">=0.0.24"                                   # SQL toolkit and ORM
+  anyio = "^4.9.0"                                        # Asynchronous I/O library
+  apscheduler = "^3.11.0"                                 # Advanced Python Scheduler
+  argon2-cffi = "^25.1.0"                                 # Password hashing library
+  asyncpg = ">=0.30.0"                                    # Asynchronous PostgreSQL driver
+  beautifulsoup4 = ">=4.13.4"                             # HTML and XML parsing library
+  celery = "^5.5.3"                                       # Distributed task queue
+  cryptography = "^45.0.3"                                # Cryptographic recipes and primitives
+  fastapi = "^0.115.12"                                   # Modern web framework for building APIs
+  jsonschema = ">=4.24.0"                                 # JSON schema validation library
+  PyYAML = ">=6.0"                                        # YAML parsing and emitting library
+  openpyxl = "^3.1.5"                                     # Excel file handling library
+  orjson = "^3.10.18"                                     # Fast JSON library
+  msgpack = "^1.1.1"                                      # Efficient binary serialization format
+  cbor2 = "^5.6.5"                                        # Concise Binary Object Representation library
+  passlib = "^1.7.4"                                      # Password hashing library
+  pillow = "^11.2.1"                                      # Image processing library
+  prometheus-client = "^0.22.1"                           # Monitoring and metrics library
+  psutil = ">=7.0.0"                                      # System and process utilities
+  pymupdf = ">=1.26.0"                                    # PDF and document processing library
+  lxml = "^6.0.0"                                         # XML and HTML processing library
+  pypdf = "^5.6.0"                                        # PDF processing library
+  python = ">=3.13,<3.14"                                 # Python runtime dependency
+  python-docx = ">=1.1.2"                                 # Microsoft Word document handling library
+  python-jose = "^3.5.0"                                  # JSON Web Token (JWT) library
+  python-pptx = ">=1.0.2"                                 # Microsoft PowerPoint document handling library
+  ruamel-yaml = "^0.18.13"                                # YAML parsing and emitting library
+  tenacity = "^9.1.2"                                     # Retry library
+  thefuzz = { extras = ["speedup"], version = "^0.22.1" }
+  tomlkit = "^0.13.3"
+  watchdog = "^6.0.0"
+
+  # --- Core development utilities ------------------------------------------------
+  [tool.poetry.group.dev]
+
+    [tool.poetry.group.dev.dependencies]
+
+    # Management
+    nox = "^2025.5.1"
+    commitizen = ">=4.8.2"
+    python-semantic-release = ">=10.0.2"
+    git-cliff = ">=2.9.1"
+    jinja2 = "^3.1.6"
+    detect-secrets = "^1.5.0"
+    pre-commit = "^4.2.0"
+
+    # Linting & Formatting
+    ruff = "^0.11.13"
+    jsonlint = "^0.1"
+    yamllint = ">=1.37.1"
+    shellcheck-py = "^0.10.0.1"
+    toml-sort = ">=0.24.2"
+    docformatter = "^1.7.7"
+
+    # --- Type-checking only --------------------------------------------------------
+    types-toml = "^0.10.8.20240310"
+    types-pyyaml = "^6.0.12.20250516"
+    types-cachetools = "^6.0.0.20250525"
+    types-lxml = "^2025.3.30"
+
+  [tool.poetry.group.type.dependencies]
+  mypy = "^1.16.0"
+  pyright = "^1.1.403"
+
+  # --- Documentation toolchain ---------------------------------------------------
+
+  [tool.poetry.group.docs]
+
+    [tool.poetry.group.docs.dependencies]
+    sphinx = "^8.2.3"
+    sphinx-autobuild = "^2024.10.3"
+    sphinx-rtd-theme = "^3.0.2"
+    sphinx-autodoc-typehints = "^3.2.0"
+    autodoc-pydantic = "^2.2.0"
+    weasyprint = ">=65.1"
+
+  # --- Test suite & profiling ----------------------------------------------------
+  [tool.poetry.group.test]
+
+    [tool.poetry.group.test.dependencies]
+    radon = ">=6.0.1"
+    vulture = ">=2.14"
+    Faker = ">=37.3.0"
+    coverage = ">=7.8.2"
+    hypothesis = ">=6.135.1"
+    line-profiler = ">=4.2.0"
+    memory-profiler = ">=0.61.0"
+    pyinstrument = ">=5.0.2"
+    pytest = "^8.4.0"
+    pytest-asyncio = "^1.0.0"
+    pytest-benchmark = ">=5.1.0"
+    pytest-clarity = ">=1.0.1"
+    pytest-cov = ">=6.1.1"
+    pytest-json-report = ">=1.5.0"
+    pytest-mock = ">=3.14.1"
+    pytest-timeout = ">=2.4.0"
+    pytest-xdist = ">=3.8.0"
+    freezegun = ">=1.5.2"
 
 # --- Commitizen Configuration ------------
 [tool.commitizen]
@@ -58,30 +254,54 @@ name = "cz_conventional_commits"
 tag_format = "v$version"
 update_changelog_on_bump = false
 
-# --- Coverage Configuration --------------
-[tool.coverage]
+# --- Python-Semantic-Release Configuration -------
+[tool.semantic_release]
+allow_zero_version = true
+build_command = "poetry build --no-interaction"
+changelog_file = ""                                   # Disable PSR's changelog - git-cliff handles this
+commit_message = "bump: release v{version} [skip ci]"
+initial_version = "0.0.0"
+major_on_zero = true
+tag_format = "v{version}"
+upload_to_vcs_release = true
+vcs_release = true                                    # Create GitHub releases
+version_toml = ["pyproject.toml:project.version"]
 
-[tool.coverage.html]
-directory = ".cache/coverage/html" # HTML report output directory
+  [tool.semantic_release.branches.master]
+  match = "master"
+  prerelease = false
 
-[tool.coverage.report]
-exclude_lines = [
-  "def __repr__",
-  "if __name__ == .__main__.:",
-  "pass",
-  "pragma: no cover",
-  "raise ImportError",
-  "raise NotImplementedError"
-]
-fail_under = 85
-show_missing = true
+  [tool.semantic_release.commit_author]
+  default = "Bardia Samiee <b.samiee93@gmail.com>"
+  env = "GIT_COMMIT_AUTHOR"                        # A single env var: "Your Name <your.email@example.com>"
 
-# --- coverage Configuration --------------
-[tool.coverage.run]
-branch = true
-data_file = ".cache/coverage"
-omit = ["*/__main__.py", ".cache/*", ".venv/*", "node_modules/*", "package-lock.json", "tests/*"]
-source = ["libs/mzn", "libs/mzn_cli"] # Source code to measure coverage for
+  # --- Commit Parsing ---
+  [tool.semantic_release.commit_parser_options]
+  breaking_description = "BREAKING CHANGE"
+  major_tags = ["breaking"]
+  minor_tags = ["feat"]
+  patch_tags = ["build", "ci", "fix", "perf", "refactor", "revert"]
+
+  # --- Publishing ---
+  [tool.semantic_release.publish]
+  dist_glob_patterns = ["dist/*"] # Which files from the build to upload
+  upload_to_vcs_release = true    # Creates a GitHub release and uploads assets
+
+  # --- Remote & Author Identity ---
+  [tool.semantic_release.remote]
+  name = "origin"
+  token = { env = "GH_TOKEN" }
+
+# --- Sphinx Configuration -----------------
+[tool.sphinx]
+author = "Bardia Samiee"
+copyright = "2025, Bardia Samiee"
+project = "Parametric Arsenal"
+
+# --- tomlsort Configuration --------------
+[tool.tomlsort]
+all = true
+in_place = true
 
 # --- docformatter Configuration ----------
 [tool.docformatter]
@@ -95,367 +315,497 @@ recursive = true
 wrap-descriptions = 120
 wrap-summaries = 120
 
-# --- mypy Configuration ------------------
-[tool.mypy]
-cache_dir = ".cache/mypy"
-exclude = '(^node_modules/|^\\.venv/|^\\.cache/|^package-lock\\.json$)'
-explicit_package_bases = true
-mypy_path = [".", "libs"]
-namespace_packages = true
-plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
-python_version = "3.13"
-strict = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-
-[[tool.mypy.overrides]] # For third-party libraries that have NO type stubs available
-ignore_missing_imports = true
-module = [
-  "boltons.*",
-  "cloudscraper.*",
-  "fabric.*",
-  "icecream.*",
-  "libs.*",
-  "pudb.*",
-  "rhino3dm.*",
-  "rhinoinside.*",
-  "sh.*",
-  "thefuzz.*"
-]
-
-# --- Runtime Dependencies -----------------------------------------------------
-[tool.poetry]
-
-[tool.poetry.dependencies]
-Alembic = ">=1.16.1"
-DVC = ">=3.60.0"
-DuckDB = ">=1.3.0"
-SQLAlchemy = ">=2.0.41"
-SQLModel = ">=0.0.24"
-aiocache = "^0.12.3"
-altair = {optional = true, version = "^5.5.0"}
-anyio = "^4.9.0"
-apscheduler = "^3.11.0"
-argon2-cffi = "^25.1.0"
-asyncpg = ">=0.30.0"
-beautifulsoup4 = ">=4.13.4"
-boltons = ">=25.0.0"
-cachetools = "^6.0.0"
-celery = "^5.5.3"
-cloudscraper = {optional = true, version = "^1.2.71"}
-cryptography = "^45.0.3"
-dask = {optional = true, version = "^2025.5.1"}
-diskcache = "^5.6.3"
-dogpile-cache = "^1.1.8"
-dynaconf = "^3.2.11"
-fabric = {optional = true, version = "^3.2.2"}
-fastapi = {optional = true, version = "^0.115.12"}
-geopandas = {optional = true, version = "^1.1.0"}
-h5py = {optional = true, version = "^3.14.0"}
-httpx = {optional = true, version = ">=0.28.1"}
-icecream = "^2.1.4"
-ipdb = "^0.13.13"
-jsonschema = ">=4.24.0"
-lxml = ">=5.4.0"
-matplotlib = {optional = true, version = "^3.10.3"}
-networkx = {optional = true, version = "^3.5"}
-numpy = {optional = true, version = "^2.2.6"}
-openpyxl = "^3.1.5"
-orjson = "^3.10.18"
-pandas = {optional = true, version = "^2.3.0"}
-paramiko = {optional = true, version = "^3.5.1"}
-passlib = "^1.7.4"
-pillow = "^11.2.1"
-playwright = {optional = true, version = "^1.52.0"}
-plotly = {optional = true, version = "^6.1.2"}
-polars = {optional = true, version = "^1.30.0"}
-prometheus-client = "^0.22.1"
-prompt_toolkit = "^3.0.51"
-psutil = ">=7.0.0"
-pudb = "^2025.1"
-pyarrow = {optional = true, version = "^20.0.0"}
-pyautogui = {optional = true, version = "^0.9.54"}
-pydantic = {extras = ["email"], version = "^2.11.5"}
-pydantic-settings = "^2.9.1"
-pymupdf = ">=1.26.0"
-pypdf = "^5.6.0"
-pyserial = {optional = true, version = ">=3.5"}
-pyspark = {optional = true, version = "^4.0.0"}
-python = ">=3.13,<3.14"
-python-dateutil = "^2.9.0.post0"
-python-docx = ">=1.1.2"
-python-jose = "^3.5.0"
-python-magic = "^0.4.27"
-python-multipart = {optional = true, version = "^0.0.20"}
-python-pptx = ">=1.0.2"
-qrcode = {optional = true, version = ">=8.2"}
-redis = {extras = ["hiredis"], version = "^6.2.0"}
-rhino3dm = {optional = true, version = "^8.17.0"}
-rhinoinside = {optional = true, version = "^0.8.2"}
-rich = "^14.0.0"
-ruamel-yaml = "^0.18.13"
-scipy = {optional = true, version = "^1.15.3"}
-scrapy = {optional = true, version = "^2.13.1"}
-seaborn = {optional = true, version = ">=0.13.2"}
-sh = ">=2.2.2"
-strawberry-graphql = {optional = true, version = "^0.271.0"}
-structlog = "^25.4.0"
-sympy = {optional = true, version = ">=1.14.0"}
-tabulate = "^0.9.0"
-tenacity = "^9.1.2"
-textual = "^3.3.0"
-thefuzz = {extras = ["speedup"], version = "^0.22.1"}
-tomlkit = "^0.13.3"
-toolz = "^1.0.0"
-tqdm = "^4.67.1"
-typer = ">=0.16.0"
-uncertainties = {optional = true, version = ">=3.2.3"}
-uvicorn = {optional = true, version = "^0.34.3"}
-watchdog = "^6.0.0"
-websockets = {optional = true, version = "^15.0.1"}
-xarray = {optional = true, version = "^2025.4.0"}
-
-# --- Core development utilities ------------------------------------------------
-[tool.poetry.group.dev]
-
-[tool.poetry.group.dev.dependencies]
-# Management
-commitizen = ">=4.8.2"
-detect-secrets = "^1.5.0"
-docformatter = "^1.7.7"
-git-cliff = ">=2.9.1"
-jinja2 = "^3.1.6"
-# Linting & Formatting
-jsonlint = "^0.1"
-nox = "^2025.5.1"
-pre-commit = "^4.2.0"
-python-semantic-release = ">=10.0.2"
-# Static analysis helpers kept here for convenience
-radon = ">=6.0.1"
-ruff = "^0.11.13"
-shellcheck-py = "^0.10.0.1"
-toml-sort = ">=0.24.2"
-vulture = ">=2.14"
-yamllint = ">=1.37.1"
-
-# --- Documentation toolchain ---------------------------------------------------
-[tool.poetry.group.docs]
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "^8.2.3"
-sphinx-autobuild = "^2024.10.3"
-weasyprint = ">=65.1"
-
-# --- Test suite & profiling ----------------------------------------------------
-[tool.poetry.group.test]
-
-[tool.poetry.group.test.dependencies]
-Faker = ">=37.3.0"
-coverage = ">=7.8.2"
-hypothesis = ">=6.135.1"
-line-profiler = ">=4.2.0"
-memory-profiler = ">=0.61.0"
-pyinstrument = ">=5.0.2"
-pytest = "^8.4.0"
-pytest-cov = ">=6.1.1"
-pytest-json-report = ">=1.5.0"
-pytest-mock = ">=3.14.1"
-
-# --- Type-checking only --------------------------------------------------------
-[tool.poetry.group.type.dependencies]
-mypy = "^1.16.0"
-mypy-extensions = ">=1.1.0"
-
-[[tool.poetry.packages]]
-include = "libs/mzn"
-
-[[tool.poetry.packages]]
-include = "libs/mzn_cli"
+# --- radon Configuration -----------------
+[tool.radon]
+mi = { min = "A" }
 
 # --- pytest Configuration ----------------
 [tool.pytest]
 
-[tool.pytest.ini_options]
-addopts = """
+  [tool.pytest.ini_options]
+  addopts = """
     --import-mode=importlib
     -ra
     --cov=libs
     --cov-report=term-missing
-    --cov-fail-under=80
+    --cov-report=html
+    --cov-report=json
+    --cov-fail-under=85
     --no-cov-on-fail
+    --strict-markers
+    --strict-config
+    --tb=short
+    --verbosity=2
+    --benchmark-storage=file://./.cache/benchmarks
+    --benchmark-autosave
+    --benchmark-json=.cache/benchmarks/results.json
     """
-cache_dir = ".cache/pytest"
-markers = ["asyncio", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"]
-minversion = "8.0"
-norecursedirs = [".cache", ".venv", "node_modules", "package-lock.json"]
-python_classes = "Test*"
-python_files = "test_*.py"
-python_functions = "test_*"
-pythonpath = ["."]
-testpaths = ["libs/mzn", "libs/mzn_cli", "tests"]
+  cache_dir = ".cache/pytest"
+  console_output_style = "progress"
+  filterwarnings = ["error", "ignore::DeprecationWarning", "ignore::PendingDeprecationWarning"]
+  markers = [
+    "asyncio: marks tests as asynchronous",
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "unit: marks tests as unit tests",
+    "slow: marks tests as slow running",
+    "types: marks tests for the type system",
+    "factory: marks tests for the factory system",
+    "rules: marks tests for rule processing",
+    "builders: marks tests for Build decorators",
+    "property: marks property-based tests",
+    "cache: marks tests related to the cache package",
+    "log: marks tests related to the log package",
+    "performance: marks performance tests",
+    "quality: marks quality analysis tests",
+  ]
+  minversion = "8.0"
+  norecursedirs = [
+    ".cache",
+    ".venv",
+    "node_modules",
+    "package-lock.json",
+    ".hypothesis",
+    ".git",
+    "__pycache__",
+    "*.egg-info",
+  ]
+  python_classes = "Test*"
+  python_files = "test_*.py"
+  python_functions = "test_*"
+  pythonpath = [".", "libs"]
+  testpaths = ["tests/mzn", "tests/projects"]
 
-# --- radon Configuration -----------------
-[tool.radon]
-mi = {min = "A"}
+  # Timeout configuration (requires pytest-timeout)
+  timeout = 300             # 5 minutes default timeout
+  timeout_method = "thread"
+  timeout_func_only = true
+
+# --- Pytest Benchmark Configuration -----
+[tool.pytest-benchmark]
+# Storage location is configured via --benchmark-storage in addopts above
+
+# --- Coverage Configuration --------------
+[tool.coverage]
+
+  [tool.coverage.html]
+  directory = ".cache/coverage/html" # HTML report output directory
+
+  [tool.coverage.json]
+  output = ".cache/coverage/coverage.json"
+  pretty_print = true
+
+  [tool.coverage.report]
+  exclude_lines = [
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "pass",
+    "pragma: no cover",
+    "raise ImportError",
+    "raise NotImplementedError",
+  ]
+  exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    "raise AssertionError",
+    "except ImportError:",
+    "except ModuleNotFoundError:",
+    "def __str__",
+    "def __unicode__",
+    "def __hash__",
+    "def __eq__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "class .*\\bProtocol\\):",
+    "class .*\\bprotocol\\):",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.",
+  ]
+  fail_under = 85
+  precision = 2
+  show_missing = true
+  skip_covered = false
+  skip_empty = true
+  sort = "Cover"
+
+  [tool.coverage.run]
+  branch = true
+  data_file = ".cache/coverage/.coverage"
+  omit = ["*/__main__.py", ".cache/*", ".venv/*", "node_modules/*", "package-lock.json", "tests/*"]
+  parallel = true
+  source = ["libs/mzn", "libs/mzn_cli"]
+  source_pkgs = ["mzn", "mzn_cli"]
+
+# --- Hypothesis Configuration ------------
+[tool.hypothesis]
+database_file = ".cache/hypothesis"
+deadline = 5000                                                           # 5 seconds default
+derandomize = false
+max_examples = 100
+print_blob = true
+report_multiple_bugs = true
+suppress_health_check = ["too_slow", "data_too_large", "filter_too_much"]
+verbosity = "normal"
+
+  [tool.hypothesis.profiles.ci]
+  deadline = 5000
+  derandomize = true
+  max_examples = 100
+  print_blob = false
+  suppress_health_check = ["too_slow"]
+  verbosity = "quiet"
+
+  [tool.hypothesis.profiles.dev]
+  deadline = 2000
+  derandomize = false
+  max_examples = 10
+  print_blob = true
+  suppress_health_check = ["too_slow"]
+  verbosity = "verbose"
+
+  [tool.hypothesis.profiles.debug]
+  derandomize = true
+  max_examples = 1
+  print_blob = true
+  suppress_health_check = ["too_slow", "data_too_large", "filter_too_much", "large_base_example"]
+  verbosity = "debug"
 
 # --- ruff Configuration ------------------
 [tool.ruff]
-cache-dir = ".cache/ruff"
-exclude = [".cache", ".venv", "node_modules", "package-lock.json"]
+target-version = "py313"
 line-length = 120
 preview = true
 src = ["."]
-target-version = "py313"
+cache-dir = ".cache/ruff"
 
-[tool.ruff.lint]
-extend-ignore = [
-  "D203",
-  "D205", # Ignore blank line required between summary and description
-  "D212",
-  "D400",
-  "D405",
-  "D406",
-  "D407",
-  "D408",
-  "D409",
-  "D410",
-  "D411",
-  "D413",
-  "D414",
-  "D415",
-  "D416",
-  "DOC201", # Don't require Returns section in docstrings
-  "DOC501" # Don't require exception documentation in docstrings
+exclude = [
+  "**/.venv/**",
+  "**/.cache/**",
+  "**/node_modules/**",
+  "**/.mypy_cache/**",
+  "**/.pytest_cache/**",
+  "**/.ruff_cache/**",
+  "**/.history/**",
+  "**/dist/**",
+  "**/build/**",
 ]
-extend-select = [
-  "A",
-  "AIR",
-  "ANN",
-  "ARG",
-  "ASYNC",
-  "B",
-  "BLE",
-  "C4",
-  "COM",
-  "D",
-  "DOC",
-  "DTZ",
-  "E",
-  "EM",
-  "ERA",
-  "EXE",
-  "F",
-  "FA",
-  "FAST",
-  "FBT",
-  "FLY",
-  "FURB",
-  "G",
-  "I",
-  "ICN",
-  "INT",
-  "ISC",
-  "LOG",
-  "N",
-  "PERF",
-  "PGH",
-  "PIE",
-  "PL",
-  "PLC",
-  "PLE",
-  "PLR",
-  "PLW",
-  "PT",
-  "PTH",
-  "PYI",
-  "Q",
-  "RET",
-  "RUF",
-  "S",
-  "SIM",
-  "SLF",
-  "SLOT",
-  "T20",
-  "TC",
-  "TD",
-  "TID",
-  "TRY",
-  "UP",
-  "W"
+
+  [tool.ruff.lint]
+  extend-ignore = [
+    "COM812",  # Conflicts with formatter
+    "D203",
+    "D205",    # Ignore blank line required between summary and description
+    "D212",
+    "D400",
+    "PLC2701", # Ignore private import usage in your own project
+    "D405",
+    "D406",
+    "D407",
+    "FBT001",
+    "D408",
+    "PYI001",
+    "PYI010",  # Don't remove __str__ from stub files - needed for our type system
+    "PYI011",  # Don't flag typed self in stub files
+    "RUF029",
+    "ARG001",
+    "D409",
+    "D410",
+    "D411",
+    "D413",
+    "D414",
+    "D415",
+    "D416",
+    "DOC201",  # Don't require Returns section in docstrings
+    "DOC501",  # Don't require exception documentation in docstrings
+  ]
+  extend-select = [
+    "A",
+    "AIR",
+    "ANN",
+    "ARG",
+    "ASYNC",
+    "B",
+    "BLE",
+    "C4",
+    "COM",
+    "D",
+    "DTZ",
+    "E",
+    "EM",
+    "ERA",
+    "EXE",
+    "F",
+    "FA",
+    "FAST",
+    "FBT",
+    "FLY",
+    "FURB",
+    "G",
+    "I",
+    "ICN",
+    "INT",
+    "ISC",
+    "LOG",
+    "N",
+    "PERF",
+    "PGH",
+    "PIE",
+    "PL",
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+    "PT",
+    "PTH",
+    "PYI",
+    "Q",
+    "RET",
+    "RUF",
+    "S",
+    "SIM",
+    "SLF",
+    "SLOT",
+    "T20",
+    "TC",
+    "TD",
+    "TID",
+    "TRY",
+    "UP",
+    "W",
+  ]
+  fixable = ["ALL"] # aggressive autofixing
+
+    [tool.ruff.lint.flake8-annotations]
+    allow-star-arg-any = true
+    mypy-init-return = true
+    suppress-none-returning = true
+
+    [tool.ruff.lint.flake8-pytest-style]
+    fixture-parentheses = true
+    mark-parentheses = true
+
+    [tool.ruff.lint.isort]
+    combine-as-imports = true
+    force-single-line = false
+    known-first-party = ["mzn", "mzn_cli"]
+    lines-after-imports = 2
+
+    [tool.ruff.lint.per-file-ignores]
+    "libs/mzn/types/models/model_primitives.py" = ["ANN401"]
+    "libs/mzn/cache/*.py" = ["ANN401"] # Cache needs to handle Any types
+    "libs/mzn/types/**/*.pyi" = ["PYI010", "PYI011"] # Don't remove __str__ from our type system stubs
+    "typings/diskcache/*.pyi" = ["ANN401"] # Cache stubs need to handle Any types
+    "typings/icecream/*.pyi" = ["N802", "N803", "N815", "ANN401"] # External library API naming
+    "libs/mzn_cli/main.py" = ["PLC0415", "S404"] # Allow subprocess and conditional imports for CLI
+    "noxfile.py" = ["ANN201"] # Ignore missing return type annotations for nox sessions
+    "tests/*" = [
+      "S101",    # assert usage
+      "D",       # docstring requirements
+      "ANN",     # missing type annotations
+      "PLR2004", # magic value in comparison
+      "ARG002",  # unused arguments (fixtures)
+      "PLR6301", # methods that could be static/functions
+      "PLC0415", # import within function
+      "PT023",   # use parentheses on fixtures/marks
+      "PT006",   # wrong parametrize tuple type
+      "TC006",   # quotes in cast() calls
+      "PGH003",  # specific type ignore codes
+      "PIE790",  # unnecessary pass statements
+      "RUF012",  # mutable class defaults
+      "SLF001",  # private member access
+    ]
+    "tests/**/*.py" = [
+      "S101",
+      "D",
+      "ANN",
+      "PLR2004",
+      "ARG002",
+      "PLR6301",
+      "PLC0415",
+      "PT023",
+      "PT006",
+      "TC006",
+      "PGH003",
+      "PIE790",
+      "RUF012",
+      "SLF001",
+    ]
+
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+
+    [tool.ruff.lint.pylint]
+    allow-magic-value-types = ["int", "str"]
+
+# --- mypy Configuration ------------------
+[tool.mypy]
+python_version = "3.13"
+mypy_path = ["$MYPY_CONFIG_FILE_DIR/libs", "$MYPY_CONFIG_FILE_DIR/typings"]
+cache_dir = ".cache/mypy"
+namespace_packages = true
+explicit_package_bases = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+exclude = [
+  "\\.venv/",
+  "\\.cache/",
+  "node_modules/",
+  "\\.mypy_cache/",
+  "\\.pytest_cache/",
+  "\\.ruff_cache/",
+  "\\.history/",
+  "dist/",
+  "build/",
 ]
-fixable = ["ALL"] # aggressive autofixing
 
-[tool.ruff.lint.flake8-annotations]
-allow-star-arg-any = true
-mypy-init-return = true
-suppress-none-returning = true
+# --- Global Strictness Flags ---
+strict = true
+show_error_codes = true
+ignore_missing_imports = true
 
-[tool.ruff.lint.flake8-pytest-style]
-fixture-parentheses = true
-mark-parentheses = true
+check_untyped_defs = true
+no_implicit_optional = true
+disallow_untyped_defs = true
+disallow_any_unimported = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+warn_redundant_casts = true
+no_implicit_reexport = false
 
-[tool.ruff.lint.isort]
-combine-as-imports = true
-force-single-line = false
-known-first-party = ["mzn", "mzn_cli"]
-lines-after-imports = 2
+[tool.pydantic-mypy]
+init_typed = true        # Replaces 'Any' in the generated __init__ with the actual field types.
+init_forbid_extra = true # Removes the '**kwargs: Any' from the generated __init__
 
-[tool.ruff.lint.per-file-ignores]
-"libs/mzn_cli/main.py" = ["PLC0415", "S404"] # Allow subprocess and conditional imports for CLI
-"noxfile.py" = ["ANN201"] # Ignore missing return type annotations for nox sessions
-"tests/*" = ["S101"] # Ignore `assert` usage in tests
+  [[tool.mypy.overrides]] # For third-party libraries that have NO type stubs available
+  ignore_missing_imports = true
+  module = [
+    "aenum.*",
+    "boltons.*",
+    "cloudscraper.*",
+    "fabric.*",
+    "icecream.*",
+    "pudb.*",
+    "rhino3dm.*",
+    "rhinoinside.*",
+    "sh.*",
+    "thefuzz.*",
+  ]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+  [[tool.mypy.overrides]]
+  module = ["tests.*", "tests"]
+  disallow_untyped_defs = false
+  check_untyped_defs = true
+  warn_unused_ignores = true
+  warn_return_any = false
+  ignore_missing_imports = true
 
-[tool.ruff.lint.pylint]
-allow-magic-value-types = ["int", "str"]
+# --- pyright Configuration ---------------
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+include = ["libs"]               # Just include the libs directory
+extraPaths = ["libs", "typings"]
+# Removed executionEnvironments - it was causing path confusion with namespace packages
+exclude = [
+  "**/.venv/**",
+  "**/.cache/**",
+  "**/node_modules/**",
+  "**/.mypy_cache/**",
+  "**/.pytest_cache/**",
+  "**/.ruff_cache/**",
+  "**/.history/**",
+  "**/dist/**",
+  "**/build/**",
+]
 
-# --- Python-Semantic-Release Configuration -------
-[tool.semantic_release]
-allow_zero_version = true
-build_command = "poetry build --no-interaction"
-changelog_file = "" # Disable PSR's changelog - git-cliff handles this
-commit_message = "bump: release v{version} [skip ci]"
-initial_version = "0.0.0"
-major_on_zero = true
-tag_format = "v{version}"
-upload_to_vcs_release = true
-vcs_release = true # Create GitHub releases
-version_toml = ["pyproject.toml:project.version"]
 
-[tool.semantic_release.branches.master]
-match = "master"
-prerelease = false
+# --- Global Strictness Flags ---
+strictListInference = true
+strictDictionaryInference = true
+strictParameterNoneValue = true
+strictOptional = true
+strictSetInference = true
 
-[tool.semantic_release.commit_author]
-default = "Bardia Samiee <b.samiee93@gmail.com>"
-env = "GIT_COMMIT_AUTHOR" # A single env var: "Your Name <your.email@example.com>"
+reportMissingImports = "none"
+reportMissingModuleSource = "none"
 
-# --- Commit Parsing ---
-[tool.semantic_release.commit_parser_options]
-breaking_description = "BREAKING CHANGE"
-major_tags = ["breaking"]
-minor_tags = ["feat"]
-patch_tags = ["build", "ci", "fix", "perf", "refactor", "revert"]
-
-# --- Publishing ---
-[tool.semantic_release.publish]
-dist_glob_patterns = ["dist/*"] # Which files from the build to upload
-upload_to_vcs_release = true # Creates a GitHub release and uploads assets
-
-# --- Remote & Author Identity ---
-[tool.semantic_release.remote]
-name = "origin"
-token = {env = "GH_TOKEN"}
-
-# --- Sphinx Configuration -----------------
-[tool.sphinx]
-author = "Bardia Samiee"
-copyright = "2025, Bardia Samiee"
-project = "Parametric Arsenal"
-
-# --- tomlsort Configuration --------------
-[tool.tomlsort]
-all = true
-in_place = true
+reportDeprecated = "error"
+reportMissingTypeStubs = "error"
+reportIncompleteStub = "error"
+reportInvalidStubStatement = "error"
+reportImportCycles = "error"
+reportDuplicateImport = "error"
+reportUnusedImport = "error"
+reportImplicitStringConcatenation = "error"
+reportUnknownMemberType = "error"
+reportUnknownVariableType = "error"
+reportAbstractUsage = "error"
+reportArgumentType = "error"
+reportAssertAlwaysTrue = "error"
+reportAssertTypeFailure = "error"
+reportAssignmentType = "error"
+reportAttributeAccessIssue = "error"
+reportCallIssue = "error"
+reportSelfClsParameterName = "error"
+reportRedeclaration = "error"
+reportPrivateUsage = "error"
+reportMissingParameterType = "error"
+reportPossiblyUnboundVariable = "error"
+reportOptionalContextManager = "error"
+reportOptionalOperand = "error"
+reportOptionalIterable = "error"
+reportMissingTypeArgument = "error"
+reportMissingSuperCall = "error"
+reportInvalidTypeVarUse = "error"
+reportImplicitOverride = "error"
+reportPropertyTypeMismatch = "error"
+reportPrivateImportUsage = "error"
+reportOverlappingOverload = "error"
+reportOptionalSubscript = "error"
+reportOptionalCall = "error"
+reportOperatorIssue = "error"
+reportNoOverloadImplementation = "error"
+reportMatchNotExhaustive = "error"
+reportIndexIssue = "error"
+reportGeneralTypeIssues = "error"
+reportCallInDefaultInitializer = "error"
+reportInconsistentConstructor = "error"
+reportOptionalMemberAccess = "error"
+reportInconsistentOverload = "error"
+reportFunctionMemberAccess = "error"
+reportConstantRedefinition = "error"
+reportReturnType = "error"
+reportIncompatibleMethodOverride = "error"
+reportIncompatibleVariableOverride = "error"
+reportInvalidStringEscapeSequence = "error"
+reportInvalidTypeArguments = "error"
+reportInvalidTypeForm = "error"
+reportShadowedImports = "error"
+reportWildcardImportFromLibrary = "error"
+reportUnusedVariable = "error"
+reportUnusedFunction = "error"
+reportUnusedExpression = "error"
+reportUnusedExcept = "error"
+reportUnusedCoroutine = "error"
+reportUnusedCallResult = "error"
+reportUnusedClass = "error"
+reportUnsupportedDunderAll = "error"
+reportUntypedBaseClass = "error"
+reportUntypedClassDecorator = "error"
+reportUntypedFunctionDecorator = "error"
+reportUntypedNamedTuple = "error"
+reportUninitializedInstanceVariable = "error"
+reportUnhashable = "error"
+reportUndefinedVariable = "error"
+reportUnnecessaryCast = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnnecessaryIsInstance = "error"
+reportUnnecessaryContains = "error"
+reportUnnecessaryComparison = "error"
+reportUnboundVariable = "error"
+reportUnknownArgumentType = "error"
+reportUnknownLambdaType = "error"
+reportUnknownParameterType = "error"
+reportTypedDictNotRequiredAccess = "error"
+reportTypeCommentUsage = "error"

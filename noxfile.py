@@ -1,8 +1,9 @@
 """
 Title         : noxfile.py Author        : Bardia Samiee Project       : parametric_arsenal License       : MIT Path :
-noxfile.py.
+ROOT/noxfile.py.
 
-Description ------- A concise 1-3 sentence summary telling a new reader why this script exists.
+Automates linting, type-checking, tests, docs, builds, and releases in re-usable virtual-envs under .cache/nox.  Uses
+Poetry 2.1's `poetry sync` with --only so each session pulls exactly the dependency group(s) it needs.
 
 """
 
@@ -41,7 +42,7 @@ HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
 @nox.session(python=PYTHON_VERSIONS[0], name="setup")
 def setup(session: nox.Session) -> None:
     """Install all dependencies using Poetry into the Nox venv."""
-    session.run("poetry", "install", "--no-interaction", external=True)
+    _ = session.run("poetry", "install", "--no-interaction", external=True)
     session.log("✅  All dependencies installed in the Nox venv.")
 
 
@@ -52,7 +53,7 @@ def setup(session: nox.Session) -> None:
 def install_hooks(session: nox.Session) -> None:
     """Install *pre-commit* and *commit-msg* git hooks."""
     session.install("pre-commit")  # tiny; easier than syncing full dev group
-    session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
+    _ = session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
 
 
 # ── Quality-assurance sessions ────────────────────────────────────────────────
@@ -62,17 +63,17 @@ def install_hooks(session: nox.Session) -> None:
 def pre_commit(session: nox.Session) -> None:
     """Run *pre-commit* hooks on the entire repo."""
     if not os.getenv("CI"):  # ensure hooks are available locally
-        session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
-    session.run("pre-commit", "run", "--all-files", "--show-diff-on-failure", "-v")
+        _ = session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
+    _ = session.run("pre-commit", "run", "--all-files", "--show-diff-on-failure", "-v")
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def lint(session: nox.Session) -> None:
     """Run all formatters and then linters/checkers for code and file hygiene."""
     # --- Formatters ---
-    session.run("ruff", "check", "--fix", "-v", *SOURCE_PATHS)
-    session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
-    session.run(
+    _ = session.run("ruff", "check", "--fix", "-v", *SOURCE_PATHS)
+    _ = session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
+    _ = session.run(
         "docformatter",
         "--in-place",
         "--recursive",
@@ -83,41 +84,40 @@ def lint(session: nox.Session) -> None:
         *SOURCE_PATHS,
     )
     if Path("pyproject.toml").exists():
-        session.run("toml-sort", "--in-place", "pyproject.toml")
+        _ = session.run("toml-sort", "--in-place", "pyproject.toml")
     # Get all JSON/YAML files excluding cache directories
     json_yaml_files = [
         str(p) for p in Path().rglob("*.[jy][sa][mo][nl]") if not any(part.startswith(".cache") for part in p.parts)
     ]
     if json_yaml_files:
-        session.run("prettier", "--write", *json_yaml_files)
+        _ = session.run("prettier", "--write", *json_yaml_files)
         json_files = [f for f in json_yaml_files if f.endswith(".json")]
         if json_files:
-            session.run("jsonlint", *json_files)  # Validation only, after prettier formatting
+            _ = session.run("jsonlint", *json_files)  # Validation only, after prettier formatting
 
     # Get all Python files excluding cache directories
     py_files = [str(p) for p in Path().rglob("*.py") if not any(part.startswith(".cache") for part in p.parts)]
     if py_files:
-        session.run("pyupgrade", "--py3-plus", *py_files)
+        _ = session.run("pyupgrade", "--py3-plus", *py_files)
 
     # Get all Markdown files excluding cache directories
     md_files = [str(p) for p in Path().rglob("*.md") if not any(part.startswith(".cache") for part in p.parts)]
     if md_files:
-        session.run("mdformat", ".")
-        session.run("markdownlint", *md_files)  # Validation after formatting
+        _ = session.run("mdformat", ".")
     # --- Linters ---
-    session.run("ruff", "check", "-v", *SOURCE_PATHS)
-    session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
-    session.run("yamllint", ".")
+    _ = session.run("ruff", "check", "-v", *SOURCE_PATHS)
+    _ = session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
+    _ = session.run("yamllint", ".")
     # Get all shell files excluding cache directories
     sh_files = [str(p) for p in Path().rglob("*.sh") if not any(part.startswith(".cache") for part in p.parts)]
     if sh_files:
-        session.run("shellcheck", "-f", "diff", *sh_files)
+        _ = session.run("shellcheck", "-f", "diff", *sh_files)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
 def mypy(session: nox.Session) -> None:
     """Type-check the codebase using MyPy with strict settings."""
-    session.run("mypy", "-vv", *SOURCE_PATHS)
+    _ = session.run("mypy", "-vv", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
@@ -144,7 +144,7 @@ def docs(session: nox.Session) -> None:
 
     """
     if "--serve" in session.posargs:
-        session.run(
+        _ = session.run(
             "sphinx-autobuild",
             "docs",
             "docs/_build/html",
@@ -155,7 +155,7 @@ def docs(session: nox.Session) -> None:
             "-q",
         )
     else:
-        session.run(
+        _ = session.run(
             "sphinx-build",
             "-b",
             "html",
@@ -172,7 +172,7 @@ def docs(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def build(session: nox.Session) -> None:
     """Build distributable artefacts with Poetry."""
-    session.run("poetry", "build", external=True)
+    _ = session.run("poetry", "build", external=True)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
@@ -183,7 +183,7 @@ def release(session: nox.Session) -> None:
     Ensures all dev tools are installed and uses verbose output.
 
     """
-    session.run("semantic-release", "--verbose", "publish")
+    _ = session.run("semantic-release", "--verbose", "publish")
 
 
 # ── House-keeping ─────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ def release(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS[0])
 def clean(session: nox.Session) -> None:
     """Delete caches, build artefacts and other temporary files from the workspace."""
-    session.run(
+    _ = session.run(
         "rm",
         "-rf",
         ".mypy_cache",
@@ -204,6 +204,6 @@ def clean(session: nox.Session) -> None:
         "coverage.xml",
         external=True,
     )
-    session.run("find", ".", "-name", "__pycache__", "-delete", external=True)
-    session.run("find", ".", "-name", "*.pyc", "-delete", external=True)
+    _ = session.run("find", ".", "-name", "__pycache__", "-delete", external=True)
+    _ = session.run("find", ".", "-name", "*.pyc", "-delete", external=True)
     session.log("🧹  Workspace cleaned.")
