@@ -201,7 +201,6 @@ packages = [{ include = "mzn", from = "libs" }, { include = "mzn_cli", from = "l
     yamllint = ">=1.37.1"
     shellcheck-py = "^0.10.0.1"
     toml-sort = ">=0.24.2"
-    docformatter = "^1.7.7"
 
     # --- Type-checking only --------------------------------------------------------
     types-toml = "^0.10.8.20240310"
@@ -260,6 +259,7 @@ allow_zero_version = true
 build_command = "poetry build --no-interaction"
 changelog_file = ""                                   # Disable PSR's changelog - git-cliff handles this
 commit_message = "bump: release v{version} [skip ci]"
+commit_parser = "conventional"                        # Use conventional commit parser
 initial_version = "0.0.0"
 major_on_zero = true
 tag_format = "v{version}"
@@ -276,11 +276,14 @@ version_toml = ["pyproject.toml:project.version"]
   env = "GIT_COMMIT_AUTHOR"                        # A single env var: "Your Name <your.email@example.com>"
 
   # --- Commit Parsing ---
+  # Conventional commits configuration
   [tool.semantic_release.commit_parser_options]
-  breaking_description = "BREAKING CHANGE"
-  major_tags = ["breaking"]
+  # Types that trigger minor version bumps
   minor_tags = ["feat"]
-  patch_tags = ["build", "ci", "fix", "perf", "refactor", "revert"]
+  # Types that trigger patch version bumps
+  patch_tags = ["fix", "perf", "refactor", "build", "ci", "revert"]
+  # Text in commit body/footer that indicates breaking change
+  breaking_description = "BREAKING CHANGE"
 
   # --- Publishing ---
   [tool.semantic_release.publish]
@@ -303,17 +306,6 @@ project = "Parametric Arsenal"
 all = true
 in_place = true
 
-# --- docformatter Configuration ----------
-[tool.docformatter]
-black = false
-blank = true
-force-wrap = true
-in-place = true
-make-summary-multi-line = false
-pre-summary-newline = true
-recursive = true
-wrap-descriptions = 120
-wrap-summaries = 120
 
 # --- radon Configuration -----------------
 [tool.radon]

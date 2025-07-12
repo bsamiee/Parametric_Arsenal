@@ -57,7 +57,7 @@ commit_parsers = [
     { message = "^chore\\(changelog\\)", skip = true },
     { message = "^docs: enhance changelog", skip = true },
     { message = "^Update.*\\.md$", skip = true },
-    # Regular conventional commits
+    # Conventional commits - breaking changes are marked with ! or BREAKING CHANGE
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
     { message = "^perf", group = "Performance" },
@@ -68,7 +68,15 @@ commit_parsers = [
     { message = "^docs", group = "Documentation" },
     { message = "^chore", group = "Chores" },
     { message = "^style", group = "Styling" },
-    { message = "^breaking", group = "Breaking Changes" },
+    { message = "^test", group = "Tests" },
+    # Conventional commits with breaking changes (! notation)
+    { message = "^feat!", group = "Breaking Changes" },
+    { message = "^fix!", group = "Breaking Changes" },
+    { message = "^refactor!", group = "Breaking Changes" },
+    { message = "^perf!", group = "Breaking Changes" },
+    { message = "^build!", group = "Breaking Changes" },
+    # Body/footer breaking changes
+    { body = "BREAKING CHANGE", group = "Breaking Changes" },
 ]
 
     [git.remote]
