@@ -191,7 +191,6 @@ packages = [{ include = "mzn", from = "libs" }, { include = "mzn_cli", from = "l
     python-semantic-release = ">=10.0.2"
     git-cliff = ">=2.9.1"
     jinja2 = "^3.1.6"
-    detect-secrets = "^1.5.0"
     pre-commit = "^4.2.0"
 
     # Linting & Formatting

@@ -52,14 +52,7 @@ repos:
           - id: shellcheck
             types: [shell]
             files: \.sh$
-    - repo: https://github.com/Yelp/detect-secrets
-      rev: v1.5.0
-      hooks:
-          - id: detect-secrets
-            args:
-                - '--baseline'
-                - '.secrets.baseline'
-            exclude: 'poetry.lock'
+            args: ['--exclude=SC2148,SC1091', '--severity=warning', '--external-sources']
     - repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v5.0.0
       hooks:

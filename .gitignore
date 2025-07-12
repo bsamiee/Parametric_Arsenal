@@ -9,8 +9,6 @@
 # (e.g., *.3dm, *.gh, *.ghuser).
 
 # --- General -------------------------------------------------------------------
-todo.txt
-placeholder.txt
 .claude/
 claude.md
 gemini.md
@@ -93,9 +91,22 @@ yarn-error.log*
 # --- Logs ---------------------------------------------------------------------
 *.log
 
+# --- Rhino/Grasshopper temporary files ----------------------------------------
+*.3dmbak
+*.rhl
+*.rws
+*.rws.data
+
+# --- Local development files --------------------------------------------------
+.secrets.baseline
+todo.txt
+placeholder.txt
+
 # ------------------------------------------------------------------------------
 # Leave Rhino / Grasshopper assets *tracked* via Git LFS
 #   *.3dm
 #   *.gh
+#   *.ghx
+#   *.ghdata
 #   *.ghuser
 # (Handled by .gitattributes - do NOT ignore them here)

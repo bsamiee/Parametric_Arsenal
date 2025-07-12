@@ -2011,26 +2011,6 @@ wrapt = ">=1.10,<2"
 dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "setuptools ; python_version >= \"3.12\"", "tox"]
 
 [[package]]
-name = "detect-secrets"
-version = "1.5.0"
-description = "Tool for detecting secrets in the codebase"
-optional = false
-python-versions = "*"
-groups = ["dev"]
-files = [
-    {file = "detect_secrets-1.5.0-py3-none-any.whl", hash = "sha256:e24e7b9b5a35048c313e983f76c4bd09dad89f045ff059e354f9943bf45aa060"},
-    {file = "detect_secrets-1.5.0.tar.gz", hash = "sha256:6bb46dcc553c10df51475641bb30fd69d25645cc12339e46c824c1e0c388898a"},
-]
-
-[package.dependencies]
-pyyaml = "*"
-requests = "*"
-
-[package.extras]
-gibberish = ["gibberish-detector"]
-word-list = ["pyahocorasick"]
-
-[[package]]
 name = "dictdiffer"
 version = "0.9.0"
 description = "Dictdiffer is a library that helps you to diff and patch dictionaries."
@@ -2727,14 +2707,14 @@ woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "bro
 
 [[package]]
 name = "freezegun"
-version = "1.5.2"
+version = "1.5.3"
 description = "Let your Python tests travel through time"
 optional = false
 python-versions = ">=3.8"
 groups = ["test"]
 files = [
-    {file = "freezegun-1.5.2-py3-none-any.whl", hash = "sha256:5aaf3ba229cda57afab5bd311f0108d86b6fb119ae89d2cd9c43ec8c1733c85b"},
-    {file = "freezegun-1.5.2.tar.gz", hash = "sha256:a54ae1d2f9c02dbf42e02c18a3ab95ab4295818b549a34dac55592d72a905181"},
+    {file = "freezegun-1.5.3-py3-none-any.whl", hash = "sha256:1ce20ee4be61349ba52c3af64f5eaba8d08ff51acfcf1b3ea671f03e54c818f1"},
+    {file = "freezegun-1.5.3.tar.gz", hash = "sha256:d7c6204e33a50affd7c7aa284f4f92e04e96f72d63313b89ceaaf60d9c64bc5e"},
 ]
 
 [package.dependencies]
@@ -3372,14 +3352,14 @@ idna = ">=2.5"
 
 [[package]]
 name = "hypothesis"
-version = "6.135.26"
+version = "6.135.29"
 description = "A library for property-based testing"
 optional = false
 python-versions = ">=3.9"
 groups = ["test"]
 files = [
-    {file = "hypothesis-6.135.26-py3-none-any.whl", hash = "sha256:fa237cbe2ae2c31d65f7230dcb866139ace635dcfec6c30dddf25974dd8ff4b9"},
-    {file = "hypothesis-6.135.26.tar.gz", hash = "sha256:73af0e46cd5039c6806f514fed6a3c185d91ef88b5a1577477099ddbd1a2e300"},
+    {file = "hypothesis-6.135.29-py3-none-any.whl", hash = "sha256:db4e08bcc19235d2cf37801d6ccdaca757f86dc34a64e09c85fced15bb7e836a"},
+    {file = "hypothesis-6.135.29.tar.gz", hash = "sha256:871acb38ff61346a420267f81f4ba05ad9a85d08965211edf9b29bc0c1ad9d7b"},
 ]
 
 [package.dependencies]
@@ -10094,4 +10074,4 @@ webnet = ["fabric", "fastapi", "httpx", "paramiko", "pyserial", "python-multipar
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<3.14"
-content-hash = "531700f4d0f7c66056f2b992b5a081f312da34a651394bf04baa545306b87efe"
+content-hash = "f25554a3aa05d14ef0305efa1e5542b653aaa94e2a53ae6c7cd6774d27d80c9f"
