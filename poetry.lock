@@ -1489,6 +1489,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
+markers = {dev = "platform_system == \"Windows\" or sys_platform == \"win32\""}
 
 [[package]]
 name = "colorlog"
@@ -1507,31 +1508,6 @@ colorama = {version = "*", markers = "sys_platform == \"win32\""}
 
 [package.extras]
 development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
-
-[[package]]
-name = "commitizen"
-version = "4.8.3"
-description = "Python commitizen client tool"
-optional = false
-python-versions = "<4.0,>=3.9"
-groups = ["dev"]
-files = [
-    {file = "commitizen-4.8.3-py3-none-any.whl", hash = "sha256:91f261387ca2bbb4ab6c79a1a6378dc1576ffb40e3b7dbee201724d95aceba38"},
-    {file = "commitizen-4.8.3.tar.gz", hash = "sha256:303ebdc271217aadbb6a73a015612121291d180c8cdd05b5251c7923d4a14195"},
-]
-
-[package.dependencies]
-argcomplete = ">=1.12.1,<3.7"
-charset-normalizer = ">=2.1.0,<4"
-colorama = ">=0.4.1,<1.0"
-decli = ">=0.6.0,<1.0"
-importlib-metadata = {version = ">=8.0.0,<9.0.0", markers = "python_version != \"3.9\""}
-jinja2 = ">=2.10.3"
-packaging = ">=19"
-pyyaml = ">=3.08"
-questionary = ">=2.0,<3.0"
-termcolor = ">=1.1.0,<4.0.0"
-tomlkit = ">=0.5.3,<1.0.0"
 
 [[package]]
 name = "configobj"
@@ -1973,18 +1949,6 @@ distributed = ["distributed (==2025.5.1)"]
 test = ["pandas[test]", "pre-commit", "pytest", "pytest-cov", "pytest-mock", "pytest-rerunfailures", "pytest-timeout", "pytest-xdist"]
 
 [[package]]
-name = "decli"
-version = "0.6.3"
-description = "Minimal, easy-to-use, declarative cli tool"
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "decli-0.6.3-py3-none-any.whl", hash = "sha256:5152347c7bb8e3114ad65db719e5709b28d7f7f45bdb709f70167925e55640f3"},
-    {file = "decli-0.6.3.tar.gz", hash = "sha256:87f9d39361adf7f16b9ca6e3b614badf7519da13092f2db3c80ca223c53c7656"},
-]
-
-[[package]]
 name = "decorator"
 version = "5.2.1"
 description = "Decorators for Humans"
@@ -2156,25 +2120,6 @@ doq = ["aioquic (>=1.0.0)"]
 idna = ["idna (>=3.7)"]
 trio = ["trio (>=0.23)"]
 wmi = ["wmi (>=1.5.1)"]
-
-[[package]]
-name = "docformatter"
-version = "1.7.7"
-description = "Formats docstrings to follow PEP 257"
-optional = false
-python-versions = "<4.0,>=3.9"
-groups = ["dev"]
-files = [
-    {file = "docformatter-1.7.7-py3-none-any.whl", hash = "sha256:7af49f8a46346a77858f6651f431b882c503c2f4442c8b4524b920c863277834"},
-    {file = "docformatter-1.7.7.tar.gz", hash = "sha256:ea0e1e8867e5af468dfc3f9e947b92230a55be9ec17cd1609556387bffac7978"},
-]
-
-[package.dependencies]
-charset_normalizer = ">=3.0.0,<4.0.0"
-untokenize = ">=0.1.1,<0.2.0"
-
-[package.extras]
-tomli = ["tomli (>=2.0.0,<3.0.0) ; python_version < \"3.11\""]
 
 [[package]]
 name = "docutils"
@@ -3525,7 +3470,7 @@ version = "8.7.0"
 description = "Read metadata from Python packages"
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "dev"]
+groups = ["main"]
 files = [
     {file = "importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd"},
     {file = "importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000"},
@@ -5662,7 +5607,7 @@ version = "3.0.51"
 description = "Library for building powerful interactive command lines in Python"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "dev"]
+groups = ["main"]
 files = [
     {file = "prompt_toolkit-3.0.51-py3-none-any.whl", hash = "sha256:52742911fde84e2d423e2f9a4cf1de7d7ac4e51958f648d9540e0fb8db077b07"},
     {file = "prompt_toolkit-3.0.51.tar.gz", hash = "sha256:931a162e3b27fc90c86f1b48bb1fb2c528c2761475e57c9c06de13311c7b54ed"},
@@ -7329,21 +7274,6 @@ pil = ["pillow (>=9.1.0)"]
 png = ["pypng"]
 
 [[package]]
-name = "questionary"
-version = "2.1.0"
-description = "Python library to build pretty command line user prompts ⭐️"
-optional = false
-python-versions = ">=3.8"
-groups = ["dev"]
-files = [
-    {file = "questionary-2.1.0-py3-none-any.whl", hash = "sha256:44174d237b68bc828e4878c763a9ad6790ee61990e0ae72927694ead57bab8ec"},
-    {file = "questionary-2.1.0.tar.gz", hash = "sha256:6302cdd645b19667d8f6e6634774e9538bfcd1aad9be287e743d96cacaf95587"},
-]
-
-[package.dependencies]
-prompt_toolkit = ">=2.0,<4.0"
-
-[[package]]
 name = "queuelib"
 version = "1.8.0"
 description = "Collection of persistent (disk-based) and non-persistent (memory-based) queues"
@@ -8863,21 +8793,6 @@ doc = ["reno", "sphinx"]
 test = ["pytest", "tornado (>=4.5)", "typeguard"]
 
 [[package]]
-name = "termcolor"
-version = "3.1.0"
-description = "ANSI color formatting for output in terminal"
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "termcolor-3.1.0-py3-none-any.whl", hash = "sha256:591dd26b5c2ce03b9e43f391264626557873ce1d379019786f99b0c2bee140aa"},
-    {file = "termcolor-3.1.0.tar.gz", hash = "sha256:6a6dd7fbee581909eeec6a756cff1d7f7c376063b14e4a298dc4980309e55970"},
-]
-
-[package.extras]
-tests = ["pytest", "pytest-cov"]
-
-[[package]]
 name = "textual"
 version = "3.7.1"
 description = "Modern Text User Interface framework"
@@ -9284,17 +9199,6 @@ doc = ["python-docs-theme", "sphinx", "sphinx-copybutton"]
 test = ["pytest", "pytest_codspeed", "pytest_cov", "scipy"]
 
 [[package]]
-name = "untokenize"
-version = "0.1.1"
-description = "Transforms tokens into original source code (while preserving whitespace)."
-optional = false
-python-versions = "*"
-groups = ["dev"]
-files = [
-    {file = "untokenize-0.1.1.tar.gz", hash = "sha256:3865dbbbb8efb4bb5eaa72f1be7f3e0be00ea8b7f125c69cbd1f5fda926f37a2"},
-]
-
-[[package]]
 name = "urllib3"
 version = "2.5.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -9612,7 +9516,7 @@ version = "0.2.13"
 description = "Measures the displayed width of unicode strings in a terminal"
 optional = false
 python-versions = "*"
-groups = ["main", "dev"]
+groups = ["main"]
 files = [
     {file = "wcwidth-0.2.13-py2.py3-none-any.whl", hash = "sha256:3da69048e4540d84af32131829ff948f1e022c1c6bdb8d6102117aac784f6859"},
     {file = "wcwidth-0.2.13.tar.gz", hash = "sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5"},
@@ -10026,7 +9930,7 @@ version = "3.23.0"
 description = "Backport of pathlib-compatible object wrapper for zip files"
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "dev"]
+groups = ["main"]
 files = [
     {file = "zipp-3.23.0-py3-none-any.whl", hash = "sha256:071652d6115ed432f5ce1d34c336c0adfd6a884660d1e9712a256d3d3bd4b14e"},
     {file = "zipp-3.23.0.tar.gz", hash = "sha256:a07157588a12518c9d4034df3fbbee09c814741a33ff63c05fa29d26a2404166"},
@@ -10190,4 +10094,4 @@ webnet = ["fabric", "fastapi", "httpx", "paramiko", "pyserial", "python-multipar
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<3.14"
-content-hash = "440c603264fc9d9d7d210ceb54ac3c42ae8b169a9965ec8f4adc9c717c54ba73"
+content-hash = "531700f4d0f7c66056f2b992b5a081f312da34a651394bf04baa545306b87efe"

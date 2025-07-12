@@ -1,9 +1,13 @@
 """
-Title         : norm_binary.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/rules/normalizers/norm_binary.py.
+Title         : norm_binary.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/binary.py
 
-Description ----------- Binary data normalizers for encoding and compression.
-
+Description
+-----------
+Binary data normalizers for encoding and compression.
 """
 
 from __future__ import annotations

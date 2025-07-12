@@ -1,9 +1,13 @@
 """
-Title         : norm_data.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/normalizers/norm_data.py.
+Title         : norm_data.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_data.py
 
-Description ----------- Normalizers for data serialization and deserialization.
-
+Description
+-----------
+Normalizers for data serialization and deserialization.
 """
 
 from __future__ import annotations
@@ -133,7 +137,6 @@ async def from_base64(value: str, info: ValidationInfo) -> bytes | str:
     Decodes a Base64 string into bytes.
 
     Returns the original string if decoding fails.
-
     """
     try:
         return base64.b64decode(value)
@@ -246,7 +249,6 @@ async def detect_mime_type(value: bytes, info: ValidationInfo) -> str:
     Detect and return the MIME type of binary data using python-magic.
 
     Falls back to 'application/octet-stream' if detection fails.
-
     """
     try:
         mime_type = magic.from_buffer(value, mime=True)
@@ -272,7 +274,6 @@ async def detect_file_type(value: bytes, info: ValidationInfo) -> str:
     Detect and return a human-readable file type description.
 
     Uses python-magic to get detailed file information.
-
     """
     try:
         file_type = magic.from_buffer(value)
@@ -312,9 +313,9 @@ def extract_file_metadata(
     """
     Factory for creating a file metadata extraction normalizer.
 
-    Args:     include_mime: Whether to include MIME type in metadata     include_encoding: Whether to attempt encoding
-    detection
-
+    Args:
+        include_mime: Whether to include MIME type in metadata
+        include_encoding: Whether to attempt encoding detection
     """
     @Build.normalizer(
         description="Extract file type metadata into a dictionary.",

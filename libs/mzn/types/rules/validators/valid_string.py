@@ -1,9 +1,13 @@
 """
-Title         : valid_string.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_string.py.
+Title         : valid_string.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_string.py
 
-Description ----------- String-specific validation rules, refactored for the new registry system.
-
+Description
+-----------
+String-specific validation rules, refactored for the new registry system.
 """
 
 from __future__ import annotations
@@ -323,6 +327,5 @@ async def is_internal_prefix(value: str, info: ValidationInfo) -> bool:
     Check if string matches internal prefix pattern.
 
     Pattern: starts with __, followed by lowercase letters, ends with :
-
     """
     return re.match(r"^__[a-z]+:$", value) is not None

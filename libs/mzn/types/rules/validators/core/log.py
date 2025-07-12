@@ -1,11 +1,15 @@
 """
-Title         : log.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/validators/core/log.py.
+Title         : log.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/core/log.py
 
-Description ----------- Domain-specific validators for the log package.
+Description
+-----------
+Domain-specific validators for the log package.
 
 Provides validation rules for log levels, contexts, messages, and configurations.
-
 """
 
 from __future__ import annotations
@@ -39,9 +43,10 @@ async def is_valid_level_transition(
     """
     Ensure log level transitions follow proper escalation patterns.
 
-    Rules: - Can always escalate to higher severity (lower number to higher) - De-escalation requires at least 20 points
-    difference (2 levels) - This prevents confusing flows like ERROR→WARNING→ERROR
-
+    Rules:
+    - Can always escalate to higher severity (lower number to higher)
+    - De-escalation requires at least 20 points difference (2 levels)
+    - This prevents confusing flows like ERROR→WARNING→ERROR
     """
     current, new = value
 
@@ -65,9 +70,10 @@ async def has_valid_context_depth(
     """
     Ensure context doesn't nest too deeply for performance and readability.
 
-    Maximum depth of 3 levels prevents: - Stack overflow in recursive operations - Excessive JSON nesting - Poor log
-    readability
-
+    Maximum depth of 3 levels prevents:
+    - Stack overflow in recursive operations
+    - Excessive JSON nesting
+    - Poor log readability
     """
 
     def check_depth(obj: object, depth: int = 0) -> int:
@@ -95,9 +101,10 @@ async def is_safe_for_output(value: Annotated[str, "Message string to validate"]
     r"""
     Ensure log message is safe for output to various destinations.
 
-    Checks for: - No null bytes (can truncate logs) - No ANSI escape sequences (unless handler supports) - No unescaped
-    control characters (except \n, \r, \t)
-
+    Checks for:
+    - No null bytes (can truncate logs)
+    - No ANSI escape sequences (unless handler supports)
+    - No unescaped control characters (except \n, \r, \t)
     """
     # Check for null bytes
     if "\0" in value:
@@ -128,8 +135,10 @@ async def has_valid_handler_chain(
     """
     Validate handler chain configuration for consistency.
 
-    Checks: - No duplicate handler IDs - Compatible format/handler combinations - No circular batch handler references
-
+    Checks:
+    - No duplicate handler IDs
+    - Compatible format/handler combinations
+    - No circular batch handler references
     """
     handler_ids: set[str] = set()
     batch_targets: set[str] = set()
@@ -173,8 +182,10 @@ async def has_valid_context_size(
     """
     Ensure context doesn't exceed reasonable size limits.
 
-    Prevents: - Memory exhaustion from large contexts - Serialization performance issues - Network transmission problems
-
+    Prevents:
+    - Memory exhaustion from large contexts
+    - Serialization performance issues
+    - Network transmission problems
     """
     max_size = info.context.get("max_context_size", 100_000) if info.context else 100_000
 
@@ -202,9 +213,10 @@ async def has_valid_rotation_config(
     """
     Validate file rotation configuration.
 
-    Checks: - Max bytes is reasonable (not too small or large) - Backup count is reasonable - Rotation pattern is valid
-    if time-based
-
+    Checks:
+    - Max bytes is reasonable (not too small or large)
+    - Backup count is reasonable
+    - Rotation pattern is valid if time-based
     """
     handler_type = value.get("type")
     if handler_type != "FILE":
@@ -245,8 +257,9 @@ async def is_valid_correlation_id(
     """
     Validate correlation between trace and span IDs.
 
-    Rules: - Both must be present or both must be absent - Cannot have span without trace
-
+    Rules:
+    - Both must be present or both must be absent
+    - Cannot have span without trace
     """
     trace_id = value.get("trace_id")
     span_id = value.get("span_id")
@@ -271,9 +284,10 @@ async def has_valid_batch_config(
     """
     Validate batch handler settings for performance.
 
-    Checks: - Batch size is optimal for handler type - Flush interval is reasonable - Target handler exists and supports
-    batching
-
+    Checks:
+    - Batch size is optimal for handler type
+    - Flush interval is reasonable
+    - Target handler exists and supports batching
     """
     handler_type = value.get("type")
     if handler_type != "BATCH":
@@ -329,7 +343,9 @@ async def is_valid_timestamp_format(
     """
     Validate timestamp format is valid strftime pattern.
 
-    Common formats: - "%Y-%m-%d %H:%M:%S" - "%Y-%m-%dT%H:%M:%S.%fZ" - "%d/%b/%Y:%H:%M:%S %z"
-
+    Common formats:
+    - "%Y-%m-%d %H:%M:%S"
+    - "%Y-%m-%dT%H:%M:%S.%fZ"
+    - "%d/%b/%Y:%H:%M:%S %z"
     """
     return _is_valid_strftime(value)

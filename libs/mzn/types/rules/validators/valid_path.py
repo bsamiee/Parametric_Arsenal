@@ -1,9 +1,13 @@
 """
-Title         : valid_path.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/rules/validators/valid_path.py.
+Title         : valid_path.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_path.py
 
-Description ----------- Path validation rules.
-
+Description
+-----------
+Path validation rules.
 """
 
 from __future__ import annotations

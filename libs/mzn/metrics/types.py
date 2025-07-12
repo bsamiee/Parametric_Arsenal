@@ -1,9 +1,13 @@
 """
-Title         : types.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/metrics/types.py.
+Title         : types.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/types.py
 
-Description ----------- Re-exports of metrics-specific type assets from the types package.
-
+Description
+-----------
+Re-exports of metrics-specific type assets from the types package.
 """
 
 

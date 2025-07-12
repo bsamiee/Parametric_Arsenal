@@ -1,10 +1,14 @@
 """
-Title         : decorators.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/metrics/decorators.py.
+Title         : decorators.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/decorators.py
 
-Description ----------- Single, focused metrics decorator for automatic function instrumentation. Provides timing,
-counting, and error tracking with minimal configuration.
-
+Description
+-----------
+Single, focused metrics decorator for automatic function instrumentation.
+Provides timing, counting, and error tracking with minimal configuration.
 """
 
 from __future__ import annotations
@@ -52,10 +56,12 @@ def _extract_label_value(obj: Any, path: str) -> str:  # noqa: ANN401
     """
     Extract a value from an object using dot notation.
 
-    Args:     obj: Object to extract from     path: Dot-separated path (e.g., "request.method")
+    Args:
+        obj: Object to extract from
+        path: Dot-separated path (e.g., "request.method")
 
-    Returns:     String representation of the value or "unknown" if not found
-
+    Returns:
+        String representation of the value or "unknown" if not found
     """
     try:
         parts = path.split(".")
@@ -84,10 +90,12 @@ def _generate_metric_names(func: Callable[..., Any], custom_name: str | None = N
     """
     Generate metric names from a function.
 
-    Args:     func: Function to generate names from     custom_name: Optional custom base name override
+    Args:
+        func: Function to generate names from
+        custom_name: Optional custom base name override
 
-    Returns:     Dictionary with histogram, counter, and error metric names
-
+    Returns:
+        Dictionary with histogram, counter, and error metric names
     """
     if custom_name:
         base = custom_name
@@ -155,27 +163,46 @@ def metered(  # noqa: PLR0913, PLR0915
     """
     Decorator for automatic function timing and optional call/error counting.
 
-    ALWAYS tracks execution time as histogram. OPTIONALLY tracks call counts and errors.
+    ALWAYS tracks execution time as histogram.
+    OPTIONALLY tracks call counts and errors.
 
-    Args:     func: Function to decorate (when used without parentheses)     metric: Custom metric base name (default:
-    auto-generated)     labels: Static labels to apply to all metrics     label_from: Paths to extract dynamic labels
-    from args/result     track_calls: Create separate counter for function calls     track_errors: Create separate
-    counter for errors     buckets: Custom histogram buckets (default: prometheus defaults)
+    Args:
+        func: Function to decorate (when used without parentheses)
+        metric: Custom metric base name (default: auto-generated)
+        labels: Static labels to apply to all metrics
+        label_from: Paths to extract dynamic labels from args/result
+        track_calls: Create separate counter for function calls
+        track_errors: Create separate counter for errors
+        buckets: Custom histogram buckets (default: prometheus defaults)
 
-    Returns:     Decorated function with metric instrumentation
+    Returns:
+        Decorated function with metric instrumentation
 
-    Examples:     # Simple usage - tracks execution time only     @metered     async def process_request():         ...
+    Examples:
+        # Simple usage - tracks execution time only
+        @metered
+        async def process_request():
+            ...
 
-    # Track calls and timing @metered(track_calls=True) async def api_endpoint():     ...
+        # Track calls and timing
+        @metered(track_calls=True)
+        async def api_endpoint():
+            ...
 
-    # Track calls, timing, and errors @metered(track_calls=True, track_errors=True) async def risky_operation():     ...
+        # Track calls, timing, and errors
+        @metered(track_calls=True, track_errors=True)
+        async def risky_operation():
+            ...
 
-    # Custom metric name and labels @metered(metric="api.request", labels={"service": "users"}) async def
-    get_user(user_id: str):     ...
+        # Custom metric name and labels
+        @metered(metric="api.request", labels={"service": "users"})
+        async def get_user(user_id: str):
+            ...
 
-    # Dynamic labels from function arguments @metered(label_from=["request.method", "response.status_code"]) async def
-    handle_request(request, response):     ...
-
+        # Dynamic labels from function arguments
+        @metered(label_from=["request.method", "response.status_code"])
+        async def handle_request(request, response):
+            ...
     """
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:  # noqa: PLR0915
         # Check if function is async

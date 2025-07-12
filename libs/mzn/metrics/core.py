@@ -1,10 +1,14 @@
 """
-Title         : core.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/metrics/core.py.
+Title         : core.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/core.py
 
-Description ----------- Core metrics functionality providing typed factory methods for prometheus-client. Minimal
-abstraction layer that adds type safety while exposing prometheus directly.
-
+Description
+-----------
+Core metrics functionality providing typed factory methods for prometheus-client.
+Minimal abstraction layer that adds type safety while exposing prometheus directly.
 """
 
 from __future__ import annotations
@@ -79,16 +83,20 @@ async def create_counter(
     """
     Create a Counter metric.
 
-    Counters only go up and are reset on restart. Use for: request counts, error counts, bytes processed.
+    Counters only go up and are reset on restart.
+    Use for: request counts, error counts, bytes processed.
 
-    Args:     spec: Metric specification with name, description, and labels     config: Optional configuration (unused
-    for counters)
+    Args:
+        spec: Metric specification with name, description, and labels
+        config: Optional configuration (unused for counters)
 
-    Returns:     MetricInstance wrapping the prometheus Counter
+    Returns:
+        MetricInstance wrapping the prometheus Counter
 
-    Raises:     RegistrationError: If metric already exists     ValidationError: If spec is invalid     MetricTypeError:
-    If spec type is not COUNTER
-
+    Raises:
+        RegistrationError: If metric already exists
+        ValidationError: If spec is invalid
+        MetricTypeError: If spec type is not COUNTER
     """
     if spec.type != MetricType.COUNTER:
         error = Error.create(
@@ -156,16 +164,20 @@ async def create_gauge(
     """
     Create a Gauge metric.
 
-    Gauges can go up or down and represent current state. Use for: temperature, queue size, memory usage.
+    Gauges can go up or down and represent current state.
+    Use for: temperature, queue size, memory usage.
 
-    Args:     spec: Metric specification with name, description, and labels     config: Optional configuration with
-    initial_gauge_value
+    Args:
+        spec: Metric specification with name, description, and labels
+        config: Optional configuration with initial_gauge_value
 
-    Returns:     MetricInstance wrapping the prometheus Gauge
+    Returns:
+        MetricInstance wrapping the prometheus Gauge
 
-    Raises:     RegistrationError: If metric already exists     ValidationError: If spec is invalid     MetricTypeError:
-    If spec type is not GAUGE
-
+    Raises:
+        RegistrationError: If metric already exists
+        ValidationError: If spec is invalid
+        MetricTypeError: If spec type is not GAUGE
     """
     if spec.type != MetricType.GAUGE:
         error = Error.create(
@@ -239,16 +251,20 @@ async def create_histogram(
     """
     Create a Histogram metric.
 
-    Histograms track distributions with configurable buckets. Use for: request durations, response sizes.
+    Histograms track distributions with configurable buckets.
+    Use for: request durations, response sizes.
 
-    Args:     spec: Metric specification with name, description, and labels     config: Optional configuration with
-    histogram_buckets
+    Args:
+        spec: Metric specification with name, description, and labels
+        config: Optional configuration with histogram_buckets
 
-    Returns:     MetricInstance wrapping the prometheus Histogram
+    Returns:
+        MetricInstance wrapping the prometheus Histogram
 
-    Raises:     RegistrationError: If metric already exists     ValidationError: If spec is invalid     MetricTypeError:
-    If spec type is not HISTOGRAM
-
+    Raises:
+        RegistrationError: If metric already exists
+        ValidationError: If spec is invalid
+        MetricTypeError: If spec type is not HISTOGRAM
     """
     if spec.type != MetricType.HISTOGRAM:
         error = Error.create(
@@ -324,16 +340,20 @@ async def create_summary(
     """
     Create a Summary metric.
 
-    Summaries calculate quantiles over sliding windows. Use for: percentiles, medians.
+    Summaries calculate quantiles over sliding windows.
+    Use for: percentiles, medians.
 
-    Args:     spec: Metric specification with name, description, and labels     config: Optional configuration (unused
-    for summaries)
+    Args:
+        spec: Metric specification with name, description, and labels
+        config: Optional configuration (unused for summaries)
 
-    Returns:     MetricInstance wrapping the prometheus Summary
+    Returns:
+        MetricInstance wrapping the prometheus Summary
 
-    Raises:     RegistrationError: If metric already exists     ValidationError: If spec is invalid     MetricTypeError:
-    If spec type is not SUMMARY
-
+    Raises:
+        RegistrationError: If metric already exists
+        ValidationError: If spec is invalid
+        MetricTypeError: If spec type is not SUMMARY
     """
     if spec.type != MetricType.SUMMARY:
         error = Error.create(
@@ -401,19 +421,24 @@ async def create_info(
     """
     Create an Info metric.
 
-    Info metrics expose static labels for metadata. Use for: version info, build info, configuration.
+    Info metrics expose static labels for metadata.
+    Use for: version info, build info, configuration.
 
-    Args:     spec: Metric specification with name, description, and labels     config: Optional configuration (unused
-    for info)
+    Args:
+        spec: Metric specification with name, description, and labels
+        config: Optional configuration (unused for info)
 
-    Returns:     MetricInstance wrapping the prometheus Info
+    Returns:
+        MetricInstance wrapping the prometheus Info
 
-    Raises:     RegistrationError: If metric already exists     ValidationError: If spec is invalid     MetricTypeError:
-    If spec type is not INFO
+    Raises:
+        RegistrationError: If metric already exists
+        ValidationError: If spec is invalid
+        MetricTypeError: If spec type is not INFO
 
-    Note:     Info metrics in prometheus are special - they always have     a value of 1 and are used solely for their
-    labels.
-
+    Note:
+        Info metrics in prometheus are special - they always have
+        a value of 1 and are used solely for their labels.
     """
     if spec.type != MetricType.INFO:
         error = Error.create(

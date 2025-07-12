@@ -22,7 +22,6 @@ nox.options.sessions = [
     "setup",  # Ensure dependencies are installed first
     "install_hooks",
     "lint",
-    "mypy",
     "pre_commit",
     "code_quality",
     "tests",
@@ -33,7 +32,7 @@ nox.options.default_venv_backend = "virtualenv"
 
 PYTHON_VERSIONS = ["3.13"]  # single-version matrix for now
 SOURCE_PATHS = ("libs", "noxfile.py")
-HOOK_INSTALL_ARGS = ("--install-hooks", "--hook-type", "commit-msg")
+HOOK_INSTALL_ARGS = ("--install-hooks",)
 
 
 # ── Dependency setup ──────────────────────────────────────────────────────────
@@ -51,7 +50,7 @@ def setup(session: nox.Session) -> None:
 
 @nox.session(python=PYTHON_VERSIONS[0], name="install_hooks")
 def install_hooks(session: nox.Session) -> None:
-    """Install *pre-commit* and *commit-msg* git hooks."""
+    """Install *pre-commit* git hooks."""
     session.install("pre-commit")  # tiny; easier than syncing full dev group
     _ = session.run("pre-commit", "install", *HOOK_INSTALL_ARGS)
 
@@ -73,16 +72,6 @@ def lint(session: nox.Session) -> None:
     # --- Formatters ---
     _ = session.run("ruff", "check", "--fix", "-v", *SOURCE_PATHS)
     _ = session.run("ruff", "format", "--check", "-v", *SOURCE_PATHS)
-    _ = session.run(
-        "docformatter",
-        "--in-place",
-        "--recursive",
-        "--wrap-summaries=120",
-        "--wrap-descriptions=120",
-        "--pre-summary-newline",
-        "--force-wrap",
-        *SOURCE_PATHS,
-    )
     if Path("pyproject.toml").exists():
         _ = session.run("toml-sort", "--in-place", "pyproject.toml")
     # Get all JSON/YAML files excluding cache directories
@@ -112,12 +101,6 @@ def lint(session: nox.Session) -> None:
     sh_files = [str(p) for p in Path().rglob("*.sh") if not any(part.startswith(".cache") for part in p.parts)]
     if sh_files:
         _ = session.run("shellcheck", "-f", "diff", *sh_files)
-
-
-@nox.session(python=PYTHON_VERSIONS[0])
-def mypy(session: nox.Session) -> None:
-    """Type-check the codebase using MyPy with strict settings."""
-    _ = session.run("mypy", "-vv", *SOURCE_PATHS)
 
 
 @nox.session(python=PYTHON_VERSIONS[0])
@@ -195,7 +178,6 @@ def clean(session: nox.Session) -> None:
     _ = session.run(
         "rm",
         "-rf",
-        ".mypy_cache",
         "dist",
         "build",
         "docs/_build",

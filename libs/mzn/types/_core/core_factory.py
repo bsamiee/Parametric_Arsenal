@@ -1,13 +1,17 @@
 """
-Title         : core_factory.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_factory.py.
+Title         : core_factory.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_factory.py
 
-Description ----------- Async-first protocol-aware factory for creating type assets with automatic feature composition.
+Description
+-----------
+Async-first protocol-aware factory for creating type assets with automatic feature composition.
 
-This module provides intelligent async factories that automatically apply the appropriate feature mixins based on asset
-type and target protocol tier, enabling progressive enhancement while maintaining clean APIs. Fully integrated with
-Error/Cache/Log infrastructure.
-
+This module provides intelligent async factories that automatically apply the appropriate
+feature mixins based on asset type and target protocol tier, enabling progressive
+enhancement while maintaining clean APIs. Fully integrated with Error/Cache/Log infrastructure.
 """
 
 from __future__ import annotations
@@ -81,8 +85,8 @@ async def aget_mixin_classes() -> dict[str, type]:
     """
     Get available mixin classes for feature composition.
 
-    Returns:     Dictionary mapping mixin names to mixin classes
-
+    Returns:
+        Dictionary mapping mixin names to mixin classes
     """
     mixins: dict[str, type] = {
         "ComparisonMixin": ComparisonMixin,
@@ -157,12 +161,15 @@ async def aapply_mixins[T](cls: type[T], mixin_names: list[str]) -> type[T]:
     """
     Apply feature mixins to a class.
 
-    Args:     cls: Base class to enhance     mixin_names: List of mixin names to apply
+    Args:
+        cls: Base class to enhance
+        mixin_names: List of mixin names to apply
 
-    Returns:     Enhanced class with mixins applied
+    Returns:
+        Enhanced class with mixins applied
 
-    Raises:     RuntimeError: If mixin application fails
-
+    Raises:
+        RuntimeError: If mixin application fails
     """
     # Apply mixins to the class
     try:
@@ -224,14 +231,17 @@ async def abuild_asset_model[T_Build](
     """
     Universal builder for creating the final Pydantic RootModel for an asset.
 
-    This function takes a class that has been enhanced with feature mixins and constructs the final, instantiable
-    Pydantic model using Pydantic's official create_model API.
+    This function takes a class that has been enhanced with feature mixins
+    and constructs the final, instantiable Pydantic model using Pydantic's
+    official create_model API.
 
-    Args:     name: The name of the new model class.     inner_type: The core Python type this asset wraps (e.g., str,
-    int).     shell_cls: The class composed by the AssetFactory, containing mixins.
+    Args:
+        name: The name of the new model class.
+        inner_type: The core Python type this asset wraps (e.g., str, int).
+        shell_cls: The class composed by the AssetFactory, containing mixins.
 
-    Returns:     A new Pydantic RootModel subclass.
-
+    Returns:
+        A new Pydantic RootModel subclass.
     """
     # 1. Process rules if the class supports it
     all_rules: list[Any] = []
@@ -342,17 +352,15 @@ class AssetFactory:
     """
     Async protocol-aware factory for creating type assets.
 
-    Automatically applies appropriate feature mixins based on the target protocol and asset type, enabling progressive
-    enhancement with zero configuration.
-
+    Automatically applies appropriate feature mixins based on the target protocol
+    and asset type, enabling progressive enhancement with zero configuration.
     """
 
     def __init__(self, asset_type: constants.AssetType) -> None:
-        """
-        Initialize the factory for a specific asset type.
+        """Initialize the factory for a specific asset type.
 
-        Args:     asset_type: Type of asset this factory creates
-
+        Args:
+            asset_type: Type of asset this factory creates
         """
         super().__init__()
         self.asset_type = asset_type
@@ -374,15 +382,20 @@ class AssetFactory:
         """
         Create an enhanced asset with automatic feature composition.
 
-        Args:     cls: Base class to enhance     target_protocol: Target protocol tier (auto-selected if None) metadata:
-        Additional metadata to attach     tags: Set of tags to attach to the asset     register: Whether to register in
-        the type registry     operations: Configuration for primitive-like operations.     enable_caching: Whether to
-        enable caching (performance feature, off by default)
+        Args:
+            cls: Base class to enhance
+            target_protocol: Target protocol tier (auto-selected if None)
+            metadata: Additional metadata to attach
+            tags: Set of tags to attach to the asset
+            register: Whether to register in the type registry
+            operations: Configuration for primitive-like operations.
+            enable_caching: Whether to enable caching (performance feature, off by default)
 
-        Returns:     Enhanced class with appropriate mixins applied
+        Returns:
+            Enhanced class with appropriate mixins applied
 
-        Raises:     RuntimeError: If asset creation fails
-
+        Raises:
+            RuntimeError: If asset creation fails
         """
         # Create the asset with appropriate features
         try:
@@ -493,11 +506,13 @@ class AssetFactory:
         """
         Add asset-specific mixins and core/performance features.
 
-        Args:     mixin_names: Base mixin names from protocol requirements     operations: Configuration for primitive-
-        like operations.     enable_caching: Whether to enable caching (performance feature, off by default)
+        Args:
+            mixin_names: Base mixin names from protocol requirements
+            operations: Configuration for primitive-like operations.
+            enable_caching: Whether to enable caching (performance feature, off by default)
 
-        Returns:     List of mixin names to apply, with duplicates removed
-
+        Returns:
+            List of mixin names to apply, with duplicates removed
         """
         # Always apply core mixins
         core_mixins = [
@@ -558,11 +573,14 @@ async def acreate_primitive[T](
 
     Primitives always get CoreAsset tier (metadata + registry only).
 
-    Args:     cls: Base class to enhance     register: Whether to register in the type registry     enable_caching:
-    Whether to enable caching (performance feature, off by default)     **kwargs: Additional metadata to attach
+    Args:
+        cls: Base class to enhance
+        register: Whether to register in the type registry
+        enable_caching: Whether to enable caching (performance feature, off by default)
+        **kwargs: Additional metadata to attach
 
-    Returns:     Enhanced primitive type
-
+    Returns:
+        Enhanced primitive type
     """
     return await primitive_factory.acreate(
         cls,
@@ -589,13 +607,18 @@ async def acreate_alias[T](  # noqa: PLR0913
 
     Aliases default to ValidatedAsset tier (rules processing for business logic).
 
-    Args:     cls: Base class to enhance     target_protocol: Target protocol tier (ValidatedAsset if None) register:
-    Whether to register in the type registry     base: The base primitive or composite type to alias rules: Optional
-    list of validation rules for the alias     operations: Configuration for primitive-like operations. enable_caching:
-    Whether to enable caching (performance feature, off by default)     **kwargs: Additional metadata to attach
+    Args:
+        cls: Base class to enhance
+        target_protocol: Target protocol tier (ValidatedAsset if None)
+        register: Whether to register in the type registry
+        base: The base primitive or composite type to alias
+        rules: Optional list of validation rules for the alias
+        operations: Configuration for primitive-like operations.
+        enable_caching: Whether to enable caching (performance feature, off by default)
+        **kwargs: Additional metadata to attach
 
-    Returns:     Enhanced alias type
-
+    Returns:
+        Enhanced alias type
     """
     # Build metadata from direct parameters
     metadata: dict[str, Any] = dict(kwargs)
@@ -626,15 +649,18 @@ async def acreate_enum(
     """
     Create a rich enum asset from a standard Python Enum.
 
-    This factory enhances the user's enum class with composable features, working directly with aenum to support rich,
-    self-describing members.
+    This factory enhances the user's enum class with composable features,
+    working directly with aenum to support rich, self-describing members.
 
-    Args:     cls: The standard Enum class to enhance.     target_protocol: Target protocol tier (AdvancedAsset if
-    None).     register: Whether to register in the type registry.     enable_caching: Whether to enable caching
-    (performance feature, off by default).     **kwargs: Additional metadata, including `base_type`.
+    Args:
+        cls: The standard Enum class to enhance.
+        target_protocol: Target protocol tier (AdvancedAsset if None).
+        register: Whether to register in the type registry.
+        enable_caching: Whether to enable caching (performance feature, off by default).
+        **kwargs: Additional metadata, including `base_type`.
 
-    Returns:     A new, enhanced enum asset class.
-
+    Returns:
+        A new, enhanced enum asset class.
     """
     enum_cls = cls
     base_type = kwargs.pop("base_type", Enum)
@@ -739,12 +765,16 @@ async def acreate_model[T](
 
     Models default to ValidatedAsset tier but can be enhanced to AdvancedAsset.
 
-    Args:     cls: Base class to enhance     target_protocol: Target protocol tier (ValidatedAsset if None) register:
-    Whether to register in the type registry     rules: Optional list of validation rules for the model enable_caching:
-    Whether to enable caching (performance feature, off by default)     **kwargs: Additional metadata to attach
+    Args:
+        cls: Base class to enhance
+        target_protocol: Target protocol tier (ValidatedAsset if None)
+        register: Whether to register in the type registry
+        rules: Optional list of validation rules for the model
+        enable_caching: Whether to enable caching (performance feature, off by default)
+        **kwargs: Additional metadata to attach
 
-    Returns:     Enhanced model type
-
+    Returns:
+        Enhanced model type
     """
     # Build metadata from direct parameters
     metadata: dict[str, Any] = dict(kwargs)
@@ -775,13 +805,17 @@ async def acreate_asset[T](  # noqa: PLR0913
     """
     Generic asset creation function.
 
-    Args:     cls: Base class to enhance     asset_type: Type of asset to create     target_protocol: Target protocol
-    tier (auto-selected if None)     register: Whether to register in the type registry     operations: Configuration
-    for primitive-like operations.     enable_caching: Whether to enable caching (performance feature, off by default)
-    **kwargs: Additional metadata to attach
+    Args:
+        cls: Base class to enhance
+        asset_type: Type of asset to create
+        target_protocol: Target protocol tier (auto-selected if None)
+        register: Whether to register in the type registry
+        operations: Configuration for primitive-like operations.
+        enable_caching: Whether to enable caching (performance feature, off by default)
+        **kwargs: Additional metadata to attach
 
-    Returns:     Enhanced asset type
-
+    Returns:
+        Enhanced asset type
     """
     factory_map = {
         constants.PRIMITIVE: primitive_factory,
@@ -813,10 +847,11 @@ async def aupgrade_to_validated[T](cls: type[T]) -> type[T]:
     """
     Upgrade an asset to ValidatedAsset tier.
 
-    Args:     cls: Asset class to upgrade
+    Args:
+        cls: Asset class to upgrade
 
-    Returns:     Upgraded asset class
-
+    Returns:
+        Upgraded asset class
     """
     # Timer: protocol_upgrade to validated
     mixin_names = await aget_required_mixins(ValidatedAsset)
@@ -829,10 +864,11 @@ async def aupgrade_to_advanced[T](cls: type[T]) -> type[T]:
     """
     Upgrade an asset to AdvancedAsset tier.
 
-    Args:     cls: Asset class to upgrade
+    Args:
+        cls: Asset class to upgrade
 
-    Returns:     Upgraded asset class
-
+    Returns:
+        Upgraded asset class
     """
     # Timer: protocol_upgrade to advanced
     mixin_names = await aget_required_mixins(AdvancedAsset)

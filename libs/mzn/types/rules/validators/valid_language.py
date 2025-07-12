@@ -1,9 +1,13 @@
 """
-Title         : valid_language.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_language.py.
+Title         : valid_language.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_language.py
 
-Description ----------- Language-specific validation rules.
-
+Description
+-----------
+Language-specific validation rules.
 """
 
 from __future__ import annotations

@@ -1,10 +1,14 @@
 """
-Title         : enums.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/errors/enums.py.
+Title         : enums.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/errors/enums.py
 
-Description ----------- Minimal, focused error enumerations for the new error system. Only includes truly universal
-enums, enabling domain-specific flexibility.
-
+Description
+-----------
+Minimal, focused error enumerations for the new error system.
+Only includes truly universal enums, enabling domain-specific flexibility.
 """
 
 from __future__ import annotations

@@ -1,9 +1,13 @@
 """
-Title         : valid_web.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/validators/valid_web.py.
+Title         : valid_web.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_web.py
 
-Description ----------- Web-related validation rules for CSS selectors, SQL identifiers, and other web formats.
-
+Description
+-----------
+Web-related validation rules for CSS selectors, SQL identifiers, and other web formats.
 """
 
 from __future__ import annotations

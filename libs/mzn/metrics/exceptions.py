@@ -1,9 +1,13 @@
 """
-Title         : exceptions.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/metrics/exceptions.py.
+Title         : exceptions.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/exceptions.py
 
-Description ----------- Metrics-specific exceptions for the mzn.metrics package.
-
+Description
+-----------
+Metrics-specific exceptions for the mzn.metrics package.
 """
 
 from __future__ import annotations

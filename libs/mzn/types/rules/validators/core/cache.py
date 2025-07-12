@@ -1,9 +1,16 @@
 """
+Title         : cache.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/core/cache.py
+
+Description
+-----------
 Cache domain-specific validators.
 
-This module provides validation rules specifically designed for cache operations, including key validation, TTL checks,
-tag validation, and configuration validation.
-
+This module provides validation rules specifically designed for cache operations,
+including key validation, TTL checks, tag validation, and configuration validation.
 """
 
 from __future__ import annotations
@@ -38,9 +45,10 @@ async def is_valid_cache_key(
     """
     Validate cache key format and constraints.
 
-    Checks: - Only contains alphanumeric characters, colons, underscores, and hyphens - No consecutive separators (::,
-    __, --) - Length within limits (1-250 characters)
-
+    Checks:
+    - Only contains alphanumeric characters, colons, underscores, and hyphens
+    - No consecutive separators (::, __, --)
+    - Length within limits (1-250 characters)
     """
     # Check length
     if not value or len(value) > 250:
@@ -76,9 +84,10 @@ async def has_valid_namespace(
     """
     Validate cache namespace format.
 
-    Namespaces should: - Start with a letter - Contain only letters, numbers, and underscores - Be between 1 and 50
-    characters
-
+    Namespaces should:
+    - Start with a letter
+    - Contain only letters, numbers, and underscores
+    - Be between 1 and 50 characters
     """
     if not value:
         if info.context is not None:
@@ -148,7 +157,6 @@ def is_valid_ttl_range(*, min_ttl: int = 1, max_ttl: int = 86400 * 365) -> Valid
     Factory for creating a TTL range validator.
 
     Default range: 1 second to 1 year.
-
     """
 
     @Build.validator(
@@ -207,9 +215,10 @@ async def is_valid_tag_pattern(
     """
     Validate cache tag format.
 
-    Tags should: - Contain only lowercase letters, numbers, hyphens, and dots - Not start or end with separators - Be
-    between 1 and 100 characters
-
+    Tags should:
+    - Contain only lowercase letters, numbers, hyphens, and dots
+    - Not start or end with separators
+    - Be between 1 and 100 characters
     """
     if not value or len(value) > 100:
         if info.context is not None:
@@ -238,7 +247,6 @@ async def has_valid_tag_hierarchy(
     Validate hierarchical tag structure (e.g., 'category.subcategory.item').
 
     Each segment should be a valid tag pattern.
-
     """
     segments = value.split(".")
 

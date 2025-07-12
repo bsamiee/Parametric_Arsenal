@@ -1,9 +1,13 @@
 """
-Title         : memory.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/backends/memory.py.
+Title         : memory.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/backends/memory.py
 
-Description ----------- Memory backend implementation using aiocache.
-
+Description
+-----------
+Memory backend implementation using aiocache.
 """
 
 from __future__ import annotations

@@ -1,9 +1,13 @@
 """
-Title         : prim_numeric.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/primitives/prim_numeric.py.
+Title         : prim_numeric.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/primitives/prim_numeric.py
 
-Description ----------- Specialized numeric primitive types.
-
+Description
+-----------
+Specialized numeric primitive types.
 """
 
 from __future__ import annotations

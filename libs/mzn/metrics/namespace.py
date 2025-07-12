@@ -1,10 +1,14 @@
 """
-Title         : namespace.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/metrics/namespace.py.
+Title         : namespace.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/namespace.py
 
-Description ----------- Unified metrics namespace with fluent builder pattern and static utilities. Provides a clean API
-for prometheus metrics with minimal abstraction.
-
+Description
+-----------
+Unified metrics namespace with fluent builder pattern and static utilities.
+Provides a clean API for prometheus metrics with minimal abstraction.
 """
 
 from __future__ import annotations
@@ -74,8 +78,8 @@ class MetricBuilder:
     """
     Fluent builder for metric configuration.
 
-    Provides a chainable API for configuring metrics with validation at each step.
-
+    Provides a chainable API for configuring metrics
+    with validation at each step.
     """
 
     def __init__(
@@ -83,12 +87,11 @@ class MetricBuilder:
         metric_type: Annotated[MetricType, "Type of metric to create"],
         name: Annotated[str, "Metric name"],
     ) -> None:
-        """
-        Initialize builder with metric type and name.
+        """Initialize builder with metric type and name.
 
-        Args:     metric_type: Type of metric (counter, gauge, histogram, summary, info)     name: Metric name following
-        prometheus conventions
-
+        Args:
+            metric_type: Type of metric (counter, gauge, histogram, summary, info)
+            name: Metric name following prometheus conventions
         """
         super().__init__()
         self._type = metric_type
@@ -99,41 +102,41 @@ class MetricBuilder:
 
     @beartype
     def description(self, text: Annotated[str, "Metric description"]) -> Self:
-        """
-        Set metric description.
+        """Set metric description.
 
-        Args:     text: Human-readable description
+        Args:
+            text: Human-readable description
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._description = text
         return self
 
     @beartype
     def labels(self, *names: Annotated[str, "Label names"]) -> Self:
-        """
-        Set metric label names.
+        """Set metric label names.
 
-        Args:     *names: Variable number of label names
+        Args:
+            *names: Variable number of label names
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._label_names = [MetricLabelKey(name) for name in names]
         return self
 
     @beartype
     def buckets(self, *values: Annotated[float, "Bucket boundaries"]) -> Self:
-        """
-        Set histogram bucket boundaries.
+        """Set histogram bucket boundaries.
 
         Only valid for histogram metrics.
 
-        Args:     *values: Bucket boundary values in ascending order
+        Args:
+            *values: Bucket boundary values in ascending order
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         if self._type != MetricType.HISTOGRAM:
             error = Error.create(
@@ -147,15 +150,15 @@ class MetricBuilder:
 
     @beartype
     def initial_value(self, value: Annotated[float, "Initial gauge value"]) -> Self:
-        """
-        Set initial value for gauge metric.
+        """Set initial value for gauge metric.
 
         Only valid for gauge metrics.
 
-        Args:     value: Initial gauge value
+        Args:
+            value: Initial gauge value
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         if self._type != MetricType.GAUGE:
             error = Error.create(
@@ -169,13 +172,14 @@ class MetricBuilder:
 
     @beartype
     async def build(self) -> MetricInstance:
-        """
-        Build the configured metric.
+        """Build the configured metric.
 
-        Returns:     Created metric instance
+        Returns:
+            Created metric instance
 
-        Raises:     RegistrationError: If metric already exists     ValidationError: If configuration is invalid
-
+        Raises:
+            RegistrationError: If metric already exists
+            ValidationError: If configuration is invalid
         """
         # Create metric spec
         spec = MetricSpec(
@@ -211,23 +215,33 @@ class Metrics:
     """
     Unified namespace for all metrics functionality.
 
-    Provides fluent builder pattern, static utilities, and direct access to prometheus metrics with minimal abstraction.
+    Provides fluent builder pattern, static utilities, and
+    direct access to prometheus metrics with minimal abstraction.
 
-    Example:     # Fluent API     counter = await Metrics.counter("api.requests")         .description("Total API
-    requests")         .labels("method", "status")         .build()
+    Example:
+        # Fluent API
+        counter = await Metrics.counter("api.requests")
+            .description("Total API requests")
+            .labels("method", "status")
+            .build()
 
-    # Quick operations await Metrics.inc("api.requests", {"method": "GET", "status": "200"}) await
-    Metrics.observe("request.duration", 0.123)
+        # Quick operations
+        await Metrics.inc("api.requests", {"method": "GET", "status": "200"})
+        await Metrics.observe("request.duration", 0.123)
 
-    # Context managers async with Metrics.time("db.query.duration"):     async with
-    Metrics.track_active("active.connections"):         await process_request()
+        # Context managers
+        async with Metrics.time("db.query.duration"):
+            async with Metrics.track_active("active.connections"):
+                await process_request()
 
-    # Export metrics app = await Metrics.asgi()  # ASGI app for /metrics await Metrics.serve(port=9090)  # Standalone
-    server
+        # Export metrics
+        app = await Metrics.asgi()  # ASGI app for /metrics
+        await Metrics.serve(port=9090)  # Standalone server
 
-    # Use decorator @Metrics.metered(metric="operation", track_calls=True, track_errors=True) async def
-    process_data(data: dict) -> dict:     return transformed_data
-
+        # Use decorator
+        @Metrics.metered(metric="operation", track_calls=True, track_errors=True)
+        async def process_data(data: dict) -> dict:
+            return transformed_data
     """
 
     # --- Core State -----------------------------------------------------------
@@ -258,75 +272,75 @@ class Metrics:
     @classmethod
     @beartype
     def counter(cls, name: Annotated[str, "Counter metric name"]) -> MetricBuilder:
-        """
-        Create fluent builder for counter metric.
+        """Create fluent builder for counter metric.
 
         Counters only go up and are reset on restart.
 
-        Args:     name: Metric name following prometheus conventions
+        Args:
+            name: Metric name following prometheus conventions
 
-        Returns:     MetricBuilder configured for counter
-
+        Returns:
+            MetricBuilder configured for counter
         """
         return MetricBuilder(MetricType.COUNTER, name)
 
     @classmethod
     @beartype
     def gauge(cls, name: Annotated[str, "Gauge metric name"]) -> MetricBuilder:
-        """
-        Create fluent builder for gauge metric.
+        """Create fluent builder for gauge metric.
 
         Gauges can go up or down and represent current state.
 
-        Args:     name: Metric name following prometheus conventions
+        Args:
+            name: Metric name following prometheus conventions
 
-        Returns:     MetricBuilder configured for gauge
-
+        Returns:
+            MetricBuilder configured for gauge
         """
         return MetricBuilder(MetricType.GAUGE, name)
 
     @classmethod
     @beartype
     def histogram(cls, name: Annotated[str, "Histogram metric name"]) -> MetricBuilder:
-        """
-        Create fluent builder for histogram metric.
+        """Create fluent builder for histogram metric.
 
         Histograms track distributions with configurable buckets.
 
-        Args:     name: Metric name following prometheus conventions
+        Args:
+            name: Metric name following prometheus conventions
 
-        Returns:     MetricBuilder configured for histogram
-
+        Returns:
+            MetricBuilder configured for histogram
         """
         return MetricBuilder(MetricType.HISTOGRAM, name)
 
     @classmethod
     @beartype
     def summary(cls, name: Annotated[str, "Summary metric name"]) -> MetricBuilder:
-        """
-        Create fluent builder for summary metric.
+        """Create fluent builder for summary metric.
 
         Summaries calculate quantiles over sliding windows.
 
-        Args:     name: Metric name following prometheus conventions
+        Args:
+            name: Metric name following prometheus conventions
 
-        Returns:     MetricBuilder configured for summary
-
+        Returns:
+            MetricBuilder configured for summary
         """
         return MetricBuilder(MetricType.SUMMARY, name)
 
     @classmethod
     @beartype
     def info(cls, name: Annotated[str, "Info metric name"]) -> MetricBuilder:
-        """
-        Create fluent builder for info metric.
+        """Create fluent builder for info metric.
 
         Info metrics expose static labels for metadata.
 
-        Args:     name: Metric name following prometheus conventions
+        Args:
+            name: Metric name following prometheus conventions
 
-        Returns:     MetricBuilder configured for info
-
+        Returns:
+            MetricBuilder configured for info
         """
         return MetricBuilder(MetricType.INFO, name)
 
@@ -340,15 +354,17 @@ class Metrics:
         labels: Annotated[dict[str, str] | None, "Metric labels"] = None,
         value: Annotated[float, "Amount to increment"] = 1.0,
     ) -> None:
-        """
-        Increment a counter metric.
+        """Increment a counter metric.
 
-        Args:     metric: Counter metric name     labels: Optional labels as string dict     value: Amount to increment
-        (must be positive)
+        Args:
+            metric: Counter metric name
+            labels: Optional labels as string dict
+            value: Amount to increment (must be positive)
 
-        Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a counter ValidationError: If
-        value is negative
-
+        Raises:
+            MetricError: If metric not found
+            MetricTypeError: If metric is not a counter
+            ValidationError: If value is negative
         """
         metric_labels = None
         if labels:
@@ -366,13 +382,16 @@ class Metrics:
         value: Annotated[float, "Value to set"],
         labels: Annotated[dict[str, str] | None, "Metric labels"] = None,
     ) -> None:
-        """
-        Set a gauge metric value.
+        """Set a gauge metric value.
 
-        Args:     metric: Gauge metric name     value: Value to set     labels: Optional labels as string dict
+        Args:
+            metric: Gauge metric name
+            value: Value to set
+            labels: Optional labels as string dict
 
-        Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a gauge
-
+        Raises:
+            MetricError: If metric not found
+            MetricTypeError: If metric is not a gauge
         """
         metric_labels = None
         if labels:
@@ -390,14 +409,16 @@ class Metrics:
         value: Annotated[float, "Value to observe"],
         labels: Annotated[dict[str, str] | None, "Metric labels"] = None,
     ) -> None:
-        """
-        Observe a value for histogram or summary.
+        """Observe a value for histogram or summary.
 
-        Args:     metric: Histogram or summary metric name     value: Value to observe     labels: Optional labels as
-        string dict
+        Args:
+            metric: Histogram or summary metric name
+            value: Value to observe
+            labels: Optional labels as string dict
 
-        Raises:     MetricError: If metric not found     MetricTypeError: If metric is not histogram/summary
-
+        Raises:
+            MetricError: If metric not found
+            MetricTypeError: If metric is not histogram/summary
         """
         metric_labels = None
         if labels:
@@ -415,16 +436,18 @@ class Metrics:
         metric: Annotated[str, "Histogram metric name"],
         labels: Annotated[dict[str, str] | None, "Metric labels"] = None,
     ) -> Any:  # noqa: ANN401
-        """
-        Context manager to time a block of code.
+        """Context manager to time a block of code.
 
-        Args:     metric: Histogram metric name     labels: Optional labels as string dict
+        Args:
+            metric: Histogram metric name
+            labels: Optional labels as string dict
 
-        Returns:     Async context manager
+        Returns:
+            Async context manager
 
-        Example:     async with Metrics.time("db.query.duration", {"query": "select"}):         result = await
-        db.execute(query)
-
+        Example:
+            async with Metrics.time("db.query.duration", {"query": "select"}):
+                result = await db.execute(query)
         """
         metric_labels = None
         if labels:
@@ -441,20 +464,22 @@ class Metrics:
         labels: Annotated[dict[str, str] | None, "Metric labels"] = None,
         amount: Annotated[float, "Amount to inc/dec"] = 1.0,
     ) -> Any:  # noqa: ANN401
-        """
-        Context manager to track active operations.
+        """Context manager to track active operations.
 
-        Increments gauge on enter, decrements on exit. Perfect for tracking active connections, sessions, running tasks,
-        etc.
+        Increments gauge on enter, decrements on exit.
+        Perfect for tracking active connections, sessions, running tasks, etc.
 
-        Args:     metric: Gauge metric name     labels: Optional labels as string dict     amount: Amount to
-        increment/decrement
+        Args:
+            metric: Gauge metric name
+            labels: Optional labels as string dict
+            amount: Amount to increment/decrement
 
-        Returns:     Async context manager
+        Returns:
+            Async context manager
 
-        Example:     async with Metrics.track_active("websocket.connections"):         await
-        handle_websocket_connection()
-
+        Example:
+            async with Metrics.track_active("websocket.connections"):
+                await handle_websocket_connection()
         """
         metric_labels = None
         if labels:
@@ -472,13 +497,13 @@ class Metrics:
         cls,
         registry: Annotated[CollectorRegistry | None, "Prometheus registry"] = None,
     ) -> Any:  # noqa: ANN401
-        """
-        Create ASGI app for metrics endpoint.
+        """Create ASGI app for metrics endpoint.
 
-        Args:     registry: Optional custom registry (uses default if None)
+        Args:
+            registry: Optional custom registry (uses default if None)
 
-        Returns:     ASGI application serving metrics at /metrics
-
+        Returns:
+            ASGI application serving metrics at /metrics
         """
         return await create_asgi_app(registry)
 
@@ -489,13 +514,14 @@ class Metrics:
         host: Annotated[str, "Host to bind to"] = "0.0.0.0",  # noqa: S104
         port: Annotated[int, "Port to serve on"] = 9090,
     ) -> None:
-        """
-        Start standalone metrics server.
+        """Start standalone metrics server.
 
-        Args:     host: Host address to bind to     port: Port number to serve on
+        Args:
+            host: Host address to bind to
+            port: Port number to serve on
 
-        Note:     This function blocks until interrupted
-
+        Note:
+            This function blocks until interrupted
         """
         await serve(host, port)
 
@@ -506,11 +532,11 @@ class Metrics:
         app: Annotated[Any, "FastAPI application"],  # noqa: ANN401
         path: Annotated[str, "Metrics endpoint path"] = "/metrics",
     ) -> None:
-        """
-        Add metrics endpoint to FastAPI app.
+        """Add metrics endpoint to FastAPI app.
 
-        Args:     app: FastAPI application instance     path: Path for metrics endpoint
-
+        Args:
+            app: FastAPI application instance
+            path: Path for metrics endpoint
         """
         await mount_metrics(app, path)
 
@@ -522,24 +548,23 @@ class Metrics:
         cls,
         name: Annotated[str, "Metric name"],
     ) -> MetricInstance | None:
-        """
-        Get a metric instance by name.
+        """Get a metric instance by name.
 
-        Args:     name: Metric name to retrieve
+        Args:
+            name: Metric name to retrieve
 
-        Returns:     Metric instance if found, None otherwise
-
+        Returns:
+            Metric instance if found, None otherwise
         """
         return await get_metric(MetricName(name))
 
     @classmethod
     @beartype
     async def list_metrics(cls) -> list[str]:
-        """
-        List all registered metric names.
+        """List all registered metric names.
 
-        Returns:     List of metric names
-
+        Returns:
+            List of metric names
         """
         metrics = await list_metrics()
         return [str(m.spec.name) for m in metrics]
@@ -547,22 +572,19 @@ class Metrics:
     @classmethod
     @beartype
     async def clear(cls) -> None:
-        """
-        Clear all metrics from registry.
+        """Clear all metrics from registry.
 
         Warning: This removes all metrics and their data.
-
         """
         await clear_metrics()
 
     @classmethod
     @beartype
     async def export_text(cls) -> str:
-        """
-        Export metrics in prometheus text format.
+        """Export metrics in prometheus text format.
 
-        Returns:     Metrics in prometheus exposition format
-
+        Returns:
+            Metrics in prometheus exposition format
         """
         return await generate_metrics_text()
 

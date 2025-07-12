@@ -1,9 +1,13 @@
 """
-Title         : valid_collections.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       :
-MIT Path          : libs/mzn/types/rules/validators/valid_collections.py.
+Title         : valid_collections.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_collections.py
 
-Description ----------- Collection (list, set, dict) validation rules.
-
+Description
+-----------
+Collection (list, set, dict) validation rules.
 """
 
 from __future__ import annotations
@@ -147,12 +151,7 @@ def has_key[K](*, key: K) -> Validator[Mapping[K, Any]]:
     tags=(SYSTEM.INFRA.io,),
 )
 async def has_no_duplicates(value: list[Hashable], info: ValidationInfo) -> bool:
-    """
-    Checks if all items in a list are unique.
-
-    Alias for items_are_unique.
-
-    """
+    """Checks if all items in a list are unique. Alias for items_are_unique."""
     return len(value) == len(set(value))
 
 
@@ -388,7 +387,6 @@ async def values_are_serializable(value: Collection[Any] | Mapping[Any, Any], in
     Check if all values in a collection are JSON serializable.
 
     Works with lists, sets, tuples, and dictionaries.
-
     """
 
     def is_serializable(obj: object) -> bool:

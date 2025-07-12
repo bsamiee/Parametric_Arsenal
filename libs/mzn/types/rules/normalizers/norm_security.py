@@ -1,9 +1,13 @@
 """
-Title         : norm_security.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_security.py.
+Title         : norm_security.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_security.py
 
-Description ----------- Security-related normalization rules for masking sensitive data.
-
+Description
+-----------
+Security-related normalization rules for masking sensitive data.
 """
 
 from __future__ import annotations

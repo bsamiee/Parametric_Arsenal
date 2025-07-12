@@ -1,9 +1,13 @@
 """
-Title         : prim_standard.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/primitives/prim_standard.py.
+Title         : prim_standard.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/primitives/prim_standard.py
 
-Description ----------- Standard primitive types for the most common Python built-ins.
-
+Description
+-----------
+Standard primitive types for the most common Python built-ins.
 """
 
 from __future__ import annotations

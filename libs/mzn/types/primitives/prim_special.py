@@ -1,9 +1,13 @@
 """
-Title         : prim_special.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/primitives/prim_special.py.
+Title         : prim_special.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/primitives/prim_special.py
 
-Description ----------- Specialized primitives that include helper methods.
-
+Description
+-----------
+Specialized primitives that include helper methods.
 """
 # pyright: reportUninitializedInstanceVariable=false
 from __future__ import annotations

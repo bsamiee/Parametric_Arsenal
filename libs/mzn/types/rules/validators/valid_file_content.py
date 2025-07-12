@@ -1,9 +1,13 @@
 """
-Title         : valid_file_content.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       :
-MIT Path          : libs/mzn/types/rules/validators/valid_file_content.py.
+Title         : valid_file_content.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_file_content.py
 
-Description ----------- File content validation rules.
-
+Description
+-----------
+File content validation rules.
 """
 
 from __future__ import annotations
@@ -85,7 +89,6 @@ async def is_text_file(value: bytes, info: ValidationInfo) -> bool:
     Check if file content is text rather than binary.
 
     Uses python-magic to detect MIME type and checks if it's a text type.
-
     """
     try:
         mime_type = magic.from_buffer(value, mime=True)
@@ -112,7 +115,6 @@ async def is_binary_file(value: bytes, info: ValidationInfo) -> bool:
     Check if file content is binary rather than text.
 
     This is the inverse of is_text_file.
-
     """
     return not await is_text_file(value, info)
 
@@ -238,7 +240,6 @@ async def is_encrypted_file(value: bytes, info: ValidationInfo) -> bool:
     Check if file content appears to be encrypted or password-protected.
 
     This checks for common encrypted file signatures and high entropy.
-
     """
     if len(value) < 16:
         return False

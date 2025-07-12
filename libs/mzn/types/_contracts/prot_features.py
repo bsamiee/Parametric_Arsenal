@@ -1,12 +1,17 @@
 """
-Title         : prot_features.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_contracts/prot_features.py.
+Title         : prot_features.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_contracts/prot_features.py
 
-Description ----------- Protocols for all individual, composable features in the type system.
+Description
+-----------
+Protocols for all individual, composable features in the type system.
 
-This module defines the structural contracts for each feature, such as Rules, Comparison, Caching, etc. An asset that
-implements one of these protocols is guaranteed to have the corresponding feature's capabilities.
-
+This module defines the structural contracts for each feature, such as
+Rules, Comparison, Caching, etc. An asset that implements one of these
+protocols is guaranteed to have the corresponding feature's capabilities.
 """
 
 from __future__ import annotations

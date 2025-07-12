@@ -1,9 +1,13 @@
 """
-Title         : norm_network.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_network.py.
+Title         : norm_network.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_network.py
 
-Description ----------- Network-related normalization rules for IP addresses, URLs, and other network data.
-
+Description
+-----------
+Network-related normalization rules for IP addresses, URLs, and other network data.
 """
 
 from __future__ import annotations

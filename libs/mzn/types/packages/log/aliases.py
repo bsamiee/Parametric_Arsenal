@@ -1,13 +1,17 @@
 """
-Title         : aliases.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/log/aliases.py.
+Title         : aliases.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/log/aliases.py
 
-Description ----------- Type aliases for the log package.
+Description
+-----------
+Type aliases for the log package.
 
-Provides validated, domain-specific types for log components including logger names, messages, contexts, and
-identifiers. All types include sophisticated validation rules and support for primitive-like operations where
-appropriate.
-
+Provides validated, domain-specific types for log components including logger names,
+messages, contexts, and identifiers. All types include sophisticated validation rules
+and support for primitive-like operations where appropriate.
 """
 
 from __future__ import annotations
@@ -47,10 +51,16 @@ class LoggerName:
     """
     Validated logger name following Python module naming convention.
 
-    Examples:     - "myapp"     - "myapp.module"     - "myapp.module.submodule"
+    Examples:
+        - "myapp"
+        - "myapp.module"
+        - "myapp.module.submodule"
 
-    Validation:     - Lowercase only     - No double dots     - Max 128 characters     - Valid Python identifier pattern
-
+    Validation:
+        - Lowercase only
+        - No double dots
+        - Max 128 characters
+        - Valid Python identifier pattern
     """
 
 
@@ -78,11 +88,16 @@ class LogMessage:
     """
     Log message with comprehensive sanitization and validation.
 
-    Features:     - HTML stripping     - PII masking     - Control character escaping     - Length limiting     - Safe
-    output validation
+    Features:
+        - HTML stripping
+        - PII masking
+        - Control character escaping
+        - Length limiting
+        - Safe output validation
 
-    Operations:     - str() for string conversion     - len() for length checking
-
+    Operations:
+        - str() for string conversion
+        - len() for length checking
     """
 
 
@@ -112,11 +127,15 @@ class LogContext:
     """
     Additional context data attached to log records.
 
-    Features:     - Max 100 keys to prevent explosion     - Valid identifier keys only     - JSON-serializable values -
-    Max nesting depth of 3
+    Features:
+        - Max 100 keys to prevent explosion
+        - Valid identifier keys only
+        - JSON-serializable values
+        - Max nesting depth of 3
 
-    Operations:     - Dict-like operations (len, in, [])     - Casting to dict
-
+    Operations:
+        - Dict-like operations (len, in, [])
+        - Casting to dict
     """
 
 
@@ -137,5 +156,4 @@ class LogRecordID:
     Unique identifier for log records using UUID v4 format.
 
     Used for deduplication and correlation.
-
     """

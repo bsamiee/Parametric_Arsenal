@@ -1,12 +1,17 @@
 """
-Title         : feat_documentation.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       :
-MIT Path          : libs/mzn/types/_features/feat_documentation.py.
+Title         : feat_documentation.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_documentation.py
 
-Description ----------- Documentation feature mixin for all asset types.
+Description
+-----------
+Documentation feature mixin for all asset types.
 
-Provides methods for generating rich docstrings for assets and their components (rules, fields, enum members) by reading
-from the unified metadata store.
-
+Provides methods for generating rich docstrings for assets and their
+components (rules, fields, enum members) by reading from the unified
+metadata store.
 """
 
 from __future__ import annotations
@@ -53,11 +58,12 @@ class DocumentationMixin:
         """
         Generate a comprehensive docstring for the asset.
 
-        Args:     asset_type: The type of asset (e.g., "alias", "model", "enum").     shell_cls: The original user-
-        defined shell class.
+        Args:
+            asset_type: The type of asset (e.g., "alias", "model", "enum").
+            shell_cls: The original user-defined shell class.
 
-        Returns:     A comprehensive docstring for the asset.
-
+        Returns:
+            A comprehensive docstring for the asset.
         """
         doc = shell_cls.__doc__ or f"Domain Asset: {cls.__name__}"
         doc = textwrap.dedent(doc).strip()

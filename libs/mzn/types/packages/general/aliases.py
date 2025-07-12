@@ -1,9 +1,13 @@
 """
-Title         : aliases.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/general/aliases.py.
+Title         : aliases.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/general/aliases.py
 
-Description ----------- General-purpose, reusable type aliases.
-
+Description
+-----------
+General-purpose, reusable type aliases.
 """
 
 from __future__ import annotations

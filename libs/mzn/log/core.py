@@ -1,10 +1,14 @@
 """
-Title         : core.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/log/core.py.
+Title         : core.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/core.py
 
-Description ----------- Logger implementation with native structlog integration. Modern Python 3.13+ with zero-tolerance
-type safety.
-
+Description
+-----------
+Logger implementation with native structlog integration.
+Modern Python 3.13+ with zero-tolerance type safety.
 """
 
 from __future__ import annotations

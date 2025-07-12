@@ -1,12 +1,16 @@
 """
-Title         : models.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/metrics/models.py.
+Title         : models.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/metrics/models.py
 
-Description ----------- Pydantic models for the metrics package.
+Description
+-----------
+Pydantic models for the metrics package.
 
-Provides structured models for metric definitions, data points, and configurations. All models use validated types from
-the aliases module.
-
+Provides structured models for metric definitions, data points, and configurations.
+All models use validated types from the aliases module.
 """
 
 from __future__ import annotations
@@ -40,12 +44,13 @@ class MetricSpec(BaseModel):
     """
     Specification for creating prometheus-client metrics.
 
-    This model defines the metadata needed to create a Counter, Gauge, Histogram, or Summary using prometheus-client. It
-    enforces our naming conventions and adds metadata that prometheus doesn't track.
+    This model defines the metadata needed to create a Counter, Gauge,
+    Histogram, or Summary using prometheus-client. It enforces our
+    naming conventions and adds metadata that prometheus doesn't track.
 
-    Use with prometheus-client:     spec = MetricSpec(name="api_requests_total", ...)     counter = Counter(spec.name,
-    spec.description, spec.label_names)
-
+    Use with prometheus-client:
+        spec = MetricSpec(name="api_requests_total", ...)
+        counter = Counter(spec.name, spec.description, spec.label_names)
     """
 
     # Core prometheus requirements
@@ -71,11 +76,12 @@ class MetricConfig(BaseModel):
     """
     Configuration for creating prometheus-client metrics.
 
-    This model holds type-specific configuration that prometheus-client requires when creating certain metric types.
+    This model holds type-specific configuration that prometheus-client
+    requires when creating certain metric types.
 
-    Use with prometheus-client:     config = MetricConfig(histogram_buckets=[0.1, 0.5, 1.0])     histogram =
-    Histogram(..., buckets=config.histogram_buckets)
-
+    Use with prometheus-client:
+        config = MetricConfig(histogram_buckets=[0.1, 0.5, 1.0])
+        histogram = Histogram(..., buckets=config.histogram_buckets)
     """
 
     # Histogram-specific configuration
@@ -106,12 +112,14 @@ class MetricInstance(BaseModel):
     """
     Runtime wrapper for initialized prometheus-client metrics.
 
-    This model wraps the actual prometheus Counter/Gauge/Histogram/Summary object with our metadata and tracking
-    information. It provides a type-safe way to manage metric lifecycle.
+    This model wraps the actual prometheus Counter/Gauge/Histogram/Summary
+    object with our metadata and tracking information. It provides a
+    type-safe way to manage metric lifecycle.
 
-    Use pattern:     spec = MetricSpec(...)     prom_metric = Counter(spec.name, spec.description)     instance =
-    MetricInstance(spec=spec, prometheus_metric=prom_metric)
-
+    Use pattern:
+        spec = MetricSpec(...)
+        prom_metric = Counter(spec.name, spec.description)
+        instance = MetricInstance(spec=spec, prometheus_metric=prom_metric)
     """
 
     # Metric specification

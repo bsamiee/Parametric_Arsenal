@@ -1,9 +1,13 @@
 """
-Title         : core.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/core.py.
+Title         : core.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/core.py
 
-Description ----------- Streamlined cache implementation with pluggable backends.
-
+Description
+-----------
+Streamlined cache implementation with pluggable backends.
 """
 
 from __future__ import annotations
@@ -46,9 +50,12 @@ class Cache:
     """
     Streamlined async cache implementation with pluggable backends.
 
-    Features: - Multiple backends (memory, Redis, disk, cachebox) - Flexible serialization - TTL support - Statistics
-    tracking - Tag-based operations
-
+    Features:
+    - Multiple backends (memory, Redis, disk, cachebox)
+    - Flexible serialization
+    - TTL support
+    - Statistics tracking
+    - Tag-based operations
     """
 
     def __init__(self, config: Annotated[CacheConfig, "Cache configuration"]) -> None:  # pyright: ignore[reportMissingSuperCall]

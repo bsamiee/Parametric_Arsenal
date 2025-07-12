@@ -1,9 +1,13 @@
 """
-Title         : cachebox.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/backends/cachebox.py.
+Title         : cachebox.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/backends/cachebox.py
 
-Description ----------- Cachebox backend implementation - high-performance Rust-based caching.
-
+Description
+-----------
+Cachebox backend implementation - high-performance Rust-based caching.
 """
 
 from __future__ import annotations

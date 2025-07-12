@@ -1,9 +1,13 @@
 """
-Title         : rule_composites.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/rule_composites.py.
+Title         : rule_composites.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/rule_composites.py
 
-Description ----------- Composite validation rules for combining other rules with logical operators.
-
+Description
+-----------
+Composite validation rules for combining other rules with logical operators.
 """
 
 from __future__ import annotations
@@ -52,8 +56,9 @@ class BaseCompositeRule(Validator[Any]):
         """
         Initialize the composite rule with a sequence of rules and an optional error template.
 
-        Args:     *rules: A sequence of rules to compose.     error_template: An optional custom error message template.
-
+        Args:
+            *rules: A sequence of rules to compose.
+            error_template: An optional custom error message template.
         """
         super().__init__()
         processed_rules: list[Validator[Any]] = []
@@ -90,8 +95,8 @@ class Or(BaseCompositeRule):
     """
     A composite validator that succeeds if at least one of its sub-rules succeeds.
 
-    The validation stops at the first successful sub-rule. If all sub-rules fail, this validator fails.
-
+    The validation stops at the first successful sub-rule. If all sub-rules fail,
+    this validator fails.
     """
 
     @override
@@ -164,8 +169,9 @@ class Not(Validator[Any]):
         """
         Initialize the Not validator with a rule to negate and an optional error template.
 
-        Args:     rule: The rule to negate.     error_template: An optional custom error message template.
-
+        Args:
+            rule: The rule to negate.
+            error_template: An optional custom error message template.
         """
         super().__init__()
         if is_validator(rule):

@@ -1,10 +1,14 @@
 """
-Title         : disk.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/backends/disk.py.
+Title         : disk.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/backends/disk.py
 
-Description ----------- Disk-based cache backend implementation using anyio for async file operations. Simple but
-powerful design with proper TTL support and atomic operations.
-
+Description
+-----------
+Disk-based cache backend implementation using anyio for async file operations.
+Simple but powerful design with proper TTL support and atomic operations.
 """
 
 from __future__ import annotations
@@ -34,9 +38,12 @@ class DiskBackend:
     """
     Disk-based cache backend with async file operations.
 
-    Features: - Async file I/O using anyio - TTL support with metadata files - Atomic operations via temporary files -
-    Configurable serialization - Simple directory structure: one file per key
-
+    Features:
+    - Async file I/O using anyio
+    - TTL support with metadata files
+    - Atomic operations via temporary files
+    - Configurable serialization
+    - Simple directory structure: one file per key
     """
 
     def __init__(  # pyright: ignore[reportMissingSuperCall]
@@ -48,8 +55,9 @@ class DiskBackend:
         """
         Initialize disk backend.
 
-        Args:     cache_dir: Directory for cache storage     serialization: Serialization format for values
-
+        Args:
+            cache_dir: Directory for cache storage
+            serialization: Serialization format for values
         """
         self.cache_dir = Path(str(cache_dir))
         self.serialization = serialization
@@ -70,8 +78,8 @@ class DiskBackend:
         """
         Get data and metadata file paths for a key.
 
-        Returns:     Tuple of (data_path, metadata_path)
-
+        Returns:
+            Tuple of (data_path, metadata_path)
         """
         # Use SHA256 hash of key to avoid filesystem issues
         key_hash = hashlib.sha256(str(key).encode()).hexdigest()

@@ -1,9 +1,13 @@
 """
-Title         : valid_datetime.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_datetime.py.
+Title         : valid_datetime.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_datetime.py
 
-Description ----------- Date and time validation rules.
-
+Description
+-----------
+Date and time validation rules.
 """
 
 from __future__ import annotations
@@ -229,8 +233,9 @@ async def is_business_hours(value: datetime, info: ValidationInfo) -> bool:
     """
     Check if datetime falls within standard business hours.
 
-    Business hours are defined as: - Monday through Friday - 9:00 AM to 5:00 PM
-
+    Business hours are defined as:
+    - Monday through Friday
+    - 9:00 AM to 5:00 PM
     """
     # Check if it's a weekday (Monday = 0, Sunday = 6)
     if value.weekday() >= 5:  # Saturday or Sunday
@@ -245,8 +250,8 @@ def matches_rrule(*, rule_string: str) -> Validator[datetime]:
     """
     Factory for a validator that checks if a datetime matches an rrule pattern.
 
-    Args:     rule_string: An RFC 2445 rrule string (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR")
-
+    Args:
+        rule_string: An RFC 2445 rrule string (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR")
     """
     @Build.validator(
         error_template=f"Date does not match the recurring pattern: {rule_string}.",
@@ -283,7 +288,6 @@ async def is_parseable_date(value: str, info: ValidationInfo) -> bool:
     Check if string can be parsed as a date by dateutil.parser.
 
     This is useful for validating user input before attempting to parse it.
-
     """
     try:
         _ = parser.parse(value, fuzzy=False)
@@ -304,7 +308,6 @@ async def is_parseable_date_fuzzy(value: str, info: ValidationInfo) -> bool:
     Check if string can be parsed as a date with fuzzy parsing enabled.
 
     This accepts strings like "Meeting on January 15th at 2:30 PM".
-
     """
     try:
         _ = parser.parse(value, fuzzy=True)
@@ -318,8 +321,8 @@ def is_within_business_days(*, days: int) -> Validator[datetime]:
     """
     Factory for a validator that checks if a date is within N business days from today.
 
-    Args:     days: Maximum number of business days from today
-
+    Args:
+        days: Maximum number of business days from today
     """
     @Build.validator(
         error_template=f"Date must be within {days} business days from today.",
@@ -358,11 +361,13 @@ async def is_recurring_day(value: tuple[datetime, list[int]], info: ValidationIn
     """
     Check if a datetime falls on specific days of the week.
 
-    Args:     value: Tuple of (datetime, list of weekday numbers where Monday=0, Sunday=6)     info: Validation context
-    (unused)
+    Args:
+        value: Tuple of (datetime, list of weekday numbers where Monday=0, Sunday=6)
+        info: Validation context (unused)
 
-    Example:     # Check if date is on Monday, Wednesday, or Friday     is_recurring_day((datetime.now(), [0, 2, 4]))
-
+    Example:
+        # Check if date is on Monday, Wednesday, or Friday
+        is_recurring_day((datetime.now(), [0, 2, 4]))
     """
     dt, allowed_days = value
     return dt.weekday() in allowed_days
@@ -378,10 +383,13 @@ async def has_timezone_offset(value: tuple[datetime, int], info: ValidationInfo)
     """
     Check if a datetime has a specific UTC offset in hours.
 
-    Args:     value: Tuple of (datetime, expected offset in hours)     info: Validation context (unused)
+    Args:
+        value: Tuple of (datetime, expected offset in hours)
+        info: Validation context (unused)
 
-    Example:     # Check if datetime is in EST (UTC-5)     has_timezone_offset((dt, -5))
-
+    Example:
+        # Check if datetime is in EST (UTC-5)
+        has_timezone_offset((dt, -5))
     """
     dt, expected_offset = value
 

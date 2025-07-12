@@ -1,9 +1,13 @@
 """
-Title         : norm_path.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/normalizers/norm_path.py.
+Title         : norm_path.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_path.py
 
-Description ----------- Path normalization rules.
-
+Description
+-----------
+Path normalization rules.
 """
 
 from __future__ import annotations
@@ -150,9 +154,9 @@ def ensure_correct_extension(*, read_content: bool = False) -> Normalizer[str | 
     """
     Factory for a normalizer that ensures file extension matches content.
 
-    Args:     read_content: If True, reads file content to detect type.                  If False, expects bytes content
-    in context.
-
+    Args:
+        read_content: If True, reads file content to detect type.
+                     If False, expects bytes content in context.
     """
     @Build.normalizer(
         description="Fix file extension based on detected content type.",
@@ -235,9 +239,9 @@ def add_extension_from_content(*, read_content: bool = False) -> Normalizer[str 
     """
     Factory for a normalizer that adds missing extension based on content.
 
-    Args:     read_content: If True, reads file content to detect type.                  If False, expects bytes content
-    in context.
-
+    Args:
+        read_content: If True, reads file content to detect type.
+                     If False, expects bytes content in context.
     """
     @Build.normalizer(
         description="Add missing file extension based on content type.",

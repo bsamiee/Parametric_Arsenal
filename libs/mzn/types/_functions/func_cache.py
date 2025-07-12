@@ -1,10 +1,14 @@
 """
-Title         : func_cache.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/_functions/func_cache.py.
+Title         : func_cache.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_functions/func_cache.py
 
-Description ----------- Central cache management for Parametric_Arsenal systems. Provides configured caches with
-decorators and complete caching functionality.
-
+Description
+-----------
+Central cache management for Parametric_Arsenal systems.
+Provides configured caches with decorators and complete caching functionality.
 """
 
 from __future__ import annotations
@@ -62,11 +66,12 @@ class Cache:
         """
         Caching decorator using our cache instances.
 
-        Args:     cache_instance: Cache to use (defaults to Cache.main)     key: Key function for cache keys (defaults
-        to hashkey)
+        Args:
+            cache_instance: Cache to use (defaults to Cache.main)
+            key: Key function for cache keys (defaults to hashkey)
 
-        Returns:     Decorated function with caching
-
+        Returns:
+            Decorated function with caching
         """
         cache = cache_instance if cache_instance is not None else Cache.main
         return cached(cache=cache, key=key)
@@ -76,10 +81,11 @@ class Cache:
         """
         LRU caching decorator with config-aware sizing.
 
-        Args:     maxsize: Maximum cache size (defaults to config cache_size)
+        Args:
+            maxsize: Maximum cache size (defaults to config cache_size)
 
-        Returns:     Decorated function with LRU caching
-
+        Returns:
+            Decorated function with LRU caching
         """
         cache: LRUCache[Any, Any] = Cache.get_lru_cache(maxsize)
         return cached(cache=cache, key=hashkey)
@@ -89,11 +95,12 @@ class Cache:
         """
         TTL caching decorator with config-aware sizing and timing.
 
-        Args:     maxsize: Maximum cache size (defaults to config log_cache_size)     ttl: Time to live in seconds
-        (defaults to config log_cache_ttl)
+        Args:
+            maxsize: Maximum cache size (defaults to config log_cache_size)
+            ttl: Time to live in seconds (defaults to config log_cache_ttl)
 
-        Returns:     Decorated function with TTL caching
-
+        Returns:
+            Decorated function with TTL caching
         """
         cache: TTLCache[Any, Any] = Cache.get_ttl_cache(maxsize, ttl)
         return cached(cache=cache, key=hashkey)

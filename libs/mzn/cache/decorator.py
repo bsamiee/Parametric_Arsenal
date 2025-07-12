@@ -1,9 +1,13 @@
 """
-Title         : decorator.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/decorator.py.
+Title         : decorator.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/decorator.py
 
-Description ----------- Simple cache decorator for function memoization.
-
+Description
+-----------
+Simple cache decorator for function memoization.
 """
 
 from __future__ import annotations
@@ -39,17 +43,21 @@ def cached(
     key_prefix: Annotated[str | None, "Prefix for cache keys"] = None,
     tags: Annotated[list[str] | None, "Tags for cached values"] = None,
 ) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]:
-    """
-    Cache async function results with automatic key generation.
+    """Cache async function results with automatic key generation.
 
-    Args:     cache: Cache instance (if None, uses self.cache from class)     ttl: Time to live in seconds key_prefix:
-    Custom prefix for cache keys     tags: Tags for grouped invalidation
+    Args:
+        cache: Cache instance (if None, uses self.cache from class)
+        ttl: Time to live in seconds
+        key_prefix: Custom prefix for cache keys
+        tags: Tags for grouped invalidation
 
-    Returns:     Decorated function that caches results
+    Returns:
+        Decorated function that caches results
 
-    Example:     @cached(cache_instance, ttl=300)     async def expensive_function(x: int) -> str:         return await
-    slow_operation(x)
-
+    Example:
+        @cached(cache_instance, ttl=300)
+        async def expensive_function(x: int) -> str:
+            return await slow_operation(x)
     """
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         # Get function signature for key generation

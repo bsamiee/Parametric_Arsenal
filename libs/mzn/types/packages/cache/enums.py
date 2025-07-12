@@ -1,10 +1,14 @@
 """
-Title         : enums.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/cache/enums.py.
+Title         : enums.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/cache/enums.py
 
-Description ----------- Simplified cache enumerations for the new cache implementation. Only includes what's actually
-used, with clear, modern design.
-
+Description
+-----------
+Simplified cache enumerations for the new cache implementation.
+Only includes what's actually used, with clear, modern design.
 """
 
 from __future__ import annotations

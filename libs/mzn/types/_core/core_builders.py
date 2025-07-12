@@ -1,14 +1,18 @@
 """
-Title         : core_builders.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_builders.py.
+Title         : core_builders.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_builders.py
 
-Description ----------- High-level, declarative decorators for creating type assets.
+Description
+-----------
+High-level, declarative decorators for creating type assets.
 
-This module provides a modern, clean API for creating domain assets with direct parameters instead of nested metadata
-objects, allowing for clearer and more consistent configuration. All asset types now default to advanced capabilities
-with performance features disabled by default. Core features like documentation, comparison, auditing, and lifecycle are
-always enabled.
-
+This module provides a modern, clean API for creating domain assets with direct parameters
+instead of nested metadata objects, allowing for clearer and more consistent configuration.
+All asset types now default to advanced capabilities with performance features disabled by default.
+Core features like documentation, comparison, auditing, and lifecycle are always enabled.
 """
 
 from __future__ import annotations
@@ -132,12 +136,15 @@ class Build:
         """
         Create a pure wrapper around a Python built-in or collection type.
 
-        Args:     inner_type: The base Python type this asset wraps     description: Optional description of the
-        primitive     tags: Optional tags for categorizing or annotating the asset     enable_caching: Whether to enable
-        caching for this asset (default: False)     **kwargs: Additional metadata to attach
+        Args:
+            inner_type: The base Python type this asset wraps
+            description: Optional description of the primitive
+            tags: Optional tags for categorizing or annotating the asset
+            enable_caching: Whether to enable caching for this asset (default: False)
+            **kwargs: Additional metadata to attach
 
-        Returns:     A decorator that creates a primitive type asset
-
+        Returns:
+            A decorator that creates a primitive type asset
         """
         def decorator(cls: type[object]) -> type[object]:
             # Pass the inner_type through kwargs so it can be used in abuild_asset_model
@@ -167,14 +174,17 @@ class Build:
         """
         Create a domain-specific alias from a base primitive or composite type.
 
-        Args:     base: The base primitive or composite type to alias     rules: Optional list of validation rules for
-        the alias     operations: Optional configuration for primitive-like operations (arithmetic, casting, etc.)
-        description: Optional description of the alias     tags: Optional tags for categorizing or annotating the asset
-        enable_caching: Whether to enable caching for this asset (default: False)     **kwargs: Additional metadata to
-        attach
+        Args:
+            base: The base primitive or composite type to alias
+            rules: Optional list of validation rules for the alias
+            operations: Optional configuration for primitive-like operations (arithmetic, casting, etc.)
+            description: Optional description of the alias
+            tags: Optional tags for categorizing or annotating the asset
+            enable_caching: Whether to enable caching for this asset (default: False)
+            **kwargs: Additional metadata to attach
 
-        Returns:     A decorator that creates an alias type asset
-
+        Returns:
+            A decorator that creates an alias type asset
         """
         def decorator(cls: type[object]) -> type[object]:
             return _run_import_async(
@@ -205,13 +215,16 @@ class Build:
         """
         Enhance a Pydantic BaseModel with domain-specific features.
 
-        Args:     description: Optional description of the model.     tags: Optional tags for categorizing or annotating
-        the asset.     rules: Optional list of validation rules for the model.     model_config: Pydantic V2 ConfigDict
-        for model configuration.     enable_caching: Whether to enable caching for this asset (default: False) **kwargs:
-        Additional metadata to attach.
+        Args:
+            description: Optional description of the model.
+            tags: Optional tags for categorizing or annotating the asset.
+            rules: Optional list of validation rules for the model.
+            model_config: Pydantic V2 ConfigDict for model configuration.
+            enable_caching: Whether to enable caching for this asset (default: False)
+            **kwargs: Additional metadata to attach.
 
-        Returns:     A decorator that creates an enhanced model asset.
-
+        Returns:
+            A decorator that creates an enhanced model asset.
         """
         def decorator(cls: type[T_Model]) -> type[T_Model]:
             if model_config:
@@ -241,15 +254,22 @@ class Build:
         """
         Enhance a standard Python Enum with domain-specific features.
 
-        Args:     description: Optional description of the enum.     tags: Optional tags for categorizing or annotating
-        the asset.     base_type: The base enum type to use (e.g., aenum.Enum, aenum.StrEnum).     enable_caching:
-        Whether to enable caching for this asset (default: False)     **kwargs: Additional metadata to attach.
+        Args:
+            description: Optional description of the enum.
+            tags: Optional tags for categorizing or annotating the asset.
+            base_type: The base enum type to use (e.g., aenum.Enum, aenum.StrEnum).
+            enable_caching: Whether to enable caching for this asset (default: False)
+            **kwargs: Additional metadata to attach.
 
-        Returns:     A decorator that creates an enhanced enum asset.
+        Returns:
+            A decorator that creates an enhanced enum asset.
 
-        Example:     @Build.enum(base_type=aenum.StrEnum, description="Status types")     class Status(aenum.StrEnum):
-        ACTIVE = "active"         PENDING = aenum.auto()  # Use aenum.auto() directly         DONE = "done"
-
+        Example:
+            @Build.enum(base_type=aenum.StrEnum, description="Status types")
+            class Status(aenum.StrEnum):
+                ACTIVE = "active"
+                PENDING = aenum.auto()  # Use aenum.auto() directly
+                DONE = "done"
         """
         def decorator(cls: type[E]) -> type[E]:
             # Cast to the correct enum type for type safety
@@ -284,12 +304,15 @@ class Build:
         """
         A decorator to create a self-describing, configurable validator.
 
-        Args:     error_template: Template for error messages.     description: Description of what the validator does.
-        tags: Optional tags for categorizing the validator.     register_as: Key to register the rule in the global
-        registry.     **kwargs: Additional metadata to attach.
+        Args:
+            error_template: Template for error messages.
+            description: Description of what the validator does.
+            tags: Optional tags for categorizing the validator.
+            register_as: Key to register the rule in the global registry.
+            **kwargs: Additional metadata to attach.
 
-        Returns:     A decorator that creates a validator instance.
-
+        Returns:
+            A decorator that creates a validator instance.
         """
 
         def decorator(
@@ -328,12 +351,14 @@ class Build:
         """
         A decorator to create a self-describing, configurable normalizer.
 
-        Args:     description: Description of what the normalizer does.     tags: Optional tags for categorizing the
-        normalizer.     register_as: Key to register the rule in the global registry.     **kwargs: Additional metadata
-        to attach.
+        Args:
+            description: Description of what the normalizer does.
+            tags: Optional tags for categorizing the normalizer.
+            register_as: Key to register the rule in the global registry.
+            **kwargs: Additional metadata to attach.
 
-        Returns:     A decorator that creates a normalizer instance.
-
+        Returns:
+            A decorator that creates a normalizer instance.
         """
 
         def decorator(

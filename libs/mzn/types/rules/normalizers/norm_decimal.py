@@ -1,9 +1,13 @@
 """
-Title         : norm_decimal.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_decimal.py.
+Title         : norm_decimal.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_decimal.py
 
-Description ----------- Decimal normalization rules for rounding and quantization.
-
+Description
+-----------
+Decimal normalization rules for rounding and quantization.
 """
 
 from __future__ import annotations

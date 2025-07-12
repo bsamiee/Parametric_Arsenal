@@ -1,9 +1,13 @@
 """
-Title         : prim_collections.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/primitives/prim_collections.py.
+Title         : prim_collections.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/primitives/prim_collections.py
 
-Description ----------- Collection-based primitive types for various data structures.
-
+Description
+-----------
+Collection-based primitive types for various data structures.
 """
 
 from __future__ import annotations

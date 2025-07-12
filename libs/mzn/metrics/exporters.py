@@ -1,10 +1,14 @@
 """
-Title         : exporters.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/metrics/exporters.py.
+Title         : exporters.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/exporters.py
 
-Description ----------- Prometheus metrics exporters for HTTP endpoints. Provides ASGI application and standalone server
-for metrics scraping.
-
+Description
+-----------
+Prometheus metrics exporters for HTTP endpoints.
+Provides ASGI application and standalone server for metrics scraping.
 """
 
 from __future__ import annotations
@@ -53,22 +57,34 @@ async def create_asgi_app(
     """
     Create ASGI application for prometheus metrics endpoint.
 
-    This creates an ASGI app that serves prometheus metrics in text format. The app can be mounted at any path in ASGI
-    frameworks like FastAPI, Starlette, Quart, etc.
+    This creates an ASGI app that serves prometheus metrics in text format.
+    The app can be mounted at any path in ASGI frameworks like FastAPI,
+    Starlette, Quart, etc.
 
-    Args:     registry: Custom prometheus registry (default: uses our global registry)
+    Args:
+        registry: Custom prometheus registry (default: uses our global registry)
 
-    Returns:     ASGI application callable that serves metrics
+    Returns:
+        ASGI application callable that serves metrics
 
-    Raises:     ExportError: If ASGI app creation fails
+    Raises:
+        ExportError: If ASGI app creation fails
 
-    Example:     ```python     # Create metrics app     metrics_app = await create_asgi_app()
+    Example:
+        ```python
+        # Create metrics app
+        metrics_app = await create_asgi_app()
 
-    # Mount in FastAPI at any path from fastapi import FastAPI app = FastAPI() app.mount("/metrics", metrics_app)
+        # Mount in FastAPI at any path
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.mount("/metrics", metrics_app)
 
-    # Or use with Starlette from starlette.applications import Starlette app = Starlette() app.mount("/prometheus",
-    metrics_app) ```
-
+        # Or use with Starlette
+        from starlette.applications import Starlette
+        app = Starlette()
+        app.mount("/prometheus", metrics_app)
+        ```
     """
     try:
         # Use our registry if none provided
@@ -109,20 +125,30 @@ async def serve(
     """
     Run standalone metrics server using uvicorn.
 
-    This is a convenience function for testing or simple deployments. For production, consider mounting the ASGI app in
-    your main application.
+    This is a convenience function for testing or simple deployments.
+    For production, consider mounting the ASGI app in your main application.
 
-    Args:     host: Host address to bind (default: 0.0.0.0)     port: Port number to bind (default: 9090)     path: URL
-    path for metrics endpoint (default: /metrics)
+    Args:
+        host: Host address to bind (default: 0.0.0.0)
+        port: Port number to bind (default: 9090)
+        path: URL path for metrics endpoint (default: /metrics)
 
-    Raises:     ExportError: If server fails to start     ImportError: If uvicorn is not installed
+    Raises:
+        ExportError: If server fails to start
+        ImportError: If uvicorn is not installed
 
-    Example:     ```python     # Run metrics server on port 9090     await serve()
+    Example:
+        ```python
+        # Run metrics server on port 9090
+        await serve()
 
-    # Custom configuration await serve(host="127.0.0.1", port=8080, path="/prometheus") ```
+        # Custom configuration
+        await serve(host="127.0.0.1", port=8080, path="/prometheus")
+        ```
 
-    Note:     This function will run until interrupted (Ctrl+C).     Uvicorn must be installed: `pip install uvicorn`
-
+    Note:
+        This function will run until interrupted (Ctrl+C).
+        Uvicorn must be installed: `pip install uvicorn`
     """
     try:
         # Import uvicorn (optional dependency)
@@ -197,18 +223,28 @@ async def mount_metrics(
     """
     Mount metrics endpoint on existing FastAPI/Starlette application.
 
-    This is a convenience function to easily add prometheus metrics to an existing ASGI application.
+    This is a convenience function to easily add prometheus metrics
+    to an existing ASGI application.
 
-    Args:     app: FastAPI or Starlette application instance     path: URL path where metrics will be mounted
+    Args:
+        app: FastAPI or Starlette application instance
+        path: URL path where metrics will be mounted
 
-    Raises:     ExportError: If mounting fails     TypeError: If app doesn't have mount() method
+    Raises:
+        ExportError: If mounting fails
+        TypeError: If app doesn't have mount() method
 
-    Example:     ```python     from fastapi import FastAPI     from mzn.metrics.exporters import mount_metrics
+    Example:
+        ```python
+        from fastapi import FastAPI
+        from mzn.metrics.exporters import mount_metrics
 
-    app = FastAPI() await mount_metrics(app)  # Adds /metrics endpoint
+        app = FastAPI()
+        await mount_metrics(app)  # Adds /metrics endpoint
 
-    # Or with custom path await mount_metrics(app, path="/prometheus/metrics") ```
-
+        # Or with custom path
+        await mount_metrics(app, path="/prometheus/metrics")
+        ```
     """
     try:
         # Verify app has mount method (duck typing)

@@ -1,10 +1,14 @@
 """
-Title         : context.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/errors/context.py.
+Title         : context.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/context.py
 
-Description ----------- Minimal context managers for error handling patterns. Supports both sync and async usage with
-zero feature creep.
-
+Description
+-----------
+Minimal context managers for error handling patterns.
+Supports both sync and async usage with zero feature creep.
 """
 
 from __future__ import annotations
@@ -28,11 +32,14 @@ class ErrorBoundary:
     """
     Context manager that catches and transforms exceptions into MznErrors.
 
-    Supports both sync and async usage:     # Sync     with ErrorBoundary("domain.operation_failed") as boundary:
-    risky_operation()
+    Supports both sync and async usage:
+        # Sync
+        with ErrorBoundary("domain.operation_failed") as boundary:
+            risky_operation()
 
-    # Async async with ErrorBoundary("domain.operation_failed") as boundary:     await async_risky_operation()
-
+        # Async
+        async with ErrorBoundary("domain.operation_failed") as boundary:
+            await async_risky_operation()
     """
 
     def __init__(
@@ -96,11 +103,13 @@ class ErrorCollector:
     """
     Collects multiple errors without stopping execution.
 
-    Example:     with ErrorCollector() as collector:         collector.try_("op1", lambda: risky_op1())
-    collector.try_("op2", lambda: risky_op2())
+    Example:
+        with ErrorCollector() as collector:
+            collector.try_("op1", lambda: risky_op1())
+            collector.try_("op2", lambda: risky_op2())
 
-    if collector.errors:     print(f"Failed: {[e.code for e in collector.errors]}")
-
+        if collector.errors:
+            print(f"Failed: {[e.code for e in collector.errors]}")
     """
 
     def __init__(self) -> None:
@@ -132,11 +141,13 @@ class ErrorCollector:
         """
         Try to execute a function, collecting any errors.
 
-        Args:     operation: Name of the operation     func: Function to execute (callable or coroutine)     code:
-        Optional error code override
+        Args:
+            operation: Name of the operation
+            func: Function to execute (callable or coroutine)
+            code: Optional error code override
 
-        Returns:     Result of the function or None if it failed
-
+        Returns:
+            Result of the function or None if it failed
         """
         try:
             # For sync functions
@@ -199,10 +210,12 @@ def suppress_errors(
     """
     Suppress specific error codes.
 
-    Example:     with suppress_errors("fs.not_found", "fs.permission_denied") as suppressed: read_optional_file()
+    Example:
+        with suppress_errors("fs.not_found", "fs.permission_denied") as suppressed:
+            read_optional_file()
 
-    if suppressed:     print("File read failed, using defaults")
-
+        if suppressed:
+            print("File read failed, using defaults")
     """
     suppressed: list[MznError] = []
     error_codes = [ErrorCode(c) if isinstance(c, str) else c for c in codes]

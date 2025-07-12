@@ -1,10 +1,14 @@
 """
-Title         : namespace.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/namespace.py.
+Title         : namespace.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/namespace.py
 
-Description ----------- Streamlined Cache namespace with integrated functionality. Single export pattern with modern
-Python 3.13+ async design.
-
+Description
+-----------
+Streamlined Cache namespace with integrated functionality.
+Single export pattern with modern Python 3.13+ async design.
 """
 
 from __future__ import annotations
@@ -49,8 +53,8 @@ class CacheBuilder:
     """
     Fluent builder for cache configuration.
 
-    Provides a chainable API for configuring cache instances with validation at each step.
-
+    Provides a chainable API for configuring cache instances
+    with validation at each step.
     """
 
     def __init__(
@@ -58,12 +62,11 @@ class CacheBuilder:
         backend_type: Annotated[CacheBackend, "Backend type for cache"],
         name: Annotated[str, "Cache instance name"]
     ) -> None:
-        """
-        Initialize builder with backend type and name.
+        """Initialize builder with backend type and name.
 
-        Args:     backend_type: Cache backend type (memory, redis, disk, cachebox)     name: Unique identifier for the
-        cache instance
-
+        Args:
+            backend_type: Cache backend type (memory, redis, disk, cachebox)
+            name: Unique identifier for the cache instance
         """
         super().__init__()
         self._backend = backend_type
@@ -77,115 +80,109 @@ class CacheBuilder:
 
     @beartype
     def url(self, redis_url: Annotated[str, "Redis connection URL"]) -> Self:
-        """
-        Set Redis connection URL.
+        """Set Redis connection URL.
 
-        Args:     redis_url: Redis connection URL (e.g., "redis://localhost:6379")
+        Args:
+            redis_url: Redis connection URL (e.g., "redis://localhost:6379")
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._redis_url = RedisConnectionURL(redis_url)
         return self
 
     @beartype
     def path(self, disk_path: Annotated[str, "Disk cache directory path"]) -> Self:
-        """
-        Set disk cache path.
+        """Set disk cache path.
 
-        Args:     disk_path: Absolute path to cache directory
+        Args:
+            disk_path: Absolute path to cache directory
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._disk_path = FilePath(disk_path)
         return self
 
     @beartype
     def ttl(self, seconds: Annotated[int, "Default TTL in seconds"]) -> Self:
-        """
-        Set default TTL.
+        """Set default TTL.
 
-        Args:     seconds: Time-to-live in seconds (must be positive)
+        Args:
+            seconds: Time-to-live in seconds (must be positive)
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._ttl = CacheTTL(seconds)
         return self
 
     @beartype
     def max_entries(self, count: Annotated[int, "Maximum cache entries"]) -> Self:
-        """
-        Set maximum entries.
+        """Set maximum entries.
 
-        Args:     count: Maximum number of cache entries (must be positive)
+        Args:
+            count: Maximum number of cache entries (must be positive)
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._max_entries = MaxEntries(count)
         return self
 
     # Convenience methods for common serialization formats
     def json(self) -> Self:
-        """
-        Use JSON serialization.
+        """Use JSON serialization.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._serialization = SerializationFormat.JSON
         return self
 
     def pickle(self) -> Self:
-        """
-        Use Pickle serialization.
+        """Use Pickle serialization.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._serialization = SerializationFormat.PICKLE
         return self
 
     # Convenience methods for common eviction policies
     def lru(self) -> Self:
-        """
-        Use LRU (Least Recently Used) eviction policy.
+        """Use LRU (Least Recently Used) eviction policy.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._eviction_policy = EvictionPolicy.LRU
         return self
 
     def lfu(self) -> Self:
-        """
-        Use LFU (Least Frequently Used) eviction policy.
+        """Use LFU (Least Frequently Used) eviction policy.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._eviction_policy = EvictionPolicy.LFU
         return self
 
     def fifo(self) -> Self:
-        """
-        Use FIFO (First In, First Out) eviction policy.
+        """Use FIFO (First In, First Out) eviction policy.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._eviction_policy = EvictionPolicy.FIFO
         return self
 
     @beartype
     async def build(self) -> CacheImpl:
-        """
-        Build the configured cache instance.
+        """Build the configured cache instance.
 
-        Returns:     Fully configured and initialized cache instance
-
+        Returns:
+            Fully configured and initialized cache instance
         """
         config = CacheConfig(
             backend=self._backend,
@@ -206,19 +203,23 @@ class Cache:
     """
     Unified namespace for all cache functionality.
 
-    Provides intelligent, async-first caching with multiple backends and a clean, simple API.
+    Provides intelligent, async-first caching with multiple backends
+    and a clean, simple API.
 
-    Example:     # Fluent API     cache = await Cache.redis("api-
-    cache").url("redis://localhost").ttl(300).lru().json().build()     cache = await
-    Cache.memory("session").max_entries(1000).lfu().build()     cache = await
-    Cache.disk("persistent").path("/cache").fifo().pickle().build()
+    Example:
+        # Fluent API
+        cache = await Cache.redis("api-cache").url("redis://localhost").ttl(300).lru().json().build()
+        cache = await Cache.memory("session").max_entries(1000).lfu().build()
+        cache = await Cache.disk("persistent").path("/cache").fifo().pickle().build()
 
-    # Context manager async with Cache.memory("temp-cache").max_entries(100).build() as cache:     await
-    cache.set("key", "value")
+        # Context manager
+        async with Cache.memory("temp-cache").max_entries(100).build() as cache:
+            await cache.set("key", "value")
 
-    # Use decorator @Cache.cached(cache, ttl=300) async def expensive_operation(x: int) -> str:     return f"Result:
-    {x}"
-
+        # Use decorator
+        @Cache.cached(cache, ttl=300)
+        async def expensive_operation(x: int) -> str:
+            return f"Result: {x}"
     """
 
     # --- Core Implementation --------------------------------------------------
@@ -251,11 +252,10 @@ class Cache:
     @classmethod
     @beartype
     async def __aenter__(cls) -> Self:
-        """
-        Enter async context for factory-style usage.
+        """Enter async context for factory-style usage.
 
-        Returns:     Cache class instance for creating multiple caches
-
+        Returns:
+            Cache class instance for creating multiple caches
         """
         return cls()
 
@@ -267,12 +267,12 @@ class Cache:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """
-        Exit async context and cleanup all caches.
+        """Exit async context and cleanup all caches.
 
-        Args:     exc_type: Exception type if any occurred     exc_val: Exception value if any occurred     exc_tb:
-        Exception traceback if any occurred
-
+        Args:
+            exc_type: Exception type if any occurred
+            exc_val: Exception value if any occurred
+            exc_tb: Exception traceback if any occurred
         """
         await cls.close_all()
 
@@ -281,52 +281,52 @@ class Cache:
     @classmethod
     @beartype
     def memory(cls, name: Annotated[str, "Cache instance identifier"]) -> CacheBuilder:
-        """
-        Create fluent builder for memory cache.
+        """Create fluent builder for memory cache.
 
-        Args:     name: Unique cache instance identifier
+        Args:
+            name: Unique cache instance identifier
 
-        Returns:     CacheBuilder configured for memory backend
-
+        Returns:
+            CacheBuilder configured for memory backend
         """
         return CacheBuilder(CacheBackend.MEMORY, name)
 
     @classmethod
     @beartype
     def redis(cls, name: Annotated[str, "Cache instance identifier"]) -> CacheBuilder:
-        """
-        Create fluent builder for Redis cache.
+        """Create fluent builder for Redis cache.
 
-        Args:     name: Unique cache instance identifier
+        Args:
+            name: Unique cache instance identifier
 
-        Returns:     CacheBuilder configured for Redis backend
-
+        Returns:
+            CacheBuilder configured for Redis backend
         """
         return CacheBuilder(CacheBackend.REDIS, name)
 
     @classmethod
     @beartype
     def disk(cls, name: Annotated[str, "Cache instance identifier"]) -> CacheBuilder:
-        """
-        Create fluent builder for disk cache.
+        """Create fluent builder for disk cache.
 
-        Args:     name: Unique cache instance identifier
+        Args:
+            name: Unique cache instance identifier
 
-        Returns:     CacheBuilder configured for disk backend
-
+        Returns:
+            CacheBuilder configured for disk backend
         """
         return CacheBuilder(CacheBackend.DISK, name)
 
     @classmethod
     @beartype
     def cachebox(cls, name: Annotated[str, "Cache instance identifier"]) -> CacheBuilder:
-        """
-        Create fluent builder for Cachebox cache.
+        """Create fluent builder for Cachebox cache.
 
-        Args:     name: Unique cache instance identifier
+        Args:
+            name: Unique cache instance identifier
 
-        Returns:     CacheBuilder configured for Cachebox backend
-
+        Returns:
+            CacheBuilder configured for Cachebox backend
         """
         return CacheBuilder(CacheBackend.CACHEBOX, name)
 
@@ -338,13 +338,14 @@ class Cache:
         name: Annotated[str, "Cache instance name"],
         config: Annotated[CacheConfig, "Validated cache configuration"]
     ) -> CacheImpl:
-        """
-        Create cache from validated config.
+        """Create cache from validated config.
 
-        Args:     name: Unique cache instance identifier     config: Validated cache configuration with type assets
+        Args:
+            name: Unique cache instance identifier
+            config: Validated cache configuration with type assets
 
-        Returns:     Configured and initialized cache instance
-
+        Returns:
+            Configured and initialized cache instance
         """
         # Check if already cached
         if name in cls._caches:
@@ -363,10 +364,11 @@ class Cache:
         """
         Get an existing cache by name.
 
-        Args:     name: Cache instance identifier
+        Args:
+            name: Cache instance identifier
 
-        Returns:     Cache instance if found, None otherwise
-
+        Returns:
+            Cache instance if found, None otherwise
         """
         return cls._caches.get(name)
 
@@ -376,10 +378,11 @@ class Cache:
         """
         Close and remove a cache instance.
 
-        Args:     name: Cache instance identifier
+        Args:
+            name: Cache instance identifier
 
-        Returns:     True if cache was closed, False if not found
-
+        Returns:
+            True if cache was closed, False if not found
         """
         if name in cls._caches:
             cache = cls._caches[name]
@@ -391,11 +394,10 @@ class Cache:
     @classmethod
     @beartype
     async def close_all(cls) -> None:
-        """
-        Close all cache instances.
+        """Close all cache instances.
 
-        Closes all cached instances and clears the registry. Useful for cleanup in tests or application shutdown.
-
+        Closes all cached instances and clears the registry.
+        Useful for cleanup in tests or application shutdown.
         """
         for cache in cls._caches.values():
             await cache.close()

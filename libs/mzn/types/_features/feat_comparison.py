@@ -1,9 +1,13 @@
 """
-Title         : feat_comparison.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       :
+Title         : feat_comparison.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_comparison.py
 
-MIT Path          : libs/mzn/types/_features/feat_comparison.py Description   : Universal, type-safe comparison and
-hashing for all assets.
-
+Description
+-----------
+Universal, type-safe comparison and hashing for all assets.
 """
 
 from __future__ import annotations
@@ -24,9 +28,8 @@ class ComparisonMixin:
     """
     Composable mixin providing universal, type-safe comparison and hashing.
 
-    This mixin is applied to all assets created by the AssetFactory to ensure consistent and correct comparison
-    behavior, preventing type-related bugs.
-
+    This mixin is applied to all assets created by the AssetFactory to ensure
+    consistent and correct comparison behavior, preventing type-related bugs.
     """
 
     # These attributes are provided by TypeAsset base class when the mixin is applied
@@ -47,13 +50,15 @@ class ComparisonMixin:
         """
         Helper to extract a value for comparison, handling type checks.
 
-        This method enforces strict comparison rules based on metadata, preventing comparisons between unrelated alias
-        types.
+        This method enforces strict comparison rules based on metadata,
+        preventing comparisons between unrelated alias types.
 
-        Args:     other: The other object to compare against.
+        Args:
+            other: The other object to compare against.
 
-        Returns:     The value to use for comparison, or NotImplemented if comparison     is not possible.
-
+        Returns:
+            The value to use for comparison, or NotImplemented if comparison
+            is not possible.
         """
         if other is None:
             return NotImplemented
@@ -84,12 +89,14 @@ class ComparisonMixin:
         """
         Type-safe equality comparison.
 
-        Compares root values for RootModels and uses Pydantic's default field-based comparison for BaseModels.
+        Compares root values for RootModels and uses Pydantic's default
+        field-based comparison for BaseModels.
 
-        Args:     other: The other object to compare against.
+        Args:
+            other: The other object to compare against.
 
-        Returns:     True if the objects are equal, False otherwise.
-
+        Returns:
+            True if the objects are equal, False otherwise.
         """
         # Handle RootModel comparison
         if hasattr(self, "root"):
@@ -110,13 +117,14 @@ class ComparisonMixin:
         """
         Type-safe less-than comparison.
 
-        Compares root values for RootModels. For BaseModels, this might not be well-defined unless `total_ordering` is
-        used with specific fields.
+        Compares root values for RootModels. For BaseModels, this might not
+        be well-defined unless `total_ordering` is used with specific fields.
 
-        Args:     other: The other object to compare against.
+        Args:
+            other: The other object to compare against.
 
-        Returns:     True if self is less than other, False otherwise.
-
+        Returns:
+            True if self is less than other, False otherwise.
         """
         # Handle RootModel comparison
         if hasattr(self, "root"):

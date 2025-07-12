@@ -1,9 +1,13 @@
 """
-Title         : feat_tagging.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_features/feat_tagging.py.
+Title         : feat_tagging.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_tagging.py
 
-Description ----------- Feature mixin for adding tagging capabilities to assets.
-
+Description
+-----------
+Feature mixin for adding tagging capabilities to assets.
 """
 
 from __future__ import annotations
@@ -22,9 +26,9 @@ class TaggingMixin:
     """
     Composable mixin providing tagging capabilities to assets.
 
-    This mixin is automatically applied by the AssetFactory to all assets, allowing for categorization and filtering by
-    domain-specific tags. It uses a simple `set[Tag]` for storage, making it efficient and clean.
-
+    This mixin is automatically applied by the AssetFactory to all assets,
+    allowing for categorization and filtering by domain-specific tags.
+    It uses a simple `set[Tag]` for storage, making it efficient and clean.
     """
 
     # These attributes are provided by TypeAsset base class when the mixin is applied

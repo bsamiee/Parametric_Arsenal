@@ -1,12 +1,16 @@
 """
-Title         : func_debug.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/_functions/func_debug.py.
+Title         : func_debug.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_functions/func_debug.py
 
-Description ----------- Central debugging and introspection utilities for the type system.
+Description
+-----------
+Central debugging and introspection utilities for the type system.
 
-Provides tools for tracing execution, inspecting object states, and generating rich diagnostic reports, keeping these
-concerns separate from logging.
-
+Provides tools for tracing execution, inspecting object states, and generating
+rich diagnostic reports, keeping these concerns separate from logging.
 """
 
 from __future__ import annotations
@@ -80,11 +84,13 @@ class Debug:
 
         This only executes if auto tracing is enabled.
 
-        Args:     func: The function to trace.     *args: Positional arguments for the function.     **kwargs: Keyword
-        arguments for the function.
+        Args:
+            func: The function to trace.
+            *args: Positional arguments for the function.
+            **kwargs: Keyword arguments for the function.
 
-        Returns:     A dictionary containing detailed trace information.
-
+        Returns:
+            A dictionary containing detailed trace information.
         """
         cls._ensure_setup()
         if not cls.is_tracing_enabled():
@@ -121,10 +127,11 @@ class Debug:
         """
         Perform a deep inspection of an object's state.
 
-        Args:     obj: The object to inspect.
+        Args:
+            obj: The object to inspect.
 
-        Returns:     A dictionary with detailed inspection data.
-
+        Returns:
+            A dictionary with detailed inspection data.
         """
         obj_type: type = type(obj)
         info: dict[str, Any] = {

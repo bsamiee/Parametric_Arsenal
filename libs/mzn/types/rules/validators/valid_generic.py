@@ -1,9 +1,13 @@
 """
-Title         : valid_generic.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_generic.py.
+Title         : valid_generic.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_generic.py
 
-Description ----------- Generic validation rules that can apply to any type.
-
+Description
+-----------
+Generic validation rules that can apply to any type.
 """
 
 from __future__ import annotations

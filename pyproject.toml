@@ -188,7 +188,6 @@ packages = [{ include = "mzn", from = "libs" }, { include = "mzn_cli", from = "l
 
     # Management
     nox = "^2025.5.1"
-    commitizen = ">=4.8.2"
     python-semantic-release = ">=10.0.2"
     git-cliff = ">=2.9.1"
     jinja2 = "^3.1.6"
@@ -247,12 +246,6 @@ packages = [{ include = "mzn", from = "libs" }, { include = "mzn_cli", from = "l
     pytest-xdist = ">=3.8.0"
     freezegun = ">=1.5.2"
 
-# --- Commitizen Configuration ------------
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "v$version"
-update_changelog_on_bump = false
-
 # --- Python-Semantic-Release Configuration -------
 [tool.semantic_release]
 allow_zero_version = true
@@ -263,7 +256,6 @@ commit_parser = "conventional"                        # Use conventional commit 
 initial_version = "0.0.0"
 major_on_zero = true
 tag_format = "v{version}"
-upload_to_vcs_release = true
 vcs_release = true                                    # Create GitHub releases
 version_toml = ["pyproject.toml:project.version"]
 
@@ -281,9 +273,10 @@ version_toml = ["pyproject.toml:project.version"]
   # Types that trigger minor version bumps
   minor_tags = ["feat"]
   # Types that trigger patch version bumps
-  patch_tags = ["fix", "perf", "refactor", "build", "ci", "revert"]
-  # Text in commit body/footer that indicates breaking change
-  breaking_description = "BREAKING CHANGE"
+  patch_tags = ["fix", "perf", "refactor", "build", "ci", "revert", "chore", "style", "test"]
+
+  parse_squash_commits = true # Allow parsing squash commits and parse each line
+  ignore_merge_commits = true # Ignore merge commits
 
   # --- Publishing ---
   [tool.semantic_release.publish]

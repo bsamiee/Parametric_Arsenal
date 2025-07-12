@@ -1,11 +1,16 @@
 """
-Title         : enums.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/metrics/enums.py.
+Title         : enums.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/metrics/enums.py
 
-Description ----------- Enumerations for the metrics package.
+Description
+-----------
+Enumerations for the metrics package.
 
-Provides rich enums for metric types and units of measurement. All enums include metadata for enhanced functionality.
-
+Provides rich enums for metric types and units of measurement.
+All enums include metadata for enhanced functionality.
 """
 
 from __future__ import annotations

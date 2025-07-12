@@ -1,12 +1,16 @@
 """
-Title         : core_registry.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_registry.py.
+Title         : core_registry.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_registry.py
 
-Description ----------- Async-first central registry for all types in the system.
+Description
+-----------
+Async-first central registry for all types in the system.
 
-This module provides a thread-safe, async-enabled registry for tracking, registering, and looking up all type assets.
-Fully integrated with Error/Cache/Log infrastructure.
-
+This module provides a thread-safe, async-enabled registry for tracking, registering,
+and looking up all type assets. Fully integrated with Error/Cache/Log infrastructure.
 """
 from __future__ import annotations
 
@@ -249,10 +253,11 @@ class TypeRegistry(RegistryProvider[CT]):
         """
         Get all assets with a specific tag.
 
-        Args:     tag: The tag to filter assets by
+        Args:
+            tag: The tag to filter assets by
 
-        Returns:     Dictionary of registry keys to asset classes with the tag
-
+        Returns:
+            Dictionary of registry keys to asset classes with the tag
         """
         results: dict[str, CT] = {}
         async with self._lock:
@@ -273,10 +278,11 @@ class TypeRegistry(RegistryProvider[CT]):
         """
         Get all assets with tags matching a prefix.
 
-        Args:     prefix: The tag path prefix to filter by
+        Args:
+            prefix: The tag path prefix to filter by
 
-        Returns:     Dictionary of registry keys to asset classes with matching tags
-
+        Returns:
+            Dictionary of registry keys to asset classes with matching tags
         """
         results: dict[str, CT] = {}
         async with self._lock:
@@ -311,11 +317,13 @@ class TypeRegistry(RegistryProvider[CT]):
         """
         Get assets with specified tags.
 
-        Args:     tags: The set of tags to filter by     match_all: If True, assets must have all specified tags to
-        match                If False, assets with any of the specified tags will match
+        Args:
+            tags: The set of tags to filter by
+            match_all: If True, assets must have all specified tags to match
+                       If False, assets with any of the specified tags will match
 
-        Returns:     Dictionary of registry keys to asset classes with matching tags
-
+        Returns:
+            Dictionary of registry keys to asset classes with matching tags
         """
         results: dict[str, CT] = {}
         async with self._lock:
@@ -345,10 +353,11 @@ class TypeRegistry(RegistryProvider[CT]):
         """
         Get all assets that have a tag with the specified ancestor.
 
-        Args:     ancestor: The ancestor tag to filter by.
+        Args:
+            ancestor: The ancestor tag to filter by.
 
-        Returns:     A dictionary of registry keys to asset classes that have a matching tag.
-
+        Returns:
+            A dictionary of registry keys to asset classes that have a matching tag.
         """
         results: dict[str, CT] = {}
         async with self._lock:
@@ -452,9 +461,7 @@ async def aget_by_ancestor(
 class Registry:
     """
     Unified namespace for all registry functionality in the types package.
-
     Provides async registration, lookup, and type guard helpers.
-
     """
     # Core types
     TypeRegistry: ClassVar[type] = TypeRegistry

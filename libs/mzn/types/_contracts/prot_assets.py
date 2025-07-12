@@ -1,12 +1,17 @@
 """
-Title         : prot_assets.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/_contracts/prot_assets.py.
+Title         : prot_assets.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_contracts/prot_assets.py
 
-Description ----------- Async-first consolidated protocol hierarchy for the composable feature system.
+Description
+-----------
+Async-first consolidated protocol hierarchy for the composable feature system.
 
-Defines a simple 3-tier protocol system that enables progressive enhancement of type assets with clear capability
-boundaries and automatic feature composition. Fully integrated with Error/Cache/Log infrastructure.
-
+Defines a simple 3-tier protocol system that enables progressive enhancement of
+type assets with clear capability boundaries and automatic feature composition.
+Fully integrated with Error/Cache/Log infrastructure.
 """
 
 from __future__ import annotations
@@ -48,9 +53,8 @@ class CoreAsset(Protocol):
     """
     Essential asset with metadata and registry integration (Tier 1).
 
-    Every asset type gets this automatically. Provides unified metadata management and registry integration for type
-    introspection.
-
+    Every asset type gets this automatically. Provides unified metadata
+    management and registry integration for type introspection.
     """
 
     mzn_metadata: ClassVar[Annotated[Mapping[str, JSONLike], "The metadata mapping for the asset."]]
@@ -98,8 +102,8 @@ class ValidatedAsset(CoreAsset, Protocol):
     """
     Asset with validation and normalization capabilities (Tier 2).
 
-    For primitives → aliases, domain models, and any type that needs business logic validation and data transformation.
-
+    For primitives → aliases, domain models, and any type that needs
+    business logic validation and data transformation.
     """
 
     @classmethod
@@ -169,9 +173,8 @@ class AdvancedAsset(ValidatedAsset, Protocol):
     """
     Asset with performance and debugging features (Tier 3).
 
-    For complex domain models, high-performance aliases, and types that need caching, structured logging, and debugging
-    capabilities.
-
+    For complex domain models, high-performance aliases, and types that
+    need caching, structured logging, and debugging capabilities.
     """
 
     @classmethod

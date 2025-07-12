@@ -1,10 +1,14 @@
 """
-Title         : core_processors.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_processors.py.
+Title         : core_processors.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_processors.py
 
-Description ----------- Central utilities for processing validator and normalizer rules. This is part of the "Rules"
-feature and is self-contained and fully async.
-
+Description
+-----------
+Central utilities for processing validator and normalizer rules.
+This is part of the "Rules" feature and is self-contained and fully async.
 """
 
 from __future__ import annotations

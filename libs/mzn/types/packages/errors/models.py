@@ -1,9 +1,13 @@
 """
-Title         : models.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/errors/models.py.
+Title         : models.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/errors/models.py
 
-Description ----------- Minimal error models for the new domain-aware error system.
-
+Description
+-----------
+Minimal error models for the new domain-aware error system.
 """
 
 from __future__ import annotations

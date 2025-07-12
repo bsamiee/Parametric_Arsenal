@@ -1,9 +1,13 @@
 """
-Title         : core_operations.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_operations.py.
+Title         : core_operations.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_operations.py
 
-Description ----------- Configuration and mixins for enabling primitive-like operations on type assets.
-
+Description
+-----------
+Configuration and mixins for enabling primitive-like operations on type assets.
 """
 # pyright: reportUninitializedInstanceVariable=false
 
@@ -27,7 +31,10 @@ T = TypeVar("T")
 
 @dataclass(frozen=True, kw_only=True)
 class MethodConfig:
-    """A configuration object to explicitly enable primitive-like method sets on a type alias."""
+    """
+    A configuration object to explicitly enable primitive-like
+    method sets on a type alias.
+    """
 
     arithmetic: bool = False
     container: bool = False
@@ -87,9 +94,8 @@ class ArithmeticMixin:
     def __truediv__(self, other: object) -> object:
         """
         Perform true division, returning a new instance or a float.
-
-        If the result is an integer, a new instance is returned. Otherwise, the float result is returned directly.
-
+        If the result is an integer, a new instance is returned.
+        Otherwise, the float result is returned directly.
         """
         other_val = getattr(other, "root", other)
         result = self.root / other_val

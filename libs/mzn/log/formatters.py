@@ -1,10 +1,14 @@
 """
-Title         : formatters.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/log/formatters.py.
+Title         : formatters.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/formatters.py
 
-Description ----------- Structlog processors for event transformation and output formatting. Modern Python 3.13+ with
-full type safety.
-
+Description
+-----------
+Structlog processors for event transformation and output formatting.
+Modern Python 3.13+ with full type safety.
 """
 
 from __future__ import annotations

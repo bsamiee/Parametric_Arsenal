@@ -1,10 +1,14 @@
 """
-Title         : aliases.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/errors/aliases.py.
+Title         : aliases.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/errors/aliases.py
 
-Description ----------- Domain-aware error type aliases for the new error system. Focused on enabling flexible, domain-
-qualified error management.
-
+Description
+-----------
+Domain-aware error type aliases for the new error system.
+Focused on enabling flexible, domain-qualified error management.
 """
 
 from __future__ import annotations

@@ -1,9 +1,13 @@
 """
-Title         : norm_datetime.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_datetime.py.
+Title         : norm_datetime.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_datetime.py
 
-Description ----------- Date and time normalization rules.
-
+Description
+-----------
+Date and time normalization rules.
 """
 
 from __future__ import annotations
@@ -129,9 +133,12 @@ async def parse_human_date(value: str, info: ValidationInfo) -> datetime:
     """
     Parse human-readable date strings using dateutil's fuzzy parser.
 
-    Examples:     - "tomorrow at 3pm"     - "next monday"     - "3 days ago"     - "last week"     - "January 15th at
-    2:30 PM"
-
+    Examples:
+        - "tomorrow at 3pm"
+        - "next monday"
+        - "3 days ago"
+        - "last week"
+        - "January 15th at 2:30 PM"
     """
     try:
         parsed = parser.parse(value, fuzzy=True)
@@ -149,8 +156,8 @@ def add_business_days(*, days: int) -> Normalizer[datetime, datetime]:
     """
     Factory for a normalizer that adds business days (skipping weekends).
 
-    Args:     days: Number of business days to add (can be negative)
-
+    Args:
+        days: Number of business days to add (can be negative)
     """
     @Build.normalizer(
         description=f"Add {days} business days, skipping weekends.",
@@ -186,8 +193,8 @@ def next_occurrence(*, frequency: Literal["daily", "weekly", "monthly", "yearly"
     """
     Factory for a normalizer that finds the next occurrence based on frequency.
 
-    Args:     frequency: The recurrence frequency
-
+    Args:
+        frequency: The recurrence frequency
     """
     freq_map = {
         "daily": rrule.DAILY,
@@ -219,10 +226,12 @@ async def parse_timezone_name(value: tuple[datetime, str], info: ValidationInfo)
     """
     Handle timezone conversion with support for abbreviations like 'EST', 'PST'.
 
-    Args:     value: Tuple of (datetime, timezone_name)     info: Validation context (unused)
+    Args:
+        value: Tuple of (datetime, timezone_name)
+        info: Validation context (unused)
 
-    Returns:     Timezone-aware datetime
-
+    Returns:
+        Timezone-aware datetime
     """
     dt, tz_name = value
 
@@ -255,8 +264,11 @@ async def parse_duration(value: str, info: ValidationInfo) -> timedelta:
     """
     Parse human-readable duration strings into timedelta objects.
 
-    Examples:     - "2 hours 30 minutes"     - "1 day 12 hours"     - "45 minutes"     - "3 weeks"
-
+    Examples:
+        - "2 hours 30 minutes"
+        - "1 day 12 hours"
+        - "45 minutes"
+        - "3 weeks"
     """
     try:
         # Parse a future date with the duration added
@@ -300,8 +312,8 @@ def round_to_month_boundary(*, which: Literal["start", "end"]) -> Normalizer[dat
     """
     Factory for a normalizer that rounds to start or end of month.
 
-    Args:     which: Whether to round to "start" or "end" of month
-
+    Args:
+        which: Whether to round to "start" or "end" of month
     """
     @Build.normalizer(
         description=f"Round datetime to {which} of month.",
@@ -329,8 +341,9 @@ async def to_business_day(value: datetime, info: ValidationInfo) -> datetime:
     """
     Adjust datetime to the next business day if it falls on a weekend.
 
-    Saturday -> Monday Sunday -> Monday Weekday -> No change
-
+    Saturday -> Monday
+    Sunday -> Monday
+    Weekday -> No change
     """
     weekday = value.weekday()
     if weekday == 5:  # Saturday

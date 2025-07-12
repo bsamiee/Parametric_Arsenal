@@ -1,10 +1,14 @@
 """
-Title         : factory.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/errors/factory.py.
+Title         : factory.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/factory.py
 
-Description ----------- Synchronous factory functions for error creation. No async required - works in both sync and
-async contexts.
-
+Description
+-----------
+Synchronous factory functions for error creation.
+No async required - works in both sync and async contexts.
 """
 
 from __future__ import annotations
@@ -42,18 +46,27 @@ def create_error(  # noqa: PLR0913, PLR0912
     """
     Create an MznError with the given context.
 
-    This is a synchronous function that works in both sync and async contexts. No asyncio.run() workarounds needed!
+    This is a synchronous function that works in both sync and async contexts.
+    No asyncio.run() workarounds needed!
 
-    Args:     code: Domain-qualified error code (e.g., "cache.backend_failure")     message: Error message (auto-
-    generated if not provided)     severity: Error severity level (defaults to ERROR) - use ErrorSeverity enum category:
-    Error category (auto-inferred from code if not provided) - use ErrorCategory enum     recovery_hint: Optional
-    recovery guidance     request_id: Optional request tracking ID     **extra: Additional domain-specific context
-    fields
+    Args:
+        code: Domain-qualified error code (e.g., "cache.backend_failure")
+        message: Error message (auto-generated if not provided)
+        severity: Error severity level (defaults to ERROR) - use ErrorSeverity enum
+        category: Error category (auto-inferred from code if not provided) - use ErrorCategory enum
+        recovery_hint: Optional recovery guidance
+        request_id: Optional request tracking ID
+        **extra: Additional domain-specific context fields
 
-    Returns:     MznError instance ready to be raised
+    Returns:
+        MznError instance ready to be raised
 
-    Example:     raise create_error(         "cache.key_not_found",         key="user:123",         backend="redis" )
-
+    Example:
+        raise create_error(
+            "cache.key_not_found",
+            key="user:123",
+            backend="redis"
+        )
     """
     # Ensure code is ErrorCode type
     error_code = ErrorCode(code) if isinstance(code, str) else code
@@ -175,13 +188,19 @@ def from_exception(
     """
     Create an MznError from an existing exception.
 
-    Args:     exc: The original exception     code: Domain-qualified error code     **extra: Additional context fields
+    Args:
+        exc: The original exception
+        code: Domain-qualified error code
+        **extra: Additional context fields
 
-    Returns:     MznError wrapping the original exception
+    Returns:
+        MznError wrapping the original exception
 
-    Example:     try:         open("/invalid/path")     except IOError as e:         raise from_exception(e,
-    "fs.read_failed", path="/invalid/path")
-
+    Example:
+        try:
+            open("/invalid/path")
+        except IOError as e:
+            raise from_exception(e, "fs.read_failed", path="/invalid/path")
     """
     # Extract message from original exception
     message = str(exc)

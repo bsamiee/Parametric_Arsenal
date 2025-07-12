@@ -1,9 +1,13 @@
 """
-Title         : valid_numeric.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_numeric.py.
+Title         : valid_numeric.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_numeric.py
 
-Description ----------- Numeric (int, float) validation rules.
-
+Description
+-----------
+Numeric (int, float) validation rules.
 """
 
 from __future__ import annotations

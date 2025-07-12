@@ -1,9 +1,13 @@
 """
-Title         : norm_generic.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_generic.py.
+Title         : norm_generic.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_generic.py
 
-Description ----------- Generic normalization rules that can apply to any type.
-
+Description
+-----------
+Generic normalization rules that can apply to any type.
 """
 
 from __future__ import annotations

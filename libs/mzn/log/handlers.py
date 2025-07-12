@@ -1,10 +1,14 @@
 """
-Title         : handlers.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/log/handlers.py.
+Title         : handlers.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/handlers.py
 
-Description ----------- Simplified handler implementations with format selection. Modern Python 3.13+ async-first
-design.
-
+Description
+-----------
+Simplified handler implementations with format selection.
+Modern Python 3.13+ async-first design.
 """
 
 from __future__ import annotations

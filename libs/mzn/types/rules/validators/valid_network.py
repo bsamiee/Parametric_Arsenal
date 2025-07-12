@@ -1,9 +1,13 @@
 """
-Title         : valid_network.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_network.py.
+Title         : valid_network.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_network.py
 
-Description ----------- Network-related validation rules for IP addresses, ports, hostnames, and URLs.
-
+Description
+-----------
+Network-related validation rules for IP addresses, ports, hostnames, and URLs.
 """
 
 from __future__ import annotations

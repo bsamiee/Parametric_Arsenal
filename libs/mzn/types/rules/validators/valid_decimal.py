@@ -1,9 +1,13 @@
 """
-Title         : valid_decimal.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_decimal.py.
+Title         : valid_decimal.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_decimal.py
 
-Description ----------- Decimal validation rules for precise financial and numerical checks.
-
+Description
+-----------
+Decimal validation rules for precise financial and numerical checks.
 """
 
 from __future__ import annotations

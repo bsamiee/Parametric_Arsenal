@@ -1,9 +1,13 @@
 """
-Title         : valid_uuid.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/rules/validators/valid_uuid.py.
+Title         : valid_uuid.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_uuid.py
 
-Description ----------- UUID validation rules for checking versions and formats.
-
+Description
+-----------
+UUID validation rules for checking versions and formats.
 """
 
 from __future__ import annotations

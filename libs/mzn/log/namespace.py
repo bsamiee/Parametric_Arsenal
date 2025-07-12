@@ -1,10 +1,14 @@
 """
-Title         : namespace.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/log/namespace.py.
+Title         : namespace.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/namespace.py
 
-Description ----------- Streamlined Log namespace with integrated functionality. Single export pattern with modern
-Python 3.13+ async design.
-
+Description
+-----------
+Streamlined Log namespace with integrated functionality.
+Single export pattern with modern Python 3.13+ async design.
 """
 
 from __future__ import annotations
@@ -65,8 +69,8 @@ class LogBuilder:
     """
     Fluent builder for logger configuration.
 
-    Provides a chainable API for configuring logger instances with validation at each step.
-
+    Provides a chainable API for configuring logger instances
+    with validation at each step.
     """
 
     def __init__(
@@ -74,12 +78,11 @@ class LogBuilder:
         output_target: Annotated[OutputTarget, "Output destination type"],
         name: Annotated[str, "Logger instance name"],
     ) -> None:
-        """
-        Initialize builder with output target and name.
+        """Initialize builder with output target and name.
 
-        Args:     output_target: Where logs should be output (console, file, both, null)     name: Unique identifier for
-        the logger instance
-
+        Args:
+            output_target: Where logs should be output (console, file, both, null)
+            name: Unique identifier for the logger instance
         """
         super().__init__()
         self._output_target = output_target
@@ -90,130 +93,120 @@ class LogBuilder:
 
     @beartype
     def level(self, log_level: Annotated[LogLevel, "Minimum log level"]) -> Self:
-        """
-        Set minimum log level.
+        """Set minimum log level.
 
-        Args:     log_level: Minimum level to process (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        Args:
+            log_level: Minimum level to process (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._level = log_level
         return self
 
     @beartype
     def path(self, file_path: Annotated[str, "File path for log output"]) -> Self:
-        """
-        Set log file path.
+        """Set log file path.
 
-        Args:     file_path: Absolute path to log file
+        Args:
+            file_path: Absolute path to log file
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._file_path = FilePath(file_path)
         return self
 
     # Convenience methods for log levels
     def debug(self) -> Self:
-        """
-        Set log level to DEBUG with debug format.
+        """Set log level to DEBUG with debug format.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._level = LogLevel.DEBUG
         self._format = OutputFormat.DEBUG
         return self
 
     def warning(self) -> Self:
-        """
-        Set log level to WARNING.
+        """Set log level to WARNING.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._level = LogLevel.WARNING
         return self
 
     def error(self) -> Self:
-        """
-        Set log level to ERROR.
+        """Set log level to ERROR.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._level = LogLevel.ERROR
         return self
 
     def critical(self) -> Self:
-        """
-        Set log level to CRITICAL.
+        """Set log level to CRITICAL.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._level = LogLevel.CRITICAL
         return self
 
     # Convenience methods for formats
     def json(self) -> Self:
-        """
-        Use JSON output format.
+        """Use JSON output format.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._format = OutputFormat.JSON
         return self
 
     def human(self) -> Self:
-        """
-        Use human-readable format.
+        """Use human-readable format.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._format = OutputFormat.HUMAN
         return self
 
     def rich(self) -> Self:
-        """
-        Use Rich console format with colors.
+        """Use Rich console format with colors.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._format = OutputFormat.RICH
         return self
 
     def report(self) -> Self:
-        """
-        Use detailed report format.
+        """Use detailed report format.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._format = OutputFormat.REPORT
         return self
 
     def compact(self) -> Self:
-        """
-        Use compact space-efficient format.
+        """Use compact space-efficient format.
 
-        Returns:     Builder instance for method chaining
-
+        Returns:
+            Builder instance for method chaining
         """
         self._format = OutputFormat.COMPACT
         return self
 
     @beartype
     async def build(self) -> Logger:
-        """
-        Build the configured logger instance.
+        """Build the configured logger instance.
 
-        Returns:     Fully configured and initialized logger instance
-
+        Returns:
+            Fully configured and initialized logger instance
         """
         # Create output processor based on format type
         output_processor = self._create_output_processor()
@@ -316,16 +309,23 @@ class Log:
     """
     Unified namespace for all logging functionality.
 
-    Provides intelligent, async-first logging with multiple outputs and a clean, simple API.
+    Provides intelligent, async-first logging with multiple outputs
+    and a clean, simple API.
 
-    Example:     # Fluent API     logger = await Log.console("app").json().info().build()     logger = await
-    Log.file("audit").report().path("/logs/audit.log").build()     logger = await Log.both("debug-
-    app").debug().rich().auto_trace().build()
+    Example:
+        # Fluent API
+        logger = await Log.console("app").json().info().build()
+        logger = await Log.file("audit").report().path("/logs/audit.log").build()
+        logger = await Log.both("debug-app").debug().rich().auto_trace().build()
 
-    # Context manager async with Log.console("temp").json().build() as logger:     await logger.info("Processing...")
+        # Context manager
+        async with Log.console("temp").json().build() as logger:
+            await logger.info("Processing...")
 
-    # Use decorator @Log.logged async def expensive_operation(x: int) -> str:     return f"Result: {x}"
-
+        # Use decorator
+        @Log.logged
+        async def expensive_operation(x: int) -> str:
+            return f"Result: {x}"
     """
 
     # --- Core Implementation --------------------------------------------------
@@ -364,52 +364,52 @@ class Log:
     @classmethod
     @beartype
     def console(cls, name: Annotated[str, "Logger instance identifier"]) -> LogBuilder:
-        """
-        Create fluent builder for console logging.
+        """Create fluent builder for console logging.
 
-        Args:     name: Unique logger instance identifier
+        Args:
+            name: Unique logger instance identifier
 
-        Returns:     LogBuilder configured for console output
-
+        Returns:
+            LogBuilder configured for console output
         """
         return LogBuilder(OutputTarget.CONSOLE, name)
 
     @classmethod
     @beartype
     def file(cls, name: Annotated[str, "Logger instance identifier"]) -> LogBuilder:
-        """
-        Create fluent builder for file logging.
+        """Create fluent builder for file logging.
 
-        Args:     name: Unique logger instance identifier
+        Args:
+            name: Unique logger instance identifier
 
-        Returns:     LogBuilder configured for file output
-
+        Returns:
+            LogBuilder configured for file output
         """
         return LogBuilder(OutputTarget.FILE, name)
 
     @classmethod
     @beartype
     def both(cls, name: Annotated[str, "Logger instance identifier"]) -> LogBuilder:
-        """
-        Create fluent builder for console and file logging.
+        """Create fluent builder for console and file logging.
 
-        Args:     name: Unique logger instance identifier
+        Args:
+            name: Unique logger instance identifier
 
-        Returns:     LogBuilder configured for both console and file output
-
+        Returns:
+            LogBuilder configured for both console and file output
         """
         return LogBuilder(OutputTarget.BOTH, name)
 
     @classmethod
     @beartype
     def null(cls, name: Annotated[str, "Logger instance identifier"]) -> LogBuilder:
-        """
-        Create fluent builder for null logging (discard all output).
+        """Create fluent builder for null logging (discard all output).
 
-        Args:     name: Unique logger instance identifier
+        Args:
+            name: Unique logger instance identifier
 
-        Returns:     LogBuilder configured to discard all output
-
+        Returns:
+            LogBuilder configured to discard all output
         """
         return LogBuilder(OutputTarget.NULL, name)
 
@@ -419,13 +419,14 @@ class Log:
     async def create_from_config(
         cls, name: Annotated[str, "Logger instance name"], logger: Annotated[Logger, "Configured logger instance"]
     ) -> Logger:
-        """
-        Create logger from pre-configured instance.
+        """Create logger from pre-configured instance.
 
-        Args:     name: Unique logger instance identifier     logger: Pre-configured logger instance
+        Args:
+            name: Unique logger instance identifier
+            logger: Pre-configured logger instance
 
-        Returns:     Logger instance registered in cache
-
+        Returns:
+            Logger instance registered in cache
         """
         # Check if already cached
         if existing := cls._loggers.get(name):
@@ -445,26 +446,26 @@ class Log:
     @classmethod
     @beartype
     def get(cls, name: Annotated[str, "Logger instance identifier"]) -> Logger | None:
-        """
-        Get an existing logger by name.
+        """Get an existing logger by name.
 
-        Args:     name: Logger instance identifier
+        Args:
+            name: Logger instance identifier
 
-        Returns:     Logger instance if found, None otherwise
-
+        Returns:
+            Logger instance if found, None otherwise
         """
         return cls._loggers.get(name)
 
     @classmethod
     @beartype
     async def close(cls, name: Annotated[str, "Logger instance identifier"]) -> bool:
-        """
-        Close and remove a logger instance.
+        """Close and remove a logger instance.
 
-        Args:     name: Logger instance identifier
+        Args:
+            name: Logger instance identifier
 
-        Returns:     True if logger was closed, False if not found
-
+        Returns:
+            True if logger was closed, False if not found
         """
         if name in cls._loggers:
             logger = cls._loggers[name]
@@ -476,11 +477,10 @@ class Log:
     @classmethod
     @beartype
     async def close_all(cls) -> None:
-        """
-        Close all logger instances.
+        """Close all logger instances.
 
-        Closes all cached instances and clears the registry. Useful for cleanup in tests or application shutdown.
-
+        Closes all cached instances and clears the registry.
+        Useful for cleanup in tests or application shutdown.
         """
         for logger in cls._loggers.values():
             await logger.close()
@@ -503,20 +503,27 @@ class Log:
         """
         Decorator for automatic async function logging with debug features.
 
-        Can be used with or without parentheses:     @Log.logged     async def func(): ...
+        Can be used with or without parentheses:
+            @Log.logged
+            async def func(): ...
 
-        @Log.logged(level=LogLevel.DEBUG)  # Auto-enables debug features async def func(): ...
+            @Log.logged(level=LogLevel.DEBUG)  # Auto-enables debug features
+            async def func(): ...
 
         Note: Only supports async functions.
 
-        Args:     func: Async function to decorate (when used without parentheses)     level: Log level for function
-        calls     logger_name: Override logger name (default: function module)     include_args: Include function
-        arguments in logs     include_result: Include function result in logs     include_timing: Add elapsed time in
-        milliseconds (None = auto for DEBUG)     include_memory: Add memory usage delta in MB (None = auto for DEBUG)
-        include_trace: Add OpenTelemetry trace context (None = auto for DEBUG)
+        Args:
+            func: Async function to decorate (when used without parentheses)
+            level: Log level for function calls
+            logger_name: Override logger name (default: function module)
+            include_args: Include function arguments in logs
+            include_result: Include function result in logs
+            include_timing: Add elapsed time in milliseconds (None = auto for DEBUG)
+            include_memory: Add memory usage delta in MB (None = auto for DEBUG)
+            include_trace: Add OpenTelemetry trace context (None = auto for DEBUG)
 
-        Returns:     Decorated async function or decorator
-
+        Returns:
+            Decorated async function or decorator
         """
 
         def decorator(fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:  # noqa: PLR0915

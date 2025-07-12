@@ -1,12 +1,16 @@
 """
-Title         : feat_caching.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_features/feat_caching.py.
+Title         : feat_caching.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_caching.py
 
-Description ----------- Caching feature mixin for advanced asset types.
+Description
+-----------
+Caching feature mixin for advanced asset types.
 
-Provides methods for cached validation and cache management, implementing the caching-related aspects of the
-AdvancedAsset protocol.
-
+Provides methods for cached validation and cache management, implementing
+the caching-related aspects of the AdvancedAsset protocol.
 """
 
 from __future__ import annotations
@@ -35,9 +39,8 @@ class CachingMixin:
     """
     Mixin providing caching functionality for advanced asset types.
 
-    Implements methods for cached validation, cache management, and cache statistics, fulfilling the caching-related
-    aspects of the AdvancedAsset protocol.
-
+    Implements methods for cached validation, cache management, and cache statistics,
+    fulfilling the caching-related aspects of the AdvancedAsset protocol.
     """
 
     # These attributes are provided by TypeAsset base class when the mixin is applied
@@ -67,12 +70,14 @@ class CachingMixin:
         """
         Validate a value using a class-local cache to optimize performance.
 
-        Args:     value: The value to validate.
+        Args:
+            value: The value to validate.
 
-        Returns:     The validated value.
+        Returns:
+            The validated value.
 
-        Raises:     ValueError: If validation fails.
-
+        Raises:
+            ValueError: If validation fails.
         """
         cache = await cls._get_cache()
         try:
@@ -104,8 +109,8 @@ class CachingMixin:
         """
         Get performance statistics for the validation cache.
 
-        Returns:     A dictionary with cache statistics (size, maxsize, hits, misses).
-
+        Returns:
+            A dictionary with cache statistics (size, maxsize, hits, misses).
         """
         cache = await cls._get_cache()
         return {

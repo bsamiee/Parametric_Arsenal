@@ -1,10 +1,14 @@
 """
-Title         : prot_base.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/_contracts/prot_base.py.
+Title         : prot_base.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_contracts/prot_base.py
 
-Description ----------- Base protocols and type aliases for the contract system. This module should have no local
-dependencies on other protocol files.
-
+Description
+-----------
+Base protocols and type aliases for the contract system.
+This module should have no local dependencies on other protocol files.
 """
 
 from __future__ import annotations

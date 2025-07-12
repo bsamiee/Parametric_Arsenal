@@ -1,10 +1,14 @@
 """
-Title         : decorator.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/errors/decorator.py.
+Title         : decorator.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/decorator.py
 
-Description ----------- Modern, minimal error-aware decorator with domain inference. Supports both sync and async
-functions with automatic context capture.
-
+Description
+-----------
+Modern, minimal error-aware decorator with domain inference.
+Supports both sync and async functions with automatic context capture.
 """
 
 from __future__ import annotations
@@ -57,17 +61,24 @@ def error_aware(
     """
     Modern error-aware decorator for sync and async functions.
 
-    Automatically captures context and transforms exceptions into MznErrors with domain-qualified error codes.
+    Automatically captures context and transforms exceptions into MznErrors
+    with domain-qualified error codes.
 
-    Args:     func: Function to decorate (when used without parentheses)     domain: Error domain (e.g., "cache",
-    "validation")     operation: Operation name (e.g., "get", "validate")     severity: Default severity for errors
-    category: Default category for errors
+    Args:
+        func: Function to decorate (when used without parentheses)
+        domain: Error domain (e.g., "cache", "validation")
+        operation: Operation name (e.g., "get", "validate")
+        severity: Default severity for errors
+        category: Default category for errors
 
-    Returns:     Decorated function that transforms exceptions
+    Returns:
+        Decorated function that transforms exceptions
 
-    Example:     @error_aware(domain="cache", operation="get")     async def get_item(key: str) -> Any:         # Errors
-    become: "cache.get_failed"         ...
-
+    Example:
+        @error_aware(domain="cache", operation="get")
+        async def get_item(key: str) -> Any:
+            # Errors become: "cache.get_failed"
+            ...
     """
     def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         # Auto-infer domain and operation if not provided

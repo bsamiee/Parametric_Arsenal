@@ -1,9 +1,13 @@
 """
-Title         : norm_numeric.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_numeric.py.
+Title         : norm_numeric.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_numeric.py
 
-Description ----------- Numeric (int, float) normalization rules.
-
+Description
+-----------
+Numeric (int, float) normalization rules.
 """
 
 from __future__ import annotations

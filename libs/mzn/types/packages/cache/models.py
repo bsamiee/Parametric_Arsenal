@@ -1,10 +1,14 @@
 """
-Title         : models.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/cache/models.py.
+Title         : models.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/cache/models.py
 
-Description ----------- Simplified cache models for the new cache implementation. Only includes what's actually needed,
-with clear, modern design.
-
+Description
+-----------
+Simplified cache models for the new cache implementation.
+Only includes what's actually needed, with clear, modern design.
 """
 
 from __future__ import annotations

@@ -1,10 +1,14 @@
 """
-Title         : operations.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/metrics/operations.py.
+Title         : operations.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/operations.py
 
-Description ----------- Async operations for prometheus metrics manipulation. Provides clean wrappers for incrementing,
-setting, and observing metric values.
-
+Description
+-----------
+Async operations for prometheus metrics manipulation.
+Provides clean wrappers for incrementing, setting, and observing metric values.
 """
 
 # pyright: reportPrivateUsage=false
@@ -65,12 +69,15 @@ def _validate_labels(
     """
     Validate and convert labels to prometheus format.
 
-    Args:     instance: The metric instance     labels: Label key-value pairs to validate
+    Args:
+        instance: The metric instance
+        labels: Label key-value pairs to validate
 
-    Returns:     Dictionary with string keys/values for prometheus
+    Returns:
+        Dictionary with string keys/values for prometheus
 
-    Raises:     ValidationError: If labels don't match spec
-
+    Raises:
+        ValidationError: If labels don't match spec
     """
     expected_labels = {str(label) for label in instance.spec.label_names}
 
@@ -123,12 +130,16 @@ async def _get_metric_with_labels(
     """
     Get metric instance and apply labels.
 
-    Args:     metric: Metric name     labels: Optional labels to apply
+    Args:
+        metric: Metric name
+        labels: Optional labels to apply
 
-    Returns:     Tuple of (metric instance, prometheus metric with labels)
+    Returns:
+        Tuple of (metric instance, prometheus metric with labels)
 
-    Raises:     MetricError: If metric not found     ValidationError: If labels invalid
-
+    Raises:
+        MetricError: If metric not found
+        ValidationError: If labels invalid
     """
     instance = await get_metric(metric)
     if not instance:
@@ -160,12 +171,15 @@ async def increment(
     """
     Increment a counter metric.
 
-    Args:     metric: Name of the counter metric     value: Amount to increment (must be positive)     labels: Labels to
-    apply to the metric
+    Args:
+        metric: Name of the counter metric
+        value: Amount to increment (must be positive)
+        labels: Labels to apply to the metric
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a counter     ValidationError: If
-    labels don't match specification or value is negative
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a counter
+        ValidationError: If labels don't match specification or value is negative
     """
     if float(value) < 0:
         error = Error.create(
@@ -212,11 +226,15 @@ async def gauge_set(
     """
     Set a gauge metric value.
 
-    Args:     metric: Name of the gauge metric     value: Value to set     labels: Labels to apply to the metric
+    Args:
+        metric: Name of the gauge metric
+        value: Value to set
+        labels: Labels to apply to the metric
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a gauge     ValidationError: If
-    labels don't match specification
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a gauge
+        ValidationError: If labels don't match specification
     """
     instance, labeled_metric = await _get_metric_with_labels(metric, labels)
 
@@ -252,12 +270,15 @@ async def gauge_inc(
     """
     Increment a gauge metric by value.
 
-    Args:     metric: Name of the gauge metric     value: Amount to increment (can be negative)     labels: Labels to
-    apply to the metric
+    Args:
+        metric: Name of the gauge metric
+        value: Amount to increment (can be negative)
+        labels: Labels to apply to the metric
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a gauge     ValidationError: If
-    labels don't match specification
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a gauge
+        ValidationError: If labels don't match specification
     """
     instance, labeled_metric = await _get_metric_with_labels(metric, labels)
 
@@ -293,12 +314,15 @@ async def gauge_dec(
     """
     Decrement a gauge metric by value.
 
-    Args:     metric: Name of the gauge metric     value: Amount to decrement (positive value)     labels: Labels to
-    apply to the metric
+    Args:
+        metric: Name of the gauge metric
+        value: Amount to decrement (positive value)
+        labels: Labels to apply to the metric
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a gauge     ValidationError: If
-    labels don't match specification
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a gauge
+        ValidationError: If labels don't match specification
     """
     instance, labeled_metric = await _get_metric_with_labels(metric, labels)
 
@@ -337,12 +361,15 @@ async def observe(
     """
     Observe a value for histogram or summary metrics.
 
-    Args:     metric: Name of the histogram/summary metric     value: Value to observe     labels: Labels to apply to
-    the metric
+    Args:
+        metric: Name of the histogram/summary metric
+        value: Value to observe
+        labels: Labels to apply to the metric
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a histogram or summary
-    ValidationError: If labels don't match specification
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a histogram or summary
+        ValidationError: If labels don't match specification
     """
     instance, labeled_metric = await _get_metric_with_labels(metric, labels)
 
@@ -380,13 +407,17 @@ async def set_info(
     """
     Set labels for an info metric.
 
-    Info metrics are special - they always have a value of 1 and are used solely for their labels to expose metadata.
+    Info metrics are special - they always have a value of 1
+    and are used solely for their labels to expose metadata.
 
-    Args:     metric: Name of the info metric     labels: Labels to set (required)
+    Args:
+        metric: Name of the info metric
+        labels: Labels to set (required)
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not an info metric ValidationError:
-    If labels don't match specification
-
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not an info metric
+        ValidationError: If labels don't match specification
     """
     if not labels:
         error = Error.create(
@@ -443,18 +474,25 @@ async def time_histogram(
     """
     Time a block of code and record to histogram.
 
-    Measures execution time in seconds and records it to the specified histogram metric.
+    Measures execution time in seconds and records it to the specified
+    histogram metric.
 
-    Args:     metric: Name of the histogram metric     labels: Labels to apply to the metric
+    Args:
+        metric: Name of the histogram metric
+        labels: Labels to apply to the metric
 
-    Yields:     None
+    Yields:
+        None
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a histogram     ValidationError:
-    If labels don't match specification
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a histogram
+        ValidationError: If labels don't match specification
 
-    Example:     labels = {MetricLabelKey("endpoint"): MetricLabelValue("/api/users")}     async with
-    time_histogram("request.duration", labels):         await process_request()
-
+    Example:
+        labels = {MetricLabelKey("endpoint"): MetricLabelValue("/api/users")}
+        async with time_histogram("request.duration", labels):
+            await process_request()
     """
     instance, labeled_metric = await _get_metric_with_labels(metric, labels)
 
@@ -496,20 +534,26 @@ async def track_active(
     """
     Context manager to track active operations.
 
-    Increments gauge on enter, decrements on exit. Perfect for tracking active connections, sessions, running tasks,
-    etc.
+    Increments gauge on enter, decrements on exit.
+    Perfect for tracking active connections, sessions, running tasks, etc.
 
-    Args:     metric: Name of the gauge metric     labels: Labels to apply to the metric     amount: Amount to
-    increment/decrement (default: 1.0)
+    Args:
+        metric: Name of the gauge metric
+        labels: Labels to apply to the metric
+        amount: Amount to increment/decrement (default: 1.0)
 
-    Yields:     None
+    Yields:
+        None
 
-    Raises:     MetricError: If metric not found     MetricTypeError: If metric is not a gauge     ValidationError: If
-    labels don't match specification
+    Raises:
+        MetricError: If metric not found
+        MetricTypeError: If metric is not a gauge
+        ValidationError: If labels don't match specification
 
-    Example:     labels = {MetricLabelKey("endpoint"): MetricLabelValue("/api/users")}     async with
-    track_active("websocket.connections", labels):         await handle_websocket_connection()
-
+    Example:
+        labels = {MetricLabelKey("endpoint"): MetricLabelValue("/api/users")}
+        async with track_active("websocket.connections", labels):
+            await handle_websocket_connection()
     """
     await gauge_inc(metric, amount, labels)
     try:
@@ -529,17 +573,23 @@ async def with_labels(
     """
     Get a metric with labels pre-applied.
 
-    This is useful when you need to perform multiple operations on the same labeled metric.
+    This is useful when you need to perform multiple operations
+    on the same labeled metric.
 
-    Args:     metric: Name of the metric     **label_values: Label key-value pairs
+    Args:
+        metric: Name of the metric
+        **label_values: Label key-value pairs
 
-    Returns:     Prometheus metric object with labels applied
+    Returns:
+        Prometheus metric object with labels applied
 
-    Raises:     MetricError: If metric not found     ValidationError: If labels don't match specification
+    Raises:
+        MetricError: If metric not found
+        ValidationError: If labels don't match specification
 
-    Example:     user_requests = await with_labels("http.requests", method="GET", status="200")     user_requests.inc()
-    # Direct prometheus API
-
+    Example:
+        user_requests = await with_labels("http.requests", method="GET", status="200")
+        user_requests.inc()  # Direct prometheus API
     """
     # Convert kwargs to our typed labels
     labels = {

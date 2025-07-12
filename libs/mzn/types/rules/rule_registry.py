@@ -1,10 +1,15 @@
 """
-Title         : rules.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/rules.py.
+Title         : rules.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/rules.py
 
-Description ----------- Hierarchical, self-registering, and callable Enum-based system for all rules. Enhanced with
-dynamic member creation similar to the tags system. Reorganized with core atomic rules and improved categorization.
-
+Description
+-----------
+Hierarchical, self-registering, and callable Enum-based system for all rules.
+Enhanced with dynamic member creation similar to the tags system.
+Reorganized with core atomic rules and improved categorization.
 """
 
 from __future__ import annotations
@@ -59,10 +64,10 @@ def define_rule() -> CallableRule[..., BaseRule]:
     """
     A factory function to bridge the gap between runtime `auto()` and static analysis.
 
-    During static analysis (when `TYPE_CHECKING` is true), this function is treated as returning a `CallableRule`, which
-    satisfies the type checker that the enum member is callable and returns a valid rule. At runtime, it returns
-    `aenum.auto()`, allowing for dynamic member creation.
-
+    During static analysis (when `TYPE_CHECKING` is true), this function
+    is treated as returning a `CallableRule`, which satisfies the type checker
+    that the enum member is callable and returns a valid rule.
+    At runtime, it returns `aenum.auto()`, allowing for dynamic member creation.
     """
     if TYPE_CHECKING:
 
@@ -110,9 +115,7 @@ def register_rule(
 ) -> None:
     """
     Registers a rule instance against its corresponding Enum member.
-
     This function is called by the @Build decorators.
-
     """
     if key in _rule_map:
         # Warning: Overwriting rule for key
@@ -127,9 +130,9 @@ class _RuleMeta(EnumMeta):
     """
     Metaclass for dynamic rule creation, similar to the tags system.
 
-    This metaclass enables creating enum members on-demand when they're accessed but don't exist, allowing for dynamic
-    registration of rules without pre-defining them in this file.
-
+    This metaclass enables creating enum members on-demand when they're accessed
+    but don't exist, allowing for dynamic registration of rules without
+    pre-defining them in this file.
     """
 
     def __new__(
@@ -162,9 +165,8 @@ class _RuleMeta(EnumMeta):
         """
         Handle dynamic member creation when accessing non-existent enum members.
 
-        This is called when someone tries to access an attribute that doesn't exist on the enum class, allowing us to
-        create enum members on-demand.
-
+        This is called when someone tries to access an attribute that doesn't exist
+        on the enum class, allowing us to create enum members on-demand.
         """
         # First check if it's an existing member
         members = getattr(self, "__members__", {})
@@ -188,10 +190,8 @@ class _RuleMeta(EnumMeta):
 class Rule(Enum, metaclass=_RuleMeta):
     """
     Base class for the hierarchical, callable rule enum.
-
-    Provides the dynamic __call__ method to delegate to the real rule. Enhanced with dynamic member creation
-    capabilities.
-
+    Provides the dynamic __call__ method to delegate to the real rule.
+    Enhanced with dynamic member creation capabilities.
     """
 
     @classmethod
@@ -276,10 +276,9 @@ class Rule(Enum, metaclass=_RuleMeta):
         """
         Load ALL rule modules from validators/ and normalizers/ directories.
 
-        This discovers and imports every .py file, letting @Build decorators register themselves automatically. Also
-        registers factory functions by name matching. File names are completely irrelevant - we only care about the enum
-        hierarchy.
-
+        This discovers and imports every .py file, letting @Build decorators
+        register themselves automatically. Also registers factory functions by name matching.
+        File names are completely irrelevant - we only care about the enum hierarchy.
         """
         # Get the rules directory
         rules_dir = Path(__file__).parent

@@ -1,9 +1,13 @@
 """
-Title         : types.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/types.py.
+Title         : types.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/types.py
 
-Description ----------- Re-exports of cache-specific type assets from the types package.
-
+Description
+-----------
+Re-exports of cache-specific type assets from the types package.
 """
 
 # --- Cache-specific aliases --------------------------------------------------

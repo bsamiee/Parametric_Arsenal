@@ -1,9 +1,13 @@
 """
-Title         : norm_collections.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/normalizers/norm_collections.py.
+Title         : norm_collections.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_collections.py
 
-Description ----------- Collection (list, set, dict) normalization rules.
-
+Description
+-----------
+Collection (list, set, dict) normalization rules.
 """
 
 from __future__ import annotations
@@ -281,8 +285,8 @@ async def lowercase_keys(
     """
     Convert all dictionary keys to lowercase.
 
-    Note: This may cause key collisions if keys differ only by case. The last value wins in case of collision.
-
+    Note: This may cause key collisions if keys differ only by case.
+    The last value wins in case of collision.
     """
     result: dict[str, Any] = {}
 

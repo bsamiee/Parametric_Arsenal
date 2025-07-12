@@ -1,10 +1,14 @@
 """
-Title         : registry.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/metrics/registry.py.
+Title         : registry.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/metrics/registry.py
 
-Description ----------- Prometheus registry management with async-first design. Handles metric registration, tracking,
-and text format generation.
-
+Description
+-----------
+Prometheus registry management with async-first design.
+Handles metric registration, tracking, and text format generation.
 """
 
 from __future__ import annotations
@@ -74,10 +78,11 @@ async def set_registry(
 
     Useful for testing or multi-tenant applications.
 
-    Args:     registry: CollectorRegistry instance to use
+    Args:
+        registry: CollectorRegistry instance to use
 
-    Raises:     RegistrationError: If metrics already exist in current registry
-
+    Raises:
+        RegistrationError: If metrics already exist in current registry
     """
     lock = await _get_lock()
     async with lock:
@@ -99,8 +104,8 @@ async def get_registry() -> CollectorRegistry:
     """
     Get the current prometheus registry.
 
-    Returns:     Current CollectorRegistry instance
-
+    Returns:
+        Current CollectorRegistry instance
     """
     return _registry
 
@@ -115,10 +120,11 @@ async def register_metric(
     """
     Register a metric instance in our tracking.
 
-    Args:     instance: MetricInstance to register
+    Args:
+        instance: MetricInstance to register
 
-    Raises:     RegistrationError: If metric name already exists
-
+    Raises:
+        RegistrationError: If metric name already exists
     """
     name = str(instance.spec.name)
 
@@ -151,12 +157,14 @@ async def unregister_metric(
     """
     Unregister a metric from tracking.
 
-    Note: This only removes from our tracking. Prometheus-client doesn't support true unregistration from collectors.
+    Note: This only removes from our tracking. Prometheus-client
+    doesn't support true unregistration from collectors.
 
-    Args:     name: Name of metric to unregister
+    Args:
+        name: Name of metric to unregister
 
-    Returns:     True if metric was removed, False if not found
-
+    Returns:
+        True if metric was removed, False if not found
     """
     str_name = str(name)
 
@@ -181,10 +189,11 @@ async def get_metric(
     """
     Get an existing metric instance by name.
 
-    Args:     name: Metric name to retrieve
+    Args:
+        name: Metric name to retrieve
 
-    Returns:     MetricInstance if found, None otherwise
-
+    Returns:
+        MetricInstance if found, None otherwise
     """
     lock = await _get_lock()
     async with lock:
@@ -198,10 +207,11 @@ async def list_metrics(
     """
     List all registered metrics.
 
-    Args:     metric_type: Optional filter by metric type
+    Args:
+        metric_type: Optional filter by metric type
 
-    Returns:     List of metric instances matching the filter
-
+    Returns:
+        List of metric instances matching the filter
     """
     lock = await _get_lock()
     async with lock:
@@ -220,10 +230,11 @@ async def metric_exists(
     """
     Check if a metric exists.
 
-    Args:     name: Metric name to check
+    Args:
+        name: Metric name to check
 
-    Returns:     True if metric exists, False otherwise
-
+    Returns:
+        True if metric exists, False otherwise
     """
     lock = await _get_lock()
     async with lock:
@@ -238,8 +249,8 @@ async def clear_metrics() -> None:
     """
     Clear all metric instances from tracking.
 
-    WARNING: This is for testing only. It clears our tracking but doesn't unregister from prometheus collectors.
-
+    WARNING: This is for testing only. It clears our tracking
+    but doesn't unregister from prometheus collectors.
     """
     lock = await _get_lock()
     async with lock:
@@ -256,11 +267,13 @@ async def generate_metrics_text() -> str:
 
     This is the format expected by prometheus scrapers.
 
-    Returns:     Prometheus text format string with all metrics
+    Returns:
+        Prometheus text format string with all metrics
 
-    Example:     # HELP http_requests_total Total HTTP requests     # TYPE http_requests_total counter
-    http_requests_total{method="GET",status="200"} 1027.0
-
+    Example:
+        # HELP http_requests_total Total HTTP requests
+        # TYPE http_requests_total counter
+        http_requests_total{method="GET",status="200"} 1027.0
     """
     # generate_latest returns bytes, decode to string
     return generate_latest(_registry).decode("utf-8")

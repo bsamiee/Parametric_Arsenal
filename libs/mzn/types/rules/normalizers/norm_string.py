@@ -1,9 +1,13 @@
 """
-Title         : norm_string.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/rules/normalizers/norm_string.py.
+Title         : norm_string.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_string.py
 
-Description ----------- String-specific normalization rules.
-
+Description
+-----------
+String-specific normalization rules.
 """
 
 from __future__ import annotations
@@ -265,8 +269,8 @@ async def deduplicate_separators(value: str, info: ValidationInfo) -> str:
     """
     Remove duplicate separator characters.
 
-    Default separators: ::, __, --, // Can be customized via info.context['separators']
-
+    Default separators: ::, __, --, //
+    Can be customized via info.context['separators']
     """
     separators = (info.context.get("separators", ["::", "__", "--", "//"])
                   if info.context is not None else ["::", "__", "--", "//"])
@@ -290,7 +294,6 @@ async def remove_control_characters(value: str, info: ValidationInfo) -> str:
     Remove control characters (non-printable) from string.
 
     Keeps tabs, newlines, and carriage returns by default.
-
     """
     keep_chars = (info.context.get("keep_chars", "\t\n\r")
                   if info.context is not None else "\t\n\r")

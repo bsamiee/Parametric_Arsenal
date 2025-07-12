@@ -1,10 +1,14 @@
 """
-Title         : aliases.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/metrics/aliases.py.
+Title         : aliases.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/metrics/aliases.py
 
-Description ----------- Type aliases for the metrics package, providing validated domain-specific types for metric
-names, values, timestamps, and configuration parameters.
-
+Description
+-----------
+Type aliases for the metrics package, providing validated domain-specific types
+for metric names, values, timestamps, and configuration parameters.
 """
 
 from mzn.types._core.core_builders import Build

@@ -1,12 +1,17 @@
 """
-Title         : feat_rules.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/_features/feat_rules.py.
+Title         : feat_rules.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_rules.py
 
-Description ----------- Rule processing feature for validation and normalization.
+Description
+-----------
+Rule processing feature for validation and normalization.
 
-This module provides a composable mixin that implements the HasRules protocol, enabling consistent rule processing
-across all asset types. It integrates with the existing rule processor utility and provides enhanced functionality.
-
+This module provides a composable mixin that implements the HasRules protocol,
+enabling consistent rule processing across all asset types. It integrates with
+the existing rule processor utility and provides enhanced functionality.
 """
 
 from __future__ import annotations
@@ -43,9 +48,8 @@ class RulesMixin:
     """
     Mixin for adding rule processing to validated assets.
 
-    Provides class-level storage, management, and async processing of validation and normalization rules. Integrates
-    with the rule processor utility for async rule categorization and inspection.
-
+    Provides class-level storage, management, and async processing of validation and normalization rules.
+    Integrates with the rule processor utility for async rule categorization and inspection.
     """
 
     # These attributes are provided by TypeAsset base class when the mixin is applied
@@ -66,22 +70,15 @@ class RulesMixin:
     @classmethod
     def _ensure_own_rules_list(cls) -> None:
         """
-        Ensures that the class has its own list of rules, copying from its parent if necessary.
-
-        This implements copy-on-write for rule inheritance.
-
+        Ensures that the class has its own list of rules, copying from its
+        parent if necessary. This implements copy-on-write for rule inheritance.
         """
         if "_rules" not in cls.__dict__:
             cls._rules = list(cls._rules)
 
     @classmethod
     async def add_rule(cls, rule: Annotated[Rule, "Validation or normalization rule"]) -> Annotated[None, "No return"]:
-        """
-        Add a validation or normalization rule.
-
-        Async override of sync base method.
-
-        """
+        """Add a validation or normalization rule. Async override of sync base method."""
         if Sentinel.is_sentinel(rule) and rule is Sentinel.NOOP:
             return
         cls._ensure_own_rules_list()
@@ -90,12 +87,7 @@ class RulesMixin:
 
     @classmethod
     async def add_rules(cls, rules: Annotated[Sequence[Rule], "Multiple rules"]) -> Annotated[None, "No return"]:
-        """
-        Add multiple rules at once.
-
-        Async override of sync base method.
-
-        """
+        """Add multiple rules at once. Async override of sync base method."""
         if not rules:
             return
         cls._ensure_own_rules_list()
@@ -106,12 +98,7 @@ class RulesMixin:
     async def process_rules(
         cls,
     ) -> Annotated[RuleProcessingResult, "Processed rules"]:
-        """
-        Process rules into validators and normalizers.
-
-        Async override of sync base method.
-
-        """
+        """Process rules into validators and normalizers. Async override of sync base method."""
         if cls._processed_rules_cache is not None:
             return cls._processed_rules_cache
 
@@ -162,24 +149,14 @@ class RulesMixin:
     async def has_rules(
         cls,
     ) -> Annotated[bool, "Whether rules exist"]:
-        """
-        Check if the class has any rules configured.
-
-        Async override of sync base method.
-
-        """
+        """Check if the class has any rules configured. Async override of sync base method."""
         return bool(await cls.get_rules())
 
     @classmethod
     async def get_rule_count(
         cls,
     ) -> Annotated[int, "Number of rules"]:
-        """
-        Get the number of configured rules.
-
-        Async override of sync base method.
-
-        """
+        """Get the number of configured rules. Async override of sync base method."""
         return len(await cls.get_rules())
 
     @classmethod

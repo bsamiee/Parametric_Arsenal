@@ -1,9 +1,13 @@
 """
-Title         : serializers.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/cache/serializers.py.
+Title         : serializers.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/serializers.py
 
-Description ----------- Simple serialization utilities for cache backends.
-
+Description
+-----------
+Simple serialization utilities for cache backends.
 """
 
 from __future__ import annotations

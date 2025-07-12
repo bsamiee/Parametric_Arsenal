@@ -1,9 +1,13 @@
 """
-Title         : valid_security.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/rules/validators/valid_security.py.
+Title         : valid_security.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_security.py
 
-Description ----------- Security-related validation rules for passwords, tokens, and other security checks.
-
+Description
+-----------
+Security-related validation rules for passwords, tokens, and other security checks.
 """
 
 from __future__ import annotations
@@ -74,7 +78,7 @@ def is_strong_password(
 
 
 @Build.validator(
-    register_as=VALID.SECURITY.is_jwt,
+    register_as=VALID.PROTOCOLS.is_jwt,
     error_template="Value must be a valid JWT token.",
     description="Validates JWT format (not cryptographic validation).",
     tags=(SYSTEM.INFRA.network,),
@@ -82,9 +86,7 @@ def is_strong_password(
 async def is_jwt(value: str, info: ValidationInfo) -> bool:
     """
     Validates JWT format (not cryptographic validation).
-
     Checks for three base64url-encoded parts separated by dots.
-
     """
     parts = value.split(".")
     if len(parts) != 3:

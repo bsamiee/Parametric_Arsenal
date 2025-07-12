@@ -1,9 +1,16 @@
 """
+Title         : cache.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/core/cache.py
+
+Description
+-----------
 Cache domain-specific normalizers.
 
-This module provides normalization rules specifically designed for cache operations, including key normalization, TTL
-adjustments, and tag processing.
-
+This module provides normalization rules specifically designed for cache operations,
+including key normalization, TTL adjustments, and tag processing.
 """
 
 from __future__ import annotations
@@ -39,9 +46,12 @@ async def normalize_cache_key(
     """
     Normalize cache key with full pipeline.
 
-    Steps: 1. Strip whitespace 2. Convert to lowercase 3. Replace spaces with underscores 4. Remove any remaining
-    invalid characters 5. Deduplicate separators
-
+    Steps:
+    1. Strip whitespace
+    2. Convert to lowercase
+    3. Replace spaces with underscores
+    4. Remove any remaining invalid characters
+    5. Deduplicate separators
     """
     # Strip whitespace
     normalized = value.strip()
@@ -134,7 +144,6 @@ async def deduplicate_separators(
     Remove duplicate separator characters.
 
     Handles: ::, __, --, // etc.
-
     """
     separators = (info.context.get("separators", ["::", "__", "--", "//"])
                   if info.context is not None else ["::", "__", "--", "//"])
@@ -156,7 +165,6 @@ def add_ttl_jitter(
     Factory for creating a TTL jitter normalizer.
 
     Adds random jitter to prevent thundering herd problem.
-
     """
 
     @Build.normalizer(
@@ -192,8 +200,10 @@ async def normalize_ttl_value(
     """
     Normalize various TTL formats to seconds.
 
-    Handles: - Integer seconds - Float seconds (rounded) - String with units: "1h", "30m", "1d"
-
+    Handles:
+    - Integer seconds
+    - Float seconds (rounded)
+    - String with units: "1h", "30m", "1d"
     """
     if isinstance(value, int):
         return value
@@ -257,9 +267,12 @@ async def normalize_tag_name(
     """
     Normalize tag name for consistency.
 
-    Steps: 1. Strip whitespace 2. Convert to lowercase 3. Replace spaces and underscores with hyphens 4. Remove invalid
-    characters 5. Ensure valid format
-
+    Steps:
+    1. Strip whitespace
+    2. Convert to lowercase
+    3. Replace spaces and underscores with hyphens
+    4. Remove invalid characters
+    5. Ensure valid format
     """
     # Strip and lowercase
     normalized = value.strip().lower()
@@ -292,7 +305,6 @@ async def deduplicate_tags(
     Remove duplicate tags while preserving order.
 
     Also normalizes each tag in the process.
-
     """
     seen: set[str] = set()
     unique_tags: list[str] = []

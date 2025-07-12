@@ -1,9 +1,13 @@
 """
-Title         : norm_uuid.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/normalizers/norm_uuid.py.
+Title         : norm_uuid.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/norm_uuid.py
 
-Description ----------- UUID normalization rules for generating and formatting UUIDs.
-
+Description
+-----------
+UUID normalization rules for generating and formatting UUIDs.
 """
 
 from __future__ import annotations

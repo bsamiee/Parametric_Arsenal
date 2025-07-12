@@ -1,12 +1,17 @@
 """
-Title         : core_tags.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/_core/core_tags.py.
+Title         : core_tags.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_tags.py
 
-Description ----------- Hierarchical tag system for asset categorization.
+Description
+-----------
+Hierarchical tag system for asset categorization.
 
-This module provides a sophisticated hierarchical tag system using aenum's native nested enum capabilities. The system
-supports 3-tier hierarchies (e.g., SYSTEM.INFRA.io) and is fully compatible with downstream usage patterns.
-
+This module provides a sophisticated hierarchical tag system using aenum's
+native nested enum capabilities. The system supports 3-tier hierarchies
+(e.g., SYSTEM.INFRA.io) and is fully compatible with downstream usage patterns.
 """
 
 from __future__ import annotations

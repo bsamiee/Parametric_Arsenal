@@ -1,12 +1,17 @@
 """
-Title         : diagnostics.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/_contracts/diagnostics.py.
+Title         : diagnostics.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_contracts/diagnostics.py
 
-Description ----------- Diagnostic and utility functions for the type system.
+Description
+-----------
+Diagnostic and utility functions for the type system.
 
-This module contains high-level functions for inspecting, validating, and reporting on the protocol and type hierarchy.
-These are primarily used by the AssetFactory and for debugging purposes.
-
+This module contains high-level functions for inspecting, validating, and
+reporting on the protocol and type hierarchy. These are primarily used by
+the AssetFactory and for debugging purposes.
 """
 from __future__ import annotations
 
@@ -46,10 +51,11 @@ async def aget_asset_tier(cls: Annotated[type, "The class to check for its proto
     """
     Determine the capability tier of an asset class with async logging.
 
-    Args:     cls: Class to check
+    Args:
+        cls: Class to check
 
-    Returns:     1 for CoreAsset, 2 for ValidatedAsset, 3 for AdvancedAsset
-
+    Returns:
+        1 for CoreAsset, 2 for ValidatedAsset, 3 for AdvancedAsset
     """
     tier = 0
     if isinstance(cls, AdvancedAsset):
@@ -70,10 +76,12 @@ async def aimplements_protocol(
     """
     Check if a class implements a protocol with async logging.
 
-    Args:     cls: Class to check     protocol: Protocol to check against
+    Args:
+        cls: Class to check
+        protocol: Protocol to check against
 
-    Returns:     True if class implements protocol, False otherwise
-
+    Returns:
+        True if class implements protocol, False otherwise
     """
     # Debug logging removed to fix import-time resource warnings
     return isinstance(cls, protocol)
@@ -86,11 +94,13 @@ async def aensure_protocol(
     """
     Ensure a class implements a protocol with async error handling.
 
-    Args:     cls: Class to check     protocol: Protocol that must be implemented
+    Args:
+        cls: Class to check
+        protocol: Protocol that must be implemented
 
-    Returns:     A `Success` containing the class if it implements the protocol,     or a `Failure` with a standard
-    exception.
-
+    Returns:
+        A `Success` containing the class if it implements the protocol,
+        or a `Failure` with a standard exception.
     """
     protocol_name = getattr(protocol, "__name__", str(protocol))
     cls_name = getattr(cls, "__name__", str(cls))
@@ -109,10 +119,11 @@ async def aget_required_mixins(
     """
     Get the list of mixin names required for a target protocol with async caching and logging.
 
-    Args:     target_protocol: Protocol to analyze
+    Args:
+        target_protocol: Protocol to analyze
 
-    Returns:     List of mixin class names needed to implement the protocol
-
+    Returns:
+        List of mixin class names needed to implement the protocol
     """
     # Base mixins that all assets should have
     base_mixins = ["ComparisonMixin", "MetadataMixin", "DocumentationMixin"]
@@ -140,10 +151,11 @@ async def avalidate_protocol_hierarchy(
     """
     Validate and report on the protocol hierarchy of a class.
 
-    Args:     cls: Class to analyze
+    Args:
+        cls: Class to analyze
 
-    Returns:     Dictionary with hierarchy analysis
-
+    Returns:
+        Dictionary with hierarchy analysis
     """
     cls_name = cls.__name__
 

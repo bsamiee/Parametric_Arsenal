@@ -1,11 +1,15 @@
 """
-Title         : log.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/rules/normalizers/core/log.py.
+Title         : log.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/normalizers/core/log.py
 
-Description ----------- Domain-specific normalizers for the log package.
+Description
+-----------
+Domain-specific normalizers for the log package.
 
 Provides normalization rules for log messages, contexts, and exceptions.
-
 """
 # mypy: warn-redundant-casts=False
 from __future__ import annotations
@@ -37,8 +41,11 @@ async def sanitize_message(value: Annotated[str, "Message to sanitize"], info: V
     """
     Clean and sanitize log messages for safe output.
 
-    Operations: - Remove null bytes - Escape control characters - Normalize whitespace - Trim if exceeds length limit
-
+    Operations:
+    - Remove null bytes
+    - Escape control characters
+    - Normalize whitespace
+    - Trim if exceeds length limit
     """
     # Remove null bytes completely
     sanitized = value.replace("\0", "")
@@ -104,11 +111,14 @@ async def flatten_context(
     """
     Flatten nested dictionaries using dot notation for keys.
 
-    Benefits: - Easier to query in log aggregation systems - Better performance for serialization - Consistent key
-    naming
+    Benefits:
+    - Easier to query in log aggregation systems
+    - Better performance for serialization
+    - Consistent key naming
 
-    Example:     {"user": {"id": 123, "name": "Alice"}}     → {"user.id": 123, "user.name": "Alice"}
-
+    Example:
+        {"user": {"id": 123, "name": "Alice"}}
+        → {"user.id": 123, "user.name": "Alice"}
     """
 
     def flatten(obj: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -148,10 +158,13 @@ async def enrich_with_caller(
     """
     Enrich context with caller information for debugging.
 
-    Adds: - Module name - Function/method name - Line number - File path (relative)
+    Adds:
+    - Module name
+    - Function/method name
+    - Line number
+    - File path (relative)
 
     Only added for DEBUG and ERROR levels by default.
-
     """
     # inspect already imported at top
 
@@ -196,9 +209,11 @@ async def format_exception_info(
     """
     Format exception info into structured data.
 
-    Converts sys.exc_info() tuple into a structured dict with: - Exception type name - Exception message - Formatted
-    traceback (limited depth) - Exception attributes (if any)
-
+    Converts sys.exc_info() tuple into a structured dict with:
+    - Exception type name
+    - Exception message
+    - Formatted traceback (limited depth)
+    - Exception attributes (if any)
     """
     if not value:
         return None
@@ -241,8 +256,11 @@ async def optimize_context_size(
     """
     Optimize context size by removing redundant or oversized data.
 
-    Operations: - Remove None values - Truncate long strings - Limit list sizes - Remove empty collections
-
+    Operations:
+    - Remove None values
+    - Truncate long strings
+    - Limit list sizes
+    - Remove empty collections
     """
     max_string_length = info.context.get("max_string_length", 1000) if info.context else 1000
     max_list_size = info.context.get("max_list_size", 100) if info.context else 100
@@ -251,16 +269,19 @@ async def optimize_context_size(
         """
         Optimize a dictionary by removing keys with None values and truncating large string or list values.
 
-        - Removes any key-value pairs where the value is None. - Truncates string values longer than
-        `max_string_length`, appending "...[truncated]". - Truncates lists longer than `max_list_size` by keeping the
-        first and last halves,   inserting "...[truncated]..." in the middle. - Recursively optimizes nested
-        dictionaries. - Only includes non-empty nested dictionaries. - Leaves other types unchanged unless they are
-        empty lists or dicts, which are omitted.
+        - Removes any key-value pairs where the value is None.
+        - Truncates string values longer than `max_string_length`, appending "...[truncated]".
+        - Truncates lists longer than `max_list_size` by keeping the first and last halves,
+          inserting "...[truncated]..." in the middle.
+        - Recursively optimizes nested dictionaries.
+        - Only includes non-empty nested dictionaries.
+        - Leaves other types unchanged unless they are empty lists or dicts, which are omitted.
 
-        Args:     d (dict[str, Any]): The dictionary to optimize.
+        Args:
+            d (dict[str, Any]): The dictionary to optimize.
 
-        Returns:     dict[str, Any]: The optimized dictionary.
-
+        Returns:
+            dict[str, Any]: The optimized dictionary.
         """
         """Optimize a dictionary by removing None values and truncating large values."""
         optimized: dict[str, Any] = {}
@@ -309,8 +330,10 @@ async def generate_record_id(
     """
     Generate a UUID v4 for log record identification.
 
-    Used for: - Deduplication - Correlation across systems - Unique identification in storage
-
+    Used for:
+    - Deduplication
+    - Correlation across systems
+    - Unique identification in storage
     """
     if value:
         return value
@@ -327,8 +350,10 @@ async def normalize_level_names(value: Annotated[LevelType, "Level name or numbe
     """
     Normalize various log level representations to standard numeric values.
 
-    Handles: - String names (case insensitive) - Alternate names (WARN -> WARNING, FATAL -> CRITICAL) - Numeric values
-
+    Handles:
+    - String names (case insensitive)
+    - Alternate names (WARN -> WARNING, FATAL -> CRITICAL)
+    - Numeric values
     """
     # Standard level mapping
     level_map = {
@@ -364,9 +389,11 @@ async def normalize_metric_names(value: Annotated[str, "Metric name"], info: Val
     """
     Normalize metric names for consistency across monitoring systems.
 
-    Operations: - Convert to lowercase - Replace invalid characters with underscores - Remove duplicate underscores -
-    Ensure valid identifier
-
+    Operations:
+    - Convert to lowercase
+    - Replace invalid characters with underscores
+    - Remove duplicate underscores
+    - Ensure valid identifier
     """
     # Convert to lowercase
     normalized = value.lower()

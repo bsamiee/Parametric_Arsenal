@@ -1,13 +1,19 @@
 """
-Title         : types.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/log/types.py.
+Title         : types.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/types.py
 
-Description ----------- Type re-exports for the log package, following the TYPES FIRST POLICY. All types are imported
-from mzn.types.packages.log to ensure validation, security features, and sophisticated type system benefits.
+Description
+-----------
+Type re-exports for the log package, following the TYPES FIRST POLICY.
+All types are imported from mzn.types.packages.log to ensure validation,
+security features, and sophisticated type system benefits.
 
-This module serves as the single source of truth for all log-related types used throughout the package, providing clean
-separation from the type system while leveraging all its sophisticated features.
-
+This module serves as the single source of truth for all log-related types
+used throughout the package, providing clean separation from the type system
+while leveraging all its sophisticated features.
 """
 
 from __future__ import annotations

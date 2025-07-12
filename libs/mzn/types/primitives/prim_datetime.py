@@ -1,9 +1,13 @@
 """
-Title         : prim_datetime.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/primitives/prim_datetime.py.
+Title         : prim_datetime.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/primitives/prim_datetime.py
 
-Description ----------- Primitives for date and time handling.
-
+Description
+-----------
+Primitives for date and time handling.
 """
 
 from __future__ import annotations

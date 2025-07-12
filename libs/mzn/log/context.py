@@ -1,10 +1,14 @@
 """
-Title         : context.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/log/context.py.
+Title         : context.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/log/context.py
 
-Description ----------- Context propagation using structlog's contextvars. Simplified integration with native structlog
-features.
-
+Description
+-----------
+Context propagation using structlog's contextvars.
+Simplified integration with native structlog features.
 """
 
 from __future__ import annotations
@@ -57,9 +61,9 @@ async def context(**kwargs: Annotated[Any, "Context values"]) -> AsyncGenerator[
     """
     Add temporary context for logging.
 
-    Example:     async with context(request_id="123", user_id=456):         await logger.info("Processing")  # Includes
-    context
-
+    Example:
+        async with context(request_id="123", user_id=456):
+            await logger.info("Processing")  # Includes context
     """
     _ = bind_contextvars(**kwargs)
     try:
@@ -73,9 +77,9 @@ async def isolated_context(**kwargs: Annotated[Any, "Context values"]) -> AsyncG
     """
     Set isolated context (ignores existing).
 
-    Example:     async with isolated_context(operation="cleanup"):         await logger.info("Cleaning")  # Only has
-    operation context
-
+    Example:
+        async with isolated_context(operation="cleanup"):
+            await logger.info("Cleaning")  # Only has operation context
     """
     # Save current context
     saved_context = get_contextvars()
@@ -102,13 +106,18 @@ async def debug_context(
 
     Automatically logs completion with timing/memory info at DEBUG level if logger provided.
 
-    Args:     name: Name of the operation being debugged     include_timing: Track and log elapsed time include_memory:
-    Track and log memory usage delta     logger: Optional logger for completion message (if None, no message logged)
+    Args:
+        name: Name of the operation being debugged
+        include_timing: Track and log elapsed time
+        include_memory: Track and log memory usage delta
+        logger: Optional logger for completion message (if None, no message logged)
 
-    Example:     logger = await Log.console("myapp").build()     async with debug_context("data_processing",
-    include_memory=True, logger=logger):         data = await fetch_data()         result = await process_data(data) #
-    Automatically logs: "data_processing completed" with timing and memory
-
+    Example:
+        logger = await Log.console("myapp").build()
+        async with debug_context("data_processing", include_memory=True, logger=logger):
+            data = await fetch_data()
+            result = await process_data(data)
+        # Automatically logs: "data_processing completed" with timing and memory
     """
     # Track start conditions
     start_time = time.perf_counter() if include_timing else None

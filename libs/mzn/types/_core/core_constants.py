@@ -1,10 +1,14 @@
 """
-Title         : core_constants.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_core/core_constants.py.
+Title         : core_constants.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_core/core_constants.py
 
-Description ----------- System-wide constants, enums, and sentinels for the type system. Clean separation of Assets,
-Features, and Functions.
-
+Description
+-----------
+System-wide constants, enums, and sentinels for the type system.
+Clean separation of Assets, Features, and Functions.
 """
 
 from __future__ import annotations

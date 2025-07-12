@@ -1,10 +1,14 @@
 """
-Title         : namespace.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/errors/namespace.py.
+Title         : namespace.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/namespace.py
 
-Description ----------- Streamlined Error namespace with integrated functionality. Single export pattern with modern
-Python 3.13+ design.
-
+Description
+-----------
+Streamlined Error namespace with integrated functionality.
+Single export pattern with modern Python 3.13+ design.
 """
 
 from __future__ import annotations
@@ -37,20 +41,29 @@ class Error:
     """
     Unified namespace for all error functionality.
 
-    Provides intelligent error management with domain-qualified codes, flexible context, and a clean, simple API.
+    Provides intelligent error management with domain-qualified codes,
+    flexible context, and a clean, simple API.
 
-    Example:     # Create errors     error = Error.create("cache.not_found", message="Key not found")     error =
-    Error.from_exception(e, code="db.connection_failed")
+    Example:
+        # Create errors
+        error = Error.create("cache.not_found", message="Key not found")
+        error = Error.from_exception(e, code="db.connection_failed")
 
-    # Use decorator @Error.aware(domain="cache", operation="get") async def get_item(key: str) -> Any:     ...
+        # Use decorator
+        @Error.aware(domain="cache", operation="get")
+        async def get_item(key: str) -> Any:
+            ...
 
-    # Context managers with Error.boundary("api.request_failed") as boundary:     risky_operation()
+        # Context managers
+        with Error.boundary("api.request_failed") as boundary:
+            risky_operation()
 
-    with Error.collector() as collector:     collector.try_("op1", lambda: operation1())     collector.try_("op2",
-    lambda: operation2())
+        with Error.collector() as collector:
+            collector.try_("op1", lambda: operation1())
+            collector.try_("op2", lambda: operation2())
 
-    with Error.suppress("fs.not_found", "fs.permission_denied"):     optional_file_read()
-
+        with Error.suppress("fs.not_found", "fs.permission_denied"):
+            optional_file_read()
     """
 
     # --- Core Exception -------------------------------------------------------
@@ -84,15 +97,26 @@ class Error:
         """
         Create a new MznError with the given context.
 
-        Args:     code: Domain-qualified error code (e.g., "cache.backend_failure")     message: Human-readable error
-        message     severity: Error severity level     category: Error category for classification     recovery_hint:
-        Guidance for error recovery     request_id: Request tracking identifier     **extra: Additional context fields
+        Args:
+            code: Domain-qualified error code (e.g., "cache.backend_failure")
+            message: Human-readable error message
+            severity: Error severity level
+            category: Error category for classification
+            recovery_hint: Guidance for error recovery
+            request_id: Request tracking identifier
+            **extra: Additional context fields
 
-        Returns:     MznError instance with the specified context
+        Returns:
+            MznError instance with the specified context
 
-        Example:     error = Error.create(         "validation.invalid_format",         message="Email format is
-        invalid",         severity=Error.Severity.WARNING,         field="email",         value="not-an-email"     )
-
+        Example:
+            error = Error.create(
+                "validation.invalid_format",
+                message="Email format is invalid",
+                severity=Error.Severity.WARNING,
+                field="email",
+                value="not-an-email"
+            )
         """
         return create_error(
             code=code,
@@ -115,14 +139,19 @@ class Error:
         """
         Create MznError from an existing exception.
 
-        Args:     exception: The exception to convert     code: Override error code (auto-generated if not provided)
-        **extra: Additional context fields
+        Args:
+            exception: The exception to convert
+            code: Override error code (auto-generated if not provided)
+            **extra: Additional context fields
 
-        Returns:     MznError wrapping the original exception
+        Returns:
+            MznError wrapping the original exception
 
-        Example:     try:         risky_operation()     except ValueError as e:         error = Error.from_exception(e,
-        code="validation.failed")
-
+        Example:
+            try:
+                risky_operation()
+            except ValueError as e:
+                error = Error.from_exception(e, code="validation.failed")
         """
         if code is None:
             return from_exception(exception, **extra)
@@ -143,14 +172,18 @@ class Error:
         """
         Create error boundary context manager.
 
-        Args:     code: Default error code for caught exceptions     suppress: If True, suppress the exception after
-        catching
+        Args:
+            code: Default error code for caught exceptions
+            suppress: If True, suppress the exception after catching
 
-        Returns:     ErrorBoundary context manager
+        Returns:
+            ErrorBoundary context manager
 
-        Example:     with Error.boundary("api.request_failed") as boundary:         make_api_request()     if
-        boundary.error:         print(f"Request failed: {boundary.error}")
-
+        Example:
+            with Error.boundary("api.request_failed") as boundary:
+                make_api_request()
+            if boundary.error:
+                print(f"Request failed: {boundary.error}")
         """
         return ErrorBoundary(code, suppress=suppress)
 
@@ -159,14 +192,17 @@ class Error:
         """
         Create error collector context manager.
 
-        Returns:     ErrorCollector for collecting multiple errors
+        Returns:
+            ErrorCollector for collecting multiple errors
 
-        Example:     with Error.collector() as collector:         collector.try_("parse_config", lambda: parse_config())
-        collector.try_("validate_data", lambda: validate_data())         collector.try_("save_results", lambda:
-        save_results())
+        Example:
+            with Error.collector() as collector:
+                collector.try_("parse_config", lambda: parse_config())
+                collector.try_("validate_data", lambda: validate_data())
+                collector.try_("save_results", lambda: save_results())
 
-        if collector.errors:     print(f"Failed operations: {len(collector.errors)}")
-
+            if collector.errors:
+                print(f"Failed operations: {len(collector.errors)}")
         """
         return ErrorCollector()
 
@@ -177,15 +213,18 @@ class Error:
         """
         Create context manager to suppress specific error codes.
 
-        Args:     *codes: Error codes to suppress
+        Args:
+            *codes: Error codes to suppress
 
-        Returns:     Context manager that suppresses matching errors
+        Returns:
+            Context manager that suppresses matching errors
 
-        Example:     with Error.suppress("fs.not_found", "fs.permission_denied") as suppressed:         content =
-        read_optional_file()
+        Example:
+            with Error.suppress("fs.not_found", "fs.permission_denied") as suppressed:
+                content = read_optional_file()
 
-        if suppressed:     print("Using default configuration")
-
+            if suppressed:
+                print("Using default configuration")
         """
         return suppress_errors(*codes)
 
@@ -205,17 +244,23 @@ class Error:
         """
         Get error history with optional filtering.
 
-        Args:     limit: Maximum number of errors to return     code: Filter by specific error code     severity: Filter
-        by minimum severity level
+        Args:
+            limit: Maximum number of errors to return
+            code: Filter by specific error code
+            severity: Filter by minimum severity level
 
-        Returns:     List of errors matching the criteria
+        Returns:
+            List of errors matching the criteria
 
-        Example:     # Get last 10 errors     recent = Error.history(limit=10)
+        Example:
+            # Get last 10 errors
+            recent = Error.history(limit=10)
 
-        # Get all critical errors critical = Error.history(severity=Error.Severity.CRITICAL)
+            # Get all critical errors
+            critical = Error.history(severity=Error.Severity.CRITICAL)
 
-        # Get specific error type cache_errors = Error.history(code="cache.backend_failure")
-
+            # Get specific error type
+            cache_errors = Error.history(code="cache.backend_failure")
         """
         errors = cls._errors
 
@@ -239,7 +284,6 @@ class Error:
         Clear the error history.
 
         Useful for testing or when starting a new operation sequence.
-
         """
         cls._errors.clear()
 
@@ -248,8 +292,8 @@ class Error:
         """
         Record an error to the history (internal use).
 
-        Args:     error: Error to record
-
+        Args:
+            error: Error to record
         """
         cls._errors.append(error)
         # Maintain max history size

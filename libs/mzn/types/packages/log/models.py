@@ -1,12 +1,16 @@
 """
-Title         : models.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/log/models.py.
+Title         : models.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/log/models.py
 
-Description ----------- Pydantic models for the log package.
+Description
+-----------
+Pydantic models for the log package.
 
-Provides structured models for log records, configurations, and statistics. All models use validated types from the
-aliases module.
-
+Provides structured models for log records, configurations, and statistics.
+All models use validated types from the aliases module.
 """
 
 from __future__ import annotations
@@ -39,7 +43,6 @@ class LogRecord(BaseModel):
     Structured log record with all metadata.
 
     Frozen to ensure thread safety and prevent accidental modification.
-
     """
 
     # Required fields

@@ -1,12 +1,19 @@
 """
-Title         : aliases.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/cache/aliases.py.
+Title         : aliases.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/cache/aliases.py
 
-Description ----------- Cache-related type aliases - Redesigned with proper primitive bases.
+Description
+-----------
+Cache-related type aliases - Redesigned with proper primitive bases.
 
-This module provides semantic types for the cache package with: - Correct primitive bases - Enhanced
-validation/normalization rules - Consolidated redundant types - Clear semantic boundaries
-
+This module provides semantic types for the cache package with:
+- Correct primitive bases
+- Enhanced validation/normalization rules
+- Consolidated redundant types
+- Clear semantic boundaries
 """
 
 from __future__ import annotations

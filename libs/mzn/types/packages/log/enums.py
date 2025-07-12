@@ -1,12 +1,16 @@
 """
-Title         : enums.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/types/packages/log/enums.py.
+Title         : enums.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/packages/log/enums.py
 
-Description ----------- Enumerations for the log package.
+Description
+-----------
+Enumerations for the log package.
 
-Provides rich enums for log levels, handler types, formats, and circuit states. All enums include metadata for enhanced
-functionality.
-
+Provides rich enums for log levels, handler types, formats, and circuit states.
+All enums include metadata for enhanced functionality.
 """
 
 from __future__ import annotations
@@ -21,8 +25,9 @@ class LogLevel(aenum.IntEnum):
     """
     Standard Python logging levels with numeric comparison support.
 
-    Being an IntEnum allows for numeric comparisons:     level >= LogLevel.WARNING     level < LogLevel.ERROR
-
+    Being an IntEnum allows for numeric comparisons:
+        level >= LogLevel.WARNING
+        level < LogLevel.ERROR
     """
 
     NOTSET = 0      # No level set

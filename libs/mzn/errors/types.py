@@ -1,14 +1,19 @@
 """
-Title         : types.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/errors/types.py.
+Title         : types.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/types.py
 
-Description ----------- Central type imports for the error system.
+Description
+-----------
+Central type imports for the error system.
 
-This module re-exports all type assets from mzn.types.packages.errors/ as well as general types used by the error
-system.
+This module re-exports all type assets from mzn.types.packages.errors/
+as well as general types used by the error system.
 
-All code within the errors package should import types from this module, never directly from mzn.types.packages/.
-
+All code within the errors package should import types from this module, never directly
+from mzn.types.packages/.
 """
 
 from __future__ import annotations

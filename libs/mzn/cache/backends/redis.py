@@ -1,9 +1,13 @@
 """
-Title         : redis.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/backends/redis.py.
+Title         : redis.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/backends/redis.py
 
-Description ----------- Redis backend implementation using redis-py with async support.
-
+Description
+-----------
+Redis backend implementation using redis-py with async support.
 """
 
 from __future__ import annotations

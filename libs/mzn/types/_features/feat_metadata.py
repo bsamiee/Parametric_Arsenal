@@ -1,12 +1,17 @@
 """
-Title         : feat_metadata.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT
-Path          : libs/mzn/types/_features/feat_metadata.py.
+Title         : feat_metadata.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/_features/feat_metadata.py
 
-Description ----------- Unified metadata management feature for all asset types.
+Description
+-----------
+Unified metadata management feature for all asset types.
 
-This module provides a composable mixin that implements the CoreAsset protocol, enabling consistent metadata handling
-across primitives, aliases, models, and enums. Leverages Pydantic v2 for JSON schema generation and validation.
-
+This module provides a composable mixin that implements the CoreAsset protocol,
+enabling consistent metadata handling across primitives, aliases, models, and enums.
+Leverages Pydantic v2 for JSON schema generation and validation.
 """
 
 from __future__ import annotations
@@ -38,12 +43,12 @@ class MetadataMixin:
     """
     Composable mixin providing unified metadata management.
 
-    This mixin implements the MetadataProvider protocol, enabling consistent metadata handling across all asset types.
-    It includes special handling for tags and integration with the documentation and registry systems.
+    This mixin implements the MetadataProvider protocol, enabling consistent
+    metadata handling across all asset types. It includes special handling for
+    tags and integration with the documentation and registry systems.
 
-    Note: This class does NOT inherit from CoreAsset or MetadataProvider to avoid metaclass conflicts. It implements the
-    required interface without inheritance.
-
+    Note: This class does NOT inherit from CoreAsset or MetadataProvider to avoid
+    metaclass conflicts. It implements the required interface without inheritance.
     """
 
     # These attributes are provided by TypeAsset base class when the mixin is applied
@@ -58,11 +63,10 @@ class MetadataMixin:
 
     @classmethod
     async def get_metadata(cls) -> Annotated[Mapping[str, JSONLike], "Complete metadata mapping"]:
-        """
-        Get the type's complete metadata.
+        """Get the type's complete metadata.
 
-        Returns:     Immutable mapping of metadata key-value pairs
-
+        Returns:
+            Immutable mapping of metadata key-value pairs
         """
         return getattr(cls, "mzn_metadata", {})
 
@@ -72,13 +76,14 @@ class MetadataMixin:
         key: Annotated[LiteralString, "Metadata key to retrieve"],
         default: Annotated[JSONLike, "Default value if key not found"] = None,
     ) -> Annotated[JSONLike, "Metadata value or default"]:
-        """
-        Get a specific metadata value.
+        """Get a specific metadata value.
 
-        Args:     key: Metadata key to retrieve     default: Default value if key not found
+        Args:
+            key: Metadata key to retrieve
+            default: Default value if key not found
 
-        Returns:     The metadata value or default
-
+        Returns:
+            The metadata value or default
         """
         metadata = await cls.get_metadata()
         return metadata.get(key, default)
@@ -101,11 +106,10 @@ class MetadataMixin:
 
     @classmethod
     async def mzn_json_schema(cls) -> Annotated[dict[str, JSONLike], "Pydantic v2 JSON schema or empty dict"]:
-        """
-        Get Pydantic v2 JSON schema if available.
+        """Get Pydantic v2 JSON schema if available.
 
-        Returns:     JSON schema dictionary or empty dict if not available
-
+        Returns:
+            JSON schema dictionary or empty dict if not available
         """
         # Return from cache if available
         if cls.__json_schema_cache is not None:
@@ -130,11 +134,10 @@ class MetadataMixin:
 
     @classmethod
     async def _generate_basic_schema(cls) -> Annotated[dict[str, JSONLike], "Basic JSON schema dictionary"]:
-        """
-        Generate a basic JSON schema from metadata.
+        """Generate a basic JSON schema from metadata.
 
-        Returns:     Basic JSON schema dictionary
-
+        Returns:
+            Basic JSON schema dictionary
         """
         metadata = await cls.get_metadata()
         schema: dict[str, JSONLike] = {
@@ -154,11 +157,10 @@ class MetadataMixin:
         cls,
         other_metadata: Annotated[Mapping[str, JSONLike], "Metadata to merge in"]
     ) -> Annotated[None, "None"]:
-        """
-        Merge additional metadata into existing metadata.
+        """Merge additional metadata into existing metadata.
 
-        Args:     other_metadata: Metadata to merge in
-
+        Args:
+            other_metadata: Metadata to merge in
         """
         current = dict(await cls.get_metadata())
         current.update(other_metadata)
@@ -172,13 +174,13 @@ class MetadataMixin:
         cls,
         key: Annotated[LiteralString, "Key to check for"]
     ) -> Annotated[bool, "True if key exists, False otherwise"]:
-        """
-        Check if a metadata key exists.
+        """Check if a metadata key exists.
 
-        Args:     key: Key to check for
+        Args:
+            key: Key to check for
 
-        Returns:     True if key exists, False otherwise
-
+        Returns:
+            True if key exists, False otherwise
         """
         metadata = await cls.get_metadata()
         return key in metadata
@@ -187,11 +189,10 @@ class MetadataMixin:
     async def get_metadata_keys(
         cls,
     ) -> Annotated[set[LiteralString], "Set of all metadata keys"]:
-        """
-        Get all metadata keys.
+        """Get all metadata keys.
 
-        Returns:     Set of all metadata keys
-
+        Returns:
+            Set of all metadata keys
         """
         metadata = await cls.get_metadata()
         return cast("set[LiteralString]", set(metadata.keys()))
@@ -200,23 +201,17 @@ class MetadataMixin:
     async def validate_metadata(
         cls,
     ) -> Annotated[bool, "True if metadata is well-formed"]:
-        """
-        Validate that metadata is well-formed.
-
-        Always returns True for this implementation.
-
-        """
+        """Validate that metadata is well-formed. Always returns True for this implementation."""
         return True
 
     @classmethod
     async def serialize_metadata(
         cls,
     ) -> Annotated[dict[str, JSONLike], "Serialized metadata dictionary"]:
-        """
-        Serialize metadata to a JSON-compatible dictionary.
+        """Serialize metadata to a JSON-compatible dictionary.
 
-        Returns:     Serialized metadata dictionary
-
+        Returns:
+            Serialized metadata dictionary
         """
         if cls.__serialized_metadata_cache is not None:
             return cls.__serialized_metadata_cache
@@ -260,11 +255,10 @@ class MetadataMixin:
         cls,
         source_cls: Annotated[type[Any], "Class to copy metadata from"]
     ) -> Annotated[None, "None"]:
-        """
-        Copy metadata from another class into this one.
+        """Copy metadata from another class into this one.
 
-        Args:     source_cls: Class to copy metadata from
-
+        Args:
+            source_cls: Class to copy metadata from
         """
         if hasattr(source_cls, "get_metadata"):
             other_metadata = await source_cls.get_metadata()
@@ -275,11 +269,10 @@ class MetadataMixin:
         cls,
         *source_classes: Annotated[type[Any], "Classes to merge metadata from"]
     ) -> Annotated[None, "None"]:
-        """
-        Merge metadata from multiple source classes into this one.
+        """Merge metadata from multiple source classes into this one.
 
-        Args:     *source_classes: Classes to merge metadata from
-
+        Args:
+            *source_classes: Classes to merge metadata from
         """
         combined_metadata: dict[str, JSONLike] = {}
 

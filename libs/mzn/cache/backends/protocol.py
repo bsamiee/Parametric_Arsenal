@@ -1,9 +1,13 @@
 """
-Title         : protocol.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path :
-libs/mzn/cache/backends/protocol.py.
+Title         : protocol.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/backends/protocol.py
 
-Description ----------- Cache backend protocol definition for type-safe backend implementations.
-
+Description
+-----------
+Cache backend protocol definition for type-safe backend implementations.
 """
 
 from __future__ import annotations

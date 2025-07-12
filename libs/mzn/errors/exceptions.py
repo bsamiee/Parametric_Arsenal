@@ -1,10 +1,14 @@
 """
-Title         : exceptions.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/errors/exceptions.py.
+Title         : exceptions.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/errors/exceptions.py
 
-Description ----------- Core exception class for the error system. Simple wrapper around ErrorContext with direct
-property access.
-
+Description
+-----------
+Core exception class for the error system.
+Simple wrapper around ErrorContext with direct property access.
 """
 
 from __future__ import annotations
@@ -20,8 +24,8 @@ class MznError(Exception):
     """
     Base exception for all MZN errors.
 
-    Simple wrapper around ErrorContext that provides direct access to error properties without indirection.
-
+    Simple wrapper around ErrorContext that provides direct access
+    to error properties without indirection.
     """
 
     def __init__(
@@ -82,10 +86,11 @@ class MznError(Exception):
         """
         Format error for display.
 
-        Args:     details: Include extra context fields
+        Args:
+            details: Include extra context fields
 
-        Returns:     Formatted error string
-
+        Returns:
+            Formatted error string
         """
         return self._context.format(details=details)
 

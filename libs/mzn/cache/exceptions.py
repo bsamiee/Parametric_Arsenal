@@ -1,9 +1,13 @@
 """
-Title         : exceptions.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/cache/exceptions.py.
+Title         : exceptions.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/cache/exceptions.py
 
-Description ----------- Minimal cache-specific exceptions using the new error system.
-
+Description
+-----------
+Minimal cache-specific exceptions using the new error system.
 """
 
 from __future__ import annotations

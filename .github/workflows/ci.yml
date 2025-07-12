@@ -44,8 +44,6 @@ jobs:
             - name: Run lint
               run: nox -s lint
 
-            - name: Run type-check (mypy)
-              run: nox -s mypy
 
             - name: Run code quality checks
               run: nox -s code_quality

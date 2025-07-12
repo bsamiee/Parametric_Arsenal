@@ -1,9 +1,13 @@
 """
-Title         : valid_data.py Author        : Bardia Samiee Project       : Parametric_Arsenal License       : MIT Path
-: libs/mzn/types/rules/validators/valid_data.py.
+Title         : valid_data.py
+Author        : Bardia Samiee
+Project       : Parametric_Arsenal
+License       : MIT
+Path          : libs/mzn/types/rules/validators/valid_data.py
 
-Description ----------- Validators for structured data formats and payloads.
-
+Description
+-----------
+Validators for structured data formats and payloads.
 """
 
 from __future__ import annotations
@@ -316,7 +320,6 @@ async def is_archive_format(value: bytes, info: ValidationInfo) -> bool:
     Check if binary data is an archive format (zip, tar, rar, etc.).
 
     Uses both magic bytes and python-magic for comprehensive detection.
-
     """
     if not value or len(value) < 4:
         return False
@@ -380,9 +383,9 @@ def has_file_signature(*, signatures: dict[str, bytes] | None = None) -> Validat
     """
     Factory for creating a generic file signature validator.
 
-    Args:     signatures: Dict mapping format names to their magic byte signatures.                If None, uses python-
-    magic for detection.
-
+    Args:
+        signatures: Dict mapping format names to their magic byte signatures.
+                   If None, uses python-magic for detection.
     """
     @Build.validator(
         error_template="Binary data does not match any expected file signature.",
