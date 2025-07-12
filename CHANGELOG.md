@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-07-12
+
+
+
+### Continuous Integration
+
+
+- Add auto-merge workflow for pre-commit updates ([`9be4690`](https://github.com/bsamiee/Parametric_Arsenal/commit/9be4690c0a3480ec21b96e2642ec2fbfab340166))
+
+
 ## [2.0.0] - 2025-07-12
 
 
