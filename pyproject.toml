@@ -1,0 +1,202 @@
+# Title         : pyproject.toml
+# Author        : Bardia Samiee
+# Project       : Parametric Arsenal
+# License       : MIT
+# Path          : pyproject.toml
+# ----------------------------------------------------------------------------
+# Project python and tooling configuration
+
+[project]
+name = "parametric-arsenal"
+version = "0.1.0"
+description = "Rhino 8 Plugins and Scripts"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "anyio>=4.11.0",
+    "basedpyright>=1.31.7",
+    "dask>=2024.8.0",
+    "mypy>=1.18.2",
+    "numpy>=2.0.2",
+    "pandas>=2.3.3",
+    "polars>=1.34.0",
+    "rhino-stubs>=7.7.21140",
+    "rhino3dm>=8.17.0",
+    "rhinoinside>=0.8.2",
+    "rich>=14.2.0",
+    "ruff>=0.14.0",
+    "scipy>=1.13.1",
+    "sympy>=1.14.0",
+    "xarray>=2024.7.0",
+]
+
+# --- Mypy Configuration -----------------------------------------------------
+[tool.mypy]
+python_version = "3.9"
+cache_dir = ".cache/mypy"
+namespace_packages = true
+warn_unused_configs = true
+show_error_codes = true
+
+# Strict baseline
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_optional = true
+strict_equality = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_subclassing_any = true
+disallow_any_unimported = true
+disallow_any_expr = true
+disallow_any_decorated = true
+no_implicit_reexport = true
+
+plugins = []
+
+exclude = [
+    "\\.venv/",
+    "\\.cache/",
+    "node_modules/",
+    "\\.mypy_cache/",
+    "\\.pytest_cache/",
+    "\\.ruff_cache/",
+    "\\.history/",
+    "dist/",
+    "build/",
+]
+
+# --- BasedPyright Configuration ---------------------------------------------
+[tool.basedpyright]
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+include = ["."]
+exclude = [
+    ".venv",
+    "dist",
+    "build",
+    ".cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    ".history",
+]
+
+# Rhino dynamics: suppress only noisy host-driven issues
+reportImplicitRelativeImport = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportAttributeAccessIssue = "none"
+reportUnknownArgumentType = "none"
+reportUnusedCallResult = "none"
+
+# Keep useful signals
+reportMissingTypeStubs = "warning"
+reportMissingImports = "warning"
+reportPrivateUsage = "warning"
+reportInconsistentConstructor = "warning"
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportImportCycles = "warning"
+
+# --- Ruff Configuration -----------------------------------------------------
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+preview = true
+src = ["."]
+cache-dir = ".cache/ruff"
+exclude = [
+    "**/.venv/**",
+    "**/.cache/**",
+    "**/node_modules/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/.history/**",
+    "**/dist/**",
+    "**/build/**",
+]
+
+[tool.ruff.format]
+preview = true
+quote-style = "preserve"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+extend-select = [
+    "F","E","W",            # Pyflakes/pycodestyle
+    "I",                    # isort
+    "UP",                   # pyupgrade
+    "B","BLE","C4",         # bugbear + comprehensions
+    "A",                    # builtins
+    "ANN",                  # annotations
+    "PLC","PLE","PLR","PLW",# pylint-like checks
+    "N",                    # naming
+    "RET","SIM","TID","TRY",
+    "DTZ","PTH","PIE",
+    "S","T20",              # security + print
+    "RUF","PGH","FA","FAST","FURB","PERF",
+    "G","LOG","ICN","INT","EXE","ERA",
+]
+
+extend-ignore = [
+    "COM812",               # formatter conflict
+    "E701",                 # one-line compound for tiny helpers
+    "TID252",               # allow relative imports, matches pyright
+    "PLC2701",              # private import usage
+    "RUF029",               # __all__ module export enforcement
+]
+
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+known-first-party = ["rhino", "grasshopper"]
+lines-after-imports = 2
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+mypy-init-return = true
+suppress-none-returning = true
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = true
+mark-parentheses = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["int", "str"]
+
+[tool.ruff.lint.flake8-import-conventions.aliases]
+numpy = "np"
+pandas = "pd"
+
+# Rhino and Grasshopper scripts: pragmatic exceptions
+[tool.ruff.lint.per-file-ignores]
+"rhino/scripts/**/*.py" = [
+    "E402",     # late imports for Rhino runtime
+    "T201",     # print for Rhino console feedback
+    "PLR0911","PLR0912","PLR0915",  # complexity in imperative scripts
+    "BLE001",   # broad except for API robustness
+    "ARG001",   # unused callback args
+    "ANN",      # allow untyped callbacks
+    "N802","N803",  # callback names and param names that mirror .NET
+]
+
+"grasshopper/**/*.py" = [
+    "E402",
+    "T201",
+    "PLR0911","PLR0912","PLR0915",
+    "BLE001",
+    "ARG001",
+    "ANN",
+    "N802","N803",
+]

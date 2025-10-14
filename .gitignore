@@ -1,0 +1,116 @@
+# --- Metadata -----------------------------------------------------------------
+
+# Title           : .gitignore
+# Author          : Bardia Samiee
+# Project         : Parametric_Arsenal
+
+# Purpose: Keep the repository clean of OS noise, build artifacts and transient
+# files while *not* ignoring domain assets that should go through Git LFS
+# (e.g., *.3dm, *.gh, *.ghuser).
+
+# --- General -------------------------------------------------------------------
+.claude/
+.warp/
+.kiro/
+claude.md
+gemini.md
+agents.md
+tmp/
+
+# --- macOS & Editor cruft -----------------------------------------------------
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+
+# --- Vim / Emacs / VS Code swap files -----------------------------------------
+*~ # vim backup files
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+
+# --- Python artifacts ---------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual environments -----------------------------------------------------
+.env
+.env/
+.venv/
+env/
+venv/
+
+# --- Packaging ----------------------------------------------------------------
+build/
+dist/
+wheelhouse/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# --- Caches & reports ---------------------------------------------------------
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.nox/
+.hypothesis/
+.benchmarks/
+coverage.xml
+htmlcov/
+
+# --- .NET / Visual Studio / Rider artifacts -----------------------------------
+
+# --- Build outputs --------------------------
+**/bin/
+**/obj/
+
+# --- VS & Rider -----------------------------
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# --- Test results & coverage ----------------
+TestResults/
+*.coverage
+*.coveragexml
+*.testresults
+
+# --- Documentation build outputs ---------------------------------------------
+_site/
+
+# --- Node (occasionally used for docs scripts) --------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Logs ---------------------------------------------------------------------
+*.log
+
+# --- Rhino/Grasshopper temporary files ----------------------------------------
+*.3dmbak
+*.rhl
+*.rws
+*.rws.data
+
+# --- Local development files --------------------------------------------------
+.secrets.baseline
+todo.txt
+placeholder.txt
+
+# ------------------------------------------------------------------------------
+# Leave Rhino / Grasshopper assets *tracked* via Git LFS
+#   *.3dm
+#   *.gh
+#   *.ghx
+#   *.ghdata
+#   *.ghuser
+# (Handled by .gitattributes - do NOT ignore them here)
