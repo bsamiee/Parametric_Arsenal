@@ -12,35 +12,23 @@ Comprehensive metadata editor and layout setup tool for managing Layout pages.
 
 from __future__ import annotations
 
-import traceback
 from typing import Any
 
 import rhinoscriptsyntax as rs
 import scriptcontext as sc
+from libs.command_framework import rhino_command
+from libs.common_utils import CommonUtils, require_user_choice, require_user_string, validate_sheet_number
+from libs.constants import (
+    DESIGNATION_LEVEL_CHOICES,
+    DISCIPLINE_CHOICES,
+    L2_CHOICES_BY_MASTER,
+    Metadata,
+    Strings,
+)
+from libs.detail_tools import DetailTools
+from libs.exceptions import UserCancelledError, ValidationError
+from libs.layout_tools import LayoutTools
 
-import Rhino
-
-
-try:
-    from libs import (  # data tables; helpers / utilities
-        DESIGNATION_LEVEL_CHOICES,
-        DISCIPLINE_CHOICES,
-        L2_CHOICES_BY_MASTER,
-        Common_Utils,
-        Detail_Tools,
-        Layout_Tools,
-        Metadata,
-        Strings,
-        validate_sheet_number,
-    )
-except ImportError:
-    rs.MessageBox(
-        "[ERROR] Failed to import Layout_Toolkit_Library.\n"
-        "Fix the library path / flush-left the designation dictionaries and retry.",
-        0,
-        "Fatal Error",
-    )
-    raise
 
 # --- Constants Section ----------------------------------------------------
 DOC_PROJECT_NAME_KEY = "doc_project_name"  # stored on the document
@@ -61,6 +49,7 @@ EDITOR_MENU_OPTIONS = [
 
 # --- Wrappers -------------------------------------------------------------
 def print_metadata_snapshot(vp: Any) -> None:
+    """Prints current metadata snapshot for the viewport."""
     print("\n--- Metadata Snapshot --------------------------------")
     for k in ALL_KEYS:
         v = vp.GetUserString(k)
@@ -70,18 +59,26 @@ def print_metadata_snapshot(vp: Any) -> None:
 
 
 def sync_project_name_to_all_layouts() -> int:
+    """Syncs project name from document to all layouts."""
     proj = rs.GetDocumentUserText(DOC_PROJECT_NAME_KEY)
-    return Layout_Tools.sync_project_name_to_all_layouts(proj) if proj else 0
+    return LayoutTools.sync_project_name_to_all_layouts(proj) if proj else 0
 
 
 # --- Editor Mode ----------------------------------------------------------
 class MetadataEditor:
+    """Interactive metadata editor for layout pages with existing metadata."""
+
     def __init__(self, page_view: Any) -> None:
         self.view = page_view
         self.vp = page_view.ActiveViewport
 
     # Menu Dispatcher
     def launch(self) -> None:
+        """Launches the metadata editor menu loop.
+
+        Raises:
+            UserCancelledError: If user exits the editor.
+        """
         actions = {
             "Edit Project Name": self.project_name,
             "Edit Page Scale": self.page_scale,
@@ -99,14 +96,11 @@ class MetadataEditor:
                 "Layout Metadata Editor",
             )
             if not choice or choice == "Exit Editor":
-                break
+                raise UserCancelledError("Editor exited")
 
             undo = sc.doc.BeginUndoRecord(f"Metadata Edit - {choice}")
             try:
                 actions[choice]()
-            except (ValueError, RuntimeError, AttributeError) as exc:
-                Common_Utils.alert_user(f"Error: {exc}")
-                traceback.print_exc()
             finally:
                 sc.doc.EndUndoRecord(undo)
                 sc.doc.Views.Redraw()
@@ -114,53 +108,59 @@ class MetadataEditor:
 
     # Individual Editors
     def project_name(self) -> None:
+        """Edits project name metadata.
+
+        Raises:
+            UserCancelledError: If user cancels input.
+            ValidationError: If project name is empty.
+        """
         current = rs.GetDocumentUserText(DOC_PROJECT_NAME_KEY) or ""
-        new = rs.StringBox(Strings.PROMPT_PROJECT_NAME, current, "Project Name")
-        if new is None:
-            return
-        new = new.strip()
-        if not new:
-            Common_Utils.alert_user("Project name cannot be empty.")
-            return
+        new = require_user_string(Strings.PROMPT_PROJECT_NAME, current, "Project Name")
+
         rs.SetDocumentUserText(DOC_PROJECT_NAME_KEY, new)
         self.vp.SetUserString(Metadata.PROJECT_NAME, new)
         n = sync_project_name_to_all_layouts()
-        Common_Utils.alert_user(f"Project name synced to {n} layout(s).")
+        CommonUtils.alert_user(f"Project name synced to {n} layout(s).")
 
     def page_scale(self) -> None:
-        scales = Detail_Tools.get_available_scales()
+        """Edits page scale metadata.
+
+        Raises:
+            UserCancelledError: If user cancels scale selection.
+            ValidationError: If no scales available.
+        """
+        scales = DetailTools.get_available_scales()
         if not scales:
-            Common_Utils.alert_user("No available scales detected.")
-            return
+            raise ValidationError("No available scales detected")
 
         current = self.vp.GetUserString(Metadata.PAGE_SCALE) or "N/A"
-        picked = Detail_Tools.select_scale(
+        picked = DetailTools.select_scale(
             scales,
             mode="Architectural",
             title=f"Select Page Scale (current: {current})",
         )
-        if picked:
-            self.vp.SetUserString(Metadata.PAGE_SCALE, picked[2])
+        self.vp.SetUserString(Metadata.PAGE_SCALE, picked[2])
 
     # Combined Designation-Level + Discipline Picker
     def sheet_discipline(self) -> None:
+        """Edits sheet discipline metadata.
+
+        Raises:
+            UserCancelledError: If user cancels any selection.
+        """
         # --- 1. Pick Designation Level ------------------------------------
         lvl_opts = [f"{c} - {n}" for c, n in DESIGNATION_LEVEL_CHOICES]
-        lvl_sel = rs.ListBox(lvl_opts, Strings.PROMPT_DESIGNATION_LEVEL, "Designation Level")
-        if not lvl_sel:
-            return
+        lvl_sel = require_user_choice(lvl_opts, Strings.PROMPT_DESIGNATION_LEVEL, "Designation Level")
         level_code = lvl_sel.split(" - ")[0]
         self.vp.SetUserString(Metadata.DESIGNATION_LEVEL, level_code)
 
         # --- 2. Pick Master Discipline ------------------------------------
         mast_opts = [f"{c} - {n}" for c, n in DISCIPLINE_CHOICES]
-        mast_sel = rs.ListBox(
+        mast_sel = require_user_choice(
             mast_opts,
             Strings.PROMPT_SHEET_DISCIPLINE,
             f"Sheet Discipline (L{level_code[-1]})",
         )
-        if not mast_sel:
-            return
         master_code, master_full = mast_sel.split(" - ", 1)
 
         # --- 3. L2 → Pick Sub-discipline ----------------------------------
@@ -168,9 +168,7 @@ class MetadataEditor:
             entries = L2_CHOICES_BY_MASTER.get(master_code, [])
             if entries:
                 sub_opts = [f"{c2} - {short}" for c2, short, _ in entries]
-                sub_sel = rs.ListBox(sub_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sub-discipline")
-                if not sub_sel:
-                    return
+                sub_sel = require_user_choice(sub_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sub-discipline")
                 disc_code = sub_sel.split(" - ")[0]
                 disc_full = next(f for c2, _, f in entries if c2 == disc_code)
             else:  # master has no children - fall back to master itself
@@ -184,40 +182,53 @@ class MetadataEditor:
         self._update_full_id()
 
     def sheet_name(self) -> None:
+        """Edits sheet name metadata.
+
+        Raises:
+            UserCancelledError: If user cancels input.
+        """
         cur = self.vp.GetUserString(Metadata.SHEET_NAME) or ""
-        new = rs.StringBox(Strings.PROMPT_SHEET_NAME, cur, "Sheet Name")
-        if new is not None and new.strip():
-            self.vp.SetUserString(Metadata.SHEET_NAME, new.strip())
+        new = require_user_string(Strings.PROMPT_SHEET_NAME, cur, "Sheet Name")
+        self.vp.SetUserString(Metadata.SHEET_NAME, new)
 
     def sheet_number(self) -> None:
+        """Edits sheet number metadata.
+
+        Raises:
+            UserCancelledError: If user cancels input.
+            ValidationError: If sheet number format is invalid or ID already exists.
+        """
         while True:
             cur = self.vp.GetUserString(Metadata.SHEET_NUMBER) or ""
-            new = rs.StringBox(Strings.PROMPT_SHEET_NUMBER, cur, "Sheet Number")
-            if new is None:
-                return
-            new = new.strip()
+            new = require_user_string(Strings.PROMPT_SHEET_NUMBER, cur, "Sheet Number")
+
             if not validate_sheet_number(new):
-                Common_Utils.alert_user("Format must be digits[.digits] (e.g. 1 or 1.2).")
-                continue
+                raise ValidationError("Format must be digits[.digits] (e.g. 1 or 1.2)")
+
             full_id = (self.vp.GetUserString(Metadata.SHEET_INDICATOR) or "") + new
-            if full_id in Layout_Tools.existing_sheet_ids():
-                Common_Utils.alert_user(f"Sheet ID '{full_id}' already exists.")
-                continue
+            if full_id in LayoutTools.existing_sheet_ids():
+                raise ValidationError(f"Sheet ID '{full_id}' already exists")
+
             self.vp.SetUserString(Metadata.SHEET_NUMBER, new)
             self._update_full_id()
             break
 
     def revision_number(self) -> None:
+        """Edits revision number metadata.
+
+        Raises:
+            UserCancelledError: If user cancels input.
+        """
         cur = self.vp.GetUserString(Metadata.REVISION_NUMBER) or "0"
-        new = rs.StringBox("Enter Revision Number / Letter", cur, "Revision")
-        if new is not None:
-            self.vp.SetUserString(Metadata.REVISION_NUMBER, new.strip() or "0")
+        new = require_user_string("Enter Revision Number / Letter", cur, "Revision", allow_empty=True)
+        self.vp.SetUserString(Metadata.REVISION_NUMBER, new or "0")
 
     def clear_all(self) -> None:
+        """Clears all metadata for the layout."""
         if rs.MessageBox("Clear ALL metadata for this layout?", 4 | 32, "Confirm") == 6:
             for k in ALL_KEYS:
                 self.vp.SetUserString(k, None)
-            Common_Utils.alert_user("All metadata cleared.")
+            CommonUtils.alert_user("All metadata cleared.")
 
     # --- Helper -----------------------------------------------------------
     def _update_full_id(self) -> None:
@@ -235,12 +246,23 @@ class MetadataSetup:
         self.view = page_view
         self.vp = page_view.ActiveViewport
         self.meta: dict[str, str] = {}
-        self.existing_ids = Layout_Tools.existing_sheet_ids()
+        self.existing_ids = LayoutTools.existing_sheet_ids()
 
     # Metadata
-    def run(self) -> dict[str, str] | None:
-        if not (self._project() and self._scale() and self._discipline()):
-            return None
+    def run(self) -> dict[str, str]:
+        """Runs the setup wizard.
+
+        Returns:
+            Dictionary of metadata key-value pairs.
+
+        Raises:
+            UserCancelledError: If user cancels any step.
+            ValidationError: If validation fails.
+        """
+        self._project()
+        self._scale()
+        self._discipline()
+
         self.meta.update({
             Metadata.REVISION_NUMBER: "0",
             Metadata.DRAWN_BY: "",
@@ -251,41 +273,48 @@ class MetadataSetup:
         return self.meta
 
     # Step-by-Step Prompts
-    def _project(self) -> bool:
+    def _project(self) -> None:
+        """Prompts for project name.
+
+        Raises:
+            UserCancelledError: If user cancels input.
+        """
         name = rs.GetDocumentUserText(DOC_PROJECT_NAME_KEY)
         if not name:
-            name = rs.StringBox(Strings.PROMPT_PROJECT_NAME, "", "Project Name")
-            if name is None or not name.strip():
-                return False
-            rs.SetDocumentUserText(DOC_PROJECT_NAME_KEY, name.strip())
-        self.meta[Metadata.PROJECT_NAME] = name.strip()
-        return True
+            name = require_user_string(Strings.PROMPT_PROJECT_NAME, "", "Project Name")
+            rs.SetDocumentUserText(DOC_PROJECT_NAME_KEY, name)
+        self.meta[Metadata.PROJECT_NAME] = name
 
-    def _scale(self) -> bool:
-        scales = Detail_Tools.get_available_scales()
+    def _scale(self) -> None:
+        """Prompts for page scale.
+
+        Raises:
+            UserCancelledError: If user cancels selection.
+            ValidationError: If no scales available.
+        """
+        scales = DetailTools.get_available_scales()
         if not scales:
-            Common_Utils.alert_user("No available scales; aborting.")
-            return False
-        picked = Detail_Tools.select_scale(scales, "Architectural", Strings.PROMPT_SET_PAGE_SCALE)
-        if not picked:
-            return False
-        self.meta[Metadata.PAGE_SCALE] = picked[2]
-        return True
+            raise ValidationError("No available scales; aborting")
 
-    def _discipline(self) -> bool:  # noqa: PLR0912
+        picked = DetailTools.select_scale(scales, "Architectural", Strings.PROMPT_SET_PAGE_SCALE)
+        self.meta[Metadata.PAGE_SCALE] = picked[2]
+
+    def _discipline(self) -> None:
+        """Prompts for discipline, sheet name, and sheet number.
+
+        Raises:
+            UserCancelledError: If user cancels any input.
+            ValidationError: If sheet number format invalid or ID already exists.
+        """
         # Designation Level
         lvl_opts = [f"{c} - {n}" for c, n in DESIGNATION_LEVEL_CHOICES]
-        lvl_sel = rs.ListBox(lvl_opts, Strings.PROMPT_DESIGNATION_LEVEL, "Designation Level")
-        if not lvl_sel:
-            return False
+        lvl_sel = require_user_choice(lvl_opts, Strings.PROMPT_DESIGNATION_LEVEL, "Designation Level")
         level_code = lvl_sel.split(" - ")[0]
         self.meta[Metadata.DESIGNATION_LEVEL] = level_code
 
         # Master Discipline
         mast_opts = [f"{c} - {n}" for c, n in DISCIPLINE_CHOICES]
-        mast_sel = rs.ListBox(mast_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sheet Discipline")
-        if not mast_sel:
-            return False
+        mast_sel = require_user_choice(mast_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sheet Discipline")
         master_code, master_full = mast_sel.split(" - ", 1)
 
         # L2 Sub-discipline (if applicable)
@@ -293,9 +322,7 @@ class MetadataSetup:
             entries = L2_CHOICES_BY_MASTER.get(master_code, [])
             if entries:
                 sub_opts = [f"{c2} - {short}" for c2, short, _ in entries]
-                sub_sel = rs.ListBox(sub_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sub-discipline")
-                if not sub_sel:
-                    return False
+                sub_sel = require_user_choice(sub_opts, Strings.PROMPT_SHEET_DISCIPLINE, "Sub-discipline")
                 disc_code = sub_sel.split(" - ")[0]
                 disc_full = next(f for c2, _, f in entries if c2 == disc_code)
             else:
@@ -307,79 +334,72 @@ class MetadataSetup:
         self.meta[Metadata.SUBDISCIPLINE_CODE] = disc_full
 
         # Sheet Name
-        while True:
-            name = rs.StringBox(Strings.PROMPT_SHEET_NAME, "", "Sheet Name")
-            if name is None:
-                return False
-            name = name.strip()
-            if name:
-                break
-            Common_Utils.alert_user("Sheet name cannot be empty.")
+        name = require_user_string(Strings.PROMPT_SHEET_NAME, "", "Sheet Name")
         self.meta[Metadata.SHEET_NAME] = name
 
         # Sheet Number
         while True:
-            num = rs.StringBox(Strings.PROMPT_SHEET_NUMBER, "", "Sheet Number")
-            if num is None:
-                return False
-            num = num.strip()
+            num = require_user_string(Strings.PROMPT_SHEET_NUMBER, "", "Sheet Number")
+
             if not validate_sheet_number(num):
-                Common_Utils.alert_user("Format must be digits[.digits] (e.g. 1 or 1.2).")
-                continue
+                raise ValidationError("Format must be digits[.digits] (e.g. 1 or 1.2)")
+
             if (disc_code + num) in self.existing_ids:
-                Common_Utils.alert_user("Sheet ID already exists.")
-                continue
+                raise ValidationError("Sheet ID already exists")
+
             break
+
         self.meta[Metadata.SHEET_NUMBER] = num
         self.meta[Metadata.SHEET_ID_FULL] = disc_code + num
-        return True
 
 
 # --- Helpers --------------------------------------------------------------
-def apply_metadata(view: Any, meta: dict[str, str] | None) -> bool:
+def apply_metadata(view: Any, meta: dict[str, str]) -> None:
+    """Applies metadata dictionary to the viewport."""
     vp = view.ActiveViewport
-    if meta:
-        for k in ALL_KEYS:
-            vp.SetUserString(k, meta.get(k))
-    return True
+    for k in ALL_KEYS:
+        vp.SetUserString(k, meta.get(k))
 
 
-# --- Main Function --------------------------------------------------------
-def main() -> None:
+@rhino_command(
+    requires_layout=True,
+    undo_description="Layout Page Management",
+    auto_redraw=True,
+    print_start=False,
+    print_end=False,
+)
+def layout_page_manager() -> None:
+    """Comprehensive metadata editor and layout setup tool for managing Layout pages.
+
+    Raises:
+        UserCancelledError: If user cancels any operation
+        ValidationError: If validation fails
+    """
     view = sc.doc.Views.ActiveView
-    if not isinstance(view, Rhino.Display.RhinoPageView):
-        Common_Utils.alert_user(Strings.MSG_LAYOUT_VIEW_REQUIRED)
-        return
-
     vp = view.ActiveViewport
+
     if vp.GetUserString(META_COMPLETION_FLAG) == "true":
+        # Editor mode
         MetadataEditor(view).launch()
         return
 
-    # --- Setup Mode ---
-    undo = sc.doc.BeginUndoRecord("Layout Page Setup")
-    try:
-        meta = MetadataSetup(view).run()
-        if not meta:
-            Common_Utils.alert_user("Setup cancelled.")
-            return
-        apply_metadata(view, meta)
-        Common_Utils.alert_user("Layout metadata configured.")
-    finally:
-        sc.doc.EndUndoRecord(undo)
-        sc.doc.Views.Redraw()
+    # Setup mode
+    meta = MetadataSetup(view).run()
+    apply_metadata(view, meta)
+    CommonUtils.alert_user("Layout metadata configured.")
 
     n = sync_project_name_to_all_layouts()
     if n:
-        Common_Utils.alert_user(f"Project name synced to {n} other layout(s).")
+        CommonUtils.alert_user(f"Project name synced to {n} other layout(s).")
 
 
 # --- Rhino Plugin Entry Point ---------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
-    main()
+    """Rhino command entry point."""
+    layout_page_manager()
     return 0
 
 
 # --- Script Entry Point ---------------------------------------------------
 if __name__ == "__main__":
-    main()
+    layout_page_manager()

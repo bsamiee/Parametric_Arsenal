@@ -10,7 +10,7 @@ Description
 Centralize all constants, metadata keys, string messages, and scale dictionaries
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from System.Drawing import Color as Col
 
@@ -19,6 +19,7 @@ import Rhino
 
 # --- Constants Section ----------------------------------------------------
 class Constants:
+    """Application-wide constants including layers, scales, and unit systems."""
     # Layer Names
     DETAIL_LAYER = "Utility_Layers::Detail_Views"
     CAPTION_LAYER = "ANNO::ANNO_DETL"
@@ -30,7 +31,7 @@ class Constants:
     SCALE_NA_LABEL = "SCALE: N/A"
 
     # Unit System Support
-    SUPPORTED_UNIT_SYSTEMS: ClassVar[list] = [
+    SUPPORTED_UNIT_SYSTEMS: ClassVar[list[Any]] = [
         Rhino.UnitSystem.Inches,
         Rhino.UnitSystem.Feet,
         Rhino.UnitSystem.Millimeters,
@@ -41,7 +42,7 @@ class Constants:
     TOLERANCE = 1e-6
 
     # Camera Metadata Keys
-    CAMERA_METADATA_KEYS: ClassVar[dict] = {
+    CAMERA_METADATA_KEYS: ClassVar[dict[str, str]] = {
         "location": "camera_location",
         "direction": "camera_direction",
         "up": "camera_up",
@@ -52,7 +53,7 @@ class Constants:
     }
 
     # --- Imperial Architectural Scales ------------------------------------
-    ARCHITECTURAL_SCALES_IMPERIAL: ClassVar[dict] = {
+    ARCHITECTURAL_SCALES_IMPERIAL: ClassVar[dict[str, float]] = {
         'SCALE: 3" = 1\'-0"': 0.3333,
         'SCALE: 1-1/2" = 1\'-0"': 0.6667,
         'SCALE: 1" = 1\'-0"': 1.0,
@@ -67,7 +68,7 @@ class Constants:
         'SCALE: 1/32" = 1\'-0"': 32.0,
     }
 
-    ARCHITECTURAL_SCALES_IMPERIAL_ORDER: ClassVar[list] = [
+    ARCHITECTURAL_SCALES_IMPERIAL_ORDER: ClassVar[list[str]] = [
         'SCALE: 3" = 1\'-0"',
         'SCALE: 1-1/2" = 1\'-0"',
         'SCALE: 1" = 1\'-0"',
@@ -83,7 +84,7 @@ class Constants:
     ]
 
     # --- Imperial Engineering Scales --------------------------------------
-    ENGINEERING_SCALES_IMPERIAL: ClassVar[dict] = {
+    ENGINEERING_SCALES_IMPERIAL: ClassVar[dict[str, float]] = {
         "SCALE: 1\" = 10'": 10.0,
         "SCALE: 1\" = 20'": 20.0,
         "SCALE: 1\" = 30'": 30.0,
@@ -93,7 +94,7 @@ class Constants:
         "SCALE: 1\" = 100'": 100.0,
     }
 
-    ENGINEERING_SCALES_IMPERIAL_ORDER: ClassVar[list] = [
+    ENGINEERING_SCALES_IMPERIAL_ORDER: ClassVar[list[str]] = [
         "SCALE: 1\" = 10'",
         "SCALE: 1\" = 20'",
         "SCALE: 1\" = 30'",
@@ -104,7 +105,7 @@ class Constants:
     ]
 
     # --- Metric Architectural Scales --------------------------------------
-    ARCHITECTURAL_SCALES_METRIC: ClassVar[dict] = {
+    ARCHITECTURAL_SCALES_METRIC: ClassVar[dict[str, float]] = {
         "SCALE: 1:1": 1.0,
         "SCALE: 1:2": 2.0,
         "SCALE: 1:5": 5.0,
@@ -120,6 +121,7 @@ class Constants:
 
 # --- Metadata Keys --------------------------------------------------------
 class Metadata:
+    """Metadata key constants for layout and detail view user strings."""
     PROJECT_NAME = "meta_project_name"
     PAGE_SCALE = "page_scale"
     DESIGNATION_LEVEL = "meta_designation_level"
@@ -136,6 +138,11 @@ class Metadata:
 
     @classmethod
     def all(cls) -> list[str]:
+        """Return all metadata key values.
+
+        Returns:
+            List of all metadata key strings.
+        """
         return [v for k, v in cls.__dict__.items() if k.isupper()]
 
 
@@ -325,6 +332,7 @@ L2_CHOICES_BY_MASTER = {
 
 # --- Strings Section ------------------------------------------------------
 class Strings:
+    """User-facing strings, prompts, and messages."""
     # Alignment
     PROMPT_SELECT_PARENT = "Select Parent Reference View"
     PROMPT_SELECT_CHILD = "Select Child View to Align"
@@ -332,16 +340,14 @@ class Strings:
     PROMPT_PICK_CHILD_POINT = "Pick CHILD Matching Point"
     PROMPT_DIRECTION = "Direction"
     DEFAULT_DIRECTION = "Vertical"
-    DIRECTION_OPTIONS: ClassVar[list] = ["Horizontal", "Vertical"]
+    DIRECTION_OPTIONS: ClassVar[list[str]] = ["Horizontal", "Vertical"]
     MSG_PARENT_CHILD_SAME = "Parent and Child details cannot be the same."
     MSG_INVALID_ALIGNMENT = "Invalid alignment choice."
     MSG_INVALID_DETAIL_SELECTED = "Invalid object selected. Please select a Detail View."
     MSG_FAILED_TRANSFORM = "Failed to apply transform to Child Detail."
 
     # Camera
-    PROMPT_SELECT_DETAIL_TO_INSPECT = "Select a Detail View to Inspect"
     INFO_NO_CAMERA_METADATA = "[INFO] No previous camera metadata found. Capturing live camera settings..."
-    MSG_FAILED_CAPTURE_CAMERA = "Failed to capture camera metadata."
     MSG_FAILED_SET_CAMERA = "Failed to set camera metadata."
 
     # Detail Captioning
@@ -351,7 +357,6 @@ class Strings:
     MSG_FAILED_CREATE_TEXT = "Failed to create one or more caption text elements."
 
     # Quick Detail
-    MSG_DETAIL_CREATION_CANCELLED = "Detail creation canceled by user."
     MSG_FAILED_CREATE_DETAIL = "Failed to create Detail View."
     INFO_CREATED_NEW_DETAIL = "Created new Detail View on layer"
     INFO_CORRECTED_EXISTING_DETAILS = "Corrected {} existing Detail View(s) to '{}' layer."
@@ -369,15 +374,12 @@ class Strings:
     PROMPT_SET_CUSTOM_SCALE_FOR_ALL = "Set Custom Scale for All Details"
     PROMPT_CHOOSE_OPERATION = "Choose an operation"
     MSG_NO_DETAILS_FOUND = "No Details found on this Layout."
-    MSG_NO_DETAILS_SELECTED = "No Detail Views selected. Please select at least one."
-    MSG_USER_CANCELLED_SCALE_SELECTION = "User canceled scale selection."
-    MSG_USER_CANCELLED_OPERATION = "User canceled operation selection."
     MSG_PAGE_SCALE_NOT_RECOGNIZED = "Stored Page Scale not recognized. Please reset Page Scale."
     MSG_DETAIL_SET_TO_SCALE = "Detail '{}' set to Scale: {}."
 
     # Architectural Scale Prompting
     PROMPT_ARCHITECTURAL_DETAIL_SCALES = "Architectural Detail Scales"
-    OPTIONS_ARCHITECTURAL_OPERATIONS: ClassVar[list] = [
+    OPTIONS_ARCHITECTURAL_OPERATIONS: ClassVar[list[str]] = [
         "Set to Custom Scale",
         "Set to Page Scale",
         "Batch Custom Scale",
@@ -386,7 +388,7 @@ class Strings:
 
     # Engineering Scale Prompting
     PROMPT_ENGINEERING_DETAIL_SCALES = "Engineering Detail Scales"
-    OPTIONS_ENGINEERING_OPERATIONS: ClassVar[list] = [
+    OPTIONS_ENGINEERING_OPERATIONS: ClassVar[list[str]] = [
         "Set to Custom Scale",
         "Set to Page Scale",
         "Batch Custom Scale",
@@ -402,26 +404,20 @@ class Strings:
     # General UX & Errors
     MSG_LAYOUT_VIEW_REQUIRED = "This script must be run in a Layout (Page) View."
     MSG_UNSUPPORTED_UNIT_SYSTEM = "This unit system is not currently supported."
-    MSG_UNSUPPORTED_UNITS = "Unsupported model unit system."
 
     # Ortho Detail From Detail
     STEP1_PROMPT_SELECT_DETAIL = "Select a Detail View"
     STEP2_PROMPT_TITLE = "{} to New View"
-    # (optional alias for backward compatibility)
-    STEP3_PROMPT_TITLE = STEP2_PROMPT_TITLE
     STEP4_PROMPT_INSERTION_POINT = "Select Insertion Point"
     MSG_FAILED_RETRIEVE_CAMERA_METADATA = "Failed to retrieve camera metadata from Detail View."
     MSG_INVALID_CAMERA_DIRECTION = "Unrecognized camera direction vector. Cannot determine current view."
     MSG_MUST_BE_PARALLEL_PROJECTION = "Only Parallel Projection Detail Views can be used."
     MSG_USER_CANCELLED_TARGET_VIEW = "User cancelled target projection selection."
-    MSG_USER_CANCELLED_INSERTION_POINT = "User cancelled insertion point selection."
 
     # Center Detail View
     PROMPT_SELECT_DETAIL_VIEW = "Select Detail View to center"
     PROMPT_SELECT_OBJECTS = "Select objects inside the Detail View to center"
 
-    MSG_USER_CANCELLED_DETAIL_SELECTION = "[INFO] User cancelled Detail selection."
-    MSG_USER_CANCELLED_OBJECT_SELECTION = "[INFO] User cancelled object selection."
     MSG_DETAIL_LOCKED = "[WARNING] Detail View is locked. Cannot modify."
     MSG_FAILED_COMPUTE_BBOX = "[ERROR] Could not compute bounding box of selected objects."
 
@@ -431,7 +427,6 @@ class Strings:
     # Layout Page Manager Prompts
     PROMPT_PROJECT_NAME = "Enter Project Name:"
     PROMPT_DESIGNATION_LEVEL = "Select Designation Level:"
-    PROMPT_L2_MASTER = "L2 Designation Master"
     PROMPT_SHEET_DISCIPLINE = "Select Sheet Discipline:"
     PROMPT_SHEET_NAME = "Enter Sheet Name (e.g., Floor Plan):"
     PROMPT_SHEET_NUMBER = "Enter Sheet Number (e.g., 1.2):"

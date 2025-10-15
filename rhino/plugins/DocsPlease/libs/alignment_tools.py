@@ -20,8 +20,8 @@ import scriptcontext as sc
 import Rhino
 
 from .camera_tools import CameraTools
-from .common_utils import CommonUtils
 from .constants import Constants, Strings
+from .exceptions import DetailError, TransformError, UserCancelledError
 
 
 # --- Alignment Tools ------------------------------------------------------
@@ -29,8 +29,19 @@ class AlignmentTools:
     """Tools for aligning Detail Views on a Layout Page."""
 
     @staticmethod
-    def get_detail_object_id(prompt_message: str) -> object | None:
-        """Prompts user for a Detail View, validates, and returns its ID."""
+    def get_detail_object_id(prompt_message: str) -> object:
+        """Prompt user for a Detail View, validate, and return its ID.
+
+        Args:
+            prompt_message: Message to display to the user.
+
+        Returns:
+            The detail object ID.
+
+        Raises:
+            UserCancelledError: If user cancels the selection.
+            DetailError: If selected object is not a valid detail view.
+        """
         if isinstance(sc.doc.Views.ActiveView, Rhino.Display.RhinoPageView):
             sc.doc.Views.ActiveView.SetPageAsActive()
         else:
@@ -38,43 +49,61 @@ class AlignmentTools:
 
         obj_id = rs.GetObject(prompt_message, rs.filter.detail, True, False)
         if not obj_id:
-            return None
+            raise UserCancelledError("Detail selection cancelled")
 
         rh_obj = rs.coercerhinoobject(obj_id)
         if rh_obj and isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
             return obj_id
-        CommonUtils.alert_user(Strings.MSG_INVALID_DETAIL_SELECTED)
-        return None
+
+        raise DetailError(Strings.MSG_INVALID_DETAIL_SELECTED, context=obj_id)
 
     @staticmethod
-    def get_point_on_page(prompt_message: str) -> object | None:
-        """Prompts the user to pick a point constrained to the active Layout Page."""
+    def get_point_on_page(prompt_message: str) -> object:
+        """Prompt the user to pick a point constrained to the active Layout Page.
+
+        Args:
+            prompt_message: Message to display to the user.
+
+        Returns:
+            The selected point.
+
+        Raises:
+            UserCancelledError: If user cancels the point selection.
+        """
         if isinstance(sc.doc.Views.ActiveView, Rhino.Display.RhinoPageView):
             sc.doc.Views.ActiveView.SetPageAsActive()
         else:
             print("Warning: Alignment should ideally be run in a Layout view.")
 
-        return rs.GetPoint(prompt_message)
+        point = rs.GetPoint(prompt_message)
+        if not point:
+            raise UserCancelledError("Point selection cancelled")
 
-    @staticmethod
-    def get_object_name(obj_id: object) -> str:
-        """Returns the object name, or the GUID as string if unnamed."""
-        name = rs.ObjectName(obj_id)
-        return name or str(obj_id)
+        return point
 
     @staticmethod
     def calculate_translation_vector(pt_parent: Any, pt_child: Any, align_choice: str) -> object | None:
-        """
-        Calculates the translation vector needed to align pt_child with pt_parent.
+        """Calculate the translation vector needed to align pt_child with pt_parent.
 
-        Align_choice must be 'Horizontal' or 'Vertical'.
+        Args:
+            pt_parent: Parent point to align to.
+            pt_child: Child point to be aligned.
+            align_choice: Must be 'Horizontal' or 'Vertical'.
+
+        Returns:
+            Translation vector, or None if no translation needed (within tolerance).
+
+        Raises:
+            TransformError: If invalid points provided or invalid alignment choice.
         """
         if not all([
             isinstance(pt_parent, Rhino.Geometry.Point3d),
             isinstance(pt_child, Rhino.Geometry.Point3d),
         ]):
-            print("Error: Invalid points provided for alignment calculation.")
-            return None
+            raise TransformError(
+                "Invalid points provided for alignment calculation",
+                context={"pt_parent": pt_parent, "pt_child": pt_child},
+            )
 
         if align_choice == "Horizontal":
             delta_y = pt_parent.Y - pt_child.Y
@@ -87,13 +116,23 @@ class AlignmentTools:
                 return Rhino.Geometry.Vector3d(delta_x, 0, 0)
 
         else:
-            print(f"Warning: Invalid alignment choice '{align_choice}'")
+            raise TransformError(
+                f"Invalid alignment choice '{align_choice}'. Must be 'Horizontal' or 'Vertical'",
+                context={"align_choice": align_choice},
+            )
 
         return None
 
     @staticmethod
     def prompt_for_target_projection(current_view: str) -> object:
-        """Prompts user to choose a new projection direction excluding the current view."""
+        """Prompt user to choose a new projection direction excluding the current view.
+
+        Args:
+            current_view: Current view name to exclude from options.
+
+        Returns:
+            Selected target view name.
+        """
         options = ["Top", "Bottom", "Front", "Back", "Left", "Right"]
         if current_view in options:
             options.remove(current_view)
@@ -106,7 +145,7 @@ class AlignmentTools:
 
     @staticmethod
     def refresh_all_detail_metadata() -> None:
-        """Refreshes camera metadata for all Detail Views on the active Layout Page."""
+        """Refresh camera metadata for all Detail Views on the active Layout Page."""
         pageview = sc.doc.Views.ActiveView
         if not isinstance(pageview, Rhino.Display.RhinoPageView):
             print("Warning: Active view is not a Layout.")

@@ -23,6 +23,7 @@ import System
 import Rhino
 
 from .constants import Constants
+from .exceptions import CameraError
 
 
 # --- Camera Tools ---------------------------------------------------------
@@ -31,10 +32,20 @@ class CameraTools:
 
     # --- Internal String Conversion Utilities -----------------------------
     @staticmethod
-    def _point3d_to_string(point: object) -> str | None:
-        """Converts Rhino.Geometry.Point3d to a comma-separated string."""
+    def _point3d_to_string(point: object) -> str:
+        """Convert Rhino.Geometry.Point3d to a comma-separated string.
+
+        Args:
+            point: Point3d object to convert.
+
+        Returns:
+            Comma-separated string representation.
+
+        Raises:
+            CameraError: If point is not a valid Point3d.
+        """
         if not isinstance(point, Rhino.Geometry.Point3d):
-            return None
+            raise CameraError(f"Invalid point type: expected Point3d, got {type(point).__name__}", context=point)
         try:
             culture = System.Globalization.CultureInfo.InvariantCulture
             return f"{point.X.ToString(culture)},{point.Y.ToString(culture)},{point.Z.ToString(culture)}"
@@ -42,10 +53,20 @@ class CameraTools:
             return f"{point.X},{point.Y},{point.Z}"
 
     @staticmethod
-    def _vector3d_to_string(vector: object) -> str | None:
-        """Converts Rhino.Geometry.Vector3d to a comma-separated string."""
+    def _vector3d_to_string(vector: object) -> str:
+        """Convert Rhino.Geometry.Vector3d to a comma-separated string.
+
+        Args:
+            vector: Vector3d object to convert.
+
+        Returns:
+            Comma-separated string representation.
+
+        Raises:
+            CameraError: If vector is not a valid Vector3d.
+        """
         if not isinstance(vector, Rhino.Geometry.Vector3d):
-            return None
+            raise CameraError(f"Invalid vector type: expected Vector3d, got {type(vector).__name__}", context=vector)
         try:
             culture = System.Globalization.CultureInfo.InvariantCulture
             return f"{vector.X.ToString(culture)},{vector.Y.ToString(culture)},{vector.Z.ToString(culture)}"
@@ -53,53 +74,77 @@ class CameraTools:
             return f"{vector.X},{vector.Y},{vector.Z}"
 
     @staticmethod
-    def _string_to_point3d(s: str) -> object | None:
-        """Converts a comma-separated string back to Rhino.Geometry.Point3d."""
+    def _string_to_point3d(s: str) -> Rhino.Geometry.Point3d:
+        """Convert a comma-separated string back to Rhino.Geometry.Point3d.
+
+        Args:
+            s: Comma-separated string of coordinates.
+
+        Returns:
+            Point3d object.
+
+        Raises:
+            CameraError: If string cannot be converted to Point3d.
+        """
         if not s:
-            return None
+            raise CameraError("Cannot convert empty string to Point3d")
         try:
             parts = s.split(",")
-            if len(parts) == 3:
-                x = float(parts[0])
-                y = float(parts[1])
-                z = float(parts[2])
-                return Rhino.Geometry.Point3d(x, y, z)
+            if len(parts) != 3:
+                raise CameraError(f"Invalid Point3d string format: expected 3 values, got {len(parts)}", context=s)
+            x = float(parts[0])
+            y = float(parts[1])
+            z = float(parts[2])
+            return Rhino.Geometry.Point3d(x, y, z)
         except (ValueError, IndexError) as e:
-            print(f"Error converting string '{s}' to Point3d: {e}")
-        return None
+            raise CameraError(f"Error converting string '{s}' to Point3d: {e}", context=s) from e
 
     @staticmethod
-    def _string_to_vector3d(s: str) -> object | None:
-        """Converts a comma-separated string back to Rhino.Geometry.Vector3d."""
+    def _string_to_vector3d(s: str) -> Rhino.Geometry.Vector3d:
+        """Convert a comma-separated string back to Rhino.Geometry.Vector3d.
+
+        Args:
+            s: Comma-separated string of coordinates.
+
+        Returns:
+            Vector3d object.
+
+        Raises:
+            CameraError: If string cannot be converted to Vector3d.
+        """
         if not s:
-            return None
+            raise CameraError("Cannot convert empty string to Vector3d")
         try:
             parts = s.split(",")
-            if len(parts) == 3:
-                x = float(parts[0])
-                y = float(parts[1])
-                z = float(parts[2])
-                return Rhino.Geometry.Vector3d(x, y, z)
+            if len(parts) != 3:
+                raise CameraError(f"Invalid Vector3d string format: expected 3 values, got {len(parts)}", context=s)
+            x = float(parts[0])
+            y = float(parts[1])
+            z = float(parts[2])
+            return Rhino.Geometry.Vector3d(x, y, z)
         except (ValueError, IndexError) as e:
-            print(f"Error converting string '{s}' to Vector3d: {e}")
-        return None
+            raise CameraError(f"Error converting string '{s}' to Vector3d: {e}", context=s) from e
 
     # --- Camera Metadata Read ---------------------------------------------
     @staticmethod
-    def get_camera_metadata(detail_id: object) -> dict[str, Any] | None:  # noqa: PLR0912
-        """
-        Reads stored camera parameters from a Detail View's user strings.
+    def get_camera_metadata(detail_id: object) -> dict[str, Any]:
+        """Read stored camera parameters from a Detail View's user strings.
 
-        Returns a dictionary with keys matching Constants.CAMERA_METADATA_KEYS.
+        Args:
+            detail_id: Detail view object ID.
+
+        Returns:
+            Dictionary with keys matching Constants.CAMERA_METADATA_KEYS.
+
+        Raises:
+            CameraError: If detail is invalid or camera metadata cannot be retrieved.
         """
         rh_obj = rs.coercerhinoobject(detail_id)
         if not rh_obj or not isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
-            print("Error: Invalid Detail ID or object type provided to get_camera_metadata.")
-            return None
+            raise CameraError("Invalid Detail ID or object type provided to get_camera_metadata", context=detail_id)
 
         metadata = {}
         missing_keys = []
-        conversion_failed = False
 
         for key, user_key in Constants.CAMERA_METADATA_KEYS.items():
             value_str = rh_obj.Attributes.GetUserString(user_key)
@@ -107,7 +152,6 @@ class CameraTools:
                 missing_keys.append(user_key)
                 continue
 
-            converted_value = None
             try:
                 if key in {"location", "target"}:
                     converted_value = CameraTools._string_to_point3d(value_str)
@@ -120,42 +164,46 @@ class CameraTools:
                 else:
                     converted_value = value_str
 
-                if converted_value is None and key in {
-                    "location",
-                    "target",
-                    "direction",
-                    "up",
-                }:
-                    print(f"Warning: Conversion failed for key '{key}', value '{value_str}'")
-                    conversion_failed = True
-                else:
-                    metadata[key] = converted_value
+                metadata[key] = converted_value
 
-            except (ValueError, TypeError) as e:
-                print(f"Error converting key '{key}': {e}")
-                conversion_failed = True
+            except (ValueError, TypeError, CameraError) as e:
+                raise CameraError(
+                    f"Error converting camera metadata key '{key}': {e}",
+                    context={"detail_id": detail_id, "key": key, "value": value_str},
+                ) from e
 
-        if missing_keys or conversion_failed:
-            return None
+        if missing_keys:
+            raise CameraError(
+                f"Missing camera metadata keys: {', '.join(missing_keys)}",
+                context={"detail_id": detail_id, "missing_keys": missing_keys},
+            )
 
         if len(metadata) != len(Constants.CAMERA_METADATA_KEYS):
-            return None
+            raise CameraError(
+                f"Incomplete camera metadata: expected {len(Constants.CAMERA_METADATA_KEYS)} keys, got {len(metadata)}",
+                context={"detail_id": detail_id, "metadata": metadata},
+            )
 
         return metadata
 
     # --- Camera Metadata Write --------------------------------------------
     @staticmethod
-    def set_camera_metadata(detail_id: object) -> bool:  # noqa: PLR0911, PLR0914
-        """Captures the current camera state of a Detail View and stores it as user strings using ModifyAttributes."""
+    def set_camera_metadata(detail_id: object) -> None:
+        """Capture the current camera state of a Detail View and store it as user strings.
+
+        Args:
+            detail_id: Detail view object ID.
+
+        Raises:
+            CameraError: If detail is invalid or camera metadata cannot be stored.
+        """
         rh_obj = rs.coercerhinoobject(detail_id)
         if not rh_obj or not isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
-            print("Error: Invalid Detail ID or object type provided to set_camera_metadata.")
-            return False
+            raise CameraError("Invalid Detail ID or object type provided to set_camera_metadata", context=detail_id)
 
         detail_vp = rh_obj.Viewport
         if not detail_vp:
-            print(f"Error: Could not retrieve ViewportInfo for detail {detail_id}.")
-            return False
+            raise CameraError("Could not retrieve ViewportInfo for detail", context=detail_id)
 
         try:
             location = detail_vp.CameraLocation
@@ -167,8 +215,7 @@ class CameraTools:
             ratio = rh_obj.DetailGeometry.PageToModelRatio
 
         except (AttributeError, RuntimeError) as e:
-            print(f"Error accessing camera properties for detail {detail_id}: {e}")
-            return False
+            raise CameraError(f"Error accessing camera properties for detail: {e}", context=detail_id) from e
 
         try:
             attribs = rh_obj.Attributes.Duplicate()
@@ -180,10 +227,6 @@ class CameraTools:
             lens_str = str(lens_length)
             ratio_str = str(ratio)
 
-            if None in {loc_str, dir_str, up_str, tgt_str}:
-                print("Error: Failed to convert one or more camera geometry fields to string.")
-                return False
-
             attribs.SetUserString(Constants.CAMERA_METADATA_KEYS["location"], loc_str)
             attribs.SetUserString(Constants.CAMERA_METADATA_KEYS["direction"], dir_str)
             attribs.SetUserString(Constants.CAMERA_METADATA_KEYS["up"], up_str)
@@ -192,27 +235,32 @@ class CameraTools:
             attribs.SetUserString(Constants.CAMERA_METADATA_KEYS["projection_mode"], projection_mode)
             attribs.SetUserString(Constants.CAMERA_METADATA_KEYS["page_to_model_ratio"], ratio_str)
 
-            if sc.doc.Objects.ModifyAttributes(rh_obj.Id, attribs, True):
-                print(f"Successfully captured and stored camera metadata for detail {detail_id}.")
-                return True
-            print(f"Warning: Failed to modify attributes for detail {detail_id}")
-            return False  # noqa: TRY300
+            if not sc.doc.Objects.ModifyAttributes(rh_obj.Id, attribs, True):
+                raise CameraError("Failed to modify attributes for detail", context=detail_id)
 
+        except CameraError:
+            raise
         except (AttributeError, RuntimeError) as e:
-            print(f"Error setting/storing camera metadata for detail {detail_id}: {e}")
-            print(traceback.format_exc())
-            return False
+            raise CameraError(
+                f"Error setting/storing camera metadata for detail: {e}\n{traceback.format_exc()}", context=detail_id
+            ) from e
 
     # --- Camera Projection Utilities --------------------------------------
     @staticmethod
-    def map_camera_direction_to_named_view(vector: object) -> str | None:
-        """
-        Maps a nearly-axis-aligned camera vector to a standard named view (Top, Bottom, Front, Back, Left, Right).
+    def map_camera_direction_to_named_view(vector: object) -> str:
+        """Map a nearly-axis-aligned camera vector to a standard named view.
 
-        Returns a string or None.
+        Args:
+            vector: Camera direction vector.
+
+        Returns:
+            Named view string (Top, Bottom, Front, Back, Left, or Right).
+
+        Raises:
+            CameraError: If vector is invalid or cannot be mapped to a named view.
         """
         if not isinstance(vector, Rhino.Geometry.Vector3d):
-            return None
+            raise CameraError(f"Invalid vector type: expected Vector3d, got {type(vector).__name__}", context=vector)
 
         x, y, z = vector.X, vector.Y, vector.Z
         abs_x, abs_y, abs_z = abs(x), abs(y), abs(z)
@@ -235,14 +283,27 @@ class CameraTools:
             (1, 0, 0): "Right",
         }
 
-        return mapping.get(key)
+        result = mapping.get(key)
+        if result is None:
+            raise CameraError("Cannot map camera direction to named view", context={"vector": vector, "key": key})
+        return result
 
     @staticmethod
-    def set_camera_projection_for_named_view(detail_id: object, target_view: str) -> bool:
-        """Sets the camera projection of a Detail View to match the specified named view."""
+    def set_camera_projection_for_named_view(detail_id: object, target_view: str) -> None:
+        """Set the camera projection of a Detail View to match the specified named view.
+
+        Args:
+            detail_id: Detail view object ID.
+            target_view: Target named view (Top, Bottom, Front, Back, Left, or Right).
+
+        Raises:
+            CameraError: If detail is invalid or camera projection cannot be set.
+        """
         rh_obj = rs.coercerhinoobject(detail_id)
         if not rh_obj or not isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
-            return False
+            raise CameraError(
+                "Invalid Detail ID or object type provided to set_camera_projection_for_named_view", context=detail_id
+            )
 
         vp = rh_obj.Viewport
 
@@ -274,7 +335,10 @@ class CameraTools:
         }
 
         if target_view not in mapping:
-            return False
+            raise CameraError(
+                f"Invalid target view: '{target_view}'. Must be one of: {', '.join(mapping.keys())}",
+                context={"detail_id": detail_id, "target_view": target_view},
+            )
 
         direction, up = mapping[target_view]
         location = vp.CameraLocation
@@ -288,5 +352,3 @@ class CameraTools:
         rh_obj.CommitViewportChanges()
         rh_obj.CommitChanges()
         sc.doc.Views.Redraw()
-
-        return True

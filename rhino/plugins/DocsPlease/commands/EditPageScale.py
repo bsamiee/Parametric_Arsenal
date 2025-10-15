@@ -10,45 +10,35 @@ Description
 Edits the page scale metadata for the active Layout.
 """
 
-import rhinoscriptsyntax as rs
-import scriptcontext as sc
-from libs import Common_Utils, Constants, Detail_Tools, Strings
+from __future__ import annotations
 
-
-# --- Helper Class ---------------------------------------------------------
-class EditPageScaleHelper:
-    @staticmethod
-    def validate_environment() -> bool:
-        if not Common_Utils.is_layout_view_active():
-            Common_Utils.alert_user(Strings.MSG_LAYOUT_VIEW_REQUIRED)
-            return False
-        model_units = Common_Utils.get_model_unit_system()
-        if model_units not in Constants.SUPPORTED_UNIT_SYSTEMS:
-            Common_Utils.alert_user(Strings.MSG_UNSUPPORTED_UNIT_SYSTEM)
-            return False
-        return True
-
-    @staticmethod
-    def get_scale_dictionary() -> dict[str, float]:
-        # This correctly gets either Imperial or Metric Arch scales based on units
-        return Detail_Tools.get_available_scales()
+from libs.command_framework import rhino_command
+from libs.common_utils import require_user_choice, validate_environment_units
+from libs.constants import Constants, Strings
+from libs.detail_tools import DetailTools
+from libs.exceptions import ValidationError
 
 
 # --- Main Function --------------------------------------------------------
-def main() -> None:
-    """Main entry point for editing the Layout Page Scale metadata."""
-    print("=== Edit Page Scale Script Started ===")
+@rhino_command(requires_layout=True, undo_description="Edit Page Scale")
+def edit_page_scale() -> None:
+    """
+    Edits the page scale metadata for the active Layout.
 
-    if not EditPageScaleHelper.validate_environment():
-        return
+    Raises:
+        EnvironmentError: If model units are not supported.
+        ValidationError: If no scales are available for current units.
+        UserCancelledError: If user cancels scale selection.
+    """
+    # Validate environment units
+    validate_environment_units(Constants.SUPPORTED_UNIT_SYSTEMS)
 
-    scale_dict = EditPageScaleHelper.get_scale_dictionary()
+    # Get available scales for current units
+    scale_dict = DetailTools.get_available_scales()
     if not scale_dict:
-        print("Error: Could not determine available scales for the current model units.")
-        return
+        raise ValidationError("Could not determine available scales for the current model units.")
 
     # Determine the correct ordered list for the ListBox
-    keys = []
     if scale_dict == Constants.ARCHITECTURAL_SCALES_IMPERIAL:
         keys = Constants.ARCHITECTURAL_SCALES_IMPERIAL_ORDER
     elif scale_dict == Constants.ARCHITECTURAL_SCALES_METRIC:
@@ -58,39 +48,28 @@ def main() -> None:
         keys = sorted(scale_dict.keys())
 
     if not keys:
-        print("Error: No scale keys found to display.")
-        return
+        raise ValidationError("No scale keys found to display.")
 
     # Present the correctly ordered list
-    choice = rs.ListBox(
-        keys,  # Use the ordered list determined above
+    choice = require_user_choice(
+        keys,
         Strings.PROMPT_EDIT_PAGE_SCALE,
-        Strings.PROMPT_SET_PAGE_SCALE,  # Title for the list box
+        Strings.PROMPT_SET_PAGE_SCALE,
     )
-    if not choice:
-        print("User canceled scale selection.")
-        return
 
     # Set the chosen scale metadata
-    undo_record = sc.doc.BeginUndoRecord("Edit Page Scale")
-    try:
-        # The choice variable holds the selected scale label string
-        Detail_Tools.set_page_scale_metadata(choice)
-    finally:
-        # Use the integer return value from EndUndoRecord
-        sc.doc.EndUndoRecord(undo_record)
-        # Optional: Check undo_result if needed
+    DetailTools.set_page_scale_metadata(choice)
 
     print(f"New Page Scale set to: {choice}")
-    print("=== Script Completed ===")
 
 
 # --- Rhino Plugin Entry Point ---------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
-    main()
+    """Rhino command entry point."""
+    edit_page_scale()
     return 0
 
 
 # --- Script Entry Point ---------------------------------------------------
 if __name__ == "__main__":
-    main()
+    edit_page_scale()
