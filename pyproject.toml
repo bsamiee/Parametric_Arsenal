@@ -38,21 +38,21 @@ namespace_packages = true
 warn_unused_configs = true
 show_error_codes = true
 
-# Strict baseline
+# Strict baseline (relaxed for Rhino .NET interop)
 warn_redundant_casts = true
 warn_unused_ignores = true
-warn_return_any = true
+warn_return_any = false             # Allow Any returns for Rhino API interop
 no_implicit_optional = true
 strict_equality = true
 check_untyped_defs = true
-disallow_any_generics = true
+disallow_any_generics = false       # Allow Any generics for Rhino API
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-disallow_untyped_calls = true
-disallow_subclassing_any = true
-disallow_any_unimported = true
-disallow_any_expr = true
-disallow_any_decorated = true
+disallow_untyped_calls = false      # Allow untyped calls for Rhino API
+disallow_subclassing_any = false    # Allow subclassing Any for Rhino types
+disallow_any_unimported = false     # Allow Any from unimported modules (Rhino)
+disallow_any_expr = false           # Allow Any expressions for Rhino API
+disallow_any_decorated = false      # Allow Any decorated functions
 no_implicit_reexport = true
 
 plugins = []
@@ -68,6 +68,33 @@ exclude = [
     "dist/",
     "build/",
 ]
+
+# Rhino .NET assemblies - runtime-only, no type stubs available
+[[tool.mypy.overrides]]
+module = ["Rhino.*", "scriptcontext", "Eto.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+# IronPython-specific modules used in Rhino plugins
+[[tool.mypy.overrides]]
+module = ["rhinoscriptsyntax", "rhinoscriptsyntax.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["System", "System.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["libs", "libs.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+# Allow subclassing Eto.Forms.Dialog and other .NET types in UI modules
+[[tool.mypy.overrides]]
+module = "ui.*"
+disallow_subclassing_any = false
 
 # --- BasedPyright Configuration ---------------------------------------------
 [tool.basedpyright]
@@ -93,10 +120,12 @@ reportUnknownVariableType = "none"
 reportAttributeAccessIssue = "none"
 reportUnknownArgumentType = "none"
 reportUnusedCallResult = "none"
+reportMissingModuleSource = "none"  # Rhino is a runtime .NET assembly
+reportMissingImports = "none"  # Rhino modules (Rhino, scriptcontext, Eto) are runtime .NET assemblies
+reportUntypedBaseClass = "none"  # Allow subclassing .NET types (Eto.Forms.Dialog, etc.)
 
 # Keep useful signals
 reportMissingTypeStubs = "warning"
-reportMissingImports = "warning"
 reportPrivateUsage = "warning"
 reportInconsistentConstructor = "warning"
 reportUnnecessaryTypeIgnoreComment = "warning"
@@ -148,8 +177,11 @@ extend-ignore = [
     "COM812",               # formatter conflict
     "E701",                 # one-line compound for tiny helpers
     "TID252",               # allow relative imports, matches pyright
+    "T201",                 # print for Rhino console feedback
     "PLC2701",              # private import usage
     "RUF029",               # __all__ module export enforcement
+    "N802","N803",          # allow RunCommand naming for Rhino plugin entry points
+    "ANN401",               # allow Any for .NET event handlers and interop
 ]
 
 fixable = ["ALL"]
@@ -178,25 +210,3 @@ allow-magic-value-types = ["int", "str"]
 [tool.ruff.lint.flake8-import-conventions.aliases]
 numpy = "np"
 pandas = "pd"
-
-# Rhino and Grasshopper scripts: pragmatic exceptions
-[tool.ruff.lint.per-file-ignores]
-"rhino/scripts/**/*.py" = [
-    "E402",     # late imports for Rhino runtime
-    "T201",     # print for Rhino console feedback
-    "PLR0911","PLR0912","PLR0915",  # complexity in imperative scripts
-    "BLE001",   # broad except for API robustness
-    "ARG001",   # unused callback args
-    "ANN",      # allow untyped callbacks
-    "N802","N803",  # callback names and param names that mirror .NET
-]
-
-"grasshopper/**/*.py" = [
-    "E402",
-    "T201",
-    "PLR0911","PLR0912","PLR0915",
-    "BLE001",
-    "ARG001",
-    "ANN",
-    "N802","N803",
-]
