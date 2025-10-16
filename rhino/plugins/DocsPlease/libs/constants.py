@@ -118,6 +118,34 @@ class Constants:
         "SCALE: 1:1000": 1000.0,
     }
 
+    # --- Project Templates ------------------------------------------------
+    PROJECT_TEMPLATES: ClassVar[dict[str, dict[str, Any]]] = {
+        "Full AEC": {
+            "document_sets": ["A", "S", "E", "M", "P", "F"],
+            "designation_level": "L2",
+            "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
+            "default_scale_metric": "SCALE: 1:50"
+        },
+        "Arch Only": {
+            "document_sets": ["A"],
+            "designation_level": "L2",
+            "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
+            "default_scale_metric": "SCALE: 1:50"
+        },
+        "MEP": {
+            "document_sets": ["M", "E", "P", "F"],
+            "designation_level": "L2",
+            "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
+            "default_scale_metric": "SCALE: 1:50"
+        },
+        "Civil": {
+            "document_sets": ["C", "L"],
+            "designation_level": "L2",
+            "default_scale_imperial": 'SCALE: 1" = 20\'',
+            "default_scale_metric": "SCALE: 1:200"
+        }
+    }
+
 
 # --- Metadata Keys --------------------------------------------------------
 class Metadata:
@@ -135,6 +163,7 @@ class Metadata:
     CHECKED_BY = "meta_checked_by"
     DATE_ISSUED = "meta_date_issued"
     COMPLETION_FLAG = "meta_page_setup_complete"
+    SCALE_INHERITED = "meta_scale_inherited"
 
     @classmethod
     def all(cls) -> list[str]:

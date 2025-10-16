@@ -119,6 +119,7 @@ reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportAttributeAccessIssue = "none"
 reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
 reportUnusedCallResult = "none"
 reportMissingModuleSource = "none"  # Rhino is a runtime .NET assembly
 reportMissingImports = "none"  # Rhino modules (Rhino, scriptcontext, Eto) are runtime .NET assemblies
@@ -182,6 +183,11 @@ extend-ignore = [
     "RUF029",               # __all__ module export enforcement
     "N802","N803",          # allow RunCommand naming for Rhino plugin entry points
     "ANN401",               # allow Any for .NET event handlers and interop
+    "TRY003",               # allow long exception messages in raise statements
+    "TRY301",               # allow raise in try blocks without abstracting to inner function
+    "B904",                 # allow raise without from in except blocks
+    "PLR2004",              # allow magic values in comparisons
+    "PLR0914",              # allow more than 15 local variables
 ]
 
 fixable = ["ALL"]

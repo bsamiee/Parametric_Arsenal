@@ -21,12 +21,13 @@ import Rhino
 
 from .common_utils import CommonUtils
 from .constants import Constants
-from .exceptions import DetailError, ScaleError, UserCancelledError
+from .exceptions import DetailError, ScaleError, UserCancelledError, ValidationError
 
 
 # --- Detail Tools ---------------------------------------------------------
 class DetailTools:
     """Tools for detail view manipulation, scaling, and geometry operations."""
+
     @staticmethod
     def get_available_scales() -> dict[str, float]:
         """Return appropriate scale dictionary based on model units.
@@ -314,3 +315,250 @@ class DetailTools:
                 rs.ObjectLayer(detail.Id, target_layer)
                 moved_count += 1
         return moved_count
+
+    # --- Caption Management -----------------------------------------------
+    @staticmethod
+    def find_existing_caption(detail_id: object) -> tuple[object, object, object] | None:
+        """
+        Find caption linked to detail view via metadata.
+
+        Args:
+            detail_id: Detail view GUID.
+
+        Returns:
+            tuple: (number_id, title_id, scale_id) if found, None otherwise.
+        """
+        # Get all objects on the caption layer
+        objs = rs.ObjectsByLayer(Constants.CAPTION_LAYER)
+        if not objs:
+            return None
+
+        # Convert detail_id to string for comparison
+        detail_id_str = str(detail_id)
+
+        # Search for text objects with matching metadata
+        for obj in objs:
+            if not rs.IsText(obj):
+                continue
+
+            # Check if this is a DetailCaption with matching linked_detail_id
+            caption_type = rs.GetUserText(obj, "caption_type")
+            linked_detail = rs.GetUserText(obj, "linked_detail_id")
+
+            if caption_type == "DetailCaption" and linked_detail == detail_id_str:
+                # Found the scale text element with metadata
+                scale_id = obj
+
+                # Get the group(s) this object belongs to
+                groups = rs.ObjectGroups(scale_id)
+                if not groups:
+                    # Metadata exists but no group structure - incomplete caption
+                    continue
+
+                # Get all objects in the first group (should be the DetailCaption group)
+                group_objects = rs.GroupObjects(groups[0])
+                if not group_objects or len(group_objects) < 3:
+                    # Incomplete group structure
+                    continue
+
+                # Identify number, title, and scale text objects
+                # Number text has height 0.6, title has 0.3, scale has 0.15
+                number_id = None
+                title_id = None
+
+                for group_obj in group_objects:
+                    if not rs.IsText(group_obj):
+                        continue
+
+                    # Get text height to identify the element
+                    text_obj = rs.coercerhinoobject(group_obj)
+                    if text_obj and hasattr(text_obj.Geometry, "TextHeight"):
+                        height = text_obj.Geometry.TextHeight
+
+                        # Use tolerance for floating point comparison
+                        if abs(height - 0.6) < 0.01:
+                            number_id = group_obj
+                        elif abs(height - 0.3) < 0.01:
+                            title_id = group_obj
+
+                # Verify we found all three elements
+                if number_id and title_id and scale_id:
+                    return (number_id, title_id, scale_id)
+
+        return None
+
+    @staticmethod
+    def get_caption_title(caption_ids: tuple[object, object, object]) -> str:
+        """
+        Extract title text from caption elements.
+
+        Args:
+            caption_ids: Tuple of (number_id, title_id, scale_id).
+
+        Returns:
+            str: Current title text.
+        """
+        _, title_id, _ = caption_ids
+        return rs.TextObjectText(title_id)
+
+    @staticmethod
+    def count_existing_captions() -> int:
+        """
+        Counts existing Detail Captions on the caption layer.
+
+        Returns:
+            int: Number of Detail Captions found on the caption layer.
+        """
+        objs = rs.ObjectsByLayer(Constants.CAPTION_LAYER)
+        count = 0
+        if objs:
+            for obj in objs:
+                rh_obj = rs.coercerhinoobject(obj)
+                if rh_obj and rs.IsText(rh_obj.Id) and rs.GetUserText(rh_obj.Id, "caption_type") == "DetailCaption":
+                    count += 1
+        return count
+
+    @staticmethod
+    def get_detail_scale(detail_id: object) -> str:
+        """
+        Fetch scale from detail view metadata or live scale ratio.
+
+        Args:
+            detail_id: Detail view GUID.
+
+        Returns:
+            Scale label (e.g., 'SCALE: 1/4" = 1\'-0"') or Constants.SCALE_NA_LABEL.
+        """
+        rh_obj = rs.coercerhinoobject(detail_id)
+        if rh_obj and isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
+            # Try fetching user-stored scale label first
+            scale_text = rh_obj.Attributes.GetUserString("detail_scale")
+            if scale_text:
+                # Normalize smart quotes if necessary
+                scale_text = scale_text.replace(""", '"').replace(""", '"')
+                scale_text = scale_text.replace("'", "'").replace("'", "'")
+                return scale_text.strip()
+
+            # If no user text, fallback to live PageToModelRatio
+            ratio = getattr(rh_obj.DetailGeometry, "PageToModelRatio", None)
+            if ratio and ratio > 0.0:
+                return DetailTools.format_architectural_scale(1.0, 1.0 / ratio)
+
+        return Constants.SCALE_NA_LABEL
+
+    @staticmethod
+    def update_caption_text(
+        caption_ids: tuple[object, object, object],
+        title_text: str,
+        scale_text: str,
+    ) -> None:
+        """
+        Update existing caption title and scale text.
+
+        Args:
+            caption_ids: Tuple of (number_id, title_id, scale_id).
+            title_text: New title text.
+            scale_text: New scale text.
+
+        Raises:
+            ValidationError: If text objects don't exist or are invalid.
+        """
+        _number_id, title_id, scale_id = caption_ids
+
+        # Validate that title and scale objects exist
+        if not rs.IsText(title_id):
+            raise ValidationError(
+                "Title text object not found or invalid",
+                context={"title_id": title_id},
+            )
+
+        if not rs.IsText(scale_id):
+            raise ValidationError(
+                "Scale text object not found or invalid",
+                context={"scale_id": scale_id},
+            )
+
+        # Update title and scale text (number remains unchanged)
+        rs.TextObjectText(title_id, title_text)
+        rs.TextObjectText(scale_id, scale_text)
+
+    @staticmethod
+    def create_caption(detail_id: object, number: int, title: str, scale: str) -> tuple[object, object, object]:
+        """
+        Create new caption with number, title, and scale text.
+
+        Args:
+            detail_id: Detail view GUID.
+            number: Caption number.
+            title: Caption title text.
+            scale: Scale text.
+
+        Returns:
+            Tuple of (number_id, title_id, scale_id) of created text objects.
+
+        Raises:
+            ValidationError: If text creation fails or detail is invalid.
+        """
+        # Get detail bounding box
+        rh_detail = rs.coercerhinoobject(detail_id)
+        if not rh_detail or not isinstance(rh_detail, Rhino.DocObjects.DetailViewObject):
+            raise ValidationError(
+                "Invalid detail view object",
+                context={"detail_id": detail_id},
+            )
+
+        bbox = rh_detail.Geometry.GetBoundingBox(sc.doc.Views.ActiveView.ActiveViewport.ConstructionPlane())
+        center_x = (bbox.Min.X + bbox.Max.X) / 2.0
+        base_y = bbox.Min.Y - 0.15  # Offset below detail
+
+        # Create text objects
+        number_id = rs.AddText(str(number), (0, 0, 0), 0.6)
+        title_id = rs.AddText(title, (0, 0, 0), 0.3)
+        scale_id = rs.AddText(scale, (0, 0, 0), 0.15)
+
+        if not all([number_id, title_id, scale_id]):
+            raise ValidationError("Failed to create one or more caption text elements")
+
+        # Move to caption layer
+        rs.ObjectLayer(number_id, Constants.CAPTION_LAYER)
+        rs.ObjectLayer(title_id, Constants.CAPTION_LAYER)
+        rs.ObjectLayer(scale_id, Constants.CAPTION_LAYER)
+
+        # Position title and scale relative to number
+        bbox_number = rs.BoundingBox(number_id)
+        width_number = bbox_number[1][0] - bbox_number[0][0]
+
+        title_offset = (width_number + 0.1, 0.075, 0)
+        scale_offset = (width_number + 0.1, -(0.15 + 0.075), 0)
+
+        rs.MoveObject(title_id, title_offset)
+        rs.MoveObject(scale_id, scale_offset)
+
+        # Center the group under the detail
+        temp_group = rs.AddGroup()
+        rs.AddObjectsToGroup([number_id, title_id, scale_id], temp_group)
+
+        full_bbox = rs.BoundingBox([number_id, title_id, scale_id])
+        full_center_x = (full_bbox[0][0] + full_bbox[6][0]) / 2.0
+        full_center_y = (full_bbox[0][1] + full_bbox[6][1]) / 2.0
+        caption_height = full_bbox[6][1] - full_bbox[0][1]
+
+        move_vector = (
+            center_x - full_center_x,
+            base_y + (caption_height / 2.0) - full_center_y,
+            0,
+        )
+        rs.MoveObjects([number_id, title_id, scale_id], move_vector)
+
+        rs.DeleteGroup(temp_group)
+
+        # Create final group with metadata
+        group_name = f"DetailCaption_{number}"
+        rs.AddGroup(group_name)
+        rs.AddObjectsToGroup([number_id, title_id, scale_id], group_name)
+
+        # Add metadata to scale text element
+        rs.SetUserText(scale_id, "caption_type", "DetailCaption")
+        rs.SetUserText(scale_id, "linked_detail_id", str(detail_id))
+
+        return (number_id, title_id, scale_id)

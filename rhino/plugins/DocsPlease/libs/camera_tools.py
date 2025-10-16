@@ -352,3 +352,64 @@ class CameraTools:
         rh_obj.CommitViewportChanges()
         rh_obj.CommitChanges()
         sc.doc.Views.Redraw()
+
+    @staticmethod
+    def set_isometric_projection(detail_id: object, iso_type: str) -> None:
+        """Set detail view to isometric projection.
+
+        Uses standard isometric angles: camera at 45° horizontal, 35.264° from horizontal plane.
+        Based on Rhino's standard isometric views (NE/NW/SE/SW).
+
+        Args:
+            detail_id: Detail view object ID.
+            iso_type: "SW Isometric", "SE Isometric", "NE Isometric", or "NW Isometric".
+
+        Raises:
+            CameraError: If detail is invalid or iso_type is not recognized.
+        """
+        rh_obj = rs.coercerhinoobject(detail_id)
+        if not rh_obj or not isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
+            raise CameraError(
+                "Invalid Detail ID or object type provided to set_isometric_projection", context=detail_id
+            )
+
+        vp = rh_obj.Viewport
+
+        mapping = {
+            "SW Isometric": (
+                Rhino.Geometry.Vector3d(-1, -1, 1),
+                Rhino.Geometry.Vector3d(0, 0, 1),
+            ),
+            "SE Isometric": (
+                Rhino.Geometry.Vector3d(1, -1, 1),
+                Rhino.Geometry.Vector3d(0, 0, 1),
+            ),
+            "NE Isometric": (
+                Rhino.Geometry.Vector3d(1, 1, 1),
+                Rhino.Geometry.Vector3d(0, 0, 1),
+            ),
+            "NW Isometric": (
+                Rhino.Geometry.Vector3d(-1, 1, 1),
+                Rhino.Geometry.Vector3d(0, 0, 1),
+            ),
+        }
+
+        if iso_type not in mapping:
+            raise CameraError(
+                f"Invalid isometric type: '{iso_type}'. Must be one of: {', '.join(mapping.keys())}",
+                context={"detail_id": detail_id, "iso_type": iso_type},
+            )
+
+        direction, up = mapping[iso_type]
+        direction.Unitize()
+        location = vp.CameraLocation
+        target = location + direction
+
+        vp.ChangeToParallelProjection(True)
+        vp.SetCameraDirection(direction, True)
+        vp.CameraUp = up
+        vp.SetCameraTarget(target, True)
+
+        rh_obj.CommitViewportChanges()
+        rh_obj.CommitChanges()
+        sc.doc.Views.Redraw()

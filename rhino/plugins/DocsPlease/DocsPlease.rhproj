@@ -1,11 +1,11 @@
 {
   "host": {
     "name": "Rhino3D",
-    "version": "8.23.25251\u002B13002",
+    "version": "8.24.25281\u002B15002",
     "os": "macOS",
     "arch": "arm64"
   },
-  "id": "8ba237a6-de03-4293-a6b7-b18ed6ccb813",
+  "id": "759b7de6-d4ee-41c7-9d05-c0994a0563cd",
   "identity": {
     "name": "DocsPlease",
     "version": "0.1",
@@ -30,7 +30,7 @@
   },
   "codes": [
     {
-      "id": "9e80731a-c969-449e-af50-ab8875f53468",
+      "id": "355fba4b-8b01-4815-b192-8e029eb92b7c",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -39,7 +39,7 @@
       "uri": "commands/AlignDetailViews.py"
     },
     {
-      "id": "8e026313-46c2-4155-80f9-7805055e6b3c",
+      "id": "1d9dec11-d1de-43ef-9821-42e2c002ebcd",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -48,7 +48,7 @@
       "uri": "commands/CenterDetailView.py"
     },
     {
-      "id": "255258cb-f12a-46e9-94d2-178d946c8964",
+      "id": "d2bed202-7b37-4cf0-a1a2-c3de87a76f4d",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -57,16 +57,7 @@
       "uri": "commands/DetailCaption.py"
     },
     {
-      "id": "f3e3dac8-7502-482e-bb45-ddaee3f6b05f",
-      "language": {
-        "id": "mcneel.pythonnet.python",
-        "version": "3.9.10"
-      },
-      "title": "EditPageScale",
-      "uri": "commands/EditPageScale.py"
-    },
-    {
-      "id": "cda8c88b-f5c4-447d-a0f3-603d3113e21f",
+      "id": "6c90774d-e0a2-4b65-8eae-1a962a8fff4a",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -75,16 +66,7 @@
       "uri": "commands/InspectDetailCamera.py"
     },
     {
-      "id": "800762da-1d40-4051-9c1e-7e526a8043e0",
-      "language": {
-        "id": "mcneel.pythonnet.python",
-        "version": "3.9.10"
-      },
-      "title": "LayoutPageManager",
-      "uri": "commands/LayoutPageManager.py"
-    },
-    {
-      "id": "0da630ba-da5a-4039-9a75-1b0923b35965",
+      "id": "c1270724-2a2e-49be-9b33-8262136c56a5",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -93,7 +75,16 @@
       "uri": "commands/OrthoDetailFromDetail.py"
     },
     {
-      "id": "5424cbe2-78ac-4941-a5e2-df075cc85624",
+      "id": "06c33ebd-15a8-43b9-ae26-e8fe77ca8ce0",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "ProjectManager",
+      "uri": "commands/ProjectManager.py"
+    },
+    {
+      "id": "fadf069b-0a3b-4968-94dc-289c7d8642ec",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
@@ -102,31 +93,13 @@
       "uri": "commands/QuickDetail.py"
     },
     {
-      "id": "9c839083-0d08-43a3-a7e7-3b59824113f8",
+      "id": "565552f2-8bc2-46fb-82eb-aa1152bc1d06",
       "language": {
         "id": "mcneel.pythonnet.python",
         "version": "3.9.10"
       },
-      "title": "RefreshDetailCaptions",
-      "uri": "commands/RefreshDetailCaptions.py"
-    },
-    {
-      "id": "7ab5ae46-942a-4794-8113-92d943f109c6",
-      "language": {
-        "id": "mcneel.pythonnet.python",
-        "version": "3.9.10"
-      },
-      "title": "SetArchitecturalDetailScale",
-      "uri": "commands/SetArchitecturalDetailScale.py"
-    },
-    {
-      "id": "32f758d5-8dac-4c46-a639-bf99d663dc24",
-      "language": {
-        "id": "mcneel.pythonnet.python",
-        "version": "3.9.10"
-      },
-      "title": "SetEngineeringDetailScale",
-      "uri": "commands/SetEngineeringDetailScale.py"
+      "title": "SetScale",
+      "uri": "commands/SetScale.py"
     }
   ],
   "libraries": [

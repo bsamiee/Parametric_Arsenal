@@ -14,9 +14,10 @@ inherit from DocsPluginError and support optional context information for debugg
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Optional
+from typing import Any
 
 
+# --- Base Exception -------------------------------------------------------
 class DocsPluginError(Exception, ABC):
     """Base exception for all DocsPlease plugin errors.
 
@@ -31,7 +32,7 @@ class DocsPluginError(Exception, ABC):
         >>> raise DocsPluginError("Operation failed", context={"id": detail_id})
     """
 
-    def __init__(self, message: str, context: Optional[Any] = None) -> None:
+    def __init__(self, message: str, context: Any | None = None) -> None:
         """Initialize plugin error with message and optional context.
 
         Args:
@@ -48,6 +49,7 @@ class DocsPluginError(Exception, ABC):
         return self.message
 
 
+# --- Validation Exceptions ------------------------------------------------
 class ValidationError(DocsPluginError):
     """Raised when validation fails.
 
@@ -86,6 +88,7 @@ class DetailError(ValidationError):
     """
 
 
+# --- Operation Exceptions -------------------------------------------------
 class UserCancelledError(DocsPluginError):
     """Raised when user cancels an operation.
 
@@ -100,7 +103,7 @@ class UserCancelledError(DocsPluginError):
     """
 
 
-class EnvironmentError(ValidationError):
+class EnvironmentError(ValidationError):  # noqa: A001
     """Raised when environment prerequisites are not met.
 
     This exception is raised when the Rhino environment doesn't meet
@@ -151,4 +154,19 @@ class TransformError(DocsPluginError):
         ...     raise TransformError("Failed to move object", context={"id": obj_id, "vector": vector})
         >>> if not calculate_valid_vector(pt1, pt2):
         ...     raise TransformError("Invalid transformation vector")
+    """
+
+
+class ProjectConfigError(ValidationError):
+    """Raised when project configuration operations fail.
+
+    This exception is raised when project-level configuration validation
+    fails, configuration is missing, or configuration operations encounter
+    errors.
+
+    Example:
+        >>> if not project_name:
+        ...     raise ProjectConfigError("Project name is required")
+        >>> if not validate_project_config():
+        ...     raise ProjectConfigError("Project configuration not found")
     """

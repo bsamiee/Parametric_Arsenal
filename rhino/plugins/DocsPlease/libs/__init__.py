@@ -38,12 +38,14 @@ from .exceptions import (
     DocsPluginError,
     EnvironmentError,
     LayoutError,
+    ProjectConfigError,
     ScaleError,
     TransformError,
     UserCancelledError,
     ValidationError,
 )
 from .layout_tools import LayoutTools
+from .project_config_tools import ProjectConfigTools
 
 
 __all__ = [
@@ -59,6 +61,7 @@ __all__ = [
     "DetailTools",
     "LayoutTools",
     "Metadata",
+    "ProjectConfigTools",
     "Strings",
     # Command framework
     "rhino_command",
@@ -78,6 +81,7 @@ __all__ = [
     "DocsPluginError",
     "EnvironmentError",
     "LayoutError",
+    "ProjectConfigError",
     "ScaleError",
     "TransformError",
     "UserCancelledError",
