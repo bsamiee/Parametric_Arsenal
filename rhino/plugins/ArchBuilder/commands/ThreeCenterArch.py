@@ -13,11 +13,12 @@ Command for creating three-center (basket-handle) arches.
 
 from __future__ import annotations
 
+import importlib
+import pathlib
+import sys
 from typing import Any
 
 import Rhino.Geometry as rg
-import Rhino.Input as ri
-import Rhino.Input.Custom as ric
 from libs import (
     ArchBuilderUtils,
     ArchCommandBase,
@@ -25,15 +26,24 @@ from libs import (
     ArchSpec,
     ProfileSelection,
     ThreeCenterArchOptions,
+    specs,
 )
 from libs.geometry import ProfileSegments, three_center_profile
 
 import Rhino
 
 
+_script_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+_plugin_root = pathlib.Path(_script_dir).parent
+if _plugin_root not in sys.path:
+    sys.path.insert(0, _plugin_root)
+
+importlib.reload(specs)  # Force reload to ensure updated classes are recognized
+
+
 # --- Three-Center Command Class -------------------------------------------
 class ThreeCenterArchCommand(ArchCommandBase):
-    """Three-center arch command with shoulder position control."""
+    """Three-center arch command using traditional geometric proportions."""
 
     options_type = ThreeCenterArchOptions
 
@@ -41,27 +51,8 @@ class ThreeCenterArchCommand(ArchCommandBase):
         super().__init__(ArchFamily.THREE_CENTER, self.build_three_center)
 
     def collect_parameters(self, profile: ProfileSelection) -> dict[str, Any] | None:
-        """Prompt for the shoulder ratio that shapes the side arcs."""
-        defaults = self.options_type()
-
-        go = ric.GetOption()
-        go.SetCommandPrompt("Three-center arch parameters")
-        go.AcceptNothing(True)
-
-        opt_shoulder = ric.OptionDouble(defaults.shoulder_ratio, 0.15, 0.45)
-        go.AddOptionDouble("ShoulderRatio", opt_shoulder)
-
-        while True:
-            result = go.Get()
-            if result == ri.GetResult.Cancel:
-                return None
-            if result == ri.GetResult.Nothing:
-                break
-            if result == ri.GetResult.Option:
-                continue
-            break
-
-        options = self.options_type(shoulder_ratio=opt_shoulder.CurrentValue)
+        """Calculate traditional three-center arch proportions from geometry."""
+        options = self.options_type.from_geometry(profile.span, profile.rise)
         return options.to_metadata()
 
     def build_three_center(self, spec: ArchSpec) -> rg.Curve:

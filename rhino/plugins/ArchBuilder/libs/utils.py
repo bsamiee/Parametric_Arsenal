@@ -108,7 +108,7 @@ class ArchBuilderUtils:
         tolerance: float,
     ) -> rg.Curve:
         """Join segments with a straight baseline between the provided endpoints."""
-        baseline = rg.LineCurve(end, start)
+        baseline = rg.LineCurve(start, end)
         collection = list(curve_segments)
         collection.append(baseline)
         return ArchBuilderUtils.join_curves(collection, tolerance)

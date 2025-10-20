@@ -169,37 +169,62 @@ class EmptyArchOptions(ArchCommandOptions):
 
 @dataclass(frozen=True)
 class ThreeCenterArchOptions(ArchCommandOptions):
-    """User-configurable parameters for three-center arches."""
+    """Traditional geometric parameters for three-center arches."""
 
     shoulder_ratio: float = 0.25
+
+    @classmethod
+    def from_geometry(cls, span: float, rise: float) -> ThreeCenterArchOptions:
+        """Calculate traditional three-center arch proportions from span and rise."""
+        return cls(shoulder_ratio=0.25)
 
 
 @dataclass(frozen=True)
 class FourCenterArchOptions(ArchCommandOptions):
-    """User-configurable parameters for four-center arches."""
+    """Traditional geometric parameters for four-center arches."""
 
-    shoulder_ratio: float = 0.3
-    shoulder_height_ratio: float = 0.5
+    shoulder_ratio: float = 0.25
+    shoulder_height_ratio: float = 0.66
+
+    @classmethod
+    def from_geometry(cls, span: float, rise: float) -> FourCenterArchOptions:
+        """Calculate traditional four-center arch proportions from span and rise."""
+        return cls(shoulder_ratio=0.25, shoulder_height_ratio=0.66)
 
 
 @dataclass(frozen=True)
 class OgeeArchOptions(ArchCommandOptions):
-    """User-configurable parameters for ogee arches."""
+    """Traditional geometric parameters for ogee arches."""
 
-    inflection_height: float = 0.4
+    inflection_height: float = 0.5
     curve_strength: float = 0.5
+
+    @classmethod
+    def from_geometry(cls, span: float, rise: float) -> OgeeArchOptions:
+        """Calculate traditional ogee arch proportions from span and rise."""
+        return cls(inflection_height=0.5, curve_strength=0.5)
 
 
 @dataclass(frozen=True)
 class HorseshoeArchOptions(ArchCommandOptions):
-    """User-configurable parameters for horseshoe arches."""
+    """Traditional geometric parameters for horseshoe arches."""
 
-    extension_degrees: float = 240.0
+    extension_degrees: float = 225.0
+
+    @classmethod
+    def from_geometry(cls, span: float, rise: float) -> HorseshoeArchOptions:
+        """Calculate traditional horseshoe arch proportions from span and rise."""
+        return cls(extension_degrees=225.0)
 
 
 @dataclass(frozen=True)
 class MultifoilArchOptions(ArchCommandOptions):
-    """User-configurable parameters for multifoil arches."""
+    """Traditional geometric parameters for multifoil arches."""
 
     lobes: int = 5
-    lobe_size: float = 0.7
+    lobe_size: float = 0.3
+
+    @classmethod
+    def from_geometry(cls, span: float, rise: float) -> MultifoilArchOptions:
+        """Calculate traditional multifoil arch proportions from span and rise."""
+        return cls(lobes=5, lobe_size=0.3)

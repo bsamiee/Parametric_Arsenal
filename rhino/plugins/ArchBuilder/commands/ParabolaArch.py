@@ -13,6 +13,8 @@ Command for creating parabolic arches.
 
 from __future__ import annotations
 
+import pathlib
+import sys
 from typing import Any
 
 import Rhino.Geometry as rg
@@ -27,6 +29,12 @@ from libs import (
 from libs.geometry import ProfileSegments, parabola_profile
 
 import Rhino
+
+
+_script_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+_plugin_root = pathlib.Path(_script_dir).parent
+if _plugin_root not in sys.path:
+    sys.path.insert(0, _plugin_root)
 
 
 # --- Command Implementation -------------------------------------------------

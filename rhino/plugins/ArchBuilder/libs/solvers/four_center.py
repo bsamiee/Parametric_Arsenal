@@ -19,7 +19,7 @@ from ..geometry.math_utils import clamp
 from ..geometry.parameters import FourCenterParameters
 
 
-def solve_four_center_parameters(
+def solve_four_center_parameters(  # noqa: PLR0912, PLR0915
     span: float,
     rise: float,
     *,
@@ -91,7 +91,14 @@ def solve_four_center_parameters(
 
     # From tangency constraint: d - x_t = -(x_t - c) * (y_t - h2) / y_t
     # Let k = (x_t - c) / y_t (slope of lower radius at shoulder)
+    if abs(y_t) <= tolerance:
+        raise ValueError("Shoulder height too close to baseline for four-center arch.")
+
     k = (x_t - c) / y_t
+
+    # Validate shoulder ratio constraints
+    if abs(k) > 10.0:  # Prevent extreme slopes
+        raise ValueError("Shoulder position creates extreme geometry for four-center arch.")
 
     # Substituting into apex distance constraint and solving for h2:
     # This yields a quadratic equation in h2
@@ -100,8 +107,36 @@ def solve_four_center_parameters(
     c_coef = rise * rise + x_t * x_t - (x_t + k * y_t) ** 2
 
     discriminant = b_coef * b_coef - 4.0 * a_coef * c_coef
+
+    # Handle negative discriminant by adjusting shoulder height
     if discriminant < -tolerance:
-        raise ValueError("No valid upper center solution exists.")
+        # Adjust shoulder height to make geometry feasible
+        # Reduce shoulder height ratio to create valid tangency conditions
+        original_sh = sh
+        max_attempts = 5
+        attempt = 0
+
+        while discriminant < -tolerance and attempt < max_attempts:
+            attempt += 1
+            # Reduce shoulder height by 10% each attempt
+            sh = original_sh * (1.0 - 0.1 * attempt)
+            sh = max(sh, 0.2)  # Don't go below minimum
+
+            # Recalculate with adjusted shoulder height
+            y_t = rise * sh
+            k = (x_t - c) / y_t
+
+            # Recalculate quadratic coefficients
+            a_coef = 1.0 + k * k
+            b_coef = -2.0 * rise + 2.0 * k * x_t
+            c_coef = rise * rise + x_t * x_t - (x_t + k * y_t) ** 2
+            discriminant = b_coef * b_coef - 4.0 * a_coef * c_coef
+
+        if discriminant < -tolerance:
+            raise ValueError(
+                f"Four-center arch geometry not feasible with span={span:.2f}, rise={rise:.2f}. "
+                f"Try reducing shoulder height ratio below {original_sh:.2f} or increasing rise/span ratio."
+            )
 
     discriminant = max(0.0, discriminant)  # Handle numerical errors
 
@@ -109,10 +144,18 @@ def solve_four_center_parameters(
     h2_1 = (-b_coef + math.sqrt(discriminant)) / (2.0 * a_coef)
     h2_2 = (-b_coef - math.sqrt(discriminant)) / (2.0 * a_coef)
 
-    h2 = h2_1 if h2_1 > y_t else h2_2
+    # Select the solution that gives a valid geometry
+    h2 = None
+    for candidate in [h2_1, h2_2]:
+        if candidate > y_t + tolerance and candidate < rise * 2.0:  # Reasonable bounds
+            h2 = candidate
+            break
 
-    if h2 <= y_t + tolerance:
-        raise ValueError("Upper center must lie above the shoulder point.")
+    if h2 is None:
+        # Fallback: use the higher solution if both are problematic
+        h2 = max(h2_1, h2_2)
+        if h2 <= y_t + tolerance:
+            raise ValueError("Unable to find valid upper center position for four-center arch.")
 
     # Calculate d from tangency constraint
     d = x_t - k * (y_t - h2)

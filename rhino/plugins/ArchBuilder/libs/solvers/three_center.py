@@ -47,6 +47,7 @@ def solve_three_center_parameters(  # noqa: PLR0912, PLR0915
 
     half_span = span * 0.5
     x_t = half_span * clamp(shoulder_ratio, 0.15, 0.45)
+    y_t = rise * 0.5
 
     def slope_difference(y_t: float) -> float:
         if y_t <= tolerance or y_t >= rise - tolerance:
@@ -72,40 +73,79 @@ def solve_three_center_parameters(  # noqa: PLR0912, PLR0915
         slope_side = (x_t - d) / y_t
         return slope_central - slope_side
 
-    y_min = max(tolerance * 10.0, rise * 0.1)
-    y_max = min(rise - tolerance * 10.0, rise * 0.9)
-    samples = 96
+    # Expand search bounds for better coverage
+    y_min = max(tolerance * 5.0, rise * 0.05)
+    y_max = min(rise - tolerance * 5.0, rise * 0.95)
+    samples = 128
     prev_y = y_min
     prev_val = slope_difference(prev_y)
     root_interval: tuple[float, float] | None = None
+    best_y, best_val = prev_y, abs(prev_val) if math.isfinite(prev_val) else math.inf
+
     for i in range(1, samples + 1):
         y = y_min + (y_max - y_min) * (i / samples)
         val = slope_difference(y)
         if math.isfinite(prev_val) and math.isfinite(val) and prev_val * val <= 0:
             root_interval = (prev_y, y)
             break
-        if abs(val) < abs(prev_val):
-            prev_y, prev_val = y, val
-    if root_interval is None:
-        raise ValueError("Unable to determine tangency height for three-center arch.")
+        if math.isfinite(val) and abs(val) < best_val:
+            best_y, best_val = y, abs(val)
+        prev_y, prev_val = y, val
 
-    low, high = root_interval
-    f_low = slope_difference(low)
-    _ = slope_difference(high)  # Initial f_high not used in bisection
-    y_t = 0.5 * (low + high)
-    for _ in range(64):
-        mid = 0.5 * (low + high)
-        f_mid = slope_difference(mid)
-        if not math.isfinite(f_mid):
-            break
-        if abs(f_mid) <= tolerance:
-            y_t = mid
-            break
-        if f_low * f_mid <= 0:
-            high = mid  # Update high bound only
+    # Use best approximation if no exact root interval found
+    if root_interval is None:
+        if best_val < tolerance * 100:  # Accept reasonable approximation
+            y_t = best_y
         else:
-            low, f_low = mid, f_mid
-        y_t = 0.5 * (low + high)
+            # Try expanded search bounds
+            y_min_expanded = max(tolerance, rise * 0.01)
+            y_max_expanded = min(rise - tolerance, rise * 0.99)
+            samples_expanded = 256
+
+            for i in range(1, samples_expanded + 1):
+                y = y_min_expanded + (y_max_expanded - y_min_expanded) * (i / samples_expanded)
+                val = slope_difference(y)
+                if math.isfinite(val) and abs(val) < best_val:
+                    best_y, best_val = y, abs(val)
+
+            # Accept expanded search result if reasonable
+            if best_val < tolerance * 500:  # More relaxed tolerance
+                y_t = best_y
+            else:
+                raise ValueError(
+                    f"Three-center arch geometry not feasible with span={span:.2f}, rise={rise:.2f}, "
+                    f"shoulder_ratio={shoulder_ratio:.2f}. Try different rise/span ratio (0.3-0.5 recommended) "
+                    f"or shoulder ratio (0.2-0.4 recommended)."
+                )
+
+    # Perform bisection if root interval was found
+    if root_interval is not None:
+        low, high = root_interval
+        f_low = slope_difference(low)
+        f_high = slope_difference(high)
+
+        # Ensure we have valid bounds
+        if not (math.isfinite(f_low) and math.isfinite(f_high)):
+            y_t = best_y  # Fallback to best approximation
+        else:
+            y_t = 0.5 * (low + high)
+            for _ in range(64):
+                mid = 0.5 * (low + high)
+                f_mid = slope_difference(mid)
+                if not math.isfinite(f_mid):
+                    break
+                if abs(f_mid) <= tolerance:
+                    y_t = mid
+                    break
+                if f_low * f_mid <= 0:
+                    high, f_high = mid, f_mid
+                else:
+                    low, f_low = mid, f_mid
+                y_t = 0.5 * (low + high)
+
+                # Safety check for convergence
+                if abs(high - low) < tolerance:
+                    break
 
     numerator = x_t * x_t + y_t * y_t - rise * rise
     denominator = 2.0 * (y_t - rise)

@@ -39,6 +39,21 @@ from ..specs import (
 from .curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
 
 
+# --- Vector Angle Helper --------------------------------------------------
+def calculate_vector_angle(v1: rg.Vector3d, v2: rg.Vector3d) -> float:
+    """Calculate angle between two vectors using correct Rhino 8 API."""
+    v1_unit = rg.Vector3d(v1)
+    v2_unit = rg.Vector3d(v2)
+    v1_unit.Unitize()
+    v2_unit.Unitize()
+
+    # Calculate dot product and clamp to prevent domain errors
+    dot = v1_unit * v2_unit
+    dot = max(-1.0, min(1.0, dot))
+
+    return math.acos(dot)
+
+
 # --- Profile Result Container ---------------------------------------------
 @dataclass(frozen=True)
 class ProfileSegments:
@@ -188,7 +203,7 @@ def three_center_profile(
         # Log warning but continue
         print(
             f"Warning: Left junction tangency not achieved "
-            f"(angle: {left_tangent_vec.VectorAngle(central_left_tangent_vec)} rad)"
+            f"(angle: {calculate_vector_angle(left_tangent_vec, central_left_tangent_vec):.6f} rad)"
         )
 
     # Verify tangency at right junction point
@@ -198,7 +213,7 @@ def three_center_profile(
         # Log warning but continue
         print(
             f"Warning: Right junction tangency not achieved "
-            f"(angle: {central_right_tangent_vec.VectorAngle(right_tangent_vec)} rad)"
+            f"(angle: {calculate_vector_angle(central_right_tangent_vec, right_tangent_vec):.6f} rad)"
         )
 
     return ProfileSegments([left_lower, central_arc, right_lower], left_base, right_base)
@@ -250,7 +265,7 @@ def four_center_profile(
         # Log warning but continue - the mathematical solver should have ensured tangency
         print(
             f"Warning: Left shoulder tangency not achieved "
-            f"(angle: {left_lower_tangent.VectorAngle(left_upper_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(left_lower_tangent, left_upper_tangent):.6f} rad)"
         )
 
     # Verify tangency at right shoulder point
@@ -260,7 +275,7 @@ def four_center_profile(
         # Log warning but continue
         print(
             f"Warning: Right shoulder tangency not achieved "
-            f"(angle: {right_upper_tangent.VectorAngle(right_lower_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(right_upper_tangent, right_lower_tangent):.6f} rad)"
         )
 
     # Verify tangency at apex, tangents should be opposite at apex (anti-parallel is correct)
@@ -271,7 +286,7 @@ def four_center_profile(
     elif left_upper_apex_tangent.IsParallelTo(right_upper_apex_tangent, tolerance) != 1:
         print(
             f"Warning: Apex tangency not achieved "
-            f"(angle: {left_upper_apex_tangent.VectorAngle(right_upper_apex_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(left_upper_apex_tangent, right_upper_apex_tangent):.6f} rad)"
         )
 
     return ProfileSegments(
@@ -325,7 +340,7 @@ def ogee_profile(
         # Log warning but continue - the solver should have ensured tangency
         print(
             f"Warning: Left inflection tangency not achieved "
-            f"(angle: {left_lower_tangent.VectorAngle(left_upper_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(left_lower_tangent, left_upper_tangent):.6f} rad)"
         )
 
     # Verify tangency at right inflection point
@@ -335,7 +350,7 @@ def ogee_profile(
         # Log warning but continue
         print(
             f"Warning: Right inflection tangency not achieved "
-            f"(angle: {right_upper_tangent.VectorAngle(right_lower_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(right_upper_tangent, right_lower_tangent):.6f} rad)"
         )
 
     # Verify tangency at apex (should be anti-parallel as curves meet from opposite sides)
@@ -346,7 +361,7 @@ def ogee_profile(
     elif left_apex_tangent.IsParallelTo(right_apex_tangent, tolerance) != 1:
         print(
             f"Warning: Apex tangency not achieved "
-            f"(angle: {left_apex_tangent.VectorAngle(right_apex_tangent)} rad)"
+            f"(angle: {calculate_vector_angle(left_apex_tangent, right_apex_tangent):.6f} rad)"
         )
 
     curves = [left_lower, left_upper, right_upper, right_lower]
@@ -383,7 +398,7 @@ def multifoil_profile(
     options: MultifoilArchOptions,
     tolerance: float,
 ) -> ProfileSegments:
-    """Build a multifoil arch profile."""
+    """Build a multifoil arch profile with proper cusped geometry."""
     params = solve_multifoil_parameters(
         half_span=half_span,
         rise=rise,
@@ -392,13 +407,24 @@ def multifoil_profile(
         tolerance=tolerance,
     )
 
+    # Create individual foil arcs that form the cusped profile
     curves: list[rg.Curve] = []
+
     for foil_arc in params.foil_arcs:
         foil_center = rg.Point3d(foil_arc.center_x, foil_arc.center_y, 0.0)
-        plane = rg.Plane(foil_center, rg.Vector3d.XAxis, rg.Vector3d.YAxis)
-        circle = rg.Circle(plane, foil_arc.radius)
-        arc = rg.Arc(circle, rg.Interval(foil_arc.angle_start, foil_arc.angle_end))
-        curves.append(rg.ArcCurve(arc))
+        foil_plane = rg.Plane(foil_center, rg.Vector3d.XAxis, rg.Vector3d.YAxis)
+        foil_circle = rg.Circle(foil_plane, foil_arc.radius)
+
+        # Create the cusped foil arc
+        foil_arc_geom = rg.Arc(foil_circle, rg.Interval(foil_arc.angle_start, foil_arc.angle_end))
+        curves.append(rg.ArcCurve(foil_arc_geom))
+
+    # Join all foil arcs into a continuous curve if possible
+    if len(curves) > 1:
+        tolerance_join = tolerance * 10  # More relaxed tolerance for joining
+        joined_curves = rg.Curve.JoinCurves(curves, tolerance_join)
+        if joined_curves and len(joined_curves) > 0:
+            curves = [joined_curves[0]]  # Use the first joined result
 
     left_base = rg.Point3d(-half_span, 0.0, 0.0)
     right_base = rg.Point3d(half_span, 0.0, 0.0)

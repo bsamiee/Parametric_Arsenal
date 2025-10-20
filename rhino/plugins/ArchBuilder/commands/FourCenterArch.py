@@ -13,11 +13,12 @@ Command for creating four-center (depressed) arches.
 
 from __future__ import annotations
 
+import importlib
+import pathlib
+import sys
 from typing import Any
 
 import Rhino.Geometry as rg
-import Rhino.Input as ri
-import Rhino.Input.Custom as ric
 from libs import (
     ArchBuilderUtils,
     ArchCommandBase,
@@ -25,15 +26,24 @@ from libs import (
     ArchSpec,
     FourCenterArchOptions,
     ProfileSelection,
+    specs,
 )
 from libs.geometry import ProfileSegments, four_center_profile
 
 import Rhino
 
 
+_script_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+_plugin_root = pathlib.Path(_script_dir).parent
+if _plugin_root not in sys.path:
+    sys.path.insert(0, _plugin_root)
+
+importlib.reload(specs)  # Force reload to ensure updated classes are recognized
+
+
 # --- Four-Center Command Class --------------------------------------------
 class FourCenterArchCommand(ArchCommandBase):
-    """Four-center arch command with customizable parameters."""
+    """Four-center arch command using traditional geometric proportions."""
 
     options_type = FourCenterArchOptions
 
@@ -41,33 +51,8 @@ class FourCenterArchCommand(ArchCommandBase):
         super().__init__(ArchFamily.FOUR_CENTER, self.build_four_center)
 
     def collect_parameters(self, profile: ProfileSelection) -> dict[str, Any] | None:
-        """Prompt for shoulder ratios that shape the depressed profile."""
-        defaults = self.options_type()
-
-        go = ric.GetOption()
-        go.SetCommandPrompt("Four-center arch parameters")
-        go.AcceptNothing(True)
-
-        opt_shoulder = ric.OptionDouble(defaults.shoulder_ratio, 0.05, 0.95)
-        opt_height = ric.OptionDouble(defaults.shoulder_height_ratio, 0.2, 0.95)
-
-        go.AddOptionDouble("ShoulderRatio", opt_shoulder)
-        go.AddOptionDouble("ShoulderHeight", opt_height)
-
-        while True:
-            result = go.Get()
-            if result == ri.GetResult.Cancel:
-                return None
-            if result == ri.GetResult.Nothing:
-                break
-            if result == ri.GetResult.Option:
-                continue
-            break
-
-        options = self.options_type(
-            shoulder_ratio=opt_shoulder.CurrentValue,
-            shoulder_height_ratio=opt_height.CurrentValue,
-        )
+        """Calculate traditional four-center arch proportions from geometry."""
+        options = self.options_type.from_geometry(profile.span, profile.rise)
         return options.to_metadata()
 
     def build_four_center(self, spec: ArchSpec) -> rg.Curve:

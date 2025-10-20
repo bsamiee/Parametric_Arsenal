@@ -1,0 +1,144 @@
+{
+  "host": {
+    "name": "Rhino3D",
+    "version": "8.24.25281\u002B15002",
+    "os": "macOS",
+    "arch": "arm64"
+  },
+  "id": "e62ec9bc-18ae-48f2-a4e4-acfdfbc5b57d",
+  "identity": {
+    "name": "ArchBuilder",
+    "version": "0.1",
+    "publisher": {
+      "email": "b.samiee93@gmail.com",
+      "name": "Bardia Samiee"
+    }
+  },
+  "settings": {
+    "buildPath": "build/",
+    "buildTarget": {
+      "host": {
+        "name": "Rhino3D",
+        "version": "8"
+      },
+      "title": "Rhino3D (8.*)",
+      "slug": "rh8"
+    },
+    "publishTarget": {
+      "title": "McNeel Yak Server"
+    }
+  },
+  "codes": [
+    {
+      "id": "7e7311d3-aae6-49f2-9d0f-9a300ffa6b99",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "CatenaryArch",
+      "uri": "commands/CatenaryArch.py"
+    },
+    {
+      "id": "ab3a79ea-184e-4207-9876-098fae40f283",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "CircularArch",
+      "uri": "commands/CircularArch.py"
+    },
+    {
+      "id": "0b897962-8a64-4d49-a1f3-f5cb85d79764",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "EllipseArch",
+      "uri": "commands/EllipseArch.py"
+    },
+    {
+      "id": "6af75625-9067-472f-8b2b-901a9f851527",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "FourCenterArch",
+      "uri": "commands/FourCenterArch.py"
+    },
+    {
+      "id": "08a9fce9-4b90-42db-bd7d-e9d46e556d24",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "HorseshoeArch",
+      "uri": "commands/HorseshoeArch.py"
+    },
+    {
+      "id": "7dd0a602-569a-434b-aa65-99ff8c19083d",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "MultifoilArch",
+      "uri": "commands/MultifoilArch.py"
+    },
+    {
+      "id": "1ba70c98-2b09-4311-b9f8-91b5751525fc",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "OgeeArch",
+      "uri": "commands/OgeeArch.py"
+    },
+    {
+      "id": "b9bd8fcc-8f4c-43f9-8031-3e04cef61673",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "ParabolaArch",
+      "uri": "commands/ParabolaArch.py"
+    },
+    {
+      "id": "e964d8d5-e087-48d0-b304-8aa9831bf26d",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "SemicircleArch",
+      "uri": "commands/SemicircleArch.py"
+    },
+    {
+      "id": "362987ea-df92-43f7-8c15-42a45b5c74e1",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "ThreeCenterArch",
+      "uri": "commands/ThreeCenterArch.py"
+    },
+    {
+      "id": "1f876682-b316-4a5c-95c4-fdd3a6a72361",
+      "language": {
+        "id": "mcneel.pythonnet.python",
+        "version": "3.9.10"
+      },
+      "title": "TwoCenterArch",
+      "uri": "commands/TwoCenterArch.py"
+    }
+  ],
+  "libraries": [
+    {
+      "type": "uri",
+      "library": {
+        "base": "libs/",
+        "language": {
+          "id": "*.*.python",
+          "version": "3.*.*"
+        }
+      }
+    }
+  ]
+}

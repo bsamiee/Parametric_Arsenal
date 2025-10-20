@@ -13,11 +13,12 @@ Command for creating horseshoe arches with direct geometric control.
 
 from __future__ import annotations
 
+import importlib
+import pathlib
+import sys
 from typing import Any
 
 import Rhino.Geometry as rg
-import Rhino.Input as ri
-import Rhino.Input.Custom as ric
 from libs import (
     ArchBuilderUtils,
     ArchCommandBase,
@@ -25,15 +26,24 @@ from libs import (
     ArchSpec,
     HorseshoeArchOptions,
     ProfileSelection,
+    specs,
 )
 from libs.geometry import ProfileSegments, horseshoe_profile
 
 import Rhino
 
 
+_script_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
+_plugin_root = pathlib.Path(_script_dir).parent
+if _plugin_root not in sys.path:
+    sys.path.insert(0, _plugin_root)
+
+importlib.reload(specs)  # Force reload to ensure updated classes are recognized
+
+
 # --- Horseshoe Command Class ----------------------------------------------
 class HorseshoeArchCommand(ArchCommandBase):
-    """Horseshoe arch command with circular extension control."""
+    """Horseshoe arch command using traditional geometric proportions."""
 
     options_type = HorseshoeArchOptions
 
@@ -41,27 +51,8 @@ class HorseshoeArchCommand(ArchCommandBase):
         super().__init__(ArchFamily.HORSESHOE, self.build_horseshoe)
 
     def collect_parameters(self, profile: ProfileSelection) -> dict[str, Any] | None:
-        """Prompt for the sweep angle that defines how far the arc extends."""
-        defaults = self.options_type()
-
-        go = ric.GetOption()
-        go.SetCommandPrompt("Horseshoe arch parameters")
-        go.AcceptNothing(True)
-
-        opt_extension = ric.OptionDouble(defaults.extension_degrees, 200.0, 270.0)
-        go.AddOptionDouble("ExtensionDegrees", opt_extension)
-
-        while True:
-            result = go.Get()
-            if result == ri.GetResult.Cancel:
-                return None
-            if result == ri.GetResult.Nothing:
-                break
-            if result == ri.GetResult.Option:
-                continue
-            break
-
-        options = self.options_type(extension_degrees=opt_extension.CurrentValue)
+        """Calculate traditional horseshoe arch proportions from geometry."""
+        options = self.options_type.from_geometry(profile.span, profile.rise)
         return options.to_metadata()
 
     def build_horseshoe(self, spec: ArchSpec) -> rg.Curve:

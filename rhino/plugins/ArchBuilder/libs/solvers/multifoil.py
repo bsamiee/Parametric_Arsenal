@@ -83,15 +83,17 @@ def solve_multifoil_parameters(
             end_pt_x = main_center_x + main_radius * math.cos(end_angle)
             end_pt_y = main_center_y + main_radius * math.sin(end_angle)
 
-        # Foil center at midpoint on main arc
+        # Foil center positioned inside main arc to create inward cusps
         foil_center_angle = (start_angle + end_angle) / 2
-        foil_center_x = main_center_x + main_radius * math.cos(foil_center_angle)
-        foil_center_y = main_center_y + main_radius * math.sin(foil_center_angle)
+        # Position foil center inside the main arc based on lobe_size
+        # lobe_size controls how deep the cusps go inward
+        foil_center_distance = main_radius * (1.0 - lobe_size * 0.3)  # 0.7 to 1.0 of main radius
+        foil_center_x = main_center_x + foil_center_distance * math.cos(foil_center_angle)
+        foil_center_y = main_center_y + foil_center_distance * math.sin(foil_center_angle)
 
-        # Base radius (distance from center to cusps)
-        foil_radius_base = math.sqrt((start_pt_x - foil_center_x) ** 2 + (start_pt_y - foil_center_y) ** 2)
-        # Scale for cusp depth: 1.0 = deep, 0.1 = shallow
-        foil_radius = foil_radius_base * (0.5 + 0.5 * lobe_size)
+        # Calculate radius to reach the cusp points on the main arc
+        foil_radius = math.sqrt((start_pt_x - foil_center_x) ** 2 + (start_pt_y - foil_center_y) ** 2)
+        # The radius should be the actual distance to the cusp points for proper geometry
 
         # Angles from foil center to cusp points
         vec_start_x = start_pt_x - foil_center_x
