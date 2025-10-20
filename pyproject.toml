@@ -124,12 +124,17 @@ reportUnusedCallResult = "none"
 reportMissingModuleSource = "none"  # Rhino is a runtime .NET assembly
 reportMissingImports = "none"  # Rhino modules (Rhino, scriptcontext, Eto) are runtime .NET assemblies
 reportUntypedBaseClass = "none"  # Allow subclassing .NET types (Eto.Forms.Dialog, etc.)
+reportCallIssue = "none"  # Rhino API has overloaded methods with optional parameters
+reportArgumentType = "none"  # Rhino API overloads cause type mismatches
+reportUnnecessaryComparison = "none"  # Rhino methods can return None despite stubs saying otherwise
+reportMissingTypeArgument = "none"  # numpy.ndarray generic type arguments not needed in Python 3.9
+reportOperatorIssue = "none"  # Rhino.Geometry Point3d supports operator overloading at runtime
 
 # Keep useful signals
 reportMissingTypeStubs = "warning"
 reportPrivateUsage = "warning"
 reportInconsistentConstructor = "warning"
-reportUnnecessaryTypeIgnoreComment = "warning"
+reportUnnecessaryTypeIgnoreComment = "none"  # Allow type ignores for mypy compatibility
 reportImportCycles = "warning"
 
 # --- Ruff Configuration -----------------------------------------------------
@@ -182,12 +187,14 @@ extend-ignore = [
     "PLC2701",              # private import usage
     "RUF029",               # __all__ module export enforcement
     "N802","N803",          # allow RunCommand naming for Rhino plugin entry points
+    "N813",                 # allow camelCase Rhino modules aliased to lowercase (rg, rs, etc.)
     "ANN401",               # allow Any for .NET event handlers and interop
     "TRY003",               # allow long exception messages in raise statements
     "TRY301",               # allow raise in try blocks without abstracting to inner function
     "B904",                 # allow raise without from in except blocks
     "PLR2004",              # allow magic values in comparisons
     "PLR0914",              # allow more than 15 local variables
+    "ERA001",               # allow Rhino-specific requirement comments (# r: package)
 ]
 
 fixable = ["ALL"]
