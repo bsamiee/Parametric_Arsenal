@@ -19,7 +19,7 @@ from libs.geometry.curves import circular_segment_radius
 from libs.geometry.parameters import FoilArcParameters, MultifoilParameters
 
 
-def solve_multifoil_parameters(
+def solve_multifoil_parameters(     # noqa: PLR0915
     half_span: float,
     rise: float,
     lobes: int,

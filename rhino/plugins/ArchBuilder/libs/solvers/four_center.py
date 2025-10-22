@@ -14,7 +14,7 @@ Computes the mathematical parameters needed to construct four-center arches.
 from __future__ import annotations
 
 import math
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
 
 from libs.geometry.math_utils import clamp
 from libs.geometry.parameters import FourCenterParameters
@@ -58,10 +58,9 @@ def _prioritized_values(
     for value in sorted(extras, key=lambda candidate: abs(candidate - base_clamped)):
         push(value)
 
-    total_steps = max(1, int(round((maximum - minimum) / step)))
+    total_steps = max(1, round((maximum - minimum) / step))
     grid: set[float] = set()
-    for idx in range(total_steps + 1):
-        grid.add(_round_key(minimum + step * idx))
+    grid.update(_round_key(minimum + step * idx) for idx in range(total_steps + 1))
     grid.add(_round_key(maximum))
 
     ordered_grid = sorted(grid, key=lambda candidate: (abs(candidate - base_clamped), candidate))
@@ -77,7 +76,7 @@ def _candidate_pairs(
 ) -> Iterator[tuple[float, float]]:
     """Yield unique shoulder ratio combinations in priority order."""
     if not shoulder_ratios or not shoulder_height_ratios:
-        return iter(())
+        return
 
     seen: set[tuple[float, float]] = set()
     base_sr = shoulder_ratios[0]
@@ -86,9 +85,9 @@ def _candidate_pairs(
     def push(sr: float, sh: float) -> Iterator[tuple[float, float]]:
         key = (_round_key(sr), _round_key(sh))
         if key in seen:
-            return iter(())
+            return
         seen.add(key)
-        return iter([(sr, sh)])
+        yield (sr, sh)
 
     # Start with the base combination
     yield from push(base_sr, base_sh)
