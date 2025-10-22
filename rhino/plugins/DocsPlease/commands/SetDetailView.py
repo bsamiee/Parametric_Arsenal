@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/SetDetailView.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Set viewport projection for detail views with smart selection.
 """
 
@@ -80,13 +80,13 @@ def set_detail_view() -> None:
         print(f"Failed: {len(failed)} detail(s)")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino plugin entry point."""
     set_detail_view()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     set_detail_view()

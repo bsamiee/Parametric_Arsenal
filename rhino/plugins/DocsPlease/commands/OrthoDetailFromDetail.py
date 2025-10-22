@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/OrthoDetailFromDetail.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Duplicates a Detail View and reorients it to a different orthographic projection.
 """
 
@@ -109,13 +109,13 @@ def ortho_detail_from_detail() -> None:
     print("──────────── Detail Created Successfully ────────────\n")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino command entry point."""
     ortho_detail_from_detail()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     ortho_detail_from_detail()

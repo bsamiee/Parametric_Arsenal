@@ -22,8 +22,7 @@ import Rhino.Input.Custom as ric
 import scriptcontext as sc
 
 import Rhino
-
-from .ui import ProfileSelection
+from libs.ui import ProfileSelection
 
 
 # --- Input Method Enum ----------------------------------------------------

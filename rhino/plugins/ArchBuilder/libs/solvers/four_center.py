@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import math
 
-from ..geometry.math_utils import clamp
-from ..geometry.parameters import FourCenterParameters
+from libs.geometry.math_utils import clamp
+from libs.geometry.parameters import FourCenterParameters
 
 
 def solve_four_center_parameters(  # noqa: PLR0912, PLR0915

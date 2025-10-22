@@ -7,7 +7,7 @@ Path          : rhino/plugins/DocsPlease/libs/command_framework.py
 
 Description
 ----------------------------------------------------------------------------
-Centralized command framework with decorators for error handling and common operations. 
+Centralized command framework with decorators for error handling and common operations.
 The @rhino_command decorator that handles all cross-cutting concerns for Rhino commands.
 
 Exception Handling:
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import traceback
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import scriptcontext as sc
 
@@ -32,7 +32,7 @@ from .exceptions import (
     CameraError,
     DetailError,
     DocsPluginError,
-    EnvironmentError,
+    EnvironmentError,  # noqa: A004
     LayoutError,
     ScaleError,
     TransformError,
@@ -43,7 +43,7 @@ from .exceptions import (
 
 def rhino_command(
     requires_layout: bool = True,
-    undo_description: Optional[str] = None,
+    undo_description: str | None = None,
     auto_redraw: bool = True,
     print_start: bool = True,
     print_end: bool = True,
@@ -89,7 +89,7 @@ def rhino_command(
 
     def decorator(func: Callable[..., None]) -> Callable[..., int]:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> int:
+        def wrapper(*args: Any, **kwargs: Any) -> int:  # noqa: PLR0911, PLR0912
             # Print start message
             if print_start:
                 command_name = func.__name__.replace("_", " ").title()
@@ -116,8 +116,7 @@ def rhino_command(
                 # Print completion message
                 if print_end:
                     print("=== Script Completed ===\n")
-
-                return 0  # Success
+                return 0  # Success # noqa: TRY300
 
             except UserCancelledError:
                 print("Operation cancelled by user.")
@@ -135,7 +134,7 @@ def rhino_command(
                 CommonUtils.alert_user(f"Plugin error: {e}")
                 return 1
 
-            except Exception as e:
+            except (RuntimeError, ValueError, TypeError, AttributeError, ImportError, OSError) as e:
                 print(f"Unexpected error: {e}")
                 print("Stack trace:")
                 traceback.print_exc()

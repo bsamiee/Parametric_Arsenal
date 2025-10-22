@@ -11,9 +11,9 @@ Geometry package for arch construction calculations.
 Exports mathematical utilities, curve construction functions, and arch solvers.
 """
 
-from .curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
-from .math_utils import clamp, solve_newton
-from .parameters import (
+from geometry.curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
+from geometry.math_utils import clamp, solve_newton
+from geometry.parameters import (
     FoilArcParameters,
     FourCenterParameters,
     HorseshoeParameters,
@@ -21,7 +21,7 @@ from .parameters import (
     OgeeParameters,
     ThreeCenterParameters,
 )
-from .profiles import (
+from geometry.profiles import (
     ProfileSegments,
     catenary_profile,
     circular_segment_profile,

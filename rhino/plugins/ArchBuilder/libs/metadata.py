@@ -20,7 +20,7 @@ import Rhino.DocObjects as rd
 import Rhino.Geometry as rg
 import scriptcontext as sc
 
-from .specs import ArchFamily, ArchSpec
+from libs.specs import ArchFamily, ArchSpec
 
 
 # --- Arch Metadata Handler ------------------------------------------------

@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/QuickDetail.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Creates a new Detail View by drawing a rectangle on the Layout.
 """
 
@@ -52,13 +52,13 @@ def quick_detail() -> None:
     print("---------------------------------------------")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino plugin entry point."""
     quick_detail()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     quick_detail()

@@ -47,11 +47,11 @@ class ProjectConfigTools:
             ProjectConfigError: If name is empty or storage fails.
         """
         if not name or not name.strip():
-            raise ProjectConfigError("Project name cannot be empty")  # noqa: TRY003
+            raise ProjectConfigError("Project name cannot be empty")
 
         result = rs.SetDocumentUserText("project_config_name", name)
         if not result:
-            raise ProjectConfigError("Failed to set project name", context={"name": name})  # noqa: TRY003
+            raise ProjectConfigError("Failed to set project name", context={"name": name})
 
     @staticmethod
     def get_document_set(discipline_code: str) -> dict[str, Any] | None:
@@ -90,14 +90,14 @@ class ProjectConfigTools:
             ProjectConfigError: If discipline code is empty or storage fails.
         """
         if not discipline_code or not discipline_code.strip():
-            raise ProjectConfigError("Discipline code cannot be empty")  # noqa: TRY003
+            raise ProjectConfigError("Discipline code cannot be empty")
 
         key = f"project_config_docset_{discipline_code}"
         json_str = json.dumps(config)
 
         result = rs.SetDocumentUserText(key, json_str)
         if not result:
-            raise ProjectConfigError(  # noqa: TRY003
+            raise ProjectConfigError(
                 "Failed to set document set configuration",
                 context={"discipline_code": discipline_code, "config": config},
             )

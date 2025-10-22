@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import math
 
-from ..geometry.curves import circular_segment_radius
-from ..geometry.parameters import FoilArcParameters, MultifoilParameters
+from libs.geometry.curves import circular_segment_radius
+from libs.geometry.parameters import FoilArcParameters, MultifoilParameters
 
 
 def solve_multifoil_parameters(

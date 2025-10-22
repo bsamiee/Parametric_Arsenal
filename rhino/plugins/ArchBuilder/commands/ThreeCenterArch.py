@@ -13,32 +13,22 @@ Command for creating three-center (basket-handle) arches.
 
 from __future__ import annotations
 
-import importlib
-import pathlib
 import sys
+from pathlib import Path
+
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "libs"))
+
 from typing import Any
 
 import Rhino.Geometry as rg
-from libs import (
-    ArchBuilderUtils,
-    ArchCommandBase,
-    ArchFamily,
-    ArchSpec,
-    ProfileSelection,
-    ThreeCenterArchOptions,
-    specs,
-)
-from libs.geometry import ProfileSegments, three_center_profile
+from libs.command_base import ArchCommandBase
+from libs.geometry.profiles import ProfileSegments, three_center_profile
+from libs.specs import ArchFamily, ArchSpec, ThreeCenterArchOptions
+from libs.ui import ProfileSelection
+from libs.utils import ArchBuilderUtils
 
 import Rhino
-
-
-_script_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent
-_plugin_root = pathlib.Path(_script_dir).parent
-if _plugin_root not in sys.path:
-    sys.path.insert(0, _plugin_root)
-
-importlib.reload(specs)  # Force reload to ensure updated classes are recognized
 
 
 # --- Three-Center Command Class -------------------------------------------

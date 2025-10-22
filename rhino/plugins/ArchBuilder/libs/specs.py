@@ -161,6 +161,22 @@ class ArchCommandOptions:
                 raise ValueError(f"Missing required option '{field_info.name}' for {cls.__name__}.")
         return cls(**values)
 
+    @classmethod
+    def from_geometry(
+        cls: type[T_Options],
+        span: float,
+        rise: float,
+    ) -> T_Options:
+        """Derive options from geometry when subclasses do not provide overrides."""
+        try:
+            return cls()
+        except TypeError as exc:  # pragma: no cover - defensive path for future subclasses
+            msg = (
+                f"{cls.__name__} must implement 'from_geometry' because it requires "
+                "parameters without defaults."
+            )
+            raise NotImplementedError(msg) from exc
+
 
 @dataclass(frozen=True)
 class EmptyArchOptions(ArchCommandOptions):

@@ -18,13 +18,12 @@ import Rhino.Geometry as rg
 import scriptcontext as sc
 
 import Rhino
-
-from .assemble import ArchAssembler
-from .input_methods import ArchInputManager, InputMethod
-from .metadata import ArchMetadata
-from .specs import ArchFamily, ArchSpec
-from .ui import ProfileSelection
-from .utils import ArchBuilderUtils
+from libs.assemble import ArchAssembler
+from libs.input_methods import ArchInputManager, InputMethod
+from libs.metadata import ArchMetadata
+from libs.specs import ArchFamily, ArchSpec
+from libs.ui import ProfileSelection
+from libs.utils import ArchBuilderUtils
 
 
 # --- Base Command Class ---------------------------------------------------

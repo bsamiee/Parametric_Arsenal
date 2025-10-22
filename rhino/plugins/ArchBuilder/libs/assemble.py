@@ -16,8 +16,8 @@ from dataclasses import dataclass
 
 import Rhino.Geometry as rg
 
-from .specs import ArchSpec
-from .utils import ArchBuilderUtils
+from libs.specs import ArchSpec
+from libs.utils import ArchBuilderUtils
 
 
 # --- Assembly Result Container --------------------------------------------

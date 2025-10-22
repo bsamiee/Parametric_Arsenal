@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 
-from ..geometry.parameters import OgeeParameters
+from libs.geometry.parameters import OgeeParameters
 
 
 def solve_ogee_parameters(  # noqa: PLR0912, PLR0915

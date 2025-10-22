@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/SetScale.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Unified scale command for setting detail view scales. Handles all scale types
 (Architectural, Engineering, Metric) and operations (selected details or all
 details on page). Integrates with project-level document set configuration.
@@ -24,7 +24,7 @@ from libs.project_config_tools import ProjectConfigTools
 import Rhino
 
 
-# --- Main Scale Command ---------------------------------------------------
+# --- Main Scale Command -----------------------------------------------------
 @rhino_command(requires_layout=True, undo_description="Set Detail Scale")
 def set_scale() -> None:  # noqa: PLR0912, PLR0915
     """Unified scale command for detail views with smart selection handling.
@@ -116,7 +116,7 @@ def set_scale() -> None:  # noqa: PLR0912, PLR0915
                 print("[INFO] Scale matches document set default")
 
 
-# --- Command Entry Point --------------------------------------------------
+# --- Command Entry Point ----------------------------------------------------
 def SetScale() -> int:
     """Rhino command entry point for SetScale.
 
@@ -126,6 +126,6 @@ def SetScale() -> int:
     return set_scale()
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     SetScale()

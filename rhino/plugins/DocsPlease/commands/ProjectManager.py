@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/ProjectManager.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Unified project management command for configuring project settings and
 applying them to layout pages.
 """
@@ -30,7 +30,7 @@ from libs.project_config_tools import ProjectConfigTools
 import Rhino
 
 
-# --- Template Management --------------------------------------------------
+# --- Template Management ----------------------------------------------------
 def apply_template(template_name: str) -> None:
     """Apply a project template by enabling document sets with default scales.
 
@@ -42,7 +42,7 @@ def apply_template(template_name: str) -> None:
     """
     template = ProjectConfigTools.get_template_config(template_name)
     if not template:
-        raise ProjectConfigError(f"Template '{template_name}' not found")  # noqa: TRY003
+        raise ProjectConfigError(f"Template '{template_name}' not found")
 
     # Determine default scale based on model units
     units = CommonUtils.get_model_unit_system()
@@ -65,7 +65,7 @@ def apply_template(template_name: str) -> None:
     print(f"[INFO] Applied template '{template_name}' with {len(document_sets)} document sets")
 
 
-# --- First-Time Setup -----------------------------------------------------
+# --- First-Time Setup -------------------------------------------------------
 def first_time_setup() -> None:
     """Handle first-time project setup workflow.
 
@@ -98,7 +98,7 @@ def first_time_setup() -> None:
     print("  3. Configure your sheet details\n")
 
 
-# --- Project Configuration Menu -------------------------------------------
+# --- Project Configuration Menu ---------------------------------------------
 def configure_project_menu() -> None:
     """Display and handle the Configure Project submenu.
 
@@ -119,7 +119,7 @@ def configure_project_menu() -> None:
             view_current_configuration()
 
 
-# --- Project Settings Management ------------------------------------------
+# --- Project Settings Management --------------------------------------------
 def edit_project_name() -> None:
     """Edit the project name."""
     current_name = ProjectConfigTools.get_project_name() or ""
@@ -130,7 +130,7 @@ def edit_project_name() -> None:
     print(f"[INFO] Project name updated to: {new_name}")
 
 
-# --- Document Set Management ----------------------------------------------
+# --- Document Set Management ------------------------------------------------
 def manage_document_sets() -> None:
     """Manage document sets (enable/disable, configure scales)."""
     while True:
@@ -277,7 +277,7 @@ def view_current_configuration() -> None:
     print("=====================================\n")
 
 
-# --- Helper Functions -----------------------------------------------------
+# --- Helper Functions -------------------------------------------------------
 def get_discipline_name(disc_code: str) -> str:
     """Get discipline name from code.
 
@@ -293,7 +293,7 @@ def get_discipline_name(disc_code: str) -> str:
     return "Unknown"
 
 
-# --- Layout Application ---------------------------------------------------
+# --- Layout Application -----------------------------------------------------
 def apply_to_layout() -> None:
     """Apply project settings to active layout page.
 
@@ -306,12 +306,12 @@ def apply_to_layout() -> None:
     """
     # Validate in layout view
     if not CommonUtils.is_layout_view_active():
-        raise LayoutError("Must be in a layout view to apply settings")  # noqa: TRY003
+        raise LayoutError("Must be in a layout view to apply settings")
 
     # Get enabled document sets
     doc_sets = ProjectConfigTools.get_enabled_document_sets()
     if not doc_sets:
-        raise ValidationError("No document sets enabled. Configure project first.")  # noqa: TRY003
+        raise ValidationError("No document sets enabled. Configure project first.")
 
     # Select document set
     options = [f"{code} - {get_discipline_name(code)}" for code, _ in doc_sets]
@@ -320,7 +320,7 @@ def apply_to_layout() -> None:
     doc_set = ProjectConfigTools.get_document_set(disc_code)
 
     if not doc_set:
-        raise ValidationError(f"Document set '{disc_code}' not found")  # noqa: TRY003
+        raise ValidationError(f"Document set '{disc_code}' not found")
 
     # Get designation level and show appropriate picker
     level = doc_set["designation_level"]
@@ -341,7 +341,7 @@ def apply_to_layout() -> None:
 
     # Validate sheet number format
     if not validate_sheet_number(sheet_number):
-        raise ValidationError(  # noqa: TRY003
+        raise ValidationError(
             f"Invalid sheet number format: '{sheet_number}'. Expected format: #.# (e.g., 1.2, 101.03)"
         )
 
@@ -350,7 +350,7 @@ def apply_to_layout() -> None:
     existing_ids = LayoutTools.existing_sheet_ids()
 
     if sheet_id in existing_ids:
-        raise ValidationError(  # noqa: TRY003
+        raise ValidationError(
             f"Sheet ID '{sheet_id}' already exists. Please use a different sheet number."
         )
 
@@ -375,7 +375,7 @@ def apply_to_layout() -> None:
     print(f"  Designation Level: {level}\n")
 
 
-# --- Project Overview -----------------------------------------------------
+# --- Project Overview -------------------------------------------------------
 def view_overview() -> None:
     """Display project overview organized by document sets.
 
@@ -443,7 +443,7 @@ def view_overview() -> None:
     print("\n" + "=" * 60 + "\n")
 
 
-# --- Main Command Entry Point ---------------------------------------------
+# --- Main Command Entry Point -----------------------------------------------
 @rhino_command(requires_layout=False, undo_description="Project Management")
 def project_manager() -> None:
     """Main entry point for ProjectManager command.
@@ -460,7 +460,7 @@ def project_manager() -> None:
         main_menu()
 
 
-# --- Main Menu ------------------------------------------------------------
+# --- Main Menu --------------------------------------------------------------
 def main_menu() -> None:
     """Display and handle main project management menu.
 
@@ -483,6 +483,6 @@ def main_menu() -> None:
             view_overview()
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     project_manager()

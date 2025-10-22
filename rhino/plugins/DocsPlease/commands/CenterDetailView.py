@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/CenterDetailView.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Centers selected objects inside a Detail View on a Layout.
 """
 
@@ -139,13 +139,13 @@ def center_detail_view() -> None:
     print("──────────── Script Completed ────────────\n")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino plugin entry point."""
     center_detail_view()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     center_detail_view()

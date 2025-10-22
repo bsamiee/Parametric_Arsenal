@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/InspectDetailCamera.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Inspects and captures camera metadata for all Detail Views on the active Layout.
 """
 
@@ -72,13 +72,13 @@ def inspect_detail_cameras() -> None:
     print("\n=== Script Completed ===\n")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino plugin entry point."""
     inspect_detail_cameras()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     inspect_detail_cameras()

@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/AlignDetailViews.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Aligns two Detail Views horizontally or vertically based on user-picked reference points.
 """
 
@@ -17,11 +17,12 @@ import scriptcontext as sc
 from libs.alignment_tools import AlignmentTools
 from libs.command_framework import rhino_command
 from libs.constants import Strings
-from libs.exceptions import ValidationError
+from libs.exceptions import TransformError, UserCancelledError, ValidationError
 
 import Rhino
 
 
+# --- Command Implementation -------------------------------------------------
 @rhino_command(requires_layout=True, undo_description="Align Detail Views")
 def align_detail_views() -> None:
     """Aligns two Detail Views horizontally or vertically based on user-picked points.
@@ -59,7 +60,6 @@ def align_detail_views() -> None:
     # Choose Alignment Type
     align_choice = rs.GetString(Strings.PROMPT_DIRECTION, Strings.DEFAULT_DIRECTION, Strings.DIRECTION_OPTIONS)
     if not align_choice:
-        from libs.exceptions import UserCancelledError
 
         raise UserCancelledError("Alignment type selection cancelled")
 
@@ -74,7 +74,6 @@ def align_detail_views() -> None:
         transform = Rhino.Geometry.Transform.Translation(translation_vector)
 
         if not rs.TransformObject(child_detail_id, transform):
-            from libs.exceptions import TransformError
 
             raise TransformError(Strings.MSG_FAILED_TRANSFORM)
 
@@ -85,13 +84,13 @@ def align_detail_views() -> None:
         print("\nPicked points already aligned. No movement necessary.")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino command entry point."""
     align_detail_views()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     align_detail_views()

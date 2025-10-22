@@ -19,6 +19,9 @@ import scriptcontext as sc
 
 import Rhino
 
+from .constants import Strings
+from .exceptions import DetailError, EnvironmentError, UserCancelledError  # noqa: A004
+
 
 # --- Common Utilities -----------------------------------------------------
 class CommonUtils:
@@ -82,8 +85,6 @@ def validate_detail_object(detail_id: object) -> Rhino.DocObjects.DetailViewObje
     Raises:
         DetailError: If object is not a valid detail view.
     """
-    from .constants import Strings
-    from .exceptions import DetailError
 
     rh_obj = rs.coercerhinoobject(detail_id)
     if not rh_obj or not isinstance(rh_obj, Rhino.DocObjects.DetailViewObject):
@@ -104,7 +105,6 @@ def require_user_selection(prompt: str, filter_type: int) -> object:
     Raises:
         UserCancelledError: If user cancels or makes no selection.
     """
-    from .exceptions import UserCancelledError
 
     selection = rs.GetObject(prompt, filter_type)
     if not selection:
@@ -124,7 +124,6 @@ def require_user_point(prompt: str) -> object:
     Raises:
         UserCancelledError: If user cancels point selection.
     """
-    from .exceptions import UserCancelledError
 
     point = rs.GetPoint(prompt)
     if not point:
@@ -147,7 +146,6 @@ def require_user_string(prompt: str, default: str = "", title: str = "Input", al
     Raises:
         UserCancelledError: If user cancels or provides invalid input.
     """
-    from .exceptions import UserCancelledError
 
     result = rs.StringBox(prompt, default, title)
     if result is None:
@@ -174,7 +172,6 @@ def require_user_choice(options: list[str], prompt: str, title: str = "Select") 
     Raises:
         UserCancelledError: If user cancels selection.
     """
-    from .exceptions import UserCancelledError
 
     choice = rs.ListBox(options, prompt, title)
     if not choice:
@@ -191,8 +188,6 @@ def validate_environment_units(supported_units: list[Rhino.UnitSystem]) -> None:
     Raises:
         EnvironmentError: If current units are not supported.
     """
-    from .constants import Strings
-    from .exceptions import EnvironmentError
 
     current_units = CommonUtils.get_model_unit_system()
     if current_units not in supported_units:

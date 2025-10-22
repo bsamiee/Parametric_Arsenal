@@ -36,7 +36,7 @@ from .exceptions import (
     CameraError,
     DetailError,
     DocsPluginError,
-    EnvironmentError,
+    EnvironmentError,  # noqa: A004
     LayoutError,
     ProjectConfigError,
     ScaleError,
@@ -48,7 +48,7 @@ from .layout_tools import LayoutTools
 from .project_config_tools import ProjectConfigTools
 
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     # Data constants
     "DESIGNATION_LEVEL_CHOICES",
     "DISCIPLINE_CHOICES",

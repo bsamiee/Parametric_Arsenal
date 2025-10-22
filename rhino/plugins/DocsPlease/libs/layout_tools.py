@@ -16,7 +16,6 @@ from typing import Any
 
 import scriptcontext as sc
 
-from .common_utils import validate_sheet_number
 from .constants import Metadata
 from .exceptions import ValidationError
 

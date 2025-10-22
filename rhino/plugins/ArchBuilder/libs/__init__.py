@@ -10,10 +10,10 @@ Description
 Package initializer exporting the public API for the ArchBuilder plugin.
 """
 
-from .assemble import ArchAssembler
-from .command_base import ArchCommandBase
-from .metadata import ArchMetadata
-from .specs import (
+from libs.assemble import ArchAssembler
+from libs.command_base import ArchCommandBase
+from libs.metadata import ArchMetadata
+from libs.specs import (
     ArchFamily,
     ArchSpec,
     EmptyArchOptions,
@@ -23,8 +23,8 @@ from .specs import (
     OgeeArchOptions,
     ThreeCenterArchOptions,
 )
-from .ui import ProfileSelection
-from .utils import ArchBuilderUtils
+from libs.ui import ProfileSelection
+from libs.utils import ArchBuilderUtils
 
 
 __all__ = [

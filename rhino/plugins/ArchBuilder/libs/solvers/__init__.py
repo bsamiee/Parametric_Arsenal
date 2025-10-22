@@ -12,12 +12,12 @@ Exports general-purpose solvers, arch-specific parameter solvers, and
 mathematical utilities for geometric computations.
 """
 
-from .catenary import solve_catenary_parameter
-from .four_center import solve_four_center_parameters
-from .horseshoe import solve_horseshoe_parameters
-from .multifoil import solve_multifoil_parameters
-from .ogee import solve_ogee_parameters
-from .three_center import solve_three_center_parameters
+from solvers.catenary import solve_catenary_parameter
+from solvers.four_center import solve_four_center_parameters
+from solvers.horseshoe import solve_horseshoe_parameters
+from solvers.multifoil import solve_multifoil_parameters
+from solvers.ogee import solve_ogee_parameters
+from solvers.three_center import solve_three_center_parameters
 
 
 __all__ = [

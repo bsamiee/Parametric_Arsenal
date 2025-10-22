@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 
-from ..geometry.parameters import HorseshoeParameters
+from libs.geometry.parameters import HorseshoeParameters
 
 
 def solve_horseshoe_parameters(

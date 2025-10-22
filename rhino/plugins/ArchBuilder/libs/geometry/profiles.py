@@ -20,8 +20,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import Rhino.Geometry as rg
+from geometry.curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
 
-from ..solvers import (
+from libs.solvers import (
     solve_catenary_parameter,
     solve_four_center_parameters,
     solve_horseshoe_parameters,
@@ -29,14 +30,13 @@ from ..solvers import (
     solve_ogee_parameters,
     solve_three_center_parameters,
 )
-from ..specs import (
+from libs.specs import (
     FourCenterArchOptions,
     HorseshoeArchOptions,
     MultifoilArchOptions,
     OgeeArchOptions,
     ThreeCenterArchOptions,
 )
-from .curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
 
 
 # --- Vector Angle Helper --------------------------------------------------

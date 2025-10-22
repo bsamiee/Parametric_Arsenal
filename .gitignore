@@ -16,6 +16,7 @@ claude.md
 gemini.md
 agents.md
 tmp/
+.uv_cache/
 
 # --- macOS & Editor cruft -----------------------------------------------------
 .DS_Store

@@ -6,7 +6,7 @@ License       : MIT
 Path          : rhino/plugins/DocsPlease/commands/DetailCaption.py
 
 Description
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 Creates or updates numbered detail captions with title and scale text positioned below Detail Views.
 Automatically detects existing captions and updates them instead of creating duplicates.
 """
@@ -68,13 +68,13 @@ def detail_caption() -> None:
         print(f"Caption {caption_number} created")
 
 
-# --- Rhino Plugin Entry Point ---------------------------------------------
+# --- Rhino Plugin Entry Point -----------------------------------------------
 def RunCommand(is_interactive: bool) -> int:
     """Rhino command entry point."""
     detail_caption()
     return 0
 
 
-# --- Script Entry Point ---------------------------------------------------
+# --- Script Entry Point -----------------------------------------------------
 if __name__ == "__main__":
     detail_caption()
