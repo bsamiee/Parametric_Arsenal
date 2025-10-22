@@ -13,17 +13,9 @@ Command for creating horseshoe arches with direct geometric control.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "libs"))
-
-import importlib
 from typing import Any
 
 import Rhino.Geometry as rg
-from libs import specs
 from libs.command_base import ArchCommandBase
 from libs.geometry.profiles import ProfileSegments, horseshoe_profile
 from libs.specs import ArchFamily, ArchSpec, HorseshoeArchOptions
@@ -31,9 +23,6 @@ from libs.ui import ProfileSelection
 from libs.utils import ArchBuilderUtils
 
 import Rhino
-
-
-importlib.reload(module=specs)  # Force reload to ensure updated classes are recognized
 
 
 # --- Horseshoe Command Class ----------------------------------------------

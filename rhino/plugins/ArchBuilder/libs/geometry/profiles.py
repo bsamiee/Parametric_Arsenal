@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import Rhino.Geometry as rg
-from geometry.curves import arc_curve, arc_from_center_endpoints, circular_segment_radius, profile_curve
+from geometry.curves import arc_curve, arc_from_center_endpoints, profile_curve
 
 from libs.solvers import (
     solve_catenary_parameter,
@@ -75,7 +75,11 @@ def catenary_profile(
     parameter = solve_catenary_parameter(half_span, rise, tolerance)
 
     xs = np.linspace(-half_span, half_span, samples)
-    points = [rg.Point3d(float(x), float(parameter * (math.cosh(x / parameter) - 1.0)), 0.0) for x in xs]
+    points = []
+    for x in xs:
+        y_local = parameter * (math.cosh(x / parameter) - 1.0)
+        # Invert profile so the apex is at +rise and the feet sit on y = 0.
+        points.append(rg.Point3d(float(x), float(rise - y_local), 0.0))
     curve = arc_curve(points)
     return ProfileSegments([curve], curve.PointAtStart, curve.PointAtEnd)
 
@@ -116,16 +120,15 @@ def semicircle_profile(span: float) -> ProfileSegments:
 
 def circular_segment_profile(half_span: float, rise: float) -> ProfileSegments:
     """Build a circular segment profile curve."""
-    radius = circular_segment_radius(half_span, rise)
-    center = rg.Point3d(0.0, rise - radius, 0.0)
-    plane = rg.Plane(center, rg.Vector3d.XAxis, rg.Vector3d.YAxis)
-    circle = rg.Circle(plane, radius)
-    half_angle = math.asin(min(1.0, half_span / radius))
-    interval = rg.Interval(-half_angle, half_angle)
+    start = rg.Point3d(-half_span, 0.0, 0.0)
+    apex = rg.Point3d(0.0, rise, 0.0)
+    end = rg.Point3d(half_span, 0.0, 0.0)
 
-    arc = rg.Arc(circle, interval)
+    arc = rg.Arc(start, apex, end)
+    if not arc.IsValid:
+        raise ValueError("Circular segment could not be constructed from the provided span and rise.")
     arc_curve = rg.ArcCurve(arc)
-    return ProfileSegments([arc_curve], arc_curve.PointAtStart, arc_curve.PointAtEnd)
+    return ProfileSegments([arc_curve], start, end)
 
 
 def two_center_profile(half_span: float, rise: float) -> ProfileSegments:

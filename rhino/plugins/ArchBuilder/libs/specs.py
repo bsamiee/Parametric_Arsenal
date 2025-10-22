@@ -218,7 +218,22 @@ class OgeeArchOptions(ArchCommandOptions):
     @classmethod
     def from_geometry(cls, span: float, rise: float) -> OgeeArchOptions:
         """Calculate traditional ogee arch proportions from span and rise."""
-        return cls(inflection_height=0.5, curve_strength=0.5)
+        if span <= 0 or rise <= 0:
+            raise ValueError("Span and rise must be positive to derive ogee proportions.")
+
+        slenderness = rise / span  # Tall arches (>0.5) have higher inflection points
+
+        # Map slenderness into the solver's stable domains.
+        inflection = 0.35 + 0.30 * slenderness  # [~0.35, ~0.65] depending on ratio
+        curve_strength = 0.45 + 0.20 * (slenderness - 0.5)  # Tighter curves for taller profiles
+
+        inflection_clamped = max(0.3, min(0.7, inflection))
+        strength_clamped = max(0.2, min(0.8, curve_strength))
+
+        return cls(
+            inflection_height=inflection_clamped,
+            curve_strength=strength_clamped,
+        )
 
 
 @dataclass(frozen=True)

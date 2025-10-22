@@ -14,165 +14,173 @@ Computes the mathematical parameters needed to construct four-center arches.
 from __future__ import annotations
 
 import math
+from typing import Iterator, Sequence
 
 from libs.geometry.math_utils import clamp
 from libs.geometry.parameters import FourCenterParameters
 
 
-def solve_four_center_parameters(  # noqa: PLR0912, PLR0915
+_MIN_SHOULDER_RATIO = 0.05
+_MAX_SHOULDER_RATIO = 0.95
+_MIN_SHOULDER_HEIGHT_RATIO = 0.2
+_MAX_SHOULDER_HEIGHT_RATIO = 0.95
+_MAX_FAILURE_SAMPLES = 6
+
+
+def _round_key(value: float) -> float:
+    """Return a rounded value suitable for set membership comparisons."""
+    return round(value, 6)
+
+
+def _prioritized_values(
+    base: float,
+    minimum: float,
+    maximum: float,
+    *,
+    step: float,
+    extras: Sequence[float] = (),
+) -> list[float]:
+    """Generate candidate values ordered by proximity to the base value."""
+    base_clamped = clamp(base, minimum, maximum)
+    values: list[float] = []
+    seen: set[float] = set()
+
+    def push(raw: float) -> None:
+        clamped = clamp(raw, minimum, maximum)
+        key = _round_key(clamped)
+        if key in seen:
+            return
+        seen.add(key)
+        values.append(clamped)
+
+    push(base_clamped)
+
+    for value in sorted(extras, key=lambda candidate: abs(candidate - base_clamped)):
+        push(value)
+
+    total_steps = max(1, int(round((maximum - minimum) / step)))
+    grid: set[float] = set()
+    for idx in range(total_steps + 1):
+        grid.add(_round_key(minimum + step * idx))
+    grid.add(_round_key(maximum))
+
+    ordered_grid = sorted(grid, key=lambda candidate: (abs(candidate - base_clamped), candidate))
+    for value in ordered_grid:
+        push(value)
+
+    return values
+
+
+def _candidate_pairs(
+    shoulder_ratios: Sequence[float],
+    shoulder_height_ratios: Sequence[float],
+) -> Iterator[tuple[float, float]]:
+    """Yield unique shoulder ratio combinations in priority order."""
+    if not shoulder_ratios or not shoulder_height_ratios:
+        return iter(())
+
+    seen: set[tuple[float, float]] = set()
+    base_sr = shoulder_ratios[0]
+    base_sh = shoulder_height_ratios[0]
+
+    def push(sr: float, sh: float) -> Iterator[tuple[float, float]]:
+        key = (_round_key(sr), _round_key(sh))
+        if key in seen:
+            return iter(())
+        seen.add(key)
+        return iter([(sr, sh)])
+
+    # Start with the base combination
+    yield from push(base_sr, base_sh)
+
+    # Vary shoulder ratio while keeping shoulder height fixed first
+    for sr in shoulder_ratios:
+        yield from push(sr, base_sh)
+
+    # Vary shoulder height while keeping shoulder ratio fixed
+    for sh in shoulder_height_ratios:
+        yield from push(base_sr, sh)
+
+    # Explore the remaining grid
+    for sh in shoulder_height_ratios:
+        for sr in shoulder_ratios:
+            yield from push(sr, sh)
+
+
+def _solve_with_fixed_tangent(
     span: float,
     rise: float,
-    *,
     shoulder_ratio: float,
     shoulder_height_ratio: float,
     tolerance: float,
 ) -> FourCenterParameters:
-    """Compute parameters for a four-center (depressed/Tudor) arch.
-
-    Solves for the tangent points and arc radii that create a smooth
-    four-arc approximation with specified shoulder geometry.
-
-    The solution enforces tangency at the shoulder point by ensuring
-    the radius vectors from adjacent arc centers are collinear.
-
-    Args:
-        span: Total horizontal span of the arch
-        rise: Maximum vertical height of the arch
-        shoulder_ratio: Horizontal position of shoulder point (0.05-0.95)
-        shoulder_height_ratio: Vertical position of shoulder point (0.2-0.95)
-        tolerance: Numerical tolerance for calculations
-
-    Returns:
-        Parameters for constructing the four-center arch
-
-    Raises:
-        ValueError: If parameters produce invalid geometry
-    """
+    """Solve the four-center system for a fixed shoulder configuration."""
     if span <= 0 or rise <= 0:
         raise ValueError("Span and rise must be positive.")
 
     half_span = span * 0.5
-    sr = clamp(shoulder_ratio, 0.05, 0.95)
-    sh = clamp(shoulder_height_ratio, 0.2, 0.95)
+    sr = clamp(shoulder_ratio, _MIN_SHOULDER_RATIO, _MAX_SHOULDER_RATIO)
+    sh = clamp(shoulder_height_ratio, _MIN_SHOULDER_HEIGHT_RATIO, _MAX_SHOULDER_HEIGHT_RATIO)
 
-    # Shoulder point (tangent point between lower and upper arcs)
     x_t = half_span * sr
     y_t = rise * sh
 
-    # Lower arc center calculation
-    # Center at (c, 0) must satisfy:
-    # 1. Distance to base point (half_span, 0) equals radius
-    # 2. Distance to shoulder point (x_t, y_t) equals radius
-    # This gives: r1² = (half_span - c)² = (x_t - c)² + y_t²
-
     denominator = 2.0 * (half_span - x_t)
     if abs(denominator) <= tolerance:
-        raise ValueError("Shoulder ratio is too close to the springing point.")
+        raise ValueError("Shoulder ratio produces a degenerate lower-center configuration.")
 
     c = (half_span * half_span - x_t * x_t - y_t * y_t) / denominator
     r1 = half_span - c
-
     if r1 <= tolerance:
-        raise ValueError("Computed lower radius is non-positive.")
+        raise ValueError("Lower radius collapses for the requested proportions.")
 
-    # Verify lower arc geometry
     r1_check = math.sqrt((x_t - c) ** 2 + y_t**2)
     if abs(r1 - r1_check) > tolerance:
-        raise ValueError("Lower arc geometry is inconsistent.")
+        raise ValueError("Lower arc geometry is inconsistent with span/rise.")
 
-    # Upper arc center calculation with tangency constraint
-    # For tangency, the vectors from centers to shoulder must be collinear:
-    # (x_t - c, y_t - 0) and (x_t - d, y_t - h2) are collinear
-    # This means: (x_t - c)/y_t = (x_t - d)/(y_t - h2)
-    # Rearranging: d = x_t - (x_t - c) * (y_t - h2) / y_t
-
-    # Upper arc must also pass through apex (0, rise)
-    # Distance formula: r2² = d² + (h2 - rise)² = (x_t - d)² + (y_t - h2)²
-
-    # From tangency constraint: d - x_t = -(x_t - c) * (y_t - h2) / y_t
-    # Let k = (x_t - c) / y_t (slope of lower radius at shoulder)
     if abs(y_t) <= tolerance:
-        raise ValueError("Shoulder height too close to baseline for four-center arch.")
+        raise ValueError("Shoulder height sits on the baseline; no tangent solution.")
 
     k = (x_t - c) / y_t
+    if abs(k) > 10.0:
+        raise ValueError("Shoulder slope is extreme; try moving the tangent outward or upward.")
 
-    # Validate shoulder ratio constraints
-    if abs(k) > 10.0:  # Prevent extreme slopes
-        raise ValueError("Shoulder position creates extreme geometry for four-center arch.")
-
-    # Substituting into apex distance constraint and solving for h2:
-    # This yields a quadratic equation in h2
     a_coef = 1.0 + k * k
     b_coef = -2.0 * rise + 2.0 * k * x_t
     c_coef = rise * rise + x_t * x_t - (x_t + k * y_t) ** 2
 
     discriminant = b_coef * b_coef - 4.0 * a_coef * c_coef
-
-    # Handle negative discriminant by adjusting shoulder height
     if discriminant < -tolerance:
-        # Adjust shoulder height to make geometry feasible
-        # Reduce shoulder height ratio to create valid tangency conditions
-        original_sh = sh
-        max_attempts = 5
-        attempt = 0
+        raise ValueError("Upper arc discriminant is negative; no real solution.")
 
-        while discriminant < -tolerance and attempt < max_attempts:
-            attempt += 1
-            # Reduce shoulder height by 10% each attempt
-            sh = original_sh * (1.0 - 0.1 * attempt)
-            sh = max(sh, 0.2)  # Don't go below minimum
+    discriminant = max(0.0, discriminant)
+    sqrt_disc = math.sqrt(discriminant)
+    h2_candidates = (
+        (-b_coef + sqrt_disc) / (2.0 * a_coef),
+        (-b_coef - sqrt_disc) / (2.0 * a_coef),
+    )
 
-            # Recalculate with adjusted shoulder height
-            y_t = rise * sh
-            k = (x_t - c) / y_t
-
-            # Recalculate quadratic coefficients
-            a_coef = 1.0 + k * k
-            b_coef = -2.0 * rise + 2.0 * k * x_t
-            c_coef = rise * rise + x_t * x_t - (x_t + k * y_t) ** 2
-            discriminant = b_coef * b_coef - 4.0 * a_coef * c_coef
-
-        if discriminant < -tolerance:
-            raise ValueError(
-                f"Four-center arch geometry not feasible with span={span:.2f}, rise={rise:.2f}. "
-                f"Try reducing shoulder height ratio below {original_sh:.2f} or increasing rise/span ratio."
-            )
-
-    discriminant = max(0.0, discriminant)  # Handle numerical errors
-
-    # Choose solution that places center above shoulder
-    h2_1 = (-b_coef + math.sqrt(discriminant)) / (2.0 * a_coef)
-    h2_2 = (-b_coef - math.sqrt(discriminant)) / (2.0 * a_coef)
-
-    # Select the solution that gives a valid geometry
-    h2 = None
-    for candidate in [h2_1, h2_2]:
-        if candidate > y_t + tolerance and candidate < rise * 2.0:  # Reasonable bounds
-            h2 = candidate
-            break
-
+    h2 = next(
+        (
+            candidate
+            for candidate in h2_candidates
+            if candidate > y_t + tolerance and candidate < rise * 2.0
+        ),
+        None,
+    )
     if h2 is None:
-        # Fallback: use the higher solution if both are problematic
-        h2 = max(h2_1, h2_2)
+        h2 = max(h2_candidates)
         if h2 <= y_t + tolerance:
-            raise ValueError("Unable to find valid upper center position for four-center arch.")
+            raise ValueError("Upper centre collapses toward the tangent point.")
 
-    # Calculate d from tangency constraint
     d = x_t - k * (y_t - h2)
 
-    # Calculate upper radius
     r2_from_shoulder = math.sqrt((x_t - d) ** 2 + (y_t - h2) ** 2)
     r2_from_apex = math.sqrt(d * d + (h2 - rise) ** 2)
-
-    # Verify consistency
-    if abs(r2_from_shoulder - r2_from_apex) > tolerance:
-        # Try to adjust for numerical errors
-        r2 = (r2_from_shoulder + r2_from_apex) * 0.5
-    else:
-        r2 = r2_from_shoulder
+    r2 = (r2_from_shoulder + r2_from_apex) * 0.5
 
     if r2 <= tolerance:
-        raise ValueError("Computed upper radius is invalid.")
+        raise ValueError("Upper radius collapses for the requested proportions.")
 
     return FourCenterParameters(
         lower_center_offset=c,
@@ -182,4 +190,105 @@ def solve_four_center_parameters(  # noqa: PLR0912, PLR0915
         upper_radius=r2,
         tangent_x=x_t,
         tangent_y=y_t,
+    )
+
+
+def _shoulder_ratio_extras(base: float, rise_ratio: float) -> list[float]:
+    """Provide heuristically useful shoulder ratios."""
+    heuristics = [
+        0.18,
+        0.22,
+        0.25,
+        0.28,
+        0.3,
+        0.32,
+        0.35,
+        0.38,
+        0.4,
+        0.45,
+        base * 0.8,
+        base * 0.9,
+        base * 1.1,
+        base * 1.2,
+    ]
+    adaptive = clamp(0.18 + 0.25 * rise_ratio, _MIN_SHOULDER_RATIO, 0.6)
+    heuristics.append(adaptive)
+    return heuristics
+
+
+def _shoulder_height_extras(base: float, rise_ratio: float) -> list[float]:
+    """Provide heuristically useful shoulder height ratios."""
+    heuristics = [
+        0.35,
+        0.4,
+        0.45,
+        0.5,
+        0.55,
+        0.6,
+        0.65,
+        0.7,
+        0.75,
+        0.8,
+        0.85,
+        base * 0.9,
+        base * 1.1,
+    ]
+    adaptive = clamp(0.45 + 0.35 * rise_ratio, _MIN_SHOULDER_HEIGHT_RATIO, _MAX_SHOULDER_HEIGHT_RATIO)
+    heuristics.append(adaptive)
+    return heuristics
+
+
+def solve_four_center_parameters(
+    span: float,
+    rise: float,
+    *,
+    shoulder_ratio: float,
+    shoulder_height_ratio: float,
+    tolerance: float,
+) -> FourCenterParameters:
+    """Compute parameters for a four-center (depressed/Tudor) arch.
+
+    Attempts the requested shoulder configuration first, then explores nearby
+    configurations to find a viable tangent solution. Detailed error messages
+    are provided if no combination succeeds.
+    """
+    if span <= 0 or rise <= 0:
+        raise ValueError("Span and rise must be positive.")
+
+    sr_pref = clamp(shoulder_ratio, _MIN_SHOULDER_RATIO, _MAX_SHOULDER_RATIO)
+    sh_pref = clamp(shoulder_height_ratio, _MIN_SHOULDER_HEIGHT_RATIO, _MAX_SHOULDER_HEIGHT_RATIO)
+
+    rise_ratio = rise / span if span > 0 else 0.5
+
+    shoulder_candidates = _prioritized_values(
+        sr_pref,
+        _MIN_SHOULDER_RATIO,
+        min(_MAX_SHOULDER_RATIO, 0.65),
+        step=0.02,
+        extras=_shoulder_ratio_extras(sr_pref, rise_ratio),
+    )
+    height_candidates = _prioritized_values(
+        sh_pref,
+        _MIN_SHOULDER_HEIGHT_RATIO,
+        _MAX_SHOULDER_HEIGHT_RATIO,
+        step=0.05,
+        extras=_shoulder_height_extras(sh_pref, rise_ratio),
+    )
+
+    attempts = 0
+    failure_samples: list[str] = []
+
+    for sr, sh in _candidate_pairs(shoulder_candidates, height_candidates):
+        attempts += 1
+        try:
+            return _solve_with_fixed_tangent(span, rise, sr, sh, tolerance)
+        except ValueError as exc:
+            if len(failure_samples) < _MAX_FAILURE_SAMPLES:
+                failure_samples.append(f"sr={sr:.3f}, sh={sh:.3f}: {exc}")
+
+    sample_text = "; ".join(failure_samples) if failure_samples else "No viable combinations found."
+    raise ValueError(
+        f"Unable to solve four-center arch for span={span:.3f}, rise={rise:.3f}. "
+        f"Tried {attempts} shoulder configurations near sr={sr_pref:.3f}, sh={sh_pref:.3f}. "
+        f"{sample_text}"
     )

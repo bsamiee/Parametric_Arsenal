@@ -13,12 +13,6 @@ Command for creating two-center (Tudor) arches.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "libs"))
-
 from typing import Any
 
 import Rhino.Geometry as rg

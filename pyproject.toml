@@ -137,6 +137,10 @@ reportInconsistentConstructor = "warning"
 reportUnnecessaryTypeIgnoreComment = "none"  # Allow type ignores for mypy compatibility
 reportImportCycles = "warning"
 
+# --- UV Configuration -------------------------------------------------------
+[tool.uv]
+cache-dir = ".cache/uv"
+
 # --- Ruff Configuration -----------------------------------------------------
 [tool.ruff]
 target-version = "py39"
@@ -180,6 +184,7 @@ extend-select = [
 ]
 
 extend-ignore = [
+    "EXE001",               # Shebang at header is not for executable file
     "COM812",               # formatter conflict
     "E701",                 # one-line compound for tiny helpers
     "TID252",               # allow relative imports, matches pyright

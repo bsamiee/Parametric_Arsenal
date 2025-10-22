@@ -104,16 +104,18 @@ def solve_multifoil_parameters(
         angle_start = math.atan2(vec_start_y, vec_start_x)
         angle_end = math.atan2(vec_end_y, vec_end_x)
 
-        # Ensure inward-curving arc
+        # Ensure inward-curving arc by using the minor positive sweep
         angle_diff = angle_end - angle_start
-        # Normalize to [-π, π]
         while angle_diff > math.pi:
-            angle_diff -= 2 * math.pi
-        while angle_diff <= -math.pi:
-            angle_diff += 2 * math.pi
+            angle_diff -= 2.0 * math.pi
+        while angle_diff < -math.pi:
+            angle_diff += 2.0 * math.pi
 
         if angle_diff < 0:
-            angle_end = angle_start + angle_diff + 2 * math.pi
+            angle_diff = abs(angle_diff)
+
+        angle_span = max(angle_diff, tolerance)
+        angle_end = angle_start + angle_span
 
         foil_arcs.append(
             FoilArcParameters(
