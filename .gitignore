@@ -10,8 +10,6 @@
 
 # --- General -------------------------------------------------------------------
 .claude/
-.warp/
-.kiro/
 claude.md
 gemini.md
 agents.md

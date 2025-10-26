@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors>CS8618</WarningsNotAsErrors>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <TargetExt>.gha</TargetExt>
+    <RootNamespace>HopperHelper</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>NU1701;CA1501</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="components/**/*.cs" />
+    <Compile Include="utils/**/*.cs" />
+    <Compile Include="HopperHelperInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="8.16.25042.13001" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\libs\core\Core.csproj" />
+    <ProjectReference Include="..\..\..\libs\rhino\Rhino.csproj" />
+    <ProjectReference Include="..\..\..\libs\grasshopper\Grasshopper.csproj" />
+  </ItemGroup>
+
+  <!-- Auto-deploy to Grasshopper Libraries after build -->
+  <Target Name="DeployPlugin" AfterTargets="Build">
+    <PropertyGroup>
+      <!-- Cross-platform Grasshopper Libraries path detection -->
+      <GrasshopperLibraries Condition="'$(OS)' == 'Windows_NT'">$(APPDATA)\McNeel\Rhinoceros\8.0\Plug-ins\Grasshopper (b45a29b1-4343-4035-989e-044e8580d9cf)\Libraries</GrasshopperLibraries>
+      <GrasshopperLibraries Condition="'$(OS)' != 'Windows_NT'">$(HOME)/Library/Application Support/McNeel/Rhinoceros/8.0/Plug-ins/Grasshopper (b45a29b1-4343-4035-989e-044e8580d9cf)/Libraries</GrasshopperLibraries>
+    </PropertyGroup>
+    <ItemGroup>
+      <FilesToDeploy Include="$(OutputPath)$(AssemblyName).gha" />
+      <FilesToDeploy Include="$(OutputPath)Arsenal.Core.dll" />
+      <FilesToDeploy Include="$(OutputPath)Arsenal.Rhino.dll" />
+      <FilesToDeploy Include="$(OutputPath)Arsenal.Grasshopper.dll" />
+    </ItemGroup>
+    <Message Text="Deploying $(AssemblyName).gha and dependencies to Grasshopper Libraries..." Importance="high" />
+    <Message Text="Target directory: $(GrasshopperLibraries)" Importance="high" />
+    <MakeDir Directories="$(GrasshopperLibraries)" Condition="!Exists('$(GrasshopperLibraries)')" />
+    <Copy SourceFiles="@(FilesToDeploy)" DestinationFolder="$(GrasshopperLibraries)" SkipUnchangedFiles="false" />
+    <Message Text="Successfully deployed to: $(GrasshopperLibraries)/" Importance="high" />
+  </Target>
+</Project>
