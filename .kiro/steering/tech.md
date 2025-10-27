@@ -54,11 +54,14 @@ dotnet build -c Release
 ### Auto-Deployment
 Grasshopper plugins automatically deploy to Rhino's Grasshopper Libraries folder after build (macOS path configured in .csproj).
 
-## Development Principles
+## Development Principles (Polymorphic & Compositional)
 
-1. **Leverage SDKs First**: Always use RhinoCommon and Grasshopper SDK functionality. Never reimplement what the SDKs provide.
-2. **Build on Shared Libraries**: Use and extend `libs/` for common functionality. Libraries should build upon each other (e.g., `Arsenal.Rhino` uses `Arsenal.Core`).
-3. **Plugins Use Libraries**: All plugins should reference and leverage the shared libraries rather than duplicating code.
+1. **Interface-First Design**: Define contracts before implementations. All major functionality exposed through interfaces.
+2. **Composition Over Inheritance**: Use "has-a" and "uses-a" relationships. Avoid deep inheritance hierarchies.
+3. **Leverage SDKs Through Composition**: Compose RhinoCommon and Grasshopper SDK functionality behind our interfaces.
+4. **Functional Core, Imperative Shell**: Pure functions for business logic, OOP for boundaries and lifetime management.
+5. **Build on Shared Libraries**: Libraries compose each other through interface contracts (e.g., `Arsenal.Rhino` composes `Arsenal.Core` interfaces).
+6. **Plugins as Composition Roots**: Plugins wire up concrete implementations and orchestrate through interfaces.
 
 ## Research & Documentation Tools
 

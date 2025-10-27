@@ -1,14 +1,12 @@
 using Arsenal.Core.Result;
 using Rhino.Geometry;
 
-namespace Arsenal.Rhino.Geometry.Base;
+namespace Arsenal.Rhino.Geometry.Core;
 
-/// <summary>Determines appropriate geometric classifications for downstream operations.</summary>
+/// <summary>Geometry classification operations.</summary>
 public interface IClassifier
 {
-    /// <summary>Determines the appropriate mass property calculation mode for the geometry.</summary>
-    /// <param name="geometry">The geometry to classify.</param>
-    /// <returns>A result containing the mass property mode or a failure.</returns>
+    /// <summary>Determines appropriate mass property calculation mode for geometry.</summary>
     Result<MassPropertyMode> MassPropertyMode(GeometryBase geometry);
 }
 

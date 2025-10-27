@@ -7,9 +7,6 @@ namespace Arsenal.Core.Result;
 public sealed record Failure
 {
     /// <summary>Initializes a new failure with the specified code, message, and optional metadata.</summary>
-    /// <param name="code">The failure code.</param>
-    /// <param name="message">The failure message.</param>
-    /// <param name="metadata">Optional metadata associated with the failure.</param>
     public Failure(string code, string message, IReadOnlyDictionary<string, object?>? metadata = null)
     {
         Code = string.IsNullOrWhiteSpace(code)
@@ -33,9 +30,6 @@ public sealed record Failure
     public IReadOnlyDictionary<string, object?>? Metadata { get; }
 
     /// <summary>Creates a failure from an exception.</summary>
-    /// <param name="exception">The exception to convert.</param>
-    /// <param name="code">The failure code to use.</param>
-    /// <returns>A failure containing the exception details.</returns>
     public static Failure From(Exception exception, string code = "exception")
     {
         ArgumentNullException.ThrowIfNull(exception);

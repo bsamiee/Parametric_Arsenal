@@ -11,9 +11,7 @@ public static class Tolerance
     private const double DefaultAbsoluteTolerance = 0.01;
     private const double DefaultAngleToleranceRadians = Math.PI / 180.0;
 
-    /// <summary>Gets the absolute tolerance from a document or default value.</summary>
-    /// <param name="doc">The document to query, or null to use the active document.</param>
-    /// <returns>The absolute tolerance value.</returns>
+    /// <summary>Gets absolute tolerance from document or default.</summary>
     public static double Absolute(RhinoDoc? doc = null)
     {
         return doc?.ModelAbsoluteTolerance
@@ -21,9 +19,7 @@ public static class Tolerance
                ?? DefaultAbsoluteTolerance;
     }
 
-    /// <summary>Gets the angle tolerance in radians from a document or default value.</summary>
-    /// <param name="doc">The document to query, or null to use the active document.</param>
-    /// <returns>The angle tolerance in radians.</returns>
+    /// <summary>Gets angle tolerance in radians from document or default.</summary>
     public static double AngleRadians(RhinoDoc? doc = null)
     {
         return doc?.ModelAngleToleranceRadians
@@ -31,16 +27,10 @@ public static class Tolerance
                ?? DefaultAngleToleranceRadians;
     }
 
-    /// <summary>Gets the angle tolerance in degrees from a document or default value.</summary>
-    /// <param name="doc">The document to query, or null to use the active document.</param>
-    /// <returns>The angle tolerance in degrees.</returns>
+    /// <summary>Gets angle tolerance in degrees from document or default.</summary>
     public static double AngleDegrees(RhinoDoc? doc = null) => RhinoMath.ToDegrees(AngleRadians(doc));
 
-    /// <summary>Checks if two values are nearly equal within a specified epsilon.</summary>
-    /// <param name="a">The first value.</param>
-    /// <param name="b">The second value.</param>
-    /// <param name="epsilon">The tolerance for comparison.</param>
-    /// <returns>A result containing true if values are nearly equal, or a failure.</returns>
+    /// <summary>Checks if two values are nearly equal within epsilon.</summary>
     public static Result<bool> NearlyEqual(double a, double b, double epsilon)
     {
         if (!double.IsFinite(epsilon) || epsilon < 0)
@@ -57,10 +47,6 @@ public static class Tolerance
     }
 
     /// <summary>Checks if two values are nearly equal using document tolerance.</summary>
-    /// <param name="a">The first value.</param>
-    /// <param name="b">The second value.</param>
-    /// <param name="doc">The document to get tolerance from, or null to use active document.</param>
-    /// <returns>True if values are nearly equal within document tolerance.</returns>
     public static bool NearlyEqual(double a, double b, RhinoDoc? doc = null)
     {
         if (!double.IsFinite(a) || !double.IsFinite(b))
@@ -73,10 +59,6 @@ public static class Tolerance
     }
 
     /// <summary>Checks if two points are nearly equal using document tolerance.</summary>
-    /// <param name="a">The first point.</param>
-    /// <param name="b">The second point.</param>
-    /// <param name="doc">The document to get tolerance from, or null to use active document.</param>
-    /// <returns>A result containing true if points are nearly equal, or a failure.</returns>
     public static Result<bool> NearlyEqual(Point3d a, Point3d b, RhinoDoc? doc = null)
     {
         if (!a.IsValid || !b.IsValid)
@@ -88,10 +70,7 @@ public static class Tolerance
         return Result<bool>.Success(a.EpsilonEquals(b, tolerance));
     }
 
-    /// <summary>Validates a tolerance value is within reasonable bounds.</summary>
-    /// <param name="tolerance">The tolerance value to validate.</param>
-    /// <param name="name">The name of the tolerance for error messages.</param>
-    /// <returns>A result containing the validated tolerance or a failure.</returns>
+    /// <summary>Validates tolerance value is within reasonable bounds.</summary>
     public static Result<double> Validate(double tolerance, string name)
     {
         ArgumentNullException.ThrowIfNull(name);

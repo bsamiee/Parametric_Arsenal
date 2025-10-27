@@ -1,24 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 using Arsenal.Rhino.Spatial;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
+using RhinoCurve = Rhino.Geometry.Curve;
 
 namespace Arsenal.Rhino.Geometry.Curve;
 
-/// <summary>RhinoCommon-backed curve operations.</summary>
+/// <summary>Curve operations using RhinoCommon.</summary>
 public sealed class CurveOperations : ICurve
 {
-    /// <summary>Finds the closest point on the curve to the test point.</summary>
-    /// <param name="curve">The curve to project onto.</param>
-    /// <param name="testPoint">The point to project.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the closest point information or a failure.</returns>
-    public Result<CurveClosestPoint> ClosestPoint(global::Rhino.Geometry.Curve curve, Point3d testPoint, GeoContext context)
+    /// <summary>Finds closest point on curve to test point.</summary>
+    public Result<CurveClosestPoint> ClosestPoint(RhinoCurve curve, Point3d testPoint, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -47,15 +44,11 @@ public sealed class CurveOperations : ICurve
 
         Point3d projection = curve.PointAt(parameter);
         double distance = testPoint.DistanceTo(projection);
-
         return Result<CurveClosestPoint>.Success(new CurveClosestPoint(projection, parameter, distance));
     }
 
-    /// <summary>Computes the tangent vector at the specified parameter.</summary>
-    /// <param name="curve">The curve to evaluate.</param>
-    /// <param name="parameter">The parameter to evaluate at.</param>
-    /// <returns>A result containing the unit tangent vector or a failure.</returns>
-    public Result<Vector3d> TangentAt(global::Rhino.Geometry.Curve curve, double parameter)
+    /// <summary>Computes tangent vector at curve parameter.</summary>
+    public Result<Vector3d> TangentAt(RhinoCurve curve, double parameter)
     {
         Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
@@ -87,11 +80,8 @@ public sealed class CurveOperations : ICurve
         }
     }
 
-    /// <summary>Computes quadrant points for circular or elliptical curves.</summary>
-    /// <param name="curve">The curve to compute quadrant points for.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the quadrant points or a failure.</returns>
-    public Result<IReadOnlyList<Point3d>> QuadrantPoints(global::Rhino.Geometry.Curve curve, GeoContext context)
+    /// <summary>Computes quadrant points for circular/elliptical curves.</summary>
+    public Result<IReadOnlyList<Point3d>> QuadrantPoints(RhinoCurve curve, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -155,10 +145,8 @@ public sealed class CurveOperations : ICurve
             : Result<IReadOnlyList<Point3d>>.Fail(deduplicated.Failure!);
     }
 
-    /// <summary>Computes the midpoint of the curve.</summary>
-    /// <param name="curve">The curve to compute the midpoint for.</param>
-    /// <returns>A result containing the midpoint or a failure.</returns>
-    public Result<Point3d> Midpoint(global::Rhino.Geometry.Curve curve)
+    /// <summary>Computes curve midpoint.</summary>
+    public Result<Point3d> Midpoint(RhinoCurve curve)
     {
         Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
@@ -180,9 +168,9 @@ public sealed class CurveOperations : ICurve
         }
     }
 
-    private static Result<global::Rhino.Geometry.Curve> ValidateCurve(global::Rhino.Geometry.Curve? curve)
+    private static Result<RhinoCurve> ValidateCurve(RhinoCurve? curve)
     {
-        Result<global::Rhino.Geometry.Curve> guard = Guard.AgainstNull(curve, nameof(curve));
+        Result<RhinoCurve> guard = Guard.AgainstNull(curve, nameof(curve));
         if (!guard.IsSuccess)
         {
             return guard;
@@ -190,7 +178,7 @@ public sealed class CurveOperations : ICurve
 
         if (!guard.Value!.IsValid)
         {
-            return Result<global::Rhino.Geometry.Curve>.Fail(new Failure("curve.invalid", "Curve is not valid."));
+            return Result<RhinoCurve>.Fail(new Failure("curve.invalid", "Curve is not valid."));
         }
 
         return guard;

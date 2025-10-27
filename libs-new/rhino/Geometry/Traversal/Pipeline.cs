@@ -1,22 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Rhino.Geometry;
 
-namespace Arsenal.Rhino.Geometry.Base;
+namespace Arsenal.Rhino.Geometry.Traversal;
 
-/// <summary>Reusable traversal helpers for geometry collections.</summary>
+/// <summary>Geometry collection traversal utilities.</summary>
 public sealed class Pipeline : IPipeline
 {
-    /// <summary>Traverses geometry collections with extraction and optional pipeline processing.</summary>
-    /// <typeparam name="TIntermediate">The intermediate type extracted from geometry.</typeparam>
-    /// <typeparam name="TOutput">The final output type after pipeline processing.</typeparam>
-    /// <param name="geometries">The geometry collection to traverse.</param>
-    /// <param name="extractor">Function to extract intermediate values from each geometry.</param>
-    /// <param name="pipeline">Optional pipeline function to transform intermediate values.</param>
-    /// <returns>A result containing the processed output collection or a failure.</returns>
+    /// <summary>Traverses geometry collections with extraction and optional processing.</summary>
     public Result<IReadOnlyList<TOutput>> Traverse<TIntermediate, TOutput>(
         IEnumerable<GeometryBase> geometries,
         Func<GeometryBase, IEnumerable<TIntermediate>> extractor,

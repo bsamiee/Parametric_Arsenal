@@ -1,34 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 using Arsenal.Rhino.Spatial;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
+using RhinoCurve = Rhino.Geometry.Curve;
+using RhinoMesh = Rhino.Geometry.Mesh;
+using RhinoSurface = Rhino.Geometry.Surface;
 
 namespace Arsenal.Rhino.Geometry.Intersect;
 
-/// <summary>RhinoCommon-backed intersection operations.</summary>
+/// <summary>Intersection operations using RhinoCommon.</summary>
 public sealed class Intersect : IIntersect
 {
-    /// <summary>Computes intersections between curves.</summary>
-    /// <param name="curves">The curves to intersect.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <param name="includeSelf">Whether to include self-intersections.</param>
-    /// <returns>A result containing the intersection hits or a failure.</returns>
-    public Result<IReadOnlyList<CurveCurveHit>> CurveCurve(IEnumerable<global::Rhino.Geometry.Curve> curves, GeoContext context, bool includeSelf = false)
+    /// <summary>Computes curve-curve intersections.</summary>
+    public Result<IReadOnlyList<CurveCurveHit>> CurveCurve(IEnumerable<RhinoCurve> curves, GeoContext context, bool includeSelf = false)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<IReadOnlyCollection<global::Rhino.Geometry.Curve>> collectionResult = Guard.AgainstEmpty(curves, nameof(curves));
+        Result<IReadOnlyCollection<RhinoCurve>> collectionResult = Guard.AgainstEmpty(curves, nameof(curves));
         if (!collectionResult.IsSuccess)
         {
             return Result<IReadOnlyList<CurveCurveHit>>.Fail(collectionResult.Failure!);
         }
 
-        IReadOnlyList<global::Rhino.Geometry.Curve> curveList = collectionResult.Value!.ToList();
+        IReadOnlyList<RhinoCurve> curveList = collectionResult.Value!.ToList();
         double tol = context.AbsoluteTolerance;
 
         for (int i = 0; i < curveList.Count; i++)
@@ -51,7 +50,7 @@ public sealed class Intersect : IIntersect
 
         for (int i = 0; i < curveList.Count; i++)
         {
-            global::Rhino.Geometry.Curve curveA = curveList[i];
+            RhinoCurve curveA = curveList[i];
             BoundingBox search = curveA.GetBoundingBox(false);
             search.Inflate(tol);
 
@@ -67,7 +66,7 @@ public sealed class Intersect : IIntersect
 
             foreach (int j in candidates)
             {
-                global::Rhino.Geometry.Curve curveB = curveList[j];
+                RhinoCurve curveB = curveList[j];
                 CurveIntersections intersections = Intersection.CurveCurve(curveA, curveB, tol, tol);
                 if (intersections is { Count: > 0 })
                 {
@@ -102,21 +101,17 @@ public sealed class Intersect : IIntersect
             return Result<IReadOnlyList<CurveCurveHit>>.Fail(dedupe.Failure!);
         }
 
-        HashSet<Point3d> unique = new(dedupe.Value);
+        HashSet<Point3d> unique = new(dedupe.Value!);
         IReadOnlyList<CurveCurveHit> filtered = hits.Where(hit => unique.Contains(hit.Point)).ToList();
         return Result<IReadOnlyList<CurveCurveHit>>.Success(filtered);
     }
 
-    /// <summary>Computes intersections between a mesh and rays.</summary>
-    /// <param name="mesh">The mesh to intersect with.</param>
-    /// <param name="rays">The rays to intersect.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the intersection hits or a failure.</returns>
-    public Result<IReadOnlyList<MeshRayHit>> MeshRay(global::Rhino.Geometry.Mesh mesh, IEnumerable<Ray3d> rays, GeoContext context)
+    /// <summary>Computes mesh-ray intersections.</summary>
+    public Result<IReadOnlyList<MeshRayHit>> MeshRay(RhinoMesh mesh, IEnumerable<Ray3d> rays, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<global::Rhino.Geometry.Mesh> meshResult = Guard.AgainstNull(mesh, nameof(mesh));
+        Result<RhinoMesh> meshResult = Guard.AgainstNull(mesh, nameof(mesh));
         if (!meshResult.IsSuccess)
         {
             return Result<IReadOnlyList<MeshRayHit>>.Fail(meshResult.Failure!);
@@ -160,29 +155,25 @@ public sealed class Intersect : IIntersect
         return Result<IReadOnlyList<MeshRayHit>>.Success(hits);
     }
 
-    /// <summary>Computes intersections between surfaces and curves.</summary>
-    /// <param name="surfaces">The surfaces to intersect with.</param>
-    /// <param name="curves">The curves to intersect.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the intersection hits or a failure.</returns>
-    public Result<IReadOnlyList<SurfaceCurveHit>> SurfaceCurve(IEnumerable<global::Rhino.Geometry.Surface> surfaces, IEnumerable<global::Rhino.Geometry.Curve> curves, GeoContext context)
+    /// <summary>Computes surface-curve intersections.</summary>
+    public Result<IReadOnlyList<SurfaceCurveHit>> SurfaceCurve(IEnumerable<RhinoSurface> surfaces, IEnumerable<RhinoCurve> curves, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<IReadOnlyCollection<global::Rhino.Geometry.Surface>> surfaceResult = Guard.AgainstEmpty(surfaces, nameof(surfaces));
+        Result<IReadOnlyCollection<RhinoSurface>> surfaceResult = Guard.AgainstEmpty(surfaces, nameof(surfaces));
         if (!surfaceResult.IsSuccess)
         {
             return Result<IReadOnlyList<SurfaceCurveHit>>.Fail(surfaceResult.Failure!);
         }
 
-        Result<IReadOnlyCollection<global::Rhino.Geometry.Curve>> curveResult = Guard.AgainstEmpty(curves, nameof(curves));
+        Result<IReadOnlyCollection<RhinoCurve>> curveResult = Guard.AgainstEmpty(curves, nameof(curves));
         if (!curveResult.IsSuccess)
         {
             return Result<IReadOnlyList<SurfaceCurveHit>>.Fail(curveResult.Failure!);
         }
 
-        IReadOnlyList<global::Rhino.Geometry.Surface> surfaceList = surfaceResult.Value!.ToList();
-        IReadOnlyList<global::Rhino.Geometry.Curve> curveList = curveResult.Value!.ToList();
+        IReadOnlyList<RhinoSurface> surfaceList = surfaceResult.Value!.ToList();
+        IReadOnlyList<RhinoCurve> curveList = curveResult.Value!.ToList();
         double tol = context.AbsoluteTolerance;
 
         for (int i = 0; i < surfaceList.Count; i++)
@@ -213,7 +204,7 @@ public sealed class Intersect : IIntersect
 
         for (int i = 0; i < curveList.Count; i++)
         {
-            global::Rhino.Geometry.Curve curve = curveList[i];
+            RhinoCurve curve = curveList[i];
             BoundingBox search = curve.GetBoundingBox(false);
             search.Inflate(tol);
 
@@ -222,7 +213,7 @@ public sealed class Intersect : IIntersect
 
             foreach (int surfaceIndex in candidates)
             {
-                global::Rhino.Geometry.Surface surface = surfaceList[surfaceIndex];
+                RhinoSurface surface = surfaceList[surfaceIndex];
                 CurveIntersections intersections = Intersection.CurveSurface(curve, surface, tol, tol);
                 if (intersections is { Count: > 0 })
                 {
@@ -246,7 +237,7 @@ public sealed class Intersect : IIntersect
             return Result<IReadOnlyList<SurfaceCurveHit>>.Fail(dedupe.Failure!);
         }
 
-        HashSet<Point3d> unique = new(dedupe.Value);
+        HashSet<Point3d> unique = new(dedupe.Value!);
         IReadOnlyList<SurfaceCurveHit> filtered = hits.Where(hit => unique.Contains(hit.Point)).ToList();
         return Result<IReadOnlyList<SurfaceCurveHit>>.Success(filtered);
     }

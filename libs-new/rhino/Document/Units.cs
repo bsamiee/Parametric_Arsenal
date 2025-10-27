@@ -30,11 +30,7 @@ public static class Units
         Miles
     }
 
-    /// <summary>Converts a value from one unit system to another.</summary>
-    /// <param name="value">The value to convert.</param>
-    /// <param name="from">The source unit system.</param>
-    /// <param name="to">The target unit system.</param>
-    /// <returns>A result containing the converted value or a failure.</returns>
+    /// <summary>Converts value between unit systems.</summary>
     public static Result<double> Convert(double value, UnitType from, UnitType to)
     {
         if (!double.IsFinite(value))
@@ -63,11 +59,7 @@ public static class Units
         return Result<double>.Success(value * scale);
     }
 
-    /// <summary>Converts an area value from one unit system to another.</summary>
-    /// <param name="area">The area value to convert.</param>
-    /// <param name="from">The source unit system.</param>
-    /// <param name="to">The target unit system.</param>
-    /// <returns>A result containing the converted area or a failure.</returns>
+    /// <summary>Converts area between unit systems.</summary>
     public static Result<double> ConvertArea(double area, UnitType from, UnitType to)
     {
         if (!double.IsFinite(area) || area < 0)
@@ -81,11 +73,7 @@ public static class Units
             : Result<double>.Fail(scale.Failure!);
     }
 
-    /// <summary>Converts a volume value from one unit system to another.</summary>
-    /// <param name="volume">The volume value to convert.</param>
-    /// <param name="from">The source unit system.</param>
-    /// <param name="to">The target unit system.</param>
-    /// <returns>A result containing the converted volume or a failure.</returns>
+    /// <summary>Converts volume between unit systems.</summary>
     public static Result<double> ConvertVolume(double volume, UnitType from, UnitType to)
     {
         if (!double.IsFinite(volume) || volume < 0)
@@ -99,10 +87,7 @@ public static class Units
             : Result<double>.Fail(scale.Failure!);
     }
 
-    /// <summary>Gets the scale factor for converting between unit systems.</summary>
-    /// <param name="from">The source unit system.</param>
-    /// <param name="to">The target unit system.</param>
-    /// <returns>A result containing the scale factor or a failure.</returns>
+    /// <summary>Gets scale factor between unit systems.</summary>
     public static Result<double> GetScaleFactor(UnitType from, UnitType to)
     {
         if (from == to)
@@ -125,9 +110,7 @@ public static class Units
         return Result<double>.Success(RhinoMath.UnitScale(fromSystem.Value, toSystem.Value));
     }
 
-    /// <summary>Gets the unit system from a Rhino document.</summary>
-    /// <param name="doc">The document to query, or null to use the active document.</param>
-    /// <returns>The document's unit system, or meters if unavailable.</returns>
+    /// <summary>Gets unit system from Rhino document.</summary>
     public static UnitType GetDocumentUnits(RhinoDoc? doc = null)
     {
         RhinoDoc? target = doc ?? RhinoDoc.ActiveDoc;
@@ -140,11 +123,7 @@ public static class Units
         return result.IsSuccess ? result.Value : UnitType.Meters;
     }
 
-    /// <summary>Scales geometry from one unit system to another.</summary>
-    /// <param name="geometry">The geometry to scale.</param>
-    /// <param name="from">The source unit system.</param>
-    /// <param name="to">The target unit system.</param>
-    /// <returns>A result containing the scaled geometry or a failure.</returns>
+    /// <summary>Scales geometry between unit systems.</summary>
     public static Result<GeometryBase> ScaleGeometry(GeometryBase geometry, UnitType from, UnitType to)
     {
         Result<double> scale = GetScaleFactor(from, to);
@@ -164,11 +143,7 @@ public static class Units
         return Result<GeometryBase>.Success(copy);
     }
 
-    /// <summary>Formats a numeric value with unit suffix.</summary>
-    /// <param name="value">The value to format.</param>
-    /// <param name="units">The unit system for the suffix.</param>
-    /// <param name="decimals">The number of decimal places (0-15).</param>
-    /// <returns>A result containing the formatted string or a failure.</returns>
+    /// <summary>Formats numeric value with unit suffix.</summary>
     public static Result<string> Format(double value, UnitType units, int decimals = 2)
     {
         if (!double.IsFinite(value))
@@ -203,10 +178,7 @@ public static class Units
         return Result<string>.Success($"{formatted}{suffix}");
     }
 
-    /// <summary>Parses a dimension string with optional unit suffix.</summary>
-    /// <param name="input">The input string to parse.</param>
-    /// <param name="defaultUnits">The default unit system if no suffix is found.</param>
-    /// <returns>A result containing the parsed value in default units or a failure.</returns>
+    /// <summary>Parses dimension string with optional unit suffix.</summary>
     public static Result<double> ParseDimension(string? input, UnitType defaultUnits)
     {
         if (string.IsNullOrWhiteSpace(input))

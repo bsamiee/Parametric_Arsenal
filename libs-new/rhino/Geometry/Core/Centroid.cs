@@ -1,28 +1,27 @@
 using System;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
-using Arsenal.Rhino.Geometry.Base;
 using Rhino.Geometry;
+using RhinoBrep = Rhino.Geometry.Brep;
+using RhinoCurve = Rhino.Geometry.Curve;
+using RhinoMesh = Rhino.Geometry.Mesh;
+using RhinoSurface = Rhino.Geometry.Surface;
 
-namespace Arsenal.Rhino.Geometry.Centroid;
+namespace Arsenal.Rhino.Geometry.Core;
 
-/// <summary>RhinoCommon-backed centroid operations.</summary>
+/// <summary>Centroid operations using RhinoCommon.</summary>
 public sealed class Centroid : ICentroid
 {
     private readonly IClassifier _classifier;
 
-    /// <summary>Initializes a new instance of the Centroid class.</summary>
-    /// <param name="classifier">The geometry classifier to use for determining mass property modes.</param>
+    /// <summary>Initializes centroid operations with geometry classifier.</summary>
     public Centroid(IClassifier classifier)
     {
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
     }
 
-    /// <summary>Computes the centroid of the specified geometry.</summary>
-    /// <param name="geometry">The geometry to compute the centroid for.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the centroid point or a failure.</returns>
+    /// <summary>Computes geometry centroid.</summary>
     public Result<Point3d> Compute(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -45,15 +44,15 @@ public sealed class Centroid : ICentroid
             return geometry switch
             {
                 null => Result<Point3d>.Fail(new Failure("geometry.null", "Geometry cannot be null.")),
-                global::Rhino.Geometry.Brep brep => mode == MassPropertyMode.Volume
+                RhinoBrep brep => mode == MassPropertyMode.Volume
                     ? ComputeFromBrep(brep, useVolume: true)
                     : ComputeFromBrep(brep, useVolume: false),
-                global::Rhino.Geometry.Mesh mesh => ComputeFromMesh(mesh),
+                RhinoMesh mesh => ComputeFromMesh(mesh),
                 Extrusion extrusion => WithBrep(extrusion.ToBrep(), brep => ComputeFromBrep(brep, mode == MassPropertyMode.Volume)),
                 SubD subd => WithBrep(subd.ToBrep(), brep => ComputeFromBrep(brep, mode == MassPropertyMode.Volume)),
-                global::Rhino.Geometry.Surface surface => ComputeFromSurface(surface),
-                global::Rhino.Geometry.Curve curve when mode == MassPropertyMode.Area => ComputeFromCurveClosed(curve),
-                global::Rhino.Geometry.Curve curve => ComputeFromCurveOpen(curve),
+                RhinoSurface surface => ComputeFromSurface(surface),
+                RhinoCurve curve when mode == MassPropertyMode.Area => ComputeFromCurveClosed(curve),
+                RhinoCurve curve => ComputeFromCurveOpen(curve),
                 Point point => Result<Point3d>.Success(point.Location),
                 _ => Result<Point3d>.Success(BoundingBoxCentroid(geometry.GetBoundingBox(true)))
             };
@@ -64,7 +63,7 @@ public sealed class Centroid : ICentroid
         }
     }
 
-    private static Result<Point3d> ComputeFromBrep(global::Rhino.Geometry.Brep brep, bool useVolume)
+    private static Result<Point3d> ComputeFromBrep(RhinoBrep brep, bool useVolume)
     {
         return TryComputeCentroid(
             useVolume ? () => VolumeMassProperties.Compute(brep) : null,
@@ -72,7 +71,7 @@ public sealed class Centroid : ICentroid
             () => BoundingBoxCentroid(brep.GetBoundingBox(true)));
     }
 
-    private static Result<Point3d> ComputeFromMesh(global::Rhino.Geometry.Mesh mesh)
+    private static Result<Point3d> ComputeFromMesh(RhinoMesh mesh)
     {
         return TryComputeCentroid(
             () => VolumeMassProperties.Compute(mesh),
@@ -80,7 +79,7 @@ public sealed class Centroid : ICentroid
             () => BoundingBoxCentroid(mesh.GetBoundingBox(true)));
     }
 
-    private static Result<Point3d> ComputeFromSurface(global::Rhino.Geometry.Surface surface)
+    private static Result<Point3d> ComputeFromSurface(RhinoSurface surface)
     {
         return TryComputeCentroid(
             null,
@@ -88,7 +87,7 @@ public sealed class Centroid : ICentroid
             () => BoundingBoxCentroid(surface.GetBoundingBox(true)));
     }
 
-    private static Result<Point3d> ComputeFromCurveClosed(global::Rhino.Geometry.Curve curve)
+    private static Result<Point3d> ComputeFromCurveClosed(RhinoCurve curve)
     {
         try
         {
@@ -106,7 +105,7 @@ public sealed class Centroid : ICentroid
         return Result<Point3d>.Success(BoundingBoxCentroid(curve.GetBoundingBox(true)));
     }
 
-    private static Result<Point3d> ComputeFromCurveOpen(global::Rhino.Geometry.Curve curve)
+    private static Result<Point3d> ComputeFromCurveOpen(RhinoCurve curve)
     {
         return Result<Point3d>.Success(BoundingBoxCentroid(curve.GetBoundingBox(true)));
     }
@@ -149,7 +148,7 @@ public sealed class Centroid : ICentroid
         return Result<Point3d>.Success(fallbackPoint);
     }
 
-    private static Result<Point3d> WithBrep(global::Rhino.Geometry.Brep? brep, Func<global::Rhino.Geometry.Brep, Result<Point3d>> selector)
+    private static Result<Point3d> WithBrep(RhinoBrep? brep, Func<RhinoBrep, Result<Point3d>> selector)
     {
         if (brep is null)
         {

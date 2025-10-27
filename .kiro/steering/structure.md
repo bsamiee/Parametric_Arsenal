@@ -8,32 +8,36 @@ inclusion: always
 
 ```
 Parametric_Arsenal/
-├── libs/                    # Shared C# libraries (foundation for all plugins)
+├── libs/                    # Shared C# libraries (polymorphic foundation for all plugins)
 ├── grasshopper/            # Grasshopper plugins (C#)
 ├── rhino/                  # Rhino plugins (C#)
 ├── .kiro/                  # Kiro IDE configuration
 └── Parametric_Arsenal.sln  # Visual Studio solution
 ```
 
-## Shared Libraries (`libs/`) - The Foundation
+## Shared Libraries (`libs/`) - The Polymorphic Foundation
 
-All plugins are built on top of these shared C# libraries. Libraries should also leverage each other:
+All plugins are built on top of these shared C# libraries using composition and interface-based design. Libraries leverage each other through well-defined contracts:
 
-- **core/**: Core utilities and types (e.g., `Result<T>` pattern, common interfaces)
+- **core/**: Core interfaces, patterns, and utilities
   - Namespace: `Arsenal.Core`
-  - No external dependencies beyond .NET
+  - Contains: `Result<T>` pattern, core interfaces, functional utilities, composition helpers
+  - Dependencies: .NET 8.0 only
+  - **Design**: Pure interfaces and abstract contracts, minimal concrete implementations
   
-- **rhino/**: Rhino-specific operations (geometry, curves, tolerances, document utilities)
+- **rhino/**: Rhino-specific operations with polymorphic geometry handling
   - Namespace: `Arsenal.Rhino`
+  - Contains: Geometry interfaces, tolerance management, document utilities
   - References: `Arsenal.Core`, RhinoCommon SDK
-  - Builds upon `Arsenal.Core` patterns
+  - **Design**: Composes `Arsenal.Core` patterns with Rhino SDK capabilities
   
-- **grasshopper/**: Grasshopper component base classes and utilities
+- **grasshopper/**: Grasshopper component infrastructure with composition-based architecture
   - Namespace: `Arsenal.Grasshopper`
+  - Contains: Component base classes, data handling interfaces, solver patterns
   - References: `Arsenal.Core`, `Arsenal.Rhino`, Grasshopper SDK
-  - Builds upon both `Arsenal.Core` and `Arsenal.Rhino`
+  - **Design**: Builds upon both `Arsenal.Core` and `Arsenal.Rhino` through composition
 
-All libraries target .NET 8.0 with nullable reference types enabled.
+All libraries target .NET 8.0 with nullable reference types enabled and strict adherence to composition over inheritance.
 
 ## Grasshopper (`grasshopper/`)
 
@@ -73,31 +77,41 @@ rhino/
 
 ## Architecture Patterns
 
-### Library Design Principles
-1. **Layered Dependencies**: `Core` → `Rhino` → `Grasshopper`
-2. **SDK First**: Always use RhinoCommon/Grasshopper SDK methods before creating custom implementations
-3. **Shared Patterns**: Use `Result<T>` for operations that can fail
-4. **Minimal Base Classes**: Provide common functionality through inheritance (e.g., `GhComponentBase`)
+### Library Design Principles (Composition-Based)
+1. **Layered Dependencies**: `Core` → `Rhino` → `Grasshopper` through interface contracts
+2. **Interface-First Design**: All major functionality exposed through interfaces
+3. **Composition Over Inheritance**: Libraries compose capabilities rather than inherit them
+4. **SDK Integration**: Always use RhinoCommon/Grasshopper SDK methods, compose with our interfaces
+5. **Functional Core**: Pure functions for calculations, immutable data structures where possible
 
-### Plugin Design Principles
-1. **Leverage Libraries**: All plugins must reference and use the shared libraries
-2. **Thin Plugin Layer**: Plugins orchestrate; libraries implement
-3. **SDK Integration**: Use SDK types and methods directly; don't wrap unnecessarily
-4. **Consistent Error Handling**: Use patterns from `Arsenal.Core`
+### Plugin Design Principles (Polymorphic)
+1. **Interface Dependencies**: All plugins depend on `Arsenal.*` interfaces, not concrete classes
+2. **Thin Plugin Layer**: Plugins orchestrate through interfaces; libraries implement
+3. **Composition Root**: Plugins wire up concrete implementations at startup
+4. **Consistent Patterns**: Use `Result<T>`, `TryXxx`, and interface-based error handling
 
-### C# Code Patterns
-- Use `Result<T>` pattern for operations that can fail
-- Base classes provide common functionality (e.g., `GhComponentBase`)
-- Sealed `SolveInstance` with abstract `GuardedSolve` for uniform error handling
-- Document tolerance access via `DocTolerance` property
-- Nullable reference types enabled throughout
+### C# Code Patterns (Professional Standards)
+- **Interfaces + Composition**: Primary design pattern for all major functionality
+- **Sealed Classes**: Mark leaf implementations `sealed` for performance and clarity
+- **Pure Functions**: Business logic implemented as static pure functions where possible
+- **Immutable Data**: Use `record` types for data transfer and value objects
+- **Pattern Matching**: Use `switch` expressions and property patterns
+- **Result<T> Pattern**: For operations that can fail without exceptions
+- **TryXxx Pattern**: For expected control flow scenarios
+- **Nullable Reference Types**: Enabled throughout with proper annotations
 
-## Development Workflow
+## Development Workflow (Interface-Driven)
 
 When adding new functionality:
-1. Check if SDK provides the capability (use MCP servers to research)
-2. Check if `libs/` already provides the functionality
-3. If needed, add to appropriate library in `libs/`
-4. Plugin code should leverage the library functionality
+1. **Define Interface First**: Create interface contract in appropriate `libs/` layer
+2. **Check SDK Capabilities**: Research RhinoCommon/Grasshopper SDK (use MCP servers)
+3. **Implement Through Composition**: Create sealed implementation that composes SDK functionality
+4. **Pure Functions for Logic**: Extract business rules into static pure functions
+5. **Plugin Integration**: Plugins depend on interfaces, wire concrete implementations
 
-Never duplicate code between plugins - extract to `libs/` instead.
+### Composition Guidelines
+- **Never duplicate code**: Extract to `libs/` interfaces and implementations
+- **Prefer small interfaces**: Follow Interface Segregation Principle
+- **Use dependency injection**: Constructor injection for interface dependencies
+- **Mark classes sealed**: Unless specifically designed for inheritance
+- **Validate at boundaries**: Use pure functions for core logic, validate at API boundaries

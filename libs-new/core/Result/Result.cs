@@ -22,14 +22,10 @@ public readonly record struct Result<T>
     public Failure? Failure { get; }
 
     /// <summary>Creates a successful result with the specified value.</summary>
-    /// <param name="value">The value to wrap in the result.</param>
-    /// <returns>A successful result containing the value.</returns>
 #pragma warning disable CA1000 // Do not declare static members on generic types - factory methods are acceptable
     public static Result<T> Success(T value) => new(true, value, null);
 
     /// <summary>Creates a failed result with the specified failure.</summary>
-    /// <param name="failure">The failure to wrap in the result.</param>
-    /// <returns>A failed result containing the failure.</returns>
     public static Result<T> Fail(Failure failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
@@ -38,8 +34,6 @@ public readonly record struct Result<T>
 #pragma warning restore CA1000
 
     /// <summary>Attempts to get the value from the result.</summary>
-    /// <param name="value">The value if successful, otherwise default.</param>
-    /// <returns>True if the result is successful, false otherwise.</returns>
     public bool TryGet(out T? value)
     {
         value = Value;
@@ -47,9 +41,6 @@ public readonly record struct Result<T>
     }
 
     /// <summary>Executes side effects based on the result state without changing the result.</summary>
-    /// <param name="onSuccess">Action to execute if the result is successful.</param>
-    /// <param name="onFailure">Optional action to execute if the result is failed.</param>
-    /// <returns>The original result unchanged.</returns>
     public Result<T> Tap(Action<T> onSuccess, Action<Failure>? onFailure = null)
     {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -67,9 +58,6 @@ public readonly record struct Result<T>
     }
 
     /// <summary>Transforms the value of a successful result using the specified function.</summary>
-    /// <typeparam name="TOut">The type of the transformed value.</typeparam>
-    /// <param name="selector">The function to transform the value.</param>
-    /// <returns>A result containing the transformed value if successful, or the original failure.</returns>
     public Result<TOut> Map<TOut>(Func<T, TOut> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
@@ -80,9 +68,6 @@ public readonly record struct Result<T>
     }
 
     /// <summary>Chains another result-returning operation to this result.</summary>
-    /// <typeparam name="TOut">The type of the output result.</typeparam>
-    /// <param name="binder">The function to bind to this result.</param>
-    /// <returns>The result of the binder function if this result is successful, or the original failure.</returns>
     public Result<TOut> Bind<TOut>(Func<T, Result<TOut>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
@@ -93,10 +78,6 @@ public readonly record struct Result<T>
     }
 
     /// <summary>Matches the result state and returns a value based on success or failure.</summary>
-    /// <typeparam name="TOut">The type of the return value.</typeparam>
-    /// <param name="onSuccess">Function to execute if the result is successful.</param>
-    /// <param name="onFailure">Function to execute if the result is failed.</param>
-    /// <returns>The result of the appropriate function.</returns>
     public TOut Match<TOut>(Func<T, TOut> onSuccess, Func<Failure, TOut> onFailure)
     {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -124,12 +105,9 @@ public readonly record struct Result
     public Failure? Failure { get; }
 
     /// <summary>Creates a successful result.</summary>
-    /// <returns>A successful result.</returns>
     public static Result Success() => new(true, null);
 
     /// <summary>Creates a failed result with the specified failure.</summary>
-    /// <param name="failure">The failure to wrap in the result.</param>
-    /// <returns>A failed result containing the failure.</returns>
     public static Result Fail(Failure failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
@@ -137,17 +115,10 @@ public readonly record struct Result
     }
 
     /// <summary>Converts this result to a generic result with the specified value.</summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
-    /// <param name="value">The value to include in the result.</param>
-    /// <returns>A generic result with the value if successful, or the original failure.</returns>
     public Result<T> WithValue<T>(T value) =>
         IsSuccess ? Result<T>.Success(value) : Result<T>.Fail(Failure!);
 
     /// <summary>Matches the result state and returns a value based on success or failure.</summary>
-    /// <typeparam name="TOut">The type of the return value.</typeparam>
-    /// <param name="onSuccess">Function to execute if the result is successful.</param>
-    /// <param name="onFailure">Function to execute if the result is failed.</param>
-    /// <returns>The result of the appropriate function.</returns>
     public TOut Match<TOut>(Func<TOut> onSuccess, Func<Failure, TOut> onFailure)
     {
         ArgumentNullException.ThrowIfNull(onSuccess);

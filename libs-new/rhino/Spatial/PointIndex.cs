@@ -1,21 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>
-/// Spatial indexing helpers built on RhinoCommon <see cref="RTree"/> for point deduplication and nearest searches.
-/// </summary>
+/// <summary>Spatial indexing utilities using RhinoCommon RTree.</summary>
 public static class PointIndex
 {
-    /// <summary>Removes duplicate points within the specified tolerance using spatial indexing.</summary>
-    /// <param name="points">The points to deduplicate.</param>
-    /// <param name="tolerance">The tolerance for considering points as duplicates.</param>
-    /// <returns>A result containing the deduplicated points or a failure.</returns>
+    /// <summary>Removes duplicate points within tolerance using spatial indexing.</summary>
     public static Result<IReadOnlyList<Point3d>> Deduplicate(IEnumerable<Point3d>? points, double tolerance)
     {
         Result<IReadOnlyCollection<Point3d>> collectionResult = Guard.AgainstEmpty(points, nameof(points));
@@ -69,11 +64,7 @@ public static class PointIndex
         return Result<IReadOnlyList<Point3d>>.Success(unique);
     }
 
-    /// <summary>Finds the k nearest neighbors for each query point using spatial indexing.</summary>
-    /// <param name="searchPoints">The points to search within.</param>
-    /// <param name="queryPoints">The points to find neighbors for.</param>
-    /// <param name="k">The number of nearest neighbors to find.</param>
-    /// <returns>A result containing arrays of neighbor indices for each query point, or a failure.</returns>
+    /// <summary>Finds k nearest neighbors for each query point using spatial indexing.</summary>
     public static Result<int[][]> NearestNeighbors(IEnumerable<Point3d>? searchPoints, IEnumerable<Point3d>? queryPoints, int k)
     {
         Result<IReadOnlyCollection<Point3d>> search = Guard.AgainstEmpty(searchPoints, nameof(searchPoints));
@@ -93,7 +84,7 @@ public static class PointIndex
             return Result<int[][]>.Fail(new Failure("spatial.knn.k", "K must be positive."));
         }
 
-        if (k > search.Value.Count)
+        if (k > search.Value!.Count)
         {
             return Result<int[][]>.Fail(new Failure("spatial.knn.k", "K cannot exceed the number of search points."));
         }
@@ -101,7 +92,7 @@ public static class PointIndex
         try
         {
             IEnumerable<int[]> indices = RTree.Point3dKNeighbors(search.Value!, query.Value!, k);
-            return Result<int[][]>.Success(indices.Select(array => array.ToArray()).ToArray());
+                return Result<int[][]>.Success(indices.Select(array => array.ToArray()).ToArray());
         }
         catch (Exception ex)
         {

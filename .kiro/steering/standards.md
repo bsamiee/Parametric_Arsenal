@@ -4,222 +4,268 @@ inclusion: always
 
 # Coding Standards
 
-Modern, type-safe, object-oriented code is non-negotiable. Follow these standards strictly.
+Professional, polymorphic, composition-based C# code with functional programming integration is mandatory. These standards are non-negotiable.
 
-## C# Standards (.NET 8.0)
+## 0. File-Scoped Namespaces (MANDATORY)
 
-### Nullable Reference Types
-- Nullable reference types are **enabled globally** (`<Nullable>enable</Nullable>`)
-- Use `string?` when null is valid, `string` when it must not be null
-- Nullable warnings are enforced as **warnings** (CS8600, CS8602, CS8603, CS8604)
-  - CS8600: Converting null literal or possible null value to non-nullable type
-  - CS8602: Dereference of a possibly null reference
-  - CS8603: Possible null reference return
-  - CS8604: Possible null reference argument
-- Use null-conditional (`?.`) and null-coalescing (`??`) operators by default
-- Guard public APIs with explicit null checks (`ArgumentNullException.ThrowIfNull()`)
-- **Rationale**: Library code should be defensive with nullable annotations to prevent runtime null reference exceptions
+**ALL C# files MUST use file-scoped namespace declarations:**
+```csharp
+namespace Arsenal.Core.Result;
 
-### Modern Language Features (C# 12 / .NET 8)
-- **Collection expressions**: Use `[...]` syntax for arrays and collections
-  ```csharp
-  Point3d[] points = [point1, point2, point3];
-  ```
-- **Pattern matching**: Use `is` pattern instead of `as` + null check
-  ```csharp
-  if (obj is MyType { Value: > 0 } t) { ... }
-  if (goo.ScriptVariable() is not GeometryBase geom) { return; }
-  ```
-- **Records**: Use `record` or `record struct` for data-centric models
-  ```csharp
-  public record Point3d(double X, double Y, double Z);
-  ```
-- **Init-only properties**: Use `init` for set-once immutability
-  ```csharp
-  public class Config { public string Name { get; init; } = ""; }
-  ```
-- **File-scoped namespaces**: Reduce indentation (enforced as warning)
-  ```csharp
-  namespace Arsenal.Core;
-  ```
+// File content - NO braces around namespace
+```
 
-### Async/Await
-- Use `async` all the way up; never mix `.Result` or `.Wait()`
-- Use `ConfigureAwait(false)` in library code
-- Prefer `Task<T>` for general purpose; `ValueTask<T>` only when profiling shows benefit
+**NEVER use traditional namespace blocks:**
+```csharp
+// ❌ FORBIDDEN
+namespace Arsenal.Core.Result
+{
+    // content
+}
+```
 
-### Strong Typing (Enforced)
-- Use strongly-typed models and enums over primitives
-- Leverage generics with constraints (`where T : notnull`)
-- **Always use explicit types** (enforced as warning): Never use `var`
-  - Enforced by: `csharp_style_var_for_built_in_types = false:warning`
-  - Enforced by: `csharp_style_var_when_type_is_apparent = false:warning`
-  - Enforced by: `csharp_style_var_elsewhere = false:warning`
-  - **Rationale**: Explicit types improve code clarity and maintainability, especially in library code where API contracts must be clear
-  ```csharp
-  // ✅ Good - explicit types
-  List<Point3d> list = new List<Point3d>();
-  double tolerance = Tolerances.Abs();
-  GeometryBase geom = GetGeometry();
-  
-  // ❌ Bad - triggers warning
-  var list = new List<Point3d>();
-  var tolerance = Tolerances.Abs();
-  var geom = GetGeometry();
-  ```
+## I. Fundamental Design Principles (Critical)
 
-### Code Style (Enforced)
-- **Always use braces** (enforced as warning): Even for single-line if/for/while statements
-  - Enforced by: `csharp_prefer_braces = true:warning`
-  - Enforced by: `dotnet_diagnostic.IDE0011.severity = warning`
-  - **Rationale**: Prevents bugs from accidental scope issues and improves code consistency
-  ```csharp
-  // ✅ Good - braces always present
-  if (condition)
-  {
-      DoSomething();
-  }
-  
-  // ❌ Bad - triggers warning
-  if (condition)
-      DoSomething();
-  ```
+### Polymorphism as Foundation
+- **All major functionality MUST be exposed through interfaces**
+- **Program to contracts, never to concrete implementations**
+- **Swap implementations behind common interfaces at compile or runtime**
+- **Use inheritance only for stable taxonomies where substitutability is guaranteed**
 
-- **Collection expressions** (enforced as warning): Use `[...]` instead of `new[]` or `new Type[]`
-  - Enforced by: `dotnet_style_prefer_collection_expression = true:warning`
-  - **Rationale**: Modern C# 12 syntax that is more concise and consistent
-  ```csharp
-  // ✅ Good - collection expression
-  Point3d[] points = [point1, point2, point3];
-  
-  // ❌ Bad - triggers warning
-  Point3d[] points = new[] { point1, point2 };
-  Point3d[] points = new Point3d[] { point1, point2 };
-  ```
+### Composition Over Inheritance (Mandatory)
+- **Default to composition ("has-a", "uses-a") over inheritance ("is-a")**
+- **Inheritance is fragile - hierarchy changes break dependent code**
+- **Composition is stable, testable, and encourages interface design**
+- **Mark all leaf classes `sealed` unless specifically designed for inheritance**
 
-- **Pattern matching** (enforced as warning): Use `is` pattern instead of `as` + null check
-  - Enforced by: `csharp_style_pattern_matching_over_as_with_null_check = true:warning`
-  - Enforced by: `csharp_style_pattern_matching_over_is_with_cast_check = true:warning`
-  - **Rationale**: More concise, type-safe, and eliminates redundant null checks
-  ```csharp
-  // ✅ Good - pattern matching
-  if (goo.ScriptVariable() is not GeometryBase geom)
-  {
-      return Result.Fail("Cannot convert");
-  }
-  
-  if (obj is MyType { Value: > 0 } typed)
-  {
-      ProcessTyped(typed);
-  }
-  
-  // ❌ Bad - triggers warning
-  GeometryBase geom = goo.ScriptVariable() as GeometryBase;
-  if (geom == null)
-  {
-      return Result.Fail("Cannot convert");
-  }
-  ```
+### SOLID Principles (Strictly Enforced)
+- **S**: One class, one responsibility, one reason to change
+- **O**: Open for extension via interfaces, closed for modification
+- **L**: Subtypes must be substitutable for base types without breaking contracts
+- **I**: Many small, focused interfaces over large, general ones
+- **D**: Depend on abstractions (interfaces), never on concretions
 
-### Object-Oriented Design & SOLID Principles (Enforced)
-- **Single Responsibility**: One class, one purpose
-- **Open/Closed**: Open for extension, closed for modification
-- **Liskov Substitution**: Derived classes must be substitutable for base classes
-- **Interface Segregation**: Many specific interfaces over one general interface
-  - Enforced by: `dotnet_diagnostic.CA1040.severity = warning` (Avoid empty interfaces)
-  - **Rationale**: Empty interfaces provide no contract and violate interface segregation principle
-- **Dependency Inversion**: Depend on abstractions, not concretions
-- **Encapsulation**: Hide implementation details; expose minimal API surface
-- **Collections**: Implement generic interfaces
-  - Enforced by: `dotnet_diagnostic.CA1010.severity = warning` (Collections should implement generic interface)
-  - **Rationale**: Generic interfaces provide type safety and better API usability
-- **Namespaces**: All types must be in namespaces
-  - Enforced by: `dotnet_diagnostic.CA1050.severity = error` (Declare types in namespaces)
-  - **Rationale**: Required for proper code organization and avoiding naming conflicts
-- **Immutability**: Default to `readonly`, `init`, and `record` types
-- **Separation of concerns**: Layer architecture (domain, application, infrastructure)
+### Functional Programming Integration
+- **Pure functions for all business logic and calculations**
+- **Immutable data structures using `record` and `readonly`**
+- **Higher-order functions with `Func<T>` and `Action<T>`**
+- **Pattern matching over conditional logic**
+- **TryXxx pattern instead of exceptions for control flow**
 
-### Error Handling
-- Use `Result<T>` pattern from `Arsenal.Core` for operations that can fail
-- Throw exceptions only for exceptional conditions
-- Never swallow exceptions without logging or handling
+## II. Documentation Standards (Mandatory)
 
-## Python Standards (3.9+)
+### XML Documentation (Required for All Public APIs)
+- **All public types, members, and methods MUST have XML documentation**
+- **Summaries MUST be exactly one line** - concise, accurate, factual, and relevant
+- **NEVER use `<param>`, `<returns>`, or other XML tags** - ONLY `<summary>` allowed
+- **No redundant parameter descriptions** - method signatures are self-documenting
+- **Document intent and behavior, not implementation details**
+- **Keep documentation current** - outdated docs are worse than no docs
 
-### Type Annotations
-- **Fully annotate** all function signatures and class attributes
-  ```python
-  def process_data(items: list[str]) -> dict[str, int]:
-      ...
-  ```
-- Use abstract types in parameters (`Iterable`, `Mapping`), concrete in returns
-- Use `object` instead of `Any` to maintain type safety
-- Avoid union return types; refactor to clearer models
-- Use `TypedDict` or `Literal` for structured/enumerated types
+### Code Comments Policy (Anti-Spam)
+- **Strong policy against comment litter** - only add comments when truly justified
+- **Comments explain WHY, not WHAT** - code should be self-documenting through clear naming
+- **Remove obvious comments** - `// Increment counter` adds no value
+- **Justify complex algorithms** - when business logic requires explanation
+- **No TODO comments in production code** - use issue tracking instead
 
-### Static Type Checking
-- Configure mypy/basedpyright in **strict mode**
-- Enable `--disallow-untyped-defs` (all functions must be typed)
-- Avoid `# type: ignore` except for documented, justified cases
-- Run type checkers in CI/CD as build gates
+### Documentation Examples
+```csharp
+/// <summary>Calculates area using width and height dimensions.</summary>
+public double Area() => Width * Height;
 
-### Data Modeling
-- **Dataclasses**: Use for internal, trusted data structures
-  ```python
-  @dataclass
-  class Point3d:
-      x: float
-      y: float
-      z: float
-  ```
-- **Pydantic**: Use for external APIs or runtime validation needs
-- Never use mutable default arguments
+/// <summary>Processes payment using the configured tax policy.</summary>
+public decimal CalculateTotal(IReadOnlyList<ProductLine> lines, decimal taxRate)
+{
+    // Complex tax calculation requires policy delegation
+    decimal subtotal = OrderCalculations.Subtotal(lines);
+    return subtotal + _taxPolicy.ComputeTax(subtotal, taxRate);
+}
+```
 
-### Protocol-Oriented Design
-- Use `Protocol` for interface contracts (duck typing)
-  ```python
-  from typing import Protocol
-  
-  class Drawable(Protocol):
-      def draw(self) -> None: ...
-  ```
-- Prefer protocols over inheritance hierarchies
-- Supports better mocking and decoupling
+## III. C# Type System and Language Requirements
 
-### Async Patterns
-- Use `async def` and `await` for I/O-bound operations
-- Annotate async functions with proper return types
-- Never mix blocking I/O with async code
+### Type Selection Guidelines
+- **`interface`**: Primary design tool for contracts and polymorphism
+- **`class`**: Reference types with identity and behavior, mark `sealed` by default
+- **`record`/`record struct`**: Value-centric types with structural equality
+- **`struct`**: Small, immutable value types with low copy cost
+- **`delegate`**: Function types for higher-order functions
+- **`enum`**: Closed sets of named constants
 
-### Anti-Patterns to Avoid
-- ❌ Using `Any` (disables type checking)
-- ❌ Ignoring type checker warnings
-- ❌ Mutable default arguments
-- ❌ Complex union return types
-- ❌ Missing annotations on public APIs
+### Nullable Reference Types (Mandatory)
+- **Enabled globally** with `<Nullable>enable</Nullable>`
+- **Use `string?` for nullable, `string` for non-nullable**
+- **Guard public APIs** with `ArgumentNullException.ThrowIfNull()`
+- **Use null-conditional (`?.`) and null-coalescing (`??`) operators**
+- **Nullable warnings enforced as build warnings**
 
-## Universal Principles
+### Modern C# Features (Required)
+- **File-scoped namespaces**: `namespace Arsenal.Core;`
+- **Collection expressions**: `[item1, item2, item3]`
+- **Pattern matching**: `is` patterns over `as` + null checks
+- **Records**: For immutable data and value equality
+- **Init-only properties**: `{ get; init; }` for set-once immutability
 
-### Code Quality
-- **Readability over cleverness**: Code is read more than written
-- **Explicit over implicit**: Make intent clear
-- **Fail fast**: Validate early, fail with clear messages
-- **DRY**: Don't repeat yourself; extract to shared libraries
+### Type Safety (Enforced)
+- **Never use `var`** - explicit types required for clarity
+- **Strongly-typed models over primitives**
+- **Generic constraints**: `where T : notnull`
+- **Always use braces** for control structures
+- **Enforced by compiler warnings and analyzers**
 
-### Testing
-- Write tests that validate behavior, not implementation
-- Use dependency injection for testability
-- Mock external dependencies, not internal logic
+## IV. Implementation Guidelines
 
-### Documentation
-- Use XML docs (C#) or docstrings (Python) for public APIs
-- Keep it concise: one-line summaries for simple members, brief explanations for complex ones
-- Document why, not what (code should be self-documenting)
-- Avoid redundant parameter/return descriptions that just restate the obvious
-- Skip example code blocks unless the usage is genuinely non-obvious
-- Keep comments up-to-date or remove them
+### Interface Design (Critical)
+- **Define interfaces first, implementations second**
+- **Keep interfaces small and focused (Interface Segregation)**
+- **Separate read/write concerns**: `IReadable<T>` vs `IWritable<T>`
+- **No empty interfaces** - must provide meaningful contracts
+- **Use generic interfaces for collections**
 
-### Performance
-- Measure before optimizing
-- Prefer clarity over premature optimization
-- Use profiling tools to identify actual bottlenecks
+### Class Implementation Rules
+- **All classes `sealed` by default** unless designed for inheritance
+- **Constructor injection for dependencies**
+- **Validate invariants in constructors**
+- **Minimal public surface area**
+- **Immutable by default** - use `readonly`, `init`, `record`
+
+### Composition Patterns
+- **Dependency injection through constructor parameters**
+- **Prefer interfaces over concrete types in dependencies**
+- **Wire concrete implementations at composition root**
+- **Use strategy pattern for varying behavior**
+- **Avoid deep object hierarchies**
+
+## V. Functional Programming Integration
+
+### Pure Functions (Mandatory for Business Logic)
+- **All business calculations must be pure functions**
+- **No side effects - same input always produces same output**
+- **Static methods in static classes for stateless operations**
+- **Take immutable parameters, return immutable results**
+
+### Immutable Data Structures
+- **Use `record` and `record struct` for data transfer objects**
+- **Use `with` expressions for non-destructive updates**
+- **Prefer `readonly` fields and `init` properties**
+- **Collections should be `IReadOnlyList<T>`, `IReadOnlyDictionary<K,V>`**
+
+### Higher-Order Functions
+- **Use `Func<T>` and `Action<T>` delegates**
+- **LINQ for collection transformations (map, filter, reduce)**
+- **Avoid mutable state in lambda expressions**
+- **Compose functions rather than inherit behavior**
+
+### Pattern Matching
+- **Use `switch` expressions over if-else chains**
+- **Exhaustive matching with sealed type hierarchies**
+- **Property patterns for object deconstruction**
+- **Guard clauses with `when` conditions**
+
+## VI. Error Handling Strategy
+
+### Result Pattern (Primary)
+- **Use `Result<T>` from `Arsenal.Core` for operations that can fail**
+- **Never throw exceptions for expected failure scenarios**
+- **Chain operations with `Map`, `Bind`, `Match` methods**
+
+### TryXxx Pattern (Secondary)
+- **Use for simple success/failure scenarios**
+- **Return `bool` success flag with `out` parameter for result**
+- **Prefer over exceptions for control flow**
+
+### Exceptions (Exceptional Only)
+- **Only for truly exceptional conditions**
+- **Never catch and ignore without logging**
+- **Use specific exception types, not generic `Exception`**
+
+## VII. Async Programming
+
+### Async/Await Rules
+- **Use `async` all the way up the call stack**
+- **Never use `.Result` or `.Wait()` - causes deadlocks**
+- **Use `ConfigureAwait(false)` in library code**
+- **Prefer `Task<T>` over `ValueTask<T>` unless profiling shows benefit**
+
+## VIII. Quality Standards
+
+### Code Quality (Non-Negotiable)
+- **Readability over cleverness** - code is read more than written
+- **Explicit over implicit** - make intent clear through types and names
+- **Fail fast** - validate early, provide clear error messages
+- **DRY principle** - extract common functionality to shared libraries
+
+### Testing Standards
+- **Test behavior, not implementation details**
+- **Use dependency injection for testability**
+- **Mock external dependencies, never internal logic**
+- **Arrange-Act-Assert pattern for test structure**
+
+### Performance Guidelines
+- **Measure before optimizing**
+- **Prefer clarity over premature optimization**
+- **Use profiling tools to identify actual bottlenecks**
+- **Consider memory allocation patterns in hot paths**
+
+## IX. Integration Example
+
+Complete example demonstrating all principles working together:
+
+```csharp
+// 1. Interface-first design (Polymorphism)
+public interface IShape { double Area(); }
+public interface ITaxPolicy { decimal ComputeTax(decimal subtotal, decimal rate); }
+
+// 2. Sealed implementations (Composition over inheritance)
+public sealed class Rectangle : IShape
+{
+    public double Width { get; init; }
+    public double Height { get; init; }
+    public Rectangle(double width, double height) => (Width, Height) = (width, height);
+    public double Area() => Width * Height;
+}
+
+// 3. Value objects with immutability (Functional)
+public readonly record struct ProductLine(int Id, int Qty, decimal UnitPrice);
+
+// 4. Composition with interface dependencies (SOLID)
+public sealed class OrderProcessor
+{
+    private readonly ITaxPolicy _taxPolicy;
+    public OrderProcessor(ITaxPolicy taxPolicy) => _taxPolicy = taxPolicy;
+    
+    public decimal CalculateTotal(IReadOnlyList<ProductLine> lines, decimal taxRate)
+    {
+        decimal subtotal = OrderCalculations.Subtotal(lines);
+        decimal tax = _taxPolicy.ComputeTax(subtotal, taxRate);
+        return subtotal + tax;
+    }
+}
+
+// 5. Pure functions for business logic (Functional core)
+public static class OrderCalculations
+{
+    public static decimal Subtotal(IEnumerable<ProductLine> lines) =>
+        lines.Sum(x => x.Qty * x.UnitPrice);
+}
+
+// 6. Pattern matching for control flow (Modern C#)
+public abstract record PaymentMethod;
+public record Card(string Last4) : PaymentMethod;
+public record Cash : PaymentMethod;
+
+public static string FormatPayment(PaymentMethod method) => method switch
+{
+    Card c => $"Card ending in {c.Last4}",
+    Cash => "Cash payment",
+    _ => "Unknown payment method"
+};
+```
+
+**This demonstrates:**
+- **Polymorphism**: Interface contracts with multiple implementations
+- **Composition**: Dependencies injected through constructor
+- **SOLID**: Single responsibility, interface segregation, dependency inversion
+- **Functional**: Pure functions, immutable data, pattern matching
+- **Modern C#**: Records, pattern matching, init properties

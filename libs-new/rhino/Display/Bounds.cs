@@ -1,30 +1,26 @@
 using System;
 using System.Collections.Generic;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 using Arsenal.Rhino.Geometry.Facade;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Display;
 
-/// <summary>Preview-oriented helpers for computing bounding boxes with optional label padding.</summary>
+/// <summary>Preview bounding box utilities with label padding.</summary>
 public sealed class PreviewBounds
 {
     private readonly GeometryOps _geometry;
 
-    /// <summary>Initializes a new instance of the PreviewBounds class.</summary>
-    /// <param name="geometry">The geometry operations facade to use for calculations.</param>
+    /// <summary>Initializes preview bounds with geometry operations.</summary>
     public PreviewBounds(GeometryOps geometry)
     {
         _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
     }
 
-    /// <summary>Computes a bounding box for a collection of points with optional margin.</summary>
-    /// <param name="points">The points to compute bounds for.</param>
-    /// <param name="margin">Optional margin to inflate the bounding box.</param>
-    /// <returns>The computed bounding box.</returns>
-    public BoundingBox ForPoints(IEnumerable<Point3d>? points, double margin = 0)
+    /// <summary>Computes bounding box for points with optional margin.</summary>
+    public static BoundingBox ForPoints(IEnumerable<Point3d>? points, double margin = 0)
     {
         if (points is null)
         {
@@ -41,25 +37,21 @@ public sealed class PreviewBounds
         return box;
     }
 
-    /// <summary>Computes a bounding box for curves with optional label margin around midpoints.</summary>
-    /// <param name="curves">The curves to compute bounds for.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <param name="labelMargin">Optional margin around curve midpoints for labels.</param>
-    /// <returns>A result containing the computed bounding box or a failure.</returns>
-    public Result<BoundingBox> ForCurves(IEnumerable<global::Rhino.Geometry.Curve>? curves, GeoContext context, double labelMargin = 0)
+    /// <summary>Computes bounding box for curves with optional label margin.</summary>
+    public Result<BoundingBox> ForCurves(IEnumerable<Curve>? curves, GeoContext context, double labelMargin = 0)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<IReadOnlyCollection<global::Rhino.Geometry.Curve>> collectionResult = Guard.AgainstEmpty(curves, nameof(curves));
+        Result<IReadOnlyCollection<Curve>> collectionResult = Guard.AgainstEmpty(curves, nameof(curves));
         if (!collectionResult.IsSuccess)
         {
             return Result<BoundingBox>.Fail(collectionResult.Failure!);
         }
 
-        IReadOnlyCollection<global::Rhino.Geometry.Curve> collection = collectionResult.Value!;
+        IReadOnlyCollection<Curve> collection = collectionResult.Value!;
 
         BoundingBox box = BoundingBox.Empty;
-        foreach (global::Rhino.Geometry.Curve curve in collection)
+        foreach (Curve curve in collection)
         {
             box.Union(curve.GetBoundingBox(true));
 
@@ -76,11 +68,7 @@ public sealed class PreviewBounds
         return Result<BoundingBox>.Success(box);
     }
 
-    /// <summary>Computes a bounding box for geometry with optional label margin around centroids.</summary>
-    /// <param name="geometries">The geometry to compute bounds for.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <param name="labelMargin">Optional margin around geometry centroids for labels.</param>
-    /// <returns>A result containing the computed bounding box or a failure.</returns>
+    /// <summary>Computes bounding box for geometry with optional label margin.</summary>
     public Result<BoundingBox> ForGeometry(IEnumerable<GeometryBase>? geometries, GeoContext context, double labelMargin = 0)
     {
         ArgumentNullException.ThrowIfNull(context);

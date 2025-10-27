@@ -1,19 +1,19 @@
 using System.Collections.Generic;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Rhino.Geometry;
+using RhinoBrep = Rhino.Geometry.Brep;
+using RhinoCurve = Rhino.Geometry.Curve;
 
 namespace Arsenal.Rhino.Geometry.Brep;
 
-/// <summary>RhinoCommon-backed brep operations.</summary>
+/// <summary>Brep operations using RhinoCommon.</summary>
 public sealed class BrepOperations : IBrep
 {
     /// <summary>Extracts all vertices from the brep.</summary>
-    /// <param name="brep">The brep to extract vertices from.</param>
-    /// <returns>A result containing the vertices or a failure.</returns>
-    public Result<IReadOnlyList<Point3d>> Vertices(global::Rhino.Geometry.Brep brep)
+    public Result<IReadOnlyList<Point3d>> Vertices(RhinoBrep brep)
     {
-        Result<global::Rhino.Geometry.Brep> brepResult = ValidateBrep(brep);
+        Result<RhinoBrep> brepResult = ValidateBrep(brep);
         if (!brepResult.IsSuccess)
         {
             return Result<IReadOnlyList<Point3d>>.Fail(brepResult.Failure!);
@@ -24,26 +24,22 @@ public sealed class BrepOperations : IBrep
     }
 
     /// <summary>Extracts all edges from the brep.</summary>
-    /// <param name="brep">The brep to extract edges from.</param>
-    /// <returns>A result containing the edges or a failure.</returns>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Curve>> Edges(global::Rhino.Geometry.Brep brep)
+    public Result<IReadOnlyList<Curve>> Edges(RhinoBrep brep)
     {
-        Result<global::Rhino.Geometry.Brep> brepResult = ValidateBrep(brep);
+        Result<RhinoBrep> brepResult = ValidateBrep(brep);
         if (!brepResult.IsSuccess)
         {
-            return Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Fail(brepResult.Failure!);
+            return Result<IReadOnlyList<Curve>>.Fail(brepResult.Failure!);
         }
 
-        global::Rhino.Geometry.Curve[] edges = brep.DuplicateEdgeCurves() ?? [];
-        return Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Success(edges);
+        Curve[] edges = brep.DuplicateEdgeCurves() ?? [];
+        return Result<IReadOnlyList<Curve>>.Success(edges);
     }
 
     /// <summary>Extracts all faces from the brep.</summary>
-    /// <param name="brep">The brep to extract faces from.</param>
-    /// <returns>A result containing the faces or a failure.</returns>
-    public Result<IReadOnlyList<GeometryBase>> Faces(global::Rhino.Geometry.Brep brep)
+    public Result<IReadOnlyList<GeometryBase>> Faces(RhinoBrep brep)
     {
-        Result<global::Rhino.Geometry.Brep> brepResult = ValidateBrep(brep);
+        Result<RhinoBrep> brepResult = ValidateBrep(brep);
         if (!brepResult.IsSuccess)
         {
             return Result<IReadOnlyList<GeometryBase>>.Fail(brepResult.Failure!);
@@ -63,18 +59,16 @@ public sealed class BrepOperations : IBrep
         return Result<IReadOnlyList<GeometryBase>>.Success(faces);
     }
 
-    /// <summary>Computes the midpoints of all edges in the brep.</summary>
-    /// <param name="brep">The brep to compute edge midpoints for.</param>
-    /// <returns>A result containing the edge midpoints or a failure.</returns>
-    public Result<IReadOnlyList<Point3d>> EdgeMidpoints(global::Rhino.Geometry.Brep brep)
+    /// <summary>Computes midpoints of all brep edges.</summary>
+    public Result<IReadOnlyList<Point3d>> EdgeMidpoints(RhinoBrep brep)
     {
-        Result<global::Rhino.Geometry.Brep> brepResult = ValidateBrep(brep);
+        Result<RhinoBrep> brepResult = ValidateBrep(brep);
         if (!brepResult.IsSuccess)
         {
             return Result<IReadOnlyList<Point3d>>.Fail(brepResult.Failure!);
         }
 
-        global::Rhino.Geometry.Curve[]? edges = brep.DuplicateEdgeCurves();
+        Curve[]? edges = brep.DuplicateEdgeCurves();
         if (edges is null || edges.Length == 0)
         {
             return Result<IReadOnlyList<Point3d>>.Success([]);
@@ -83,16 +77,16 @@ public sealed class BrepOperations : IBrep
         Point3d[] midpoints = new Point3d[edges.Length];
         for (int i = 0; i < edges.Length; i++)
         {
-            global::Rhino.Geometry.Curve edge = edges[i];
+            Curve edge = edges[i];
             midpoints[i] = edge.PointAt(edge.Domain.Mid);
         }
 
         return Result<IReadOnlyList<Point3d>>.Success(midpoints);
     }
 
-    private static Result<global::Rhino.Geometry.Brep> ValidateBrep(global::Rhino.Geometry.Brep? brep)
+    private static Result<RhinoBrep> ValidateBrep(RhinoBrep? brep)
     {
-        Result<global::Rhino.Geometry.Brep> guard = Guard.AgainstNull(brep, nameof(brep));
+        Result<RhinoBrep> guard = Guard.AgainstNull(brep, nameof(brep));
         if (!guard.IsSuccess)
         {
             return guard;
@@ -100,7 +94,7 @@ public sealed class BrepOperations : IBrep
 
         if (!guard.Value!.IsValid)
         {
-            return Result<global::Rhino.Geometry.Brep>.Fail(new Failure("brep.invalid", "Brep is not valid."));
+            return Result<RhinoBrep>.Fail(new Failure("brep.invalid", "Brep is not valid."));
         }
 
         return guard;

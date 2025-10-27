@@ -3,10 +3,12 @@ using Rhino;
 
 namespace Arsenal.Rhino.Document;
 
-/// <summary>Encapsulates a Rhino document and the tolerances derived from it.</summary>
+/// <summary>Rhino document scope with derived tolerances.</summary>
 public sealed record DocScope
 {
+    /// <summary>Default absolute tolerance value in model units.</summary>
     public const double DefaultAbsoluteTolerance = 0.01;
+    /// <summary>Default angle tolerance value in radians.</summary>
     public const double DefaultAngleToleranceRadians = Math.PI / 180.0;
 
     private DocScope(RhinoDoc? document, double absoluteTolerance, double angleToleranceRadians)
@@ -26,12 +28,16 @@ public sealed record DocScope
         AngleToleranceRadians = angleToleranceRadians;
     }
 
+    /// <summary>Rhino document associated with this scope.</summary>
     public RhinoDoc? Document { get; }
 
+    /// <summary>Absolute tolerance for geometric operations.</summary>
     public double AbsoluteTolerance { get; }
 
+    /// <summary>Angle tolerance in radians for geometric operations.</summary>
     public double AngleToleranceRadians { get; }
 
+    /// <summary>Creates document scope from Rhino document.</summary>
     public static DocScope FromDocument(RhinoDoc document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -42,9 +48,11 @@ public sealed record DocScope
         return new DocScope(document, abs, angle);
     }
 
+    /// <summary>Creates detached document scope with specified tolerances.</summary>
     public static DocScope Detached(double absoluteTolerance = DefaultAbsoluteTolerance, double angleToleranceRadians = DefaultAngleToleranceRadians) =>
         new(null, absoluteTolerance, angleToleranceRadians);
 
+    /// <summary>Creates new document scope with tolerance overrides.</summary>
     public DocScope WithTolerances(double? absoluteTolerance = null, double? angleToleranceRadians = null) =>
         new(Document,
             absoluteTolerance ?? AbsoluteTolerance,

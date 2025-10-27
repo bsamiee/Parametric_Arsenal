@@ -4,7 +4,7 @@ using Arsenal.Rhino.Context;
 
 namespace Arsenal.Rhino.Geometry.Base;
 
-/// <summary>High-level operations composed from individual geometry modules.</summary>
+/// <summary>Composite geometry operations interface.</summary>
 public interface IOperations
 {
     /// <summary>Extracts vertices from geometry.</summary>
@@ -16,9 +16,9 @@ public interface IOperations
     /// <summary>Extracts faces from geometry.</summary>
     Result<IReadOnlyList<global::Rhino.Geometry.GeometryBase>> Faces(global::Rhino.Geometry.GeometryBase geometry, GeoContext context);
 
-    /// <summary>Calculates edge midpoints from geometry.</summary>
+    /// <summary>Computes edge midpoints from geometry.</summary>
     Result<IReadOnlyList<global::Rhino.Geometry.Point3d>> EdgeMidpoints(global::Rhino.Geometry.GeometryBase geometry, GeoContext context);
 
-    /// <summary>Calculates centroid of geometry.</summary>
+    /// <summary>Computes geometry centroid.</summary>
     Result<global::Rhino.Geometry.Point3d> Centroid(global::Rhino.Geometry.GeometryBase geometry, GeoContext context);
 }

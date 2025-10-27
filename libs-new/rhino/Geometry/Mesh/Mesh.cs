@@ -1,19 +1,20 @@
 using System.Collections.Generic;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Rhino.Geometry;
+using Rhino.Geometry.Collections;
+using RhinoCurve = Rhino.Geometry.Curve;
+using RhinoMesh = Rhino.Geometry.Mesh;
 
 namespace Arsenal.Rhino.Geometry.Mesh;
 
-/// <summary>RhinoCommon-backed mesh operations.</summary>
+/// <summary>Mesh operations using RhinoCommon.</summary>
 public sealed class MeshOperations : IMesh
 {
-    /// <summary>Extracts all vertices from the mesh.</summary>
-    /// <param name="mesh">The mesh to extract vertices from.</param>
-    /// <returns>A result containing the vertices or a failure.</returns>
-    public Result<IReadOnlyList<Point3d>> Vertices(global::Rhino.Geometry.Mesh mesh)
+    /// <summary>Extracts all mesh vertices.</summary>
+    public Result<IReadOnlyList<Point3d>> Vertices(RhinoMesh mesh)
     {
-        Result<global::Rhino.Geometry.Mesh> meshResult = ValidateMesh(mesh);
+        Result<RhinoMesh> meshResult = ValidateMesh(mesh);
         if (!meshResult.IsSuccess)
         {
             return Result<IReadOnlyList<Point3d>>.Fail(meshResult.Failure!);
@@ -23,19 +24,17 @@ public sealed class MeshOperations : IMesh
         return Result<IReadOnlyList<Point3d>>.Success(vertices);
     }
 
-    /// <summary>Extracts all edges from the mesh as line curves.</summary>
-    /// <param name="mesh">The mesh to extract edges from.</param>
-    /// <returns>A result containing the edges or a failure.</returns>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Curve>> Edges(global::Rhino.Geometry.Mesh mesh)
+    /// <summary>Extracts all mesh edge curves.</summary>
+    public Result<IReadOnlyList<Curve>> Edges(RhinoMesh mesh)
     {
-        Result<global::Rhino.Geometry.Mesh> meshResult = ValidateMesh(mesh);
+        Result<RhinoMesh> meshResult = ValidateMesh(mesh);
         if (!meshResult.IsSuccess)
         {
-            return Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Fail(meshResult.Failure!);
+            return Result<IReadOnlyList<Curve>>.Fail(meshResult.Failure!);
         }
 
-        global::Rhino.Geometry.Collections.MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
-        List<global::Rhino.Geometry.Curve> edges = new(topologyEdges.Count);
+        MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
+        List<Curve> edges = new(topologyEdges.Count);
 
         for (int i = 0; i < topologyEdges.Count; i++)
         {
@@ -43,21 +42,19 @@ public sealed class MeshOperations : IMesh
             edges.Add(new LineCurve(edgeLine));
         }
 
-        return Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Success(edges);
+        return Result<IReadOnlyList<Curve>>.Success(edges);
     }
 
-    /// <summary>Computes the midpoints of all edges in the mesh.</summary>
-    /// <param name="mesh">The mesh to compute edge midpoints for.</param>
-    /// <returns>A result containing the edge midpoints or a failure.</returns>
-    public Result<IReadOnlyList<Point3d>> EdgeMidpoints(global::Rhino.Geometry.Mesh mesh)
+    /// <summary>Computes midpoints of all mesh edges.</summary>
+    public Result<IReadOnlyList<global::Rhino.Geometry.Point3d>> EdgeMidpoints(global::Rhino.Geometry.Mesh mesh)
     {
-        Result<global::Rhino.Geometry.Mesh> meshResult = ValidateMesh(mesh);
+        Result<RhinoMesh> meshResult = ValidateMesh(mesh);
         if (!meshResult.IsSuccess)
         {
-            return Result<IReadOnlyList<Point3d>>.Fail(meshResult.Failure!);
+            return Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Fail(meshResult.Failure!);
         }
 
-        global::Rhino.Geometry.Collections.MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
+        MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
         Point3d[] midpoints = new Point3d[topologyEdges.Count];
 
         for (int i = 0; i < topologyEdges.Count; i++)
@@ -66,12 +63,12 @@ public sealed class MeshOperations : IMesh
             midpoints[i] = edgeLine.PointAt(0.5);
         }
 
-        return Result<IReadOnlyList<Point3d>>.Success(midpoints);
+        return Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Success(midpoints);
     }
 
-    private static Result<global::Rhino.Geometry.Mesh> ValidateMesh(global::Rhino.Geometry.Mesh? mesh)
+    private static Result<RhinoMesh> ValidateMesh(RhinoMesh? mesh)
     {
-        Result<global::Rhino.Geometry.Mesh> guard = Guard.AgainstNull(mesh, nameof(mesh));
+        Result<RhinoMesh> guard = Guard.AgainstNull(mesh, nameof(mesh));
         if (!guard.IsSuccess)
         {
             return guard;
@@ -79,7 +76,7 @@ public sealed class MeshOperations : IMesh
 
         if (!guard.Value!.IsValid)
         {
-            return Result<global::Rhino.Geometry.Mesh>.Fail(new Failure("mesh.invalid", "Mesh is not valid."));
+            return Result<RhinoMesh>.Fail(new Failure("mesh.invalid", "Mesh is not valid."));
         }
 
         return guard;

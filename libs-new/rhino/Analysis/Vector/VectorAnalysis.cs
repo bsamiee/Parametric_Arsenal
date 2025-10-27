@@ -1,80 +1,75 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Arsenal.Core.Result;
 using Arsenal.Core.Guard;
+using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 using Rhino.Geometry;
+using RhinoMesh = Rhino.Geometry.Mesh;
+using RhinoSurface = Rhino.Geometry.Surface;
+using RhinoVector3d = Rhino.Geometry.Vector3d;
+using RhinoVector3f = Rhino.Geometry.Vector3f;
 
-namespace Arsenal.Rhino.Geometry.Vector;
+namespace Arsenal.Rhino.Analysis.Vector;
 
-/// <summary>RhinoCommon-backed vector extraction operations.</summary>
-public sealed class Vector : IVector
+/// <summary>Vector extraction using RhinoCommon.</summary>
+public sealed class VectorAnalysis : IVectorAnalysis
 {
-    /// <summary>Extracts all vector samples from the geometry.</summary>
-    /// <param name="geometry">The geometry to extract vectors from.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the vector samples or a failure.</returns>
+    /// <summary>Extracts vector samples from geometry.</summary>
     public Result<IReadOnlyList<VectorSample>> ExtractAll(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         return geometry switch
         {
-            global::Rhino.Geometry.Brep brep => ExtractFromBrep(brep),
+            Brep brep => ExtractFromBrep(brep),
             BrepFace face => VectorAdapters.GetBrepFaceVectors(face),
             Extrusion extrusion => VectorAdapters.GetExtrusionVectors(extrusion),
             global::Rhino.Geometry.Surface surface => VectorAdapters.GetSurfaceVectors(surface),
-            global::Rhino.Geometry.Curve curve => VectorAdapters.GetCurveVectors(curve),
-            global::Rhino.Geometry.Mesh mesh => VectorAdapters.GetMeshVectors(mesh),
+            Curve curve => VectorAdapters.GetCurveVectors(curve),
+            RhinoMesh mesh => VectorAdapters.GetMeshVectors(mesh),
             SubD subd => ExtractFromSubD(subd),
             _ => Result<IReadOnlyList<VectorSample>>.Success([])
         };
     }
 
-    /// <summary>Extracts tangent vectors from the geometry.</summary>
-    /// <param name="geometry">The geometry to extract tangents from.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the tangent vectors or a failure.</returns>
-    public Result<IReadOnlyList<Vector3d>> Tangents(GeometryBase geometry, GeoContext context)
+    /// <summary>Extracts tangent vectors from geometry.</summary>
+    public Result<IReadOnlyList<RhinoVector3d>> Tangents(GeometryBase geometry, GeoContext context)
     {
         Result<IReadOnlyList<VectorSample>> samples = ExtractAll(geometry, context);
         if (!samples.IsSuccess)
         {
-            return Result<IReadOnlyList<Vector3d>>.Fail(samples.Failure!);
+            return Result<IReadOnlyList<RhinoVector3d>>.Fail(samples.Failure!);
         }
 
-        List<Vector3d> tangents = samples.Value!
+        List<RhinoVector3d> tangents = samples.Value!
             .Where(sample => sample.Tangent.HasValue)
             .Select(sample => sample.Tangent!.Value)
             .ToList();
 
-        return Result<IReadOnlyList<Vector3d>>.Success(tangents);
+        return Result<IReadOnlyList<RhinoVector3d>>.Success(tangents);
     }
 
-    /// <summary>Extracts normal vectors from the geometry.</summary>
-    /// <param name="geometry">The geometry to extract normals from.</param>
-    /// <param name="context">The geometric context containing tolerance information.</param>
-    /// <returns>A result containing the normal vectors or a failure.</returns>
-    public Result<IReadOnlyList<Vector3d>> Normals(GeometryBase geometry, GeoContext context)
+    /// <summary>Extracts normal vectors from geometry.</summary>
+    public Result<IReadOnlyList<RhinoVector3d>> Normals(GeometryBase geometry, GeoContext context)
     {
         Result<IReadOnlyList<VectorSample>> samples = ExtractAll(geometry, context);
         if (!samples.IsSuccess)
         {
-            return Result<IReadOnlyList<Vector3d>>.Fail(samples.Failure!);
+            return Result<IReadOnlyList<RhinoVector3d>>.Fail(samples.Failure!);
         }
 
-        List<Vector3d> normals = samples.Value!
+        List<RhinoVector3d> normals = samples.Value!
             .Where(sample => sample.Normal.HasValue)
             .Select(sample => sample.Normal!.Value)
             .ToList();
 
-        return Result<IReadOnlyList<Vector3d>>.Success(normals);
+        return Result<IReadOnlyList<RhinoVector3d>>.Success(normals);
     }
 
-    private static Result<IReadOnlyList<VectorSample>> ExtractFromBrep(global::Rhino.Geometry.Brep brep)
+    private static Result<IReadOnlyList<VectorSample>> ExtractFromBrep(Brep brep)
     {
-        Result<global::Rhino.Geometry.Brep> validation = Guard.AgainstNull(brep, nameof(brep));
+        Result<Brep> validation = Guard.AgainstNull(brep, nameof(brep));
         if (!validation.IsSuccess)
         {
             return Result<IReadOnlyList<VectorSample>>.Fail(validation.Failure!);
@@ -115,7 +110,7 @@ public sealed class Vector : IVector
 
         try
         {
-            using global::Rhino.Geometry.Brep? brep = subd.ToBrep();
+            using Brep? brep = subd.ToBrep();
             if (brep is null || !brep.IsValid)
             {
                 return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.subd.convert", "Failed to convert SubD to brep."));
@@ -131,7 +126,7 @@ public sealed class Vector : IVector
 
     private static class VectorAdapters
     {
-        public static Result<IReadOnlyList<VectorSample>> GetSurfaceVectors(global::Rhino.Geometry.Surface surface)
+        public static Result<IReadOnlyList<VectorSample>> GetSurfaceVectors(RhinoSurface surface)
         {
             if (!surface.IsValid)
             {
@@ -143,17 +138,17 @@ public sealed class Vector : IVector
             double u = uDomain.Mid;
             double v = vDomain.Mid;
 
-            bool success = surface.Evaluate(u, v, 1, out Point3d point, out Vector3d[] derivatives);
+            bool success = surface.Evaluate(u, v, 1, out Point3d point, out RhinoVector3d[] derivatives);
             if (!success || derivatives.Length < 2)
             {
                 return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.surface.evaluate", "Surface evaluation failed."));
             }
 
-            Vector3d tangentU = derivatives[0];
-            Vector3d tangentV = derivatives[1];
-            Vector3d normal = Vector3d.CrossProduct(tangentU, tangentV);
+            RhinoVector3d tangentU = derivatives[0];
+            RhinoVector3d tangentV = derivatives[1];
+            RhinoVector3d normal = RhinoVector3d.CrossProduct(tangentU, tangentV);
 
-            if (!normal.IsValid || normal.Length < RhinoMath.ZeroTolerance)
+            if (!normal.IsValid || normal.Length < 1e-12)
             {
                 normal = surface.NormalAt(u, v);
             }
@@ -174,8 +169,8 @@ public sealed class Vector : IVector
             double u = uDomain.Mid;
             double v = vDomain.Mid;
 
-            Vector3d normal = face.NormalAt(u, v);
-            bool evaluated = face.Evaluate(u, v, 1, out Point3d point, out Vector3d[] derivatives);
+            RhinoVector3d normal = face.NormalAt(u, v);
+            bool evaluated = face.Evaluate(u, v, 1, out Point3d point, out RhinoVector3d[] derivatives);
             if (!evaluated || derivatives.Length < 2 || !normal.IsValid)
             {
                 return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brepFace.evaluate", "Failed to evaluate brep face."));
@@ -185,7 +180,7 @@ public sealed class Vector : IVector
             return Result<IReadOnlyList<VectorSample>>.Success([sample]);
         }
 
-        public static Result<IReadOnlyList<VectorSample>> GetCurveVectors(global::Rhino.Geometry.Curve curve)
+        public static Result<IReadOnlyList<VectorSample>> GetCurveVectors(Curve curve)
         {
             if (!curve.IsValid)
             {
@@ -197,7 +192,7 @@ public sealed class Vector : IVector
                 List<VectorSample> results = [];
                 for (int i = 0; i < polyCurve.SegmentCount; i++)
                 {
-                    global::Rhino.Geometry.Curve? segment = polyCurve.SegmentCurve(i);
+                    Curve? segment = polyCurve.SegmentCurve(i);
                     if (segment is null || !segment.IsValid)
                     {
                         continue;
@@ -206,9 +201,9 @@ public sealed class Vector : IVector
                     Interval segmentDomain = segment.Domain;
                     double mid = segmentDomain.Mid;
                     Point3d point = segment.PointAt(mid);
-                    Vector3d tangent = segment.TangentAt(mid);
+                    RhinoVector3d tangent = segment.TangentAt(mid);
 
-                    if (!tangent.IsValid || tangent.Length < RhinoMath.ZeroTolerance)
+                    if (!tangent.IsValid || tangent.Length < 1e-12)
                     {
                         continue;
                     }
@@ -224,23 +219,21 @@ public sealed class Vector : IVector
 
                 return Result<IReadOnlyList<VectorSample>>.Success(results);
             }
-            else
+
+            double midParam = curve.Domain.Mid;
+            Point3d midPoint = curve.PointAt(midParam);
+            RhinoVector3d tangentVector = curve.TangentAt(midParam);
+
+            if (!tangentVector.IsValid || tangentVector.Length < 1e-12)
             {
-                double mid = curve.Domain.Mid;
-                Point3d point = curve.PointAt(mid);
-                Vector3d tangent = curve.TangentAt(mid);
-
-                if (!tangent.IsValid || tangent.Length < RhinoMath.ZeroTolerance)
-                {
-                    return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.tangent", "Curve tangent is invalid."));
-                }
-
-                tangent.Unitize();
-                return Result<IReadOnlyList<VectorSample>>.Success([new VectorSample(point, tangent, null, null, null)]);
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.tangent", "Curve tangent is invalid."));
             }
+
+            tangentVector.Unitize();
+            return Result<IReadOnlyList<VectorSample>>.Success([new VectorSample(midPoint, tangentVector, null, null, null)]);
         }
 
-        public static Result<IReadOnlyList<VectorSample>> GetMeshVectors(global::Rhino.Geometry.Mesh mesh)
+        public static Result<IReadOnlyList<VectorSample>> GetMeshVectors(RhinoMesh mesh)
         {
             if (!mesh.IsValid)
             {
@@ -256,14 +249,14 @@ public sealed class Vector : IVector
             for (int i = 0; i < mesh.Faces.Count; i++)
             {
                 MeshFace face = mesh.Faces[i];
-                Vector3f normal = mesh.FaceNormals[i];
-                if (!normal.IsValid || normal.Length < RhinoMath.ZeroTolerance)
+                RhinoVector3f normal = mesh.FaceNormals[i];
+                if (!normal.IsValid || normal.Length < 1e-12)
                 {
                     continue;
                 }
 
                 Point3d center = FaceCenter(mesh, face);
-                samples.Add(new VectorSample(center, null, new Vector3d(normal), null, null));
+                samples.Add(new VectorSample(center, null, new RhinoVector3d(normal), null, null));
             }
 
             if (samples.Count == 0)
@@ -276,8 +269,8 @@ public sealed class Vector : IVector
 
         public static Result<IReadOnlyList<VectorSample>> GetExtrusionVectors(Extrusion extrusion)
         {
-            Vector3d direction = extrusion.PathEnd - extrusion.PathStart;
-            if (!direction.IsValid || direction.Length < RhinoMath.ZeroTolerance)
+            RhinoVector3d direction = extrusion.PathEnd - extrusion.PathStart;
+            if (!direction.IsValid || direction.Length < 1e-12)
             {
                 return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.extrusion.direction", "Extrusion direction is invalid."));
             }
@@ -286,7 +279,7 @@ public sealed class Vector : IVector
             return Result<IReadOnlyList<VectorSample>>.Success([new VectorSample(point, direction, null, null, null)]);
         }
 
-        private static Point3d FaceCenter(global::Rhino.Geometry.Mesh mesh, MeshFace face)
+        private static Point3d FaceCenter(RhinoMesh mesh, MeshFace face)
         {
             Point3f a = mesh.Vertices[face.A];
             Point3f b = mesh.Vertices[face.B];
