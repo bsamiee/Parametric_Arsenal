@@ -3,7 +3,7 @@ using Arsenal.Core.Result;
 using Rhino.Geometry;
 using RhinoMesh = Rhino.Geometry.Mesh;
 
-namespace Arsenal.Rhino.Geometry.Mesh;
+namespace Arsenal.Rhino.Geometry.Meshes;
 
 /// <summary>Mesh geometry operations.</summary>
 public interface IMesh

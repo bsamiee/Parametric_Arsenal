@@ -1,7 +1,7 @@
 using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 
-namespace Arsenal.Rhino.Geometry.Surface;
+namespace Arsenal.Rhino.Geometry.Surfaces;
 
 /// <summary>Surface geometry operations.</summary>
 public interface ISurface

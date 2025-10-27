@@ -5,7 +5,7 @@ using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 using Arsenal.Rhino.Geometry.Brep;
 using Arsenal.Rhino.Geometry.Core;
-using Arsenal.Rhino.Geometry.Mesh;
+using Arsenal.Rhino.Geometry.Meshes;
 using Rhino.Geometry;
 using RhinoBrep = Rhino.Geometry.Brep;
 using RhinoMesh = Rhino.Geometry.Mesh;

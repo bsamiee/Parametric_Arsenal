@@ -3,10 +3,9 @@ using Arsenal.Core.Guard;
 using Arsenal.Core.Result;
 using Rhino.Geometry;
 using Rhino.Geometry.Collections;
-using RhinoCurve = Rhino.Geometry.Curve;
 using RhinoMesh = Rhino.Geometry.Mesh;
 
-namespace Arsenal.Rhino.Geometry.Mesh;
+namespace Arsenal.Rhino.Geometry.Meshes;
 
 /// <summary>Mesh operations using RhinoCommon.</summary>
 public sealed class MeshOperations : IMesh
@@ -46,12 +45,12 @@ public sealed class MeshOperations : IMesh
     }
 
     /// <summary>Computes midpoints of all mesh edges.</summary>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Point3d>> EdgeMidpoints(global::Rhino.Geometry.Mesh mesh)
+    public Result<IReadOnlyList<Point3d>> EdgeMidpoints(Mesh mesh)
     {
         Result<RhinoMesh> meshResult = ValidateMesh(mesh);
         if (!meshResult.IsSuccess)
         {
-            return Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Fail(meshResult.Failure!);
+            return Result<IReadOnlyList<Point3d>>.Fail(meshResult.Failure!);
         }
 
         MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
@@ -63,7 +62,7 @@ public sealed class MeshOperations : IMesh
             midpoints[i] = edgeLine.PointAt(0.5);
         }
 
-        return Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Success(midpoints);
+        return Result<IReadOnlyList<Point3d>>.Success(midpoints);
     }
 
     private static Result<RhinoMesh> ValidateMesh(RhinoMesh? mesh)

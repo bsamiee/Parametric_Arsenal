@@ -5,11 +5,11 @@ using Arsenal.Rhino.Analysis.Vector;
 using Arsenal.Rhino.Context;
 using Arsenal.Rhino.Geometry.Brep;
 using Arsenal.Rhino.Geometry.Core;
-using Arsenal.Rhino.Geometry.Curve;
+using Arsenal.Rhino.Geometry.Curves;
 using Arsenal.Rhino.Geometry.Elements;
 using Arsenal.Rhino.Geometry.Intersect;
-using Arsenal.Rhino.Geometry.Mesh;
-using Arsenal.Rhino.Geometry.Surface;
+using Arsenal.Rhino.Geometry.Meshes;
+using Arsenal.Rhino.Geometry.Surfaces;
 using Rhino.Geometry;
 using RhinoBrep = Rhino.Geometry.Brep;
 using RhinoCurve = Rhino.Geometry.Curve;
@@ -50,7 +50,7 @@ public sealed class GeometryOps : IElementOperations
     }
 
     /// <summary>Extracts vertices from geometry.</summary>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Point3d>> Vertices(global::Rhino.Geometry.GeometryBase geometry, GeoContext context)
+    public Result<IReadOnlyList<Point3d>> Vertices(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -61,14 +61,14 @@ public sealed class GeometryOps : IElementOperations
             Extrusion extrusion => WithBrep(extrusion.ToBrep(), _breps.Vertices),
             SubD subd => WithBrep(subd.ToBrep(), _breps.Vertices),
             RhinoSurface surface => WithBrep(RhinoBrep.CreateFromSurface(surface), _breps.Vertices),
-            RhinoCurve curve => Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Success([curve.PointAtStart, curve.PointAtEnd]),
-            _ => Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Fail(new Failure("geometry.vertices.unsupported",
+            RhinoCurve curve => Result<IReadOnlyList<Point3d>>.Success([curve.PointAtStart, curve.PointAtEnd]),
+            _ => Result<IReadOnlyList<Point3d>>.Fail(new Failure("geometry.vertices.unsupported",
                 $"Vertices extraction is not supported for geometry type {geometry.ObjectType}."))
         };
     }
 
     /// <summary>Extracts edges from geometry.</summary>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Curve>> Edges(global::Rhino.Geometry.GeometryBase geometry, GeoContext context)
+    public Result<IReadOnlyList<Curve>> Edges(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -79,14 +79,14 @@ public sealed class GeometryOps : IElementOperations
             Extrusion extrusion => WithBrep(extrusion.ToBrep(), _breps.Edges),
             SubD subd => WithBrep(subd.ToBrep(), _breps.Edges),
             RhinoSurface surface => WithBrep(RhinoBrep.CreateFromSurface(surface), _breps.Edges),
-            RhinoCurve curve => Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Success([curve.DuplicateCurve()]),
-            _ => Result<IReadOnlyList<global::Rhino.Geometry.Curve>>.Fail(new Failure("geometry.edges.unsupported",
+            RhinoCurve curve => Result<IReadOnlyList<Curve>>.Success([curve.DuplicateCurve()]),
+            _ => Result<IReadOnlyList<Curve>>.Fail(new Failure("geometry.edges.unsupported",
                 $"Edge extraction is not supported for geometry type {geometry.ObjectType}."))
         };
     }
 
     /// <summary>Extracts faces from geometry.</summary>
-    public Result<IReadOnlyList<global::Rhino.Geometry.GeometryBase>> Faces(global::Rhino.Geometry.GeometryBase geometry, GeoContext context)
+    public Result<IReadOnlyList<GeometryBase>> Faces(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -95,16 +95,16 @@ public sealed class GeometryOps : IElementOperations
             RhinoBrep brep => _breps.Faces(brep),
             Extrusion extrusion => WithBrep(extrusion.ToBrep(), _breps.Faces),
             SubD subd => WithBrep(subd.ToBrep(), _breps.Faces),
-            RhinoSurface surface => Result<IReadOnlyList<global::Rhino.Geometry.GeometryBase>>.Success([surface.Duplicate()]),
-            RhinoMesh => Result<IReadOnlyList<global::Rhino.Geometry.GeometryBase>>.Fail(new Failure("geometry.faces.unsupported",
+            RhinoSurface surface => Result<IReadOnlyList<GeometryBase>>.Success([surface.Duplicate()]),
+            RhinoMesh => Result<IReadOnlyList<GeometryBase>>.Fail(new Failure("geometry.faces.unsupported",
                 "Mesh faces should be accessed directly via mesh topology.")),
-            _ => Result<IReadOnlyList<global::Rhino.Geometry.GeometryBase>>.Fail(new Failure("geometry.faces.unsupported",
+            _ => Result<IReadOnlyList<GeometryBase>>.Fail(new Failure("geometry.faces.unsupported",
                 $"Face extraction is not supported for geometry type {geometry.ObjectType}."))
         };
     }
 
     /// <summary>Computes edge midpoints from geometry.</summary>
-    public Result<IReadOnlyList<global::Rhino.Geometry.Point3d>> EdgeMidpoints(global::Rhino.Geometry.GeometryBase geometry, GeoContext context)
+    public Result<IReadOnlyList<Point3d>> EdgeMidpoints(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -115,14 +115,14 @@ public sealed class GeometryOps : IElementOperations
             Extrusion extrusion => WithBrep(extrusion.ToBrep(), _breps.EdgeMidpoints),
             SubD subd => WithBrep(subd.ToBrep(), _breps.EdgeMidpoints),
             RhinoSurface surface => WithBrep(RhinoBrep.CreateFromSurface(surface), _breps.EdgeMidpoints),
-            RhinoCurve curve => Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Success([curve.PointAt(curve.Domain.Mid)]),
-            _ => Result<IReadOnlyList<global::Rhino.Geometry.Point3d>>.Fail(new Failure("geometry.edgeMidpoints.unsupported",
+            RhinoCurve curve => Result<IReadOnlyList<Point3d>>.Success([curve.PointAt(curve.Domain.Mid)]),
+            _ => Result<IReadOnlyList<Point3d>>.Fail(new Failure("geometry.edgeMidpoints.unsupported",
                 $"Edge midpoint extraction is not supported for geometry type {geometry.ObjectType}."))
         };
     }
 
     /// <summary>Computes geometry centroid.</summary>
-    public Result<global::Rhino.Geometry.Point3d> Centroid(global::Rhino.Geometry.GeometryBase geometry, GeoContext context)
+    public Result<Point3d> Centroid(GeometryBase geometry, GeoContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         return _centroids.Compute(geometry, context);
@@ -147,8 +147,6 @@ public sealed class GeometryOps : IElementOperations
     /// <summary>Finds closest point on surface to test point.</summary>
     public Result<SurfaceClosestPoint> SurfaceClosestPoint(RhinoSurface surface, Point3d testPoint, GeoContext context) =>
         _surfaces.ClosestPoint(surface, testPoint, context ?? throw new ArgumentNullException(nameof(context)));
-
-
 
     /// <summary>Computes curve-curve intersections.</summary>
     public Result<IReadOnlyList<CurveCurveHit>> CurveIntersections(IEnumerable<RhinoCurve> curves, GeoContext context, bool includeSelf = false) =>

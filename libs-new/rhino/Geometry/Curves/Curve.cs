@@ -9,7 +9,7 @@ using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using RhinoCurve = Rhino.Geometry.Curve;
 
-namespace Arsenal.Rhino.Geometry.Curve;
+namespace Arsenal.Rhino.Geometry.Curves;
 
 /// <summary>Curve operations using RhinoCommon.</summary>
 public sealed class CurveOperations : ICurve
@@ -19,7 +19,7 @@ public sealed class CurveOperations : ICurve
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
+        Result<Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
         {
             return Result<CurveClosestPoint>.Fail(curveResult.Failure!);
@@ -50,7 +50,7 @@ public sealed class CurveOperations : ICurve
     /// <summary>Computes tangent vector at curve parameter.</summary>
     public Result<Vector3d> TangentAt(RhinoCurve curve, double parameter)
     {
-        Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
+        Result<Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
         {
             return Result<Vector3d>.Fail(curveResult.Failure!);
@@ -85,7 +85,7 @@ public sealed class CurveOperations : ICurve
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
+        Result<Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
         {
             return Result<IReadOnlyList<Point3d>>.Fail(curveResult.Failure!);
@@ -148,7 +148,7 @@ public sealed class CurveOperations : ICurve
     /// <summary>Computes curve midpoint.</summary>
     public Result<Point3d> Midpoint(RhinoCurve curve)
     {
-        Result<global::Rhino.Geometry.Curve> curveResult = ValidateCurve(curve);
+        Result<Curve> curveResult = ValidateCurve(curve);
         if (!curveResult.IsSuccess)
         {
             return Result<Point3d>.Fail(curveResult.Failure!);

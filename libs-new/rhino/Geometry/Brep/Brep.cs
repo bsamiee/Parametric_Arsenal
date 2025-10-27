@@ -3,7 +3,6 @@ using Arsenal.Core.Guard;
 using Arsenal.Core.Result;
 using Rhino.Geometry;
 using RhinoBrep = Rhino.Geometry.Brep;
-using RhinoCurve = Rhino.Geometry.Curve;
 
 namespace Arsenal.Rhino.Geometry.Brep;
 

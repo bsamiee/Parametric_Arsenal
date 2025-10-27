@@ -5,7 +5,7 @@ using Arsenal.Rhino.Context;
 using Rhino.Geometry;
 using RhinoSurface = Rhino.Geometry.Surface;
 
-namespace Arsenal.Rhino.Geometry.Surface;
+namespace Arsenal.Rhino.Geometry.Surfaces;
 
 /// <summary>Surface operations using RhinoCommon.</summary>
 public sealed class SurfaceOperations : ISurface
@@ -15,7 +15,7 @@ public sealed class SurfaceOperations : ISurface
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        Result<global::Rhino.Geometry.Surface> surfaceResult = ValidateSurface(surface);
+        Result<Surface> surfaceResult = ValidateSurface(surface);
         if (!surfaceResult.IsSuccess)
         {
             return Result<SurfaceClosestPoint>.Fail(surfaceResult.Failure!);

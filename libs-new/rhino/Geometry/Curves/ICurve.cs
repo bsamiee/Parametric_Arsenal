@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Arsenal.Core.Result;
 using Arsenal.Rhino.Context;
 
-namespace Arsenal.Rhino.Geometry.Curve;
+namespace Arsenal.Rhino.Geometry.Curves;
 
 /// <summary>Curve geometry operations.</summary>
 public interface ICurve
