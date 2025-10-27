@@ -6,104 +6,69 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Geometry;
 
-/// <summary>Core functional patterns for traversing and extracting elements from geometry.</summary>
+/// <summary>Functional pipeline for extracting and processing elements from geometry with composable operations.</summary>
 public static class GeometryTraversal
 {
-    /// <summary>Extracts elements from geometry using a provided extractor function.</summary>
-    public static Result<T[]> Extract<T>(
+    /// <summary>
+    /// Extracts elements from geometry and applies a composable pipeline of operations.
+    /// Supports transformation, filtering, and deduplication through function composition.
+    /// </summary>
+    public static Result<TResult[]> Extract<TExtracted, TResult>(
         GeometryBase? geometry,
-        Func<GeometryBase, T[]> extractor)
+        Func<GeometryBase, TExtracted[]> extractor,
+        Func<IEnumerable<TExtracted>, IEnumerable<TResult>>? pipeline = null)
     {
         Result<GeometryBase> geometryValidation = Guard.RequireNonNull(geometry, nameof(geometry));
         if (!geometryValidation.Ok)
         {
-            return Result<T[]>.Fail(geometryValidation.Error!);
+            return Result<TResult[]>.Fail(geometryValidation.Error!);
         }
 
         if (geometryValidation.Value is not { IsValid: true })
         {
-            return Result<T[]>.Fail($"Geometry is invalid: {geometry!.ObjectType} failed validation");
+            return Result<TResult[]>.Fail($"Geometry is invalid: {geometry!.ObjectType} failed validation");
         }
 
         try
         {
-            T[] elements = extractor(geometryValidation.Value);
-            return Result<T[]>.Success(elements);
+            TExtracted[] extracted = extractor(geometryValidation.Value);
+
+            // Apply pipeline if provided, otherwise assume TExtracted == TResult
+            IEnumerable<TResult> processed = pipeline?.Invoke(extracted)
+                                             ?? extracted.Cast<TResult>();
+
+            return Result<TResult[]>.Success(processed.ToArray());
         }
         catch (Exception ex)
         {
-            return Result<T[]>.Fail($"Extraction failed: {ex.Message}");
+            return Result<TResult[]>.Fail($"Pipeline execution failed: {ex.Message}");
         }
     }
 
-    /// <summary>Extracts and transforms elements from geometry in a single operation.</summary>
-    public static Result<TOut[]> ExtractAndTransform<TIn, TOut>(
-        GeometryBase? geometry,
-        Func<GeometryBase, TIn[]> extractor,
-        Func<TIn, TOut> transformer)
-    {
-        ArgumentNullException.ThrowIfNull(transformer);
-
-        Result<TIn[]> extractionResult = Extract(geometry, extractor);
-        if (!extractionResult.Ok)
-        {
-            return Result<TOut[]>.Fail(extractionResult.Error!);
-        }
-
-        try
-        {
-            TOut[] transformed = extractionResult.Value!.Select(transformer).ToArray();
-            return Result<TOut[]>.Success(transformed);
-        }
-        catch (Exception ex)
-        {
-            return Result<TOut[]>.Fail($"Transformation failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>Extracts unique elements from geometry, removing duplicates based on equality comparison.</summary>
-    public static Result<T[]> ExtractUnique<T>(
-        GeometryBase? geometry,
-        Func<GeometryBase, T[]> extractor,
-        IEqualityComparer<T>? comparer = null)
-    {
-        Result<T[]> extractionResult = Extract(geometry, extractor);
-        if (!extractionResult.Ok)
-        {
-            return extractionResult;
-        }
-
-        try
-        {
-            T[] unique = extractionResult.Value!.Distinct(comparer).ToArray();
-            return Result<T[]>.Success(unique);
-        }
-        catch (Exception ex)
-        {
-            return Result<T[]>.Fail($"Deduplication failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>Extracts elements from multiple geometries and combines the results.</summary>
-    public static Result<T[]> ExtractFromMany<T>(
+    /// <summary>
+    /// Extracts elements from multiple geometries and applies a composable pipeline.
+    /// Aggregates results from all geometries, continuing on individual failures.
+    /// </summary>
+    public static Result<TResult[]> ExtractMany<TExtracted, TResult>(
         IEnumerable<GeometryBase>? geometries,
-        Func<GeometryBase, T[]> extractor)
+        Func<GeometryBase, TExtracted[]> extractor,
+        Func<IEnumerable<TExtracted>, IEnumerable<TResult>>? pipeline = null)
     {
         Result<IEnumerable<GeometryBase>> geometriesValidation = Guard.RequireNonNull(geometries, nameof(geometries));
         if (!geometriesValidation.Ok)
         {
-            return Result<T[]>.Fail(geometriesValidation.Error!);
+            return Result<TResult[]>.Fail(geometriesValidation.Error!);
         }
 
-        List<T> allElements = [];
+        List<TExtracted> allExtracted = [];
         List<string> errors = [];
 
         foreach (GeometryBase geom in geometriesValidation.Value!)
         {
-            Result<T[]> result = Extract(geom, extractor);
+            Result<TExtracted[]> result = Extract<TExtracted, TExtracted>(geom, extractor);
             if (result is { Ok: true, Value: not null })
             {
-                allElements.AddRange(result.Value);
+                allExtracted.AddRange(result.Value);
             }
             else if (result.Error is not null)
             {
@@ -111,36 +76,46 @@ public static class GeometryTraversal
             }
         }
 
-        if (errors.Count > 0 && allElements.Count == 0)
+        if (errors.Count > 0 && allExtracted.Count == 0)
         {
-            return Result<T[]>.Fail($"All extractions failed: {string.Join("; ", errors)}");
-        }
-
-        return Result<T[]>.Success([.. allElements]);
-    }
-
-    /// <summary>Filters extracted elements based on a predicate.</summary>
-    public static Result<T[]> ExtractWhere<T>(
-        GeometryBase? geometry,
-        Func<GeometryBase, T[]> extractor,
-        Func<T, bool> predicate)
-    {
-        ArgumentNullException.ThrowIfNull(predicate);
-
-        Result<T[]> extractionResult = Extract(geometry, extractor);
-        if (!extractionResult.Ok)
-        {
-            return extractionResult;
+            return Result<TResult[]>.Fail($"All extractions failed: {string.Join("; ", errors)}");
         }
 
         try
         {
-            T[] filtered = extractionResult.Value!.Where(predicate).ToArray();
-            return Result<T[]>.Success(filtered);
+            // Apply pipeline if provided, otherwise assume TExtracted == TResult
+            IEnumerable<TResult> processed = pipeline?.Invoke(allExtracted)
+                                             ?? allExtracted.Cast<TResult>();
+
+            return Result<TResult[]>.Success(processed.ToArray());
         }
         catch (Exception ex)
         {
-            return Result<T[]>.Fail($"Filtering failed: {ex.Message}");
+            return Result<TResult[]>.Fail($"Pipeline execution failed: {ex.Message}");
         }
     }
+}
+
+/// <summary>Extension methods for creating composable geometry processing pipelines.</summary>
+public static class GeometryPipeline
+{
+    /// <summary>Transforms elements using the provided function.</summary>
+    public static IEnumerable<TOut> Transform<TIn, TOut>(
+        this IEnumerable<TIn> source,
+        Func<TIn, TOut> transformer) => source.Select(transformer);
+
+    /// <summary>Filters elements using the provided predicate.</summary>
+    public static IEnumerable<T> Filter<T>(
+        this IEnumerable<T> source,
+        Func<T, bool> predicate) => source.Where(predicate);
+
+    /// <summary>Removes duplicate elements using optional comparer.</summary>
+    public static IEnumerable<T> Deduplicate<T>(
+        this IEnumerable<T> source,
+        IEqualityComparer<T>? comparer = null) => source.Distinct(comparer);
+
+    /// <summary>Removes duplicate elements by key selector.</summary>
+    public static IEnumerable<T> DeduplicateBy<T, TKey>(
+        this IEnumerable<T> source,
+        Func<T, TKey> keySelector) => source.GroupBy(keySelector).Select(g => g.First());
 }

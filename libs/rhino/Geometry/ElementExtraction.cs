@@ -11,7 +11,7 @@ public static class ElementExtraction
     /// <summary>Extracts all vertices from geometry as Point3d objects.</summary>
     public static Result<Point3d[]> ExtractVertices(GeometryBase? geom)
     {
-        Result<Point3d[]> result = GeometryTraversal.Extract(geom, GeometryAdapters.GetVertices);
+        Result<Point3d[]> result = GeometryTraversal.Extract<Point3d, Point3d>(geom, GeometryAdapters.GetVertices);
         if (!result.Ok || result.Value is null)
         {
             return result;
@@ -24,19 +24,19 @@ public static class ElementExtraction
     /// <summary>Extracts all edges from geometry as curve objects.</summary>
     public static Result<Curve[]> ExtractEdges(GeometryBase? geom)
     {
-        return GeometryTraversal.Extract(geom, GeometryAdapters.GetEdges);
+        return GeometryTraversal.Extract<Curve, Curve>(geom, GeometryAdapters.GetEdges);
     }
 
     /// <summary>Extracts all faces from geometry as surface or mesh face objects.</summary>
     public static Result<GeometryBase[]> ExtractFaces(GeometryBase? geom)
     {
-        return GeometryTraversal.Extract(geom, GeometryAdapters.GetFaces);
+        return GeometryTraversal.Extract<GeometryBase, GeometryBase>(geom, GeometryAdapters.GetFaces);
     }
 
     /// <summary>Extracts deduplicated edge midpoints from geometry.</summary>
     public static Result<Point3d[]> ExtractEdgeMidpoints(GeometryBase? geom)
     {
-        Result<Point3d[]> result = GeometryTraversal.Extract(geom, GeometryAdapters.GetEdgeMidpoints);
+        Result<Point3d[]> result = GeometryTraversal.Extract<Point3d, Point3d>(geom, GeometryAdapters.GetEdgeMidpoints);
         if (!result.Ok || result.Value is null)
         {
             return result;

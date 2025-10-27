@@ -123,7 +123,10 @@ public static class GeometryConversion
             : Result<Mesh>.Fail($"Cannot convert {goo.TypeName} to Mesh");
     }
 
-    /// <summary>Converts IGH_Goo to GeometryBase using ScriptVariable and pattern matching.</summary>
+    /// <summary>
+    /// Converts IGH_Goo to GeometryBase using GH_Convert to extract existing geometry.
+    /// Does not create new geometry objects - only extracts existing ones from the wrapper.
+    /// </summary>
     public static Result<GeometryBase> ToGeometryBase(IGH_Goo? goo)
     {
         if (goo is null)
@@ -131,8 +134,20 @@ public static class GeometryConversion
             return Result<GeometryBase>.Fail("Input cannot be null");
         }
 
-        return goo.ScriptVariable() is GeometryBase geom
-            ? Result<GeometryBase>.Success(geom)
-            : Result<GeometryBase>.Fail($"Cannot convert {goo.TypeName} to GeometryBase");
+        // First try GH_Convert.ToGeometryBase - this is the recommended SDK approach
+        GeometryBase? geometry = GH_Convert.ToGeometryBase(goo);
+        if (geometry is not null)
+        {
+            return Result<GeometryBase>.Success(geometry);
+        }
+
+        // Final fallback: try accessing the ScriptVariable for direct geometry
+        object? scriptVariable = goo.ScriptVariable();
+        if (scriptVariable is GeometryBase scriptGeometry)
+        {
+            return Result<GeometryBase>.Success(scriptGeometry);
+        }
+
+        return Result<GeometryBase>.Fail($"Cannot convert {goo.TypeName} to GeometryBase");
     }
 }

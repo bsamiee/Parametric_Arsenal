@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors>CS8618</WarningsNotAsErrors>
+    <RootNamespace>Arsenal.Rhino</RootNamespace>
+    <AssemblyName>Arsenal.Rhino</AssemblyName>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>NU1701</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="RhinoCommon" Version="8.16.25042.13001" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../core/Core.csproj" />
+  </ItemGroup>
+</Project>

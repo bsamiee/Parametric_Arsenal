@@ -24,6 +24,20 @@ public abstract class ExtractorBase<T>(
     private T[] _extractedElements = [];
     private bool _showLabels = true;
 
+    /// <summary>Clears preview data when inputs are disconnected.</summary>
+    protected override void BeforeSolveInstance()
+    {
+        base.BeforeSolveInstance();
+
+        // Check if the geometry input (index 0) has any sources connected
+        if (Params.Input.Count > 0 && Params.Input[0].SourceCount == 0)
+        {
+            // No input connected, clear the preview
+            _extractedElements = [];
+            _showLabels = true;
+        }
+    }
+
     /// <summary>Registers standard input parameters for geometry extraction components.</summary>
     protected override void RegisterInputParams(GH_InputParamManager pManager)
     {
@@ -48,12 +62,16 @@ public abstract class ExtractorBase<T>(
         Result<IGH_GeometricGoo> gooResult = ParameterAccess.GetItem<IGH_GeometricGoo>(DA, 0);
         if (!ReportIfFailed(gooResult))
         {
+            _extractedElements = [];
+            _showLabels = true;
             return;
         }
 
         Result<bool> disableLabelsResult = ParameterAccess.GetOptionalValue(DA, 1, false);
         if (!ReportIfFailed(disableLabelsResult))
         {
+            _extractedElements = [];
+            _showLabels = true;
             return;
         }
 
@@ -62,12 +80,16 @@ public abstract class ExtractorBase<T>(
         Result<GeometryBase> conversionResult = GeometryConversion.ToGeometryBase(gooResult.Value!);
         if (!ReportIfFailed(conversionResult))
         {
+            _extractedElements = [];
+            _showLabels = !disableLabels;
             return;
         }
 
         Result<T[]> extractionResult = ExtractElements(conversionResult.Value!);
         if (!ReportIfFailed(extractionResult))
         {
+            _extractedElements = [];
+            _showLabels = !disableLabels;
             return;
         }
 

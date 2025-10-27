@@ -179,4 +179,81 @@ public static class Guard
             ? Result.Success()
             : Result.Fail(string.Join("; ", errors));
     }
+
+    /// <summary>Validates that a value passes all specified validators.</summary>
+    public static Result<T> RequireAll<T>(T value, params Func<T, Result<T>>[] validators) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(validators);
+
+        Result<T> current = Result<T>.Success(value);
+
+        foreach (Func<T, Result<T>> validator in validators)
+        {
+            current = current.Bind(validator);
+            if (!current.Ok)
+            {
+                return current;
+            }
+        }
+
+        return current;
+    }
+
+    /// <summary>Validates that a value passes at least one of the specified validators.</summary>
+    public static Result<T> RequireAny<T>(T value, params Func<T, Result<T>>[] validators) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(validators);
+
+        if (validators.Length == 0)
+        {
+            return Result<T>.Fail("At least one validator must be provided");
+        }
+
+        List<string> errors = [];
+
+        foreach (Func<T, Result<T>> validator in validators)
+        {
+            Result<T> result = validator(value);
+            if (result.Ok)
+            {
+                return result;
+            }
+
+            if (result.Error is not null)
+            {
+                errors.Add(result.Error);
+            }
+        }
+
+        return Result<T>.Fail($"All validators failed: {string.Join("; ", errors)}");
+    }
+
+    /// <summary>Validates each item in a sequence using the specified validator.</summary>
+    public static Result<T[]> ValidateSequence<T>(IEnumerable<T> items, Func<T, Result<T>> validator) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(validator);
+
+        List<T> validatedItems = [];
+        List<string> errors = [];
+        int index = 0;
+
+        foreach (T item in items)
+        {
+            Result<T> result = validator(item);
+            if (result is { Ok: true, Value: not null })
+            {
+                validatedItems.Add(result.Value);
+            }
+            else
+            {
+                errors.Add($"Item at index {index}: {result.Error ?? "Unknown error"}");
+            }
+            index++;
+        }
+
+        return errors.Count == 0
+            ? Result<T[]>.Success(validatedItems.ToArray())
+            : Result<T[]>.Fail(string.Join("; ", errors));
+    }
 }

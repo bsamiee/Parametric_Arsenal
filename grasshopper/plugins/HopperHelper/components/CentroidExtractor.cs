@@ -10,9 +10,9 @@ using Rhino.Geometry;
 
 namespace HopperHelper.Components;
 
-/// <summary>Extracts the centroid point from input geometry using proper SDK methods.</summary>
+/// <summary>Extracts the centroid point from input geometry using the refactored GeometryCentroids library.</summary>
 public class CentroidExtractor() : GhComponentBase("Centroid Extractor", "Centroid",
-    "Extracts the centroid point from input geometry using mass properties and native center calculations",
+    "Extracts the centroid point from input geometry using automatic SDK method selection",
     "HopperHelper", "Extraction")
 {
     /// <summary>Registers input and output parameters for the component.</summary>
@@ -47,10 +47,10 @@ public class CentroidExtractor() : GhComponentBase("Centroid Extractor", "Centro
             return;
         }
 
-        // Calculate centroid using enhanced GeometryCentroids library
+        // Calculate centroid using refactored GeometryCentroids library
         Point3d centroid = GeometryCentroids.GetCentroid(geometryResult.Value!);
 
-        // Set output using single Point3d
+        // Set output
         DA.SetData(0, centroid);
     }
 

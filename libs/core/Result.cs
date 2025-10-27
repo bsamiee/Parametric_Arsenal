@@ -180,6 +180,145 @@ public static class Results
         return Result<IReadOnlyList<T>>.Success(values);
     }
 
+    /// <summary>Converts a sequence of Results into a Result of sequence (railway-oriented programming).</summary>
+    public static Result<T[]> Sequence<T>(IEnumerable<Result<T>> results) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        List<T> values = [];
+        List<string> errors = [];
+
+        foreach (Result<T> result in results)
+        {
+            if (result is { Ok: true, Value: not null })
+            {
+                values.Add(result.Value);
+            }
+            else
+            {
+                errors.Add(result.Error ?? "Unknown error");
+            }
+        }
+
+        return errors.Count == 0
+            ? Result<T[]>.Success(values.ToArray())
+            : Result<T[]>.Fail(string.Join("; ", errors));
+    }
+
+    /// <summary>Maps each item in a sequence through a function that returns a Result, then sequences the results.</summary>
+    public static Result<U[]> Traverse<T, U>(IEnumerable<T> items, Func<T, Result<U>> transform) where U : notnull
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(transform);
+
+        List<Result<U>> results = [];
+
+        foreach (T item in items)
+        {
+            results.Add(transform(item));
+        }
+
+        return Sequence(results);
+    }
+
+    /// <summary>Filters and maps items in a sequence, keeping only those that pass the predicate.</summary>
+    public static Result<T[]> FilterMap<T>(IEnumerable<T> items, Func<T, Result<bool>> predicate) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(predicate);
+
+        List<T> filteredItems = [];
+        List<string> errors = [];
+
+        foreach (T item in items)
+        {
+            Result<bool> predicateResult = predicate(item);
+            if (predicateResult.Ok)
+            {
+                if (predicateResult.Value)
+                {
+                    filteredItems.Add(item);
+                }
+            }
+            else
+            {
+                errors.Add(predicateResult.Error ?? "Unknown error");
+            }
+        }
+
+        return errors.Count == 0
+            ? Result<T[]>.Success(filteredItems.ToArray())
+            : Result<T[]>.Fail(string.Join("; ", errors));
+    }
+
+    /// <summary>Combines all results, collecting all successful values even if some fail.</summary>
+    public static Result<T[]> CombineAll<T>(params Result<T>[] results) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        List<T> values = [];
+        List<string> errors = [];
+
+        foreach (Result<T> result in results)
+        {
+            if (result is { Ok: true, Value: not null })
+            {
+                values.Add(result.Value);
+            }
+            else
+            {
+                errors.Add(result.Error ?? "Unknown error");
+            }
+        }
+
+        return errors.Count == 0
+            ? Result<T[]>.Success(values.ToArray())
+            : Result<T[]>.Fail($"Some operations failed: {string.Join("; ", errors)}");
+    }
+
+    /// <summary>Combines only valid results, ignoring failures.</summary>
+    public static Result<T[]> CombineValid<T>(IEnumerable<Result<T>> results) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        List<T> values = [];
+
+        foreach (Result<T> result in results)
+        {
+            if (result is { Ok: true, Value: not null })
+            {
+                values.Add(result.Value);
+            }
+        }
+
+        return Result<T[]>.Success(values.ToArray());
+    }
+
+    /// <summary>Returns the first successful result, or the last failure if all fail.</summary>
+    public static Result<T> FirstSuccess<T>(params Result<T>[] results) where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        if (results.Length == 0)
+        {
+            return Result<T>.Fail("No results provided");
+        }
+
+        Result<T> lastFailure = results[0];
+
+        foreach (Result<T> result in results)
+        {
+            if (result.Ok)
+            {
+                return result;
+            }
+
+            lastFailure = result;
+        }
+
+        return lastFailure;
+    }
+
     /// <summary>Executes the specified function, catching exceptions and converting them to failures.</summary>
     public static Result<T> Try<T>(Func<T> func)
     {

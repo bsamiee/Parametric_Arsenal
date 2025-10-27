@@ -33,10 +33,7 @@ public static class GeometryAdapters
     {
         return geometry switch
         {
-            Brep brep => brep.Edges
-                .Where(e => e.EdgeCurve is not null)
-                .Select(e => e.EdgeCurve!)
-                .ToArray(),
+            Brep brep => brep.DuplicateEdgeCurves() ?? [],
             Mesh mesh => ExtractMeshEdges(mesh),
             Extrusion extrusion => ExtractExtrusionEdges(extrusion),
             SubD subd => ExtractSubDEdges(subd),
@@ -70,8 +67,11 @@ public static class GeometryAdapters
     {
         return geometry switch
         {
-            Brep brep => brep.Edges.Select(e => e.PointAt(e.Domain.Mid)).ToArray(),
+            Brep brep => ExtractBrepEdgeMidpoints(brep),
             Mesh mesh => ExtractMeshEdgeMidpoints(mesh),
+            Extrusion extrusion => ExtractExtrusionEdgeMidpoints(extrusion),
+            SubD subd => ExtractSubDEdgeMidpoints(subd),
+            Surface surface => ExtractSurfaceEdgeMidpoints(surface),
             PolyCurve polyCurve => Enumerable.Range(0, polyCurve.SegmentCount)
                 .Select(i => polyCurve.SegmentCurve(i))
                 .Select(seg => seg.PointAt(seg.Domain.Mid))
@@ -127,26 +127,17 @@ public static class GeometryAdapters
 
     private static Curve[] ExtractSurfaceEdges(Surface surface)
     {
-        return WithTemporaryBrep(surface, brep => brep.Edges
-            .Where(e => e.EdgeCurve is not null)
-            .Select(e => e.EdgeCurve!)
-            .ToArray());
+        return WithTemporaryBrep(surface, brep => brep.DuplicateEdgeCurves() ?? []);
     }
 
     private static Curve[] ExtractExtrusionEdges(Extrusion extrusion)
     {
-        return WithTemporaryBrep(extrusion, brep => brep.Edges
-            .Where(e => e.EdgeCurve is not null)
-            .Select(e => e.EdgeCurve!)
-            .ToArray());
+        return WithTemporaryBrep(extrusion, brep => brep.DuplicateEdgeCurves() ?? []);
     }
 
     private static Curve[] ExtractSubDEdges(SubD subd)
     {
-        return WithTemporaryBrep(subd, brep => brep.Edges
-            .Where(e => e.EdgeCurve is not null)
-            .Select(e => e.EdgeCurve!)
-            .ToArray());
+        return WithTemporaryBrep(subd, brep => brep.DuplicateEdgeCurves() ?? []);
     }
 
     private static GeometryBase[] ExtractBrepFaces(Brep brep)
@@ -218,6 +209,38 @@ public static class GeometryAdapters
         return ExtractTopologyMidpoints(polyline,
             p => p.SegmentCount,
             (p, i) => p.SegmentAt(i));
+    }
+
+    private static Point3d[] ExtractBrepEdgeMidpoints(Brep brep)
+    {
+        Curve[]? edges = brep.DuplicateEdgeCurves();
+        if (edges is null || edges.Length == 0)
+        {
+            return [];
+        }
+
+        Point3d[] midpoints = new Point3d[edges.Length];
+        for (int i = 0; i < edges.Length; i++)
+        {
+            midpoints[i] = edges[i].PointAt(edges[i].Domain.Mid);
+        }
+
+        return midpoints;
+    }
+
+    private static Point3d[] ExtractExtrusionEdgeMidpoints(Extrusion extrusion)
+    {
+        return WithTemporaryBrep(extrusion, ExtractBrepEdgeMidpoints);
+    }
+
+    private static Point3d[] ExtractSubDEdgeMidpoints(SubD subd)
+    {
+        return WithTemporaryBrep(subd, ExtractBrepEdgeMidpoints);
+    }
+
+    private static Point3d[] ExtractSurfaceEdgeMidpoints(Surface surface)
+    {
+        return WithTemporaryBrep(surface, ExtractBrepEdgeMidpoints);
     }
 
     private static T[] WithTemporaryBrep<T>(Surface surface, Func<Brep, T[]> operation)
