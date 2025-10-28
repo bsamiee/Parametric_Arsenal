@@ -22,7 +22,7 @@ public static class Bootstrapper
         ICentroid centroid = new Centroid(classifier);
         ICurve curves = new CurveOperations();
         IBoundsCalculator boundsCalculator = new BoundsCalculator(curves, centroid);
-        
+
         ServiceRegistry.Instance.ConfigureBoundsCalculator(() => boundsCalculator);
         _initialized = true;
     }

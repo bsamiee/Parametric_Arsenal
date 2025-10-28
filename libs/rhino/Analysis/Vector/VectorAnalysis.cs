@@ -91,7 +91,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
         }
 
         return all.Count == 0
-            ? Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brep.empty", "No vectors were extracted from brep faces."))
+            ? Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brep.empty",
+                "No vectors were extracted from brep faces."))
             : Result<IReadOnlyList<VectorSample>>.Success(all);
     }
 
@@ -113,7 +114,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
             using Brep? brep = subd.ToBrep();
             if (brep is null || !brep.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.subd.convert", "Failed to convert SubD to brep."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.subd.convert",
+                    "Failed to convert SubD to brep."));
             }
 
             return ExtractFromBrep(brep);
@@ -130,7 +132,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
         {
             if (!surface.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.surface.invalid", "Surface is not valid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.surface.invalid",
+                    "Surface is not valid."));
             }
 
             Interval uDomain = surface.Domain(0);
@@ -141,7 +144,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
             bool success = surface.Evaluate(u, v, 1, out Point3d point, out RhinoVector3d[] derivatives);
             if (!success || derivatives.Length < 2)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.surface.evaluate", "Surface evaluation failed."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.surface.evaluate",
+                    "Surface evaluation failed."));
             }
 
             RhinoVector3d tangentU = derivatives[0];
@@ -161,7 +165,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
         {
             if (!face.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brepFace.invalid", "Brep face is not valid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brepFace.invalid",
+                    "Brep face is not valid."));
             }
 
             Interval uDomain = face.Domain(0);
@@ -173,7 +178,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
             bool evaluated = face.Evaluate(u, v, 1, out Point3d point, out RhinoVector3d[] derivatives);
             if (!evaluated || derivatives.Length < 2 || !normal.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brepFace.evaluate", "Failed to evaluate brep face."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.brepFace.evaluate",
+                    "Failed to evaluate brep face."));
             }
 
             VectorSample sample = new(point, null, normal, derivatives[0], derivatives[1]);
@@ -184,7 +190,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
         {
             if (!curve.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.invalid", "Curve is not valid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.invalid",
+                    "Curve is not valid."));
             }
 
             if (curve is PolyCurve polyCurve)
@@ -214,7 +221,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
 
                 if (results.Count == 0)
                 {
-                    return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.empty", "No tangent vectors extracted from polycurve."));
+                    return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.empty",
+                        "No tangent vectors extracted from polycurve."));
                 }
 
                 return Result<IReadOnlyList<VectorSample>>.Success(results);
@@ -226,18 +234,22 @@ public sealed class VectorAnalysis : IVectorAnalysis
 
             if (!tangentVector.IsValid || tangentVector.Length < 1e-12)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.tangent", "Curve tangent is invalid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.curve.tangent",
+                    "Curve tangent is invalid."));
             }
 
             tangentVector.Unitize();
-            return Result<IReadOnlyList<VectorSample>>.Success([new VectorSample(midPoint, tangentVector, null, null, null)]);
+            return Result<IReadOnlyList<VectorSample>>.Success([
+                new VectorSample(midPoint, tangentVector, null, null, null)
+            ]);
         }
 
         public static Result<IReadOnlyList<VectorSample>> GetMeshVectors(RhinoMesh mesh)
         {
             if (!mesh.IsValid)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.mesh.invalid", "Mesh is not valid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(
+                    new Failure("vector.mesh.invalid", "Mesh is not valid."));
             }
 
             if (mesh.FaceNormals.Count == 0)
@@ -261,7 +273,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
 
             if (samples.Count == 0)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.mesh.empty", "No valid mesh normals found."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.mesh.empty",
+                    "No valid mesh normals found."));
             }
 
             return Result<IReadOnlyList<VectorSample>>.Success(samples);
@@ -272,7 +285,8 @@ public sealed class VectorAnalysis : IVectorAnalysis
             RhinoVector3d direction = extrusion.PathEnd - extrusion.PathStart;
             if (!direction.IsValid || direction.Length < 1e-12)
             {
-                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.extrusion.direction", "Extrusion direction is invalid."));
+                return Result<IReadOnlyList<VectorSample>>.Fail(new Failure("vector.extrusion.direction",
+                    "Extrusion direction is invalid."));
             }
 
             Point3d point = (extrusion.PathStart + extrusion.PathEnd) * 0.5;
