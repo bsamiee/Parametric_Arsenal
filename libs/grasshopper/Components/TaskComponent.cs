@@ -13,7 +13,7 @@ namespace Arsenal.Grasshopper.Components;
 /// <summary>Base class for task-capable components using Result-driven workflows.</summary>
 /// <typeparam name="TWork">Captured input data passed to background execution.</typeparam>
 /// <typeparam name="TResult">Computed output payload.</typeparam>
-public abstract class TaskComponent<TWork, TResult> : GH_TaskCapableComponent<SolveWorkResult<TResult>>
+public abstract class TaskComponent<TWork, TResult> : GH_TaskCapableComponent<Result<TResult>>
 {
     private readonly ISolvePipeline _pipeline;
     private readonly IDocumentScopeProvider _documentScopeProvider;
@@ -34,7 +34,7 @@ public abstract class TaskComponent<TWork, TResult> : GH_TaskCapableComponent<So
     }
 
     /// <summary>Provides access to shared parameter metadata.</summary>
-    protected ParameterCatalog Parameters { get; } = ParameterCatalog.Instance;
+    protected IParameterCatalog Parameters { get; } = ParameterCatalog.Instance;
 
     /// <inheritdoc/>
     protected sealed override void SolveInstance(IGH_DataAccess dataAccess)
@@ -60,9 +60,9 @@ public abstract class TaskComponent<TWork, TResult> : GH_TaskCapableComponent<So
             return;
         }
 
-        if (!GetSolveResults(dataAccess, out SolveWorkResult<TResult>? outcome) || outcome is null)
+        if (!GetSolveResults(dataAccess, out Result<TResult> outcome))
         {
-            SolveWorkResult<TResult> fallback = InvokeSynchronously(context);
+            Result<TResult> fallback = InvokeSynchronously(context);
             HandleOutcome(context, fallback);
             return;
         }
@@ -111,57 +111,48 @@ public abstract class TaskComponent<TWork, TResult> : GH_TaskCapableComponent<So
         return new SolveContext(this, dataAccess, docScope, geoContext, CancelToken);
     }
 
-    /// <summary>Schedules asynchronous work and wraps the outcome.</summary>
-    private async Task<SolveWorkResult<TResult>> ScheduleAsync(TWork work, SolveContext context,
+    /// <summary>Schedules asynchronous work and returns the result directly.</summary>
+    private async Task<Result<TResult>> ScheduleAsync(TWork work, SolveContext context,
         CancellationToken cancellationToken)
     {
         SolveContext cancellableContext = context.WithCancellation(cancellationToken);
-        Result<TResult> result = await RunWorkAsync(work, cancellableContext, cancellationToken).ConfigureAwait(false);
-        return new SolveWorkResult<TResult>(result);
+        return await RunWorkAsync(work, cancellableContext, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Invokes synchronous execution when async results are unavailable.</summary>
-    private SolveWorkResult<TResult> InvokeSynchronously(SolveContext context)
+    private Result<TResult> InvokeSynchronously(SolveContext context)
     {
         Result<TWork> preparation = _pipeline.Execute(() => PrepareWork(context));
         if (!preparation.IsSuccess || preparation.Value is null)
         {
             return preparation.Failure is not null
-                ? new SolveWorkResult<TResult>(Result<TResult>.Fail(preparation.Failure))
-                : new SolveWorkResult<TResult>(Result<TResult>.Fail(new Failure("grasshopper.task.invalidInput",
-                    "Task preparation failed.")));
+                ? Result<TResult>.Fail(preparation.Failure)
+                : Result<TResult>.Fail(new Failure("grasshopper.task.invalidInput",
+                    "Task preparation failed."));
         }
 
-        Result<TResult> result = _pipeline.Execute(() => RunWork(preparation.Value, context));
-        return new SolveWorkResult<TResult>(result);
+        return _pipeline.Execute(() => RunWork(preparation.Value, context));
     }
 
     /// <summary>Handles a solve outcome by applying outputs or reporting failures.</summary>
-    private void HandleOutcome(SolveContext context, SolveWorkResult<TResult>? outcome)
+    private void HandleOutcome(SolveContext context, Result<TResult> outcome)
     {
-        if (outcome is null)
+        if (outcome.IsSuccess)
         {
-            HandleFailure(new Failure("grasshopper.task.noOutcome", "Background task returned no outcome."), context);
-            return;
-        }
-
-        Result<TResult> result = outcome.Outcome;
-        if (result.IsSuccess)
-        {
-            if (result.Value is null)
+            if (outcome.Value is null)
             {
                 HandleFailure(new Failure("grasshopper.result.null", "Operation succeeded without producing a value."),
                     context);
                 return;
             }
 
-            ApplyResult(context, result.Value);
+            ApplyResult(context, outcome.Value);
             return;
         }
 
-        if (result.Failure is not null)
+        if (outcome.Failure is not null)
         {
-            HandleFailure(result.Failure, context);
+            HandleFailure(outcome.Failure, context);
         }
     }
 

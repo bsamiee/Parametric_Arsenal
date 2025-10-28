@@ -30,7 +30,7 @@ public abstract class ComponentBase : GH_Component
     }
 
     /// <summary>Provides access to parameter metadata catalog for derived components.</summary>
-    protected ParameterCatalog Parameters { get; } = ParameterCatalog.Instance;
+    protected IParameterCatalog Parameters { get; } = ParameterCatalog.Instance;
 
     /// <summary>Sealed to enforce uniform orchestration and Result handling.</summary>
     protected sealed override void SolveInstance(IGH_DataAccess dataAccess)

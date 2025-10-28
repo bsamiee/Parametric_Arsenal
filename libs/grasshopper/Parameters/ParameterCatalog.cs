@@ -6,7 +6,7 @@ using Grasshopper.Kernel.Parameters;
 namespace Arsenal.Grasshopper.Parameters;
 
 /// <summary>Central registry of reusable parameter definitions.</summary>
-public sealed class ParameterCatalog
+public sealed class ParameterCatalog : IParameterCatalog
 {
     private readonly Dictionary<string, ParameterDefinition> _definitions;
 
@@ -18,10 +18,10 @@ public sealed class ParameterCatalog
     /// <summary>Gets the singleton catalog instance.</summary>
     public static ParameterCatalog Instance { get; } = new();
 
-    /// <summary>Enumerates the registered definitions.</summary>
+    /// <inheritdoc/>
     public IEnumerable<KeyValuePair<string, ParameterDefinition>> Definitions => _definitions;
 
-    /// <summary>Gets a parameter definition by key.</summary>
+    /// <inheritdoc/>
     public ParameterDefinition Get(string key)
     {
         if (!_definitions.TryGetValue(key, out ParameterDefinition? definition))
@@ -32,7 +32,7 @@ public sealed class ParameterCatalog
         return definition;
     }
 
-    /// <summary>Creates a parameter instance using the specified key.</summary>
+    /// <inheritdoc/>
     public IGH_Param CreateParameter(string key)
     {
         ParameterDefinition definition = Get(key);

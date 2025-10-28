@@ -16,6 +16,6 @@
     <PackageReference Include="RhinoCommon" Version="8.16.25042.13001" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\core\Core.csproj" />
+    <ProjectReference Include="../core/Core.csproj" />
   </ItemGroup>
 </Project>

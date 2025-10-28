@@ -15,10 +15,12 @@ public interface IBoundsCalculator
     Result<BoundingBox> FromPoints(IEnumerable<Point3d>? points, double margin = 0, BoundingBox baseBounds = default);
 
     /// <summary>Creates a bounding box that includes the specified curves.</summary>
-    Result<BoundingBox> FromCurves(IEnumerable<Curve>? curves, GeoContext context, double labelMargin = 0, BoundingBox baseBounds = default);
+    Result<BoundingBox> FromCurves(IEnumerable<Curve?>? curves, GeoContext context, double labelMargin = 0,
+        BoundingBox baseBounds = default);
 
     /// <summary>Creates a bounding box that includes the specified geometry.</summary>
-    Result<BoundingBox> FromGeometry(IEnumerable<GeometryBase>? geometries, GeoContext context, double labelMargin = 0, BoundingBox baseBounds = default);
+    Result<BoundingBox> FromGeometry(IEnumerable<GeometryBase?>? geometries, GeoContext context, double labelMargin = 0,
+        BoundingBox baseBounds = default);
 }
 
 /// <summary>Default implementation of <see cref="IBoundsCalculator"/> using curve and centroid services.</summary>
@@ -35,7 +37,8 @@ public sealed class BoundsCalculator : IBoundsCalculator
     }
 
     /// <inheritdoc/>
-    public Result<BoundingBox> FromPoints(IEnumerable<Point3d>? points, double margin = 0, BoundingBox baseBounds = default)
+    public Result<BoundingBox> FromPoints(IEnumerable<Point3d>? points, double margin = 0,
+        BoundingBox baseBounds = default)
     {
         BoundingBox accumulator = baseBounds;
         bool hasData = accumulator.IsValid;
@@ -61,7 +64,8 @@ public sealed class BoundsCalculator : IBoundsCalculator
     }
 
     /// <inheritdoc/>
-    public Result<BoundingBox> FromCurves(IEnumerable<Curve>? curves, GeoContext context, double labelMargin = 0, BoundingBox baseBounds = default)
+    public Result<BoundingBox> FromCurves(IEnumerable<Curve?>? curves, GeoContext context, double labelMargin = 0,
+        BoundingBox baseBounds = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -102,7 +106,8 @@ public sealed class BoundsCalculator : IBoundsCalculator
     }
 
     /// <inheritdoc/>
-    public Result<BoundingBox> FromGeometry(IEnumerable<GeometryBase>? geometries, GeoContext context, double labelMargin = 0, BoundingBox baseBounds = default)
+    public Result<BoundingBox> FromGeometry(IEnumerable<GeometryBase?>? geometries, GeoContext context,
+        double labelMargin = 0, BoundingBox baseBounds = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 

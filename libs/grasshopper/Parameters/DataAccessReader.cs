@@ -7,11 +7,18 @@ using Grasshopper.Kernel.Types;
 
 namespace Arsenal.Grasshopper.Parameters;
 
-/// <summary>Result-returning helpers for reading inputs and writing outputs.</summary>
-public static class DataAccessReader
+/// <summary>Default implementation for reading Grasshopper component inputs and writing outputs using Result patterns.</summary>
+public sealed class DataAccessReader : IDataAccessReader
 {
-    /// <summary>Reads a required reference type input.</summary>
-    public static Result<T> GetRequired<T>(IGH_DataAccess dataAccess, int index, string parameterName)
+    /// <summary>Gets the singleton instance.</summary>
+    public static DataAccessReader Instance { get; } = new();
+
+    private DataAccessReader()
+    {
+    }
+
+    /// <inheritdoc/>
+    public Result<T> GetRequired<T>(IGH_DataAccess dataAccess, int index, string parameterName)
         where T : class
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
@@ -28,8 +35,8 @@ public static class DataAccessReader
         return Result<T>.Success(value);
     }
 
-    /// <summary>Reads an optional reference type input with a default fallback.</summary>
-    public static Result<T> GetOptional<T>(IGH_DataAccess dataAccess, int index, string parameterName, T defaultValue)
+    /// <inheritdoc/>
+    public Result<T> GetOptional<T>(IGH_DataAccess dataAccess, int index, string parameterName, T defaultValue)
         where T : class
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
@@ -40,8 +47,8 @@ public static class DataAccessReader
         return Result<T>.Success(value ?? defaultValue);
     }
 
-    /// <summary>Reads a required value type input.</summary>
-    public static Result<T> GetRequiredValue<T>(IGH_DataAccess dataAccess, int index, string parameterName)
+    /// <inheritdoc/>
+    public Result<T> GetRequiredValue<T>(IGH_DataAccess dataAccess, int index, string parameterName)
         where T : struct
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
@@ -58,8 +65,8 @@ public static class DataAccessReader
         return Result<T>.Success(value);
     }
 
-    /// <summary>Reads an optional value type input with a default fallback.</summary>
-    public static Result<T> GetOptionalValue<T>(IGH_DataAccess dataAccess, int index, string parameterName, T defaultValue)
+    /// <inheritdoc/>
+    public Result<T> GetOptionalValue<T>(IGH_DataAccess dataAccess, int index, string parameterName, T defaultValue)
         where T : struct
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
@@ -70,8 +77,8 @@ public static class DataAccessReader
         return Result<T>.Success(value);
     }
 
-    /// <summary>Reads a required list input.</summary>
-    public static Result<IReadOnlyList<T>> GetList<T>(IGH_DataAccess dataAccess, int index, string parameterName)
+    /// <inheritdoc/>
+    public Result<IReadOnlyList<T>> GetList<T>(IGH_DataAccess dataAccess, int index, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
         ValidateIndex(index, parameterName);
@@ -87,8 +94,8 @@ public static class DataAccessReader
         return Result<IReadOnlyList<T>>.Success(buffer);
     }
 
-    /// <summary>Reads an optional list input that may be empty.</summary>
-    public static Result<IReadOnlyList<T>> GetOptionalList<T>(IGH_DataAccess dataAccess, int index, string parameterName)
+    /// <inheritdoc/>
+    public Result<IReadOnlyList<T>> GetOptionalList<T>(IGH_DataAccess dataAccess, int index, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
         ValidateIndex(index, parameterName);
@@ -98,8 +105,8 @@ public static class DataAccessReader
         return Result<IReadOnlyList<T>>.Success(buffer);
     }
 
-    /// <summary>Reads a GH data tree input.</summary>
-    public static Result<GH_Structure<T>> GetTree<T>(IGH_DataAccess dataAccess, int index, string parameterName)
+    /// <inheritdoc/>
+    public Result<GH_Structure<T>> GetTree<T>(IGH_DataAccess dataAccess, int index, string parameterName)
         where T : IGH_Goo
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
@@ -113,8 +120,8 @@ public static class DataAccessReader
                 $"Parameter '{parameterName}' requires a valid data tree."));
     }
 
-    /// <summary>Writes a value to an output parameter.</summary>
-    public static Result SetData<T>(IGH_DataAccess dataAccess, int index, T value, string parameterName)
+    /// <inheritdoc/>
+    public Result SetData<T>(IGH_DataAccess dataAccess, int index, T value, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
         ValidateIndex(index, parameterName);
@@ -127,8 +134,8 @@ public static class DataAccessReader
                 $"Failed to set output '{parameterName}'."));
     }
 
-    /// <summary>Writes a list to an output parameter.</summary>
-    public static Result SetDataList<T>(IGH_DataAccess dataAccess, int index, IEnumerable<T> values, string parameterName)
+    /// <inheritdoc/>
+    public Result SetDataList<T>(IGH_DataAccess dataAccess, int index, IEnumerable<T> values, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(dataAccess);
         ValidateIndex(index, parameterName);
