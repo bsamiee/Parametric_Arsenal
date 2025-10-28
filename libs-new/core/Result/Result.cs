@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Arsenal.Core.Result;
 
@@ -87,6 +89,90 @@ public readonly record struct Result<T>
             ? onSuccess(Value)
             : onFailure(Failure!);
     }
+
+    /// <summary>Combines multiple results into a single result.</summary>
+#pragma warning disable CA1000 // Do not declare static members on generic types - utility methods are acceptable
+    public static Result<IReadOnlyList<T>> Combine(params Result<T>[] results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        List<T> values = new(results.Length);
+        List<Failure> failures = [];
+
+        foreach (Result<T> result in results)
+        {
+            if (result.IsSuccess)
+            {
+                if (result.Value is not null)
+                {
+                    values.Add(result.Value);
+                }
+            }
+            else if (result.Failure is not null)
+            {
+                failures.Add(result.Failure);
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            Failure combinedFailure = failures.Count == 1
+                ? failures[0]
+                : new Failure("results.combined", $"Multiple failures: {string.Join("; ", failures.Select(f => f.Message))}");
+            return Result<IReadOnlyList<T>>.Fail(combinedFailure);
+        }
+
+        return Result<IReadOnlyList<T>>.Success(values);
+    }
+
+    /// <summary>Combines multiple results into a single result.</summary>
+    public static Result<IReadOnlyList<T>> Combine(IEnumerable<Result<T>> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        return Combine(results.ToArray());
+    }
+
+    /// <summary>Combines all results, collecting successful values even if some fail.</summary>
+    public static Result<IReadOnlyList<T>> CombineAll(params Result<T>[] results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+
+        List<T> values = new(results.Length);
+        List<Failure> failures = [];
+
+        foreach (Result<T> result in results)
+        {
+            if (result.IsSuccess)
+            {
+                if (result.Value is not null)
+                {
+                    values.Add(result.Value);
+                }
+            }
+            else if (result.Failure is not null)
+            {
+                failures.Add(result.Failure);
+            }
+        }
+
+        if (failures.Count > 0 && values.Count == 0)
+        {
+            Failure combinedFailure = failures.Count == 1
+                ? failures[0]
+                : new Failure("results.allFailed", $"All operations failed: {string.Join("; ", failures.Select(f => f.Message))}");
+            return Result<IReadOnlyList<T>>.Fail(combinedFailure);
+        }
+
+        return Result<IReadOnlyList<T>>.Success(values);
+    }
+
+    /// <summary>Combines all results, collecting successful values even if some fail.</summary>
+    public static Result<IReadOnlyList<T>> CombineAll(IEnumerable<Result<T>> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        return CombineAll(results.ToArray());
+    }
+#pragma warning restore CA1000
 }
 
 /// <summary>Non-generic result state for operations that only signal success or failure.</summary>
