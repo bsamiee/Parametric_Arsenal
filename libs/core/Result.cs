@@ -37,20 +37,20 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
 
     /// <summary>Gets value or fallback if failed.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public T GetValueOr(T fallback) => IsSuccess ? Value! : fallback;
+    public T GetValueOr(T fallback) => IsSuccess && Value is { } value ? value : fallback;
 
     /// <summary>Transforms result using success or error function.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TU Match<TU>(Func<T, TU> onSuccess, Func<ErrorInfo, TU> onError) =>
-        IsSuccess ? onSuccess(Value!) : onError(Error!.Value);
+        IsSuccess && Value is { } value ? onSuccess(value) : onError(Error!.Value);
 
     /// <summary>Maps success value to new type.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TU> Map<TU>(Func<T, TU> transform)
     {
-        if (IsSuccess)
+        if (IsSuccess && Value is { } value)
         {
-            return Result.Ok(transform(Value!));
+            return Result.Ok(transform(value));
         }
 
         ErrorInfo err = Error!.Value;
@@ -63,9 +63,9 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TU> Bind<TU>(Func<T, Result<TU>> next)
     {
-        if (IsSuccess)
+        if (IsSuccess && Value is { } value)
         {
-            return next(Value!);
+            return next(value);
         }
 
         ErrorInfo err = Error!.Value;
@@ -78,9 +78,9 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> MapError(Func<ErrorInfo, ErrorInfo> transform)
     {
-        if (IsFailure)
+        if (IsFailure && Error is { } error)
         {
-            ErrorInfo transformed = transform(Error!.Value);
+            ErrorInfo transformed = transform(error);
             return transformed.Exception is not null
                 ? Result.Err<T>(transformed.Code, transformed.Message, transformed.Exception)
                 : Result.Err<T>(transformed.Code, transformed.Message);
@@ -93,17 +93,16 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TU> Apply<TU>(Result<Func<T, TU>> resultFunc)
     {
-        if (resultFunc.IsSuccess && IsSuccess)
+        if (resultFunc is { IsSuccess: true, Value: { } func } && IsSuccess && Value is { } value)
         {
-            return Result.Ok(resultFunc.Value!(Value!));
+            return Result.Ok(func(value));
         }
 
-        if (resultFunc.IsFailure)
+        if (resultFunc is { IsFailure: true, Error: { } funcErr })
         {
-            Result<Func<T, TU>>.ErrorInfo err = resultFunc.Error!.Value;
-            return err.Exception is not null
-                ? Result.Err<TU>(err.Code, err.Message, err.Exception)
-                : Result.Err<TU>(err.Code, err.Message);
+            return funcErr.Exception is not null
+                ? Result.Err<TU>(funcErr.Code, funcErr.Message, funcErr.Exception)
+                : Result.Err<TU>(funcErr.Code, funcErr.Message);
         }
 
         ErrorInfo error = Error!.Value;
@@ -115,20 +114,20 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
     /// <summary>Recovers from failure with fallback function.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Recover(Func<ErrorInfo, T> recovery) =>
-        IsFailure ? Result.Ok(recovery(Error!.Value)) : this;
+        IsFailure && Error is { } error ? Result.Ok(recovery(error)) : this;
 
     /// <summary>Validates success value with predicate.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(Func<T, bool> predicate, string code, string message) =>
-        IsSuccess && !predicate(Value!) ? Result.Err<T>(code, message) : this;
+        IsSuccess && Value is { } value && !predicate(value) ? Result.Err<T>(code, message) : this;
 
     /// <summary>Transforms both success and error paths.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TU> BiMap<TU>(Func<T, TU> onSuccess, Func<ErrorInfo, ErrorInfo> onError)
     {
-        if (IsSuccess)
+        if (IsSuccess && Value is { } value)
         {
-            return Result.Ok(onSuccess(Value!));
+            return Result.Ok(onSuccess(value));
         }
 
         ErrorInfo transformed = onError(Error!.Value);
@@ -139,18 +138,15 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
 
     /// <summary>Tries alternative result if failed.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> OrElse(Func<ErrorInfo, Result<T>> alternative)
-    {
-        return IsFailure ? alternative(Error!.Value) : this;
-    }
+    public Result<T> OrElse(Func<ErrorInfo, Result<T>> alternative) => IsFailure && Error is { } error ? alternative(error) : this;
 
     /// <summary>Executes side effects without transforming the result.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Tap(Action<T> onSuccess)
     {
-        if (IsSuccess)
+        if (IsSuccess && Value is { } value)
         {
-            onSuccess(Value!);
+            onSuccess(value);
         }
 
         return this;
@@ -160,13 +156,13 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Tap(Action<T> onSuccess, Action<ErrorInfo> onError)
     {
-        if (IsSuccess)
+        if (IsSuccess && Value is { } value)
         {
-            onSuccess(Value!);
+            onSuccess(value);
         }
-        else
+        else if (Error is { } error)
         {
-            onError(Error!.Value);
+            onError(error);
         }
 
         return this;

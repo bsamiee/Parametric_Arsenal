@@ -1,38 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>12</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Deterministic>true</Deterministic>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <!-- Keep platform API warnings visible but non‑blocking (Rhino provides cross‑platform shims) -->
-    <WarningsNotAsErrors>CA1416</WarningsNotAsErrors>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
+  <PropertyGroup Label="Project Identity">
     <AssemblyName>Arsenal.Rhino</AssemblyName>
     <RootNamespace>Arsenal.Rhino</RootNamespace>
-    <TargetExt>.rhp</TargetExt>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Use Rhino’s runtime assemblies; don't copy RhinoCommon into output -->
-    <PackageReference Include="RhinoCommon" Version="8.24.25281.15001" ExcludeAssets="runtime" />
+  <PropertyGroup Label="Rhino Plugin Configuration">
+    <TargetExt>.rhp</TargetExt>
+  </PropertyGroup>
+
+  <ItemGroup Label="Rhino SDK">
+    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Label="Project Dependencies">
     <ProjectReference Include="../core/Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.238" PrivateAssets="all" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848" PrivateAssets="all" />
-    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
-  </ItemGroup>
 </Project>
