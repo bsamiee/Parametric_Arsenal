@@ -41,25 +41,37 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
 
     /// <summary>Transforms result using success or error function.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public U Match<U>(Func<T, U> onSuccess, Func<ErrorInfo, U> onError) =>
+    public TU Match<TU>(Func<T, TU> onSuccess, Func<ErrorInfo, TU> onError) =>
         IsSuccess ? onSuccess(Value!) : onError(Error!.Value);
 
     /// <summary>Maps success value to new type.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<U> Map<U>(Func<T, U> transform)
+    public Result<TU> Map<TU>(Func<T, TU> transform)
     {
-        if (IsSuccess) return Result.Ok(transform(Value!));
+        if (IsSuccess)
+        {
+            return Result.Ok(transform(Value!));
+        }
+
         ErrorInfo err = Error!.Value;
-        return Result.Err<U>(err.Code, err.Message, err.Exception);
+        return err.Exception is not null
+            ? Result.Err<TU>(err.Code, err.Message, err.Exception)
+            : Result.Err<TU>(err.Code, err.Message);
     }
 
     /// <summary>Chains result-returning operations.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<U> Bind<U>(Func<T, Result<U>> next)
+    public Result<TU> Bind<TU>(Func<T, Result<TU>> next)
     {
-        if (IsSuccess) return next(Value!);
+        if (IsSuccess)
+        {
+            return next(Value!);
+        }
+
         ErrorInfo err = Error!.Value;
-        return Result.Err<U>(err.Code, err.Message, err.Exception);
+        return err.Exception is not null
+            ? Result.Err<TU>(err.Code, err.Message, err.Exception)
+            : Result.Err<TU>(err.Code, err.Message);
     }
 
     /// <summary>Transforms error if failed.</summary>
@@ -69,7 +81,9 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
         if (IsFailure)
         {
             ErrorInfo transformed = transform(Error!.Value);
-            return Result.Err<T>(transformed.Code, transformed.Message, transformed.Exception);
+            return transformed.Exception is not null
+                ? Result.Err<T>(transformed.Code, transformed.Message, transformed.Exception)
+                : Result.Err<T>(transformed.Code, transformed.Message);
         }
 
         return this;
@@ -77,13 +91,26 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
 
     /// <summary>Applies wrapped function to wrapped value.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<U> Apply<U>(Result<Func<T, U>> resultFunc) =>
-        resultFunc.IsSuccess && IsSuccess
-            ? Result.Ok(resultFunc.Value!(Value!))
-            : resultFunc.IsFailure
-                ? Result.Err<U>(resultFunc.Error!.Value.Code, resultFunc.Error!.Value.Message,
-                    resultFunc.Error!.Value.Exception)
-                : Result.Err<U>(Error!.Value.Code, Error!.Value.Message, Error!.Value.Exception);
+    public Result<TU> Apply<TU>(Result<Func<T, TU>> resultFunc)
+    {
+        if (resultFunc.IsSuccess && IsSuccess)
+        {
+            return Result.Ok(resultFunc.Value!(Value!));
+        }
+
+        if (resultFunc.IsFailure)
+        {
+            Result<Func<T, TU>>.ErrorInfo err = resultFunc.Error!.Value;
+            return err.Exception is not null
+                ? Result.Err<TU>(err.Code, err.Message, err.Exception)
+                : Result.Err<TU>(err.Code, err.Message);
+        }
+
+        ErrorInfo error = Error!.Value;
+        return error.Exception is not null
+            ? Result.Err<TU>(error.Code, error.Message, error.Exception)
+            : Result.Err<TU>(error.Code, error.Message);
+    }
 
     /// <summary>Recovers from failure with fallback function.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -97,24 +124,51 @@ public readonly record struct Result<T>(bool IsSuccess, T? Value, Result<T>.Erro
 
     /// <summary>Transforms both success and error paths.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<U> BiMap<U>(Func<T, U> onSuccess, Func<ErrorInfo, ErrorInfo> onError)
+    public Result<TU> BiMap<TU>(Func<T, TU> onSuccess, Func<ErrorInfo, ErrorInfo> onError)
     {
-        if (IsSuccess) return Result.Ok(onSuccess(Value!));
+        if (IsSuccess)
+        {
+            return Result.Ok(onSuccess(Value!));
+        }
+
         ErrorInfo transformed = onError(Error!.Value);
-        return Result.Err<U>(transformed.Code, transformed.Message, transformed.Exception);
+        return transformed.Exception is not null
+            ? Result.Err<TU>(transformed.Code, transformed.Message, transformed.Exception)
+            : Result.Err<TU>(transformed.Code, transformed.Message);
     }
 
     /// <summary>Tries alternative result if failed.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> OrElse(Func<ErrorInfo, Result<T>> alternative) =>
-        IsFailure ? alternative(Error!.Value) : this;
+    public Result<T> OrElse(Func<ErrorInfo, Result<T>> alternative)
+    {
+        return IsFailure ? alternative(Error!.Value) : this;
+    }
 
     /// <summary>Executes side effects without transforming the result.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Tap(Action<T> onSuccess, Action<ErrorInfo>? onError = null)
+    public Result<T> Tap(Action<T> onSuccess)
     {
-        if (IsSuccess) onSuccess(Value!);
-        else if (onError is not null) onError(Error!.Value);
+        if (IsSuccess)
+        {
+            onSuccess(Value!);
+        }
+
+        return this;
+    }
+
+    /// <summary>Executes side effects without transforming the result.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> Tap(Action<T> onSuccess, Action<ErrorInfo> onError)
+    {
+        if (IsSuccess)
+        {
+            onSuccess(Value!);
+        }
+        else
+        {
+            onError(Error!.Value);
+        }
+
         return this;
     }
 
@@ -136,20 +190,26 @@ public static class Result
     public static Result<T> Ok<T>(T value) => new(true, value, null);
 
     /// <summary>Creates failed result.</summary>
-    public static Result<T> Err<T>(string code, string message, Exception? ex = null)
+    public static Result<T> Err<T>(string code, string message)
+        => new(false, default, new Result<T>.ErrorInfo(code, message));
+
+    /// <summary>Creates failed result.</summary>
+    public static Result<T> Err<T>(string code, string message, Exception ex)
         => new(false, default, new Result<T>.ErrorInfo(code, message, ex));
 
     /// <summary>Map each item with a resultful function, aggregate or short-circuit.</summary>
-    public static Result<ImmutableArray<U>> Traverse<T, U>(IEnumerable<T> items, Func<T, Result<U>> transform)
+    public static Result<ImmutableArray<TU>> Traverse<T, TU>(IEnumerable<T> items, Func<T, Result<TU>> transform)
     {
-        ImmutableArray<U>.Builder builder = ImmutableArray.CreateBuilder<U>();
+        ImmutableArray<TU>.Builder builder = ImmutableArray.CreateBuilder<TU>();
         foreach (T item in items)
         {
-            Result<U> result = transform(item);
+            Result<TU> result = transform(item);
             if (result.IsFailure)
             {
-                return Err<ImmutableArray<U>>(result.Error!.Value.Code, result.Error!.Value.Message,
-                    result.Error!.Value.Exception);
+                Result<TU>.ErrorInfo err = result.Error!.Value;
+                return err.Exception is not null
+                    ? Err<ImmutableArray<TU>>(err.Code, err.Message, err.Exception)
+                    : Err<ImmutableArray<TU>>(err.Code, err.Message);
             }
 
             builder.Add(result.Value!);
