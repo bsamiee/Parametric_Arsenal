@@ -3,21 +3,50 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <WarningsAsErrors />
-    <WarningsNotAsErrors>CS8618</WarningsNotAsErrors>
-    <RootNamespace>Arsenal.Grasshopper</RootNamespace>
-    <AssemblyName>Arsenal.Grasshopper</AssemblyName>
-    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Keep platform API warnings visible but non‑blocking for cross‑platform GH UI bits -->
+    <WarningsNotAsErrors>CA1416</WarningsNotAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>NU1701</NoWarn>
+
+    <AssemblyName>Arsenal.Grasshopper</AssemblyName>
+    <RootNamespace>Arsenal.Grasshopper</RootNamespace>
+    <TargetExt>.gha</TargetExt>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Ensure third‑party dependencies are copied next to the .gha for loading -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Grasshopper" Version="8.16.25042.13001" />
-    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <!-- Compile against GH/Rhino, but rely on Rhino to provide them at runtime -->
+    <PackageReference Include="Grasshopper" Version="8.24.25281.15001" ExcludeAssets="runtime" />
+    <PackageReference Include="RhinoCommon" Version="8.24.25281.15001" ExcludeAssets="runtime" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../core/Core.csproj" />
     <ProjectReference Include="../rhino/Rhino.csproj" />
+  </ItemGroup>
+
+  <!-- macOS deploy helper -->
+  <PropertyGroup>
+    <GrasshopperLibraries>$(HOME)/Library/Application Support/McNeel/Rhinoceros/MacPlugIns/Grasshopper/Libraries</GrasshopperLibraries>
+  </PropertyGroup>
+  <Target Name="DeployToGrasshopper" AfterBuild Condition="'$(Configuration)'=='Debug'">
+    <MakeDir Directories="$(GrasshopperLibraries)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GrasshopperLibraries)" />
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths)" DestinationFolder="$(GrasshopperLibraries)" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.238" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
+    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
   </ItemGroup>
 </Project>

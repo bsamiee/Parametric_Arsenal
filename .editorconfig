@@ -36,7 +36,7 @@ dotnet_diagnostic.IDE0051.severity = none
 dotnet_diagnostic.CA1812.severity = none
 
 # Modern C# 12 style preferences - enforce best practices
-csharp_prefer_braces = true:warning                                         # Always use braces, even for single-line statements
+csharp_prefer_braces = false:none                                           # Prefer no braces for single-line statements
 csharp_style_pattern_matching_over_is_with_cast_check = true:warning        # Use pattern matching over is with cast
 csharp_style_pattern_matching_over_as_with_null_check = true:warning        # Use 'is not' pattern instead of 'as' + null check
 dotnet_style_prefer_collection_expression = true:warning                    # Use collection expressions [...] instead of new[]
@@ -47,9 +47,12 @@ csharp_style_var_when_type_is_apparent = false:warning          # Never use var 
 csharp_style_var_elsewhere = false:warning                      # Never use var anywhere - always explicit types
 
 # Code style enforcement
-dotnet_diagnostic.IDE0011.severity = warning     # Add braces
+dotnet_diagnostic.IDE0011.severity = none        # Add braces - disabled, prefer braceless for single statements
 dotnet_diagnostic.IDE0058.severity = none        # Expression value is never used
 dotnet_diagnostic.IDE0290.severity = warning     # Use primary constructor
+
+# SonarAnalyzer - Advanced code patterns
+dotnet_diagnostic.S3358.severity = none          # Nested ternary operators - allowed for sophisticated functional patterns
 
 # ===================================================================
 # MODERN C# 12 / .NET 8 IDE RULES
@@ -171,14 +174,14 @@ resharper_redundant_explicit_array_creation_highlighting = warning
 resharper_suggest_var_or_type_built_in_types = use_explicit_type
 resharper_suggest_var_or_type_simple_types = use_explicit_type
 resharper_suggest_var_or_type_elsewhere = use_explicit_type
-resharper_enforce_do_while_statement_braces = true
-resharper_enforce_fixed_statement_braces = true
-resharper_enforce_foreach_statement_braces = true
-resharper_enforce_for_statement_braces = true
-resharper_enforce_if_statement_braces = true
-resharper_enforce_lock_statement_braces = true
-resharper_enforce_using_statement_braces = true
-resharper_enforce_while_statement_braces = true
+resharper_enforce_do_while_statement_braces = false
+resharper_enforce_fixed_statement_braces = false
+resharper_enforce_foreach_statement_braces = false
+resharper_enforce_for_statement_braces = false
+resharper_enforce_if_statement_braces = false
+resharper_enforce_lock_statement_braces = false
+resharper_enforce_using_statement_braces = false
+resharper_enforce_while_statement_braces = false
 
 # Access modifier preferences
 resharper_redundant_default_member_initializer_highlighting = suggestion
@@ -210,7 +213,7 @@ dotnet_diagnostic.CA1720.severity = warning      # Identifiers should not contai
 # Interface Segregation Principle (ISP)
 dotnet_diagnostic.CA1010.severity = warning      # Collections should implement generic interface
 dotnet_diagnostic.CA1040.severity = warning      # Avoid empty interfaces
-dotnet_diagnostic.CA1034.severity = warning      # Nested types should not be visible
+dotnet_diagnostic.CA1034.severity = none         # Nested types should not be visible - allow for tightly-coupled value types like Result<T>.ErrorInfo
 
 # Dependency Inversion Principle (DIP)
 dotnet_diagnostic.CA1050.severity = error        # Declare types in namespaces (required for proper organization)
