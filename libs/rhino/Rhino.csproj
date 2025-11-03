@@ -9,10 +9,6 @@
     <TargetExt>.rhp</TargetExt>
   </PropertyGroup>
 
-  <ItemGroup Label="Rhino SDK">
-    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" />
-  </ItemGroup>
-
   <ItemGroup Label="Project Dependencies">
     <ProjectReference Include="../core/Core.csproj" />
   </ItemGroup>

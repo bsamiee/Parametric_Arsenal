@@ -11,10 +11,9 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <ItemGroup Label="Grasshopper SDK">
-    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" ExcludeAssets="runtime" />
-    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" />
-  </ItemGroup>
+  <PropertyGroup Label="Grasshopper Plugin Marker">
+    <IsGrasshopperPlugin>true</IsGrasshopperPlugin>
+  </PropertyGroup>
 
   <ItemGroup Label="Project Dependencies">
     <ProjectReference Include="../core/Core.csproj" />

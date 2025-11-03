@@ -1,51 +1,70 @@
 <Project>
 
+  <!-- Language/runtime -->
   <PropertyGroup Label="Language">
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>12</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>                       <!-- NULLABLE ENABLED -->
+    <ImplicitUsings>enable</ImplicitUsings>           <!-- IMPLICIT USINGS ENABLED -->
+    <PlatformTarget>AnyCPU</PlatformTarget>           <!-- Rhino 8 requires AnyCPU for cross‑platform -->
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
 
-  <PropertyGroup Label="Build Quality">
+  <!-- Build quality -->
+  <PropertyGroup Label="BuildQuality">
     <Deterministic>true</Deterministic>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
-    <ReportAnalyzer>true</ReportAnalyzer>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-    <DebugType>embedded</DebugType>
+    <AnalysisLevel>latest</AnalysisLevel>             <!-- Locks to most recent rule set in the SDK -->
+    <ReportAnalyzer>true</ReportAnalyzer>             <!-- Emits analyzer timing into the binlog -->
+    <RunAnalyzers>true</RunAnalyzers>
+    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+    <DebugType>portable</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <PropertyGroup Label="Rhino Plugin Warnings">
-    <WarningsNotAsErrors Condition="'$(TargetExt)' == '.gha' OR '$(TargetExt)' == '.rhp'">CA1416</WarningsNotAsErrors>
+  <!-- Config‑specific knobs -->
+  <PropertyGroup Label="Debug" Condition="'$(Configuration)'=='Debug'">
+    <Optimize>false</Optimize>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
 
-  <PropertyGroup Label="Library Project Suppressions">
-    <NoWarn>$(NoWarn);CA1016</NoWarn>
+  <PropertyGroup Label="Release" Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
   </PropertyGroup>
 
-  <ItemGroup Label="Analyzers">
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.238" PrivateAssets="all" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848" PrivateAssets="all" />
-    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
-    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.6.1-beta.1" PrivateAssets="all" />
-    <PackageReference Include="ErrorProne.NET.Structs" Version="0.6.1-beta.1" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.11.20" PrivateAssets="all" />
-    <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6169" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  <!-- Rhino/GH SDK versions -->
+  <PropertyGroup Label="SDK Versions">
+    <RhinoVersion>8.24.25281.15001</RhinoVersion>     <!-- Pin to specific Rhino/GH NuGet version -->
+    <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
+  </PropertyGroup>
+
+  <!-- Compile‑time SDK refs; Rhino supplies runtime assemblies -->
+  <ItemGroup Label="RhinoPackages">
+    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)">
+      <PrivateAssets>all</PrivateAssets>              <!-- Available at compile/design time, not copied to output -->
+      <ExcludeAssets>runtime</ExcludeAssets>          <!-- Prevents copying Rhino assemblies to output -->
+    </PackageReference>
+    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" Condition="'$(IsGrasshopperPlugin)'=='true'">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
   </ItemGroup>
 
-  <PropertyGroup Label="Analyzer Configuration">
-    <StructSizeThreshold>64</StructSizeThreshold>
-  </PropertyGroup>
-
-  <PropertyGroup Label="SDK Versions">
-    <RhinoVersion>8.24.25281.15001</RhinoVersion>
-  </PropertyGroup>
+  <!-- Analyzers -->
+  <ItemGroup Label="Analyzers">
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.6.1-beta.1" PrivateAssets="all" />
+    <PackageReference Include="ErrorProne.NET.Structs" Version="0.6.1-beta.1" PrivateAssets="all" />
+    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.240" PrivateAssets="all" />
+    <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581" PrivateAssets="all" />
+  </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@
   <PropertyGroup Label="Identity">
     <AssemblyName>Arsenal.Core</AssemblyName>
     <RootNamespace>Arsenal.Core</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>
