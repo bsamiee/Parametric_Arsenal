@@ -1,59 +1,124 @@
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Tests.Common;
+using CsCheck;
 using Xunit;
 
 namespace Arsenal.Core.Tests.Results;
 
-/// <summary>Tests ResultFactory creation methods and error handling.</summary>
+/// <summary>Algebraic tests for ResultFactory operations using zero-boilerplate composition and pattern matching.</summary>
 public sealed class ResultFactoryTests {
-    /// <summary>Tests Create method with all parameter combinations.</summary>
-    [Theory]
-    [MemberData(nameof(ResultTestData.FactoryParameterCases), MemberType = typeof(ResultTestData))]
-    public void CreateAllParametersReturnsExpected(
-        object? value, SystemError[]? errors, SystemError? error,
-        Func<Result<int>>? deferred, (Func<int, bool>, SystemError)[]? conditionals,
-        Result<Result<int>>? nested, bool expectedSuccess) {
+    private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors =
+        (new(ErrorDomain.Results, 1001, "E1"), new(ErrorDomain.Results, 1002, "E2"), new(ErrorDomain.Results, 1003, "E3"));
 
-        // Direct call to ResultFactory.Create<int> with proper parameter handling
-        Result<int> result = value switch {
-            int intValue => ResultFactory.Create<int>(value: intValue, errors: errors, error: error, deferred: deferred, conditionals: conditionals, nested: nested),
-            _ => ResultFactory.Create<int>(errors: errors, error: error, deferred: deferred, conditionals: conditionals, nested: nested)
-        };
-
-        bool actualSuccess = result.IsSuccess;
-
-        Assert.Equal(expectedSuccess, actualSuccess);
-    }
-
-    /// <summary>Tests null argument handling and state access violations.</summary>
+    /// <summary>Verifies Create parameter polymorphism using algebraic sum type semantics.</summary>
     [Fact]
-    public void NullHandlingThrowsCorrectly() {
-        Result<int> success = ResultFactory.Create(value: 42);
-        Result<int> failure = ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 1001, "Test"));
+    public void Create_AllParameterCombinations_BehavesCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion(v => {
+            var r = ResultFactory.Create(value: v);
+            Assert.Equal((true, v), (r.IsSuccess, r.Value));
+        }, 50),
+        ResultGenerators.SystemErrorGen.ToAssertion(e => {
+            var r = ResultFactory.Create<int>(error: e);
+            Assert.True(!r.IsSuccess && r.Errors.Contains(e));
+        }, 50),
+        ResultGenerators.SystemErrorArrayGen.ToAssertion(errs =>
+            Assert.Equal(errs.Length, ResultFactory.Create<int>(errors: errs).Errors.Count), 50),
+        Gen.Int.ToAssertion(v => {
+            (bool executed, var result) = (false, ResultFactory.Create(deferred: () => { executed = true; return ResultFactory.Create(value: v); }));
+            Assert.Equal((true, false, v, true), (result.IsDeferred, executed, result.Value, executed));
+        }, 50),
+        Gen.Int.ToAssertion(v =>
+            Assert.Equal(v > 0, ResultFactory.Create(value: v, conditionals: [(x => x > 0, Errors.E1)]).IsSuccess), 50),
+        ResultGenerators.NestedResultGen<int>().ToAssertion(nested =>
+            Assert.Equal(nested.IsSuccess && nested.Value.IsSuccess, ResultFactory.Create(nested: nested).IsSuccess), 50));
 
-        // Null function parameters should throw
-        Assert.Throws<ArgumentNullException>(() => success.Map((Func<int, int>)null!));
-        Assert.Throws<ArgumentNullException>(() => success.Bind((Func<int, Result<int>>)null!));
-        Assert.Throws<ArgumentNullException>(() => success.Match(null!, _ => 0));
-
-        // State access violations
-        Assert.Throws<InvalidOperationException>(() => failure.Value);
-        Assert.NotEqual(default, failure.Error); // Should contain the actual error
-    }
-
-    /// <summary>Tests error transformation and accumulation in chained operations.</summary>
+    /// <summary>Verifies Validate polymorphism using algebraic validation pattern matching.</summary>
     [Fact]
-    public void ErrorAccumulationTransformsCorrectly() {
-        SystemError originalError = new(ErrorDomain.Results, 1001, "Original");
-        SystemError transformedError = new(ErrorDomain.Results, 1002, "Transformed");
+    public void Validate_AllParameterCombinations_ValidatesCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion(v =>
+            Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(predicate: x => x > 0, error: Errors.E1).IsSuccess), 50),
+        Gen.Int.ToAssertion(v =>
+            Assert.Equal(v >= 0, ResultFactory.Create(value: v).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess), 50),
+        Gen.Int.ToAssertion(v =>
+            Assert.Equal(v <= 10 || v < 100,
+                ResultFactory.Create(value: v).Validate(premise: x => x > 10, conclusion: x => x < 100, error: Errors.E1).IsSuccess), 50),
+        Gen.Int.ToAssertion(v => {
+            var result = ResultFactory.Create(value: v).Validate(validations: [
+                ((Func<int, bool>)(x => x > 0), Errors.E1),
+                ((Func<int, bool>)(x => x < 100), Errors.E2),
+                ((Func<int, bool>)(x => x % 2 == 0), Errors.E3)
+            ]);
+            Assert.Equal((v is > 0 and < 100 && v % 2 == 0), result.IsSuccess);
+        }, 50),
+        Gen.Int.ToAssertion(v => {
+            var result = ResultFactory.Create(value: v).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2));
+            Assert.Equal(v > 10 ? v * 2 : v, result.Value);
+        }, 50),
+        Gen.Int.ToAssertion(v =>
+            Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(args: [(Func<int, bool>)(x => x > 0), Errors.E1]).IsSuccess), 50));
 
-        Result<int> result = ResultFactory.Create<int>(error: originalError)
-            .OnError(mapError: errors => [transformedError])
-            .Bind(x => ResultFactory.Create(value: x * 2))
-            .Filter(x => x > 0, new SystemError(ErrorDomain.Results, 1003, "Filter"));
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains(transformedError, result.Errors);
-        Assert.DoesNotContain(originalError, result.Errors);
+    /// <summary>Verifies Lift using algebraic applicative composition and partial application.</summary>
+    [Fact]
+    public void Lift_FunctionLifting_AccumulatesErrorsApplicatively() {
+        Func<int, int, int> add = (x, y) => x + y;
+        TestUtilities.AssertAll(
+            Gen.Int.Tuple(Gen.Int).ToAssertion((a, b) => {
+                var result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: a), ResultFactory.Create(value: b));
+                Assert.Equal((true, a + b), (result.IsSuccess, result.Value));
+            }, 50),
+            Gen.Int.Tuple(ResultGenerators.SystemErrorGen).ToAssertion((v, err) => {
+                var result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: v), ResultFactory.Create<int>(error: err));
+                Assert.True(!result.IsSuccess && result.Errors.Contains(err));
+            }, 50),
+            ResultGenerators.SystemErrorGen.Tuple(ResultGenerators.SystemErrorGen).ToAssertion((e1, e2) => {
+                var result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create<int>(error: e1), ResultFactory.Create<int>(error: e2));
+                Assert.Equal((false, 2), (result.IsSuccess, result.Errors.Count));
+            }, 50),
+            Gen.Int.ToAssertion(v =>
+                Assert.True(((Result<Func<object[], int>>)ResultFactory.Lift<int>((x, y, z) => x + y + z, ResultFactory.Create(value: v))).IsSuccess), 50));
     }
+
+    /// <summary>Verifies TraverseElements using algebraic collection monadic composition.</summary>
+    [Fact]
+    public void TraverseElements_CollectionTransformation_AccumulatesErrors() => TestUtilities.AssertAll(
+        Gen.Int.List[1, 10].ToAssertion(items => {
+            var result = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: x * 2));
+            Assert.Equal((true, items.Count, items.Select(x => x * 2)), (result.IsSuccess, result.Value.Count, result.Value));
+        }, 50),
+        Gen.Int.List[1, 10].ToAssertion(items =>
+            Assert.Equal(!items.Any(x => x % 2 != 0),
+                ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => x % 2 == 0
+                    ? ResultFactory.Create(value: x) : ResultFactory.Create<int>(error: Errors.E1)).IsSuccess), 50),
+        ResultGenerators.SystemErrorGen.ToAssertion(err =>
+            Assert.True(!ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: x * 2)).IsSuccess), 50),
+        () => Assert.Empty(ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: x * 2)).Value));
+
+    /// <summary>Verifies null argument handling using algebraic exception pattern matching.</summary>
+    [Fact]
+    public void NullArguments_ThrowCorrectly() {
+        var (success, failure) = (ResultFactory.Create(value: 42), ResultFactory.Create<int>(error: Errors.E1));
+        TestUtilities.AssertAll(
+            () => Assert.Throws<ArgumentNullException>(() => success.Map((Func<int, int>)null!)),
+            () => Assert.Throws<ArgumentNullException>(() => success.Bind((Func<int, Result<int>>)null!)),
+            () => Assert.Throws<ArgumentNullException>(() => success.Match(null!, _ => 0)),
+            () => Assert.Throws<ArgumentNullException>(() => success.Filter(null!, Errors.E1)),
+            () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Lift<int>(null!, 1, 2)),
+            () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Create<IEnumerable<int>>(value: [1, 2]).TraverseElements((Func<int, Result<int>>)null!)),
+            () => Assert.Throws<InvalidOperationException>(() => failure.Value),
+            () => Assert.NotEmpty(failure.Errors));
+    }
+
+    /// <summary>Verifies error handling using algebraic transformation and recovery morphisms.</summary>
+    [Fact]
+    public void ErrorHandling_TransformationAndRecovery_BehavesCorrectly() => TestUtilities.AssertAll(
+        ResultGenerators.SystemErrorGen.ToAssertion(origErr => {
+            var result = ResultFactory.Create<int>(error: origErr).OnError(mapError: _ => [Errors.E2]);
+            Assert.True(!result.IsSuccess && result.Errors.Contains(Errors.E2) && !result.Errors.Contains(origErr));
+        }, 50),
+        ResultGenerators.SystemErrorGen.ToAssertion(err =>
+            Assert.Equal(42, ResultFactory.Create<int>(error: err).OnError(recover: _ => 42).Value), 50),
+        ResultGenerators.SystemErrorGen.ToAssertion(err =>
+            Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError(recoverWith: _ => ResultFactory.Create(value: 99)).Value), 50),
+        () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Filter(x => x > 0, Errors.E2).Errors));
 }

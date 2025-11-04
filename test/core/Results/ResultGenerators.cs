@@ -1,75 +1,75 @@
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Tests.Common;
 using CsCheck;
 
 namespace Arsenal.Core.Tests.Results;
 
-/// <summary>CsCheck generators for Result testing.</summary>
+/// <summary>Algebraic generators using zero-allocation static lambdas and modern C# patterns.</summary>
 public static class ResultGenerators {
-    /// <summary>Generates Result instances with success/error distribution.</summary>
-    public static Gen<Result<T>> ResultGen<T>() where T : notnull =>
-        from isSuccess in Gen.Bool
-        from value in GetGenForType<T>()
-        from error in SystemErrorGen
-        from isDeferred in Gen.Bool
-        select (isSuccess, isDeferred) switch {
-            (true, false) => ResultFactory.Create(value: value),
-            (true, true) => ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)),
-            (false, false) => ResultFactory.Create<T>(error: error),
-            (false, true) => ResultFactory.Create(deferred: () => ResultFactory.Create<T>(error: error))
-        };
-
     private static Gen<T> GetGenForType<T>() where T : notnull => typeof(T) switch {
         var t when t == typeof(int) => (Gen<T>)(object)Gen.Int,
-        var t when t == typeof(string) => (Gen<T>)(object)Gen.String,
+        var t when t == typeof(string) => (Gen<T>)(object)Gen.String.Matching(static s => s is not null),
         var t when t == typeof(double) => (Gen<T>)(object)Gen.Double,
         var t when t == typeof(bool) => (Gen<T>)(object)Gen.Bool,
-        _ => throw new NotSupportedException($"Type {typeof(T)} not supported in generators")
+        _ => throw new NotSupportedException($"Type {typeof(T)} not supported")
     };
 
-    /// <summary>Creates generator for supported types using reflection.</summary>
-    public static object CreateGeneratorForType(Type type) => type switch {
-        var t when t == typeof(int) => Gen.Int,
-        var t when t == typeof(string) => Gen.String,
-        var t when t == typeof(double) => Gen.Double,
-        var t when t == typeof(bool) => Gen.Bool,
-        _ => throw new NotSupportedException($"Type {type} not supported in reflection-based generators")
-    };
-
-    /// <summary>Generates SystemError instances.</summary>
+    /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
     public static Gen<SystemError> SystemErrorGen =>
-        Gen.OneOf<ErrorDomain>(Gen.Const(ErrorDomain.Results), Gen.Const(ErrorDomain.Validation), Gen.Const(ErrorDomain.Geometry))
-        .SelectMany(domain =>
-        Gen.Int[1000, 9999].SelectMany(code =>
-        Gen.String.Where(s => !string.IsNullOrWhiteSpace(s))
-        .Select(message => new SystemError(domain, code, message))));
+        from domain in Gen.OneOf(Gen.Const(ErrorDomain.Results), Gen.Const(ErrorDomain.Validation), Gen.Const(ErrorDomain.Geometry))
+        from code in Gen.Int[1000, 9999]
+        from message in Gen.String.Matching(static s => !string.IsNullOrWhiteSpace(s))
+        select new SystemError(domain, code, message);
 
-    /// <summary>Generates functions for Bind operations.</summary>
+    /// <summary>Generates SystemError arrays using zero-allocation conversion.</summary>
+    public static Gen<SystemError[]> SystemErrorArrayGen => SystemErrorGen.List[1, 5].Select(static list => list.ToArray());
+
+    /// <summary>Generates Result with algebraic state distribution (2×2 matrix: success/failure × immediate/deferred).</summary>
+    public static Gen<Result<T>> ResultGen<T>() where T : notnull => GetGenForType<T>().ToResultGenDeferred(SystemErrorGen);
+
+    /// <summary>Generates successful Results with immediate/deferred distribution.</summary>
+    public static Gen<Result<T>> SuccessGen<T>() where T : notnull =>
+        GenEx.OneOfWeighted(
+            (1, GetGenForType<T>().Select(static v => ResultFactory.Create(value: v))),
+            (1, GetGenForType<T>().Select(static v => ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)))));
+
+    /// <summary>Generates failed Results with immediate/deferred distribution.</summary>
+    public static Gen<Result<T>> FailureGen<T>() where T : notnull =>
+        GenEx.OneOfWeighted(
+            (1, SystemErrorGen.Select(static e => ResultFactory.Create<T>(error: e))),
+            (1, SystemErrorGen.Select(static e => ResultFactory.Create(deferred: () => ResultFactory.Create<T>(error: e)))));
+
+    /// <summary>Generates nested Result using recursive composition.</summary>
+    public static Gen<Result<Result<T>>> NestedResultGen<T>() where T : notnull => ResultGen<T>().ToResultGen(SystemErrorGen);
+
+    /// <summary>Generates Result containing collections using monadic map.</summary>
+    public static Gen<Result<IEnumerable<T>>> CollectionResultGen<T>() where T : notnull =>
+        GetGenForType<T>().List[0, 10].ToResultGen(SystemErrorGen).Select(static r => r.Map(static list => (IEnumerable<T>)list));
+
+    /// <summary>Generates collections of Results using static cast.</summary>
+    public static Gen<IEnumerable<Result<T>>> ResultCollectionGen<T>() where T : notnull =>
+        ResultGen<T>().List[0, 10].Select(static list => (IEnumerable<Result<T>>)list);
+
+    /// <summary>Generates monadic functions using constant result capture.</summary>
     public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
-        from shouldSucceed in Gen.Bool
-        from value in GetGenForType<TResult>()
-        from error in SystemErrorGen
-        select (Func<T, Result<TResult>>)(_ => shouldSucceed
-            ? ResultFactory.Create(value: value)
-            : ResultFactory.Create<TResult>(error: error));
+        GetGenForType<TResult>().ToResultGen(SystemErrorGen).Select<Func<T, Result<TResult>>>(static result => _ => result);
 
-    /// <summary>Generates functions for Map operations.</summary>
+    /// <summary>Generates pure functions using constant value capture.</summary>
     public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
-        GetGenForType<TResult>().Select(value => (Func<T, TResult>)(_ => value));
-}
+        GetGenForType<TResult>().Select<Func<T, TResult>>(static value => _ => value);
 
-/// <summary>Test data for ResultFactory parameter combinations.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Meziantou.Analyzer", "MA0048:File name must match type name", Justification = "Multiple classes in single file as per design specification")]
-public static class ResultTestData {
-    /// <summary>Parameter combinations for Create method testing.</summary>
-    public static IEnumerable<object?[]> FactoryParameterCases => [
-        [42, null, null, null, null, null, true],                                                           // value only
-        [null, new SystemError[] { TestError }, null, null, null, null, false],                             // errors array
-        [null, null, TestError, null, null, null, false],                                                   // single error
-        [null, null, null, (Func<Result<int>>)(() => ResultFactory.Create(value: 42)), null, null, true],   // deferred success
-        [42, null, null, null, new[] { (Predicate, TestError) }, null, false],                              // conditional validation
-    ];
+    /// <summary>Generates predicates using constant boolean capture.</summary>
+    public static Gen<Func<T, bool>> PredicateGen<T>() where T : notnull =>
+        Gen.Bool.Select<Func<T, bool>>(static result => _ => result);
 
-    private static readonly SystemError TestError = new(ErrorDomain.Results, 1001, "Test error");
-    private static readonly Func<int, bool> Predicate = x => x < 0;
+    /// <summary>Generates validation arrays using Cartesian composition.</summary>
+    public static Gen<(Func<T, bool>, SystemError)[]> ValidationArrayGen<T>() where T : notnull =>
+        PredicateGen<T>().Tuple(SystemErrorGen).List[1, 5].Select(static list => list.ToArray());
+
+    /// <summary>Generates binary operations using static function set.</summary>
+    public static Gen<Func<int, int, int>> BinaryFunctionGen => Gen.OneOf(
+        Gen.Const<Func<int, int, int>>(static (a, b) => a + b),
+        Gen.Const<Func<int, int, int>>(static (a, b) => a * b),
+        Gen.Const<Func<int, int, int>>(static (a, b) => a - b));
 }
