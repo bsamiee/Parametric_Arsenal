@@ -39,14 +39,6 @@ public static class TestUtilities {
     /// <summary>Assertion composition builder using delegate type dispatch.</summary>
     public static Action ToAssertion<T>(this Gen<T> gen, Delegate assertion, int iterations = 100) =>
         () => gen.Assert(assertion, iterations);
-
-    // Backward compatibility extensions (to be removed once all tests migrated to unified Assert)
-    public static void AssertProperty<T>(this Gen<T> gen, Func<T, bool> property, int iter = 100) => gen.Assert(property, iter);
-    public static void AssertSample<T>(this Gen<T> gen, Action<T> assertion, int iter = 100) => gen.Assert(assertion, iter);
-    public static void AssertProperty<T1, T2>(this Gen<(T1, T2)> gen, Func<T1, T2, bool> property, int iter = 100) => gen.Assert(property, iter);
-    public static void AssertSample<T1, T2>(this Gen<(T1, T2)> gen, Action<T1, T2> assertion, int iter = 100) => gen.Assert(assertion, iter);
-    public static Action ToAssertion<T>(this Gen<T> gen, Func<T, bool> property, int iter = 100) => gen.ToAssertion((Delegate)property, iter);
-    public static Action ToAssertion<T>(this Gen<T> gen, Action<T> assertion, int iter = 100) => gen.ToAssertion((Delegate)assertion, iter);
 }
 
 /// <summary>Parameterized law verification using algebraic dispatch and zero duplication.</summary>

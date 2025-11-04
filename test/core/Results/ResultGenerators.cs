@@ -73,19 +73,3 @@ public static class ResultGenerators {
         Gen.Const<Func<int, int, int>>(static (a, b) => a * b),
         Gen.Const<Func<int, int, int>>(static (a, b) => a - b));
 }
-
-/// <summary>Test data for ResultFactory parameter combinations.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Meziantou.Analyzer", "MA0048:File name must match type name", Justification = "Multiple classes in single file as per design specification")]
-public static class ResultTestData {
-    /// <summary>Parameter combinations for Create method testing.</summary>
-    public static IEnumerable<object?[]> FactoryParameterCases => [
-        [42, null, null, null, null, null, true],                                                           // value only
-        [null, new SystemError[] { TestError }, null, null, null, null, false],                             // errors array
-        [null, null, TestError, null, null, null, false],                                                   // single error
-        [null, null, null, (Func<Result<int>>)(() => ResultFactory.Create(value: 42)), null, null, true],   // deferred success
-        [42, null, null, null, new[] { (Predicate, TestError) }, null, false],                              // conditional validation
-    ];
-
-    private static readonly SystemError TestError = new(ErrorDomain.Results, 1001, "Test error");
-    private static readonly Func<int, bool> Predicate = x => x < 0;
-}

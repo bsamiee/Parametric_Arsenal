@@ -14,14 +14,18 @@ public sealed class ResultFactoryTests {
     /// <summary>Verifies Create parameter polymorphism using algebraic sum type semantics.</summary>
     [Fact]
     public void Create_AllParameterCombinations_BehavesCorrectly() => TestUtilities.AssertAll(
-        Gen.Int.ToAssertion(v => Assert.Equal((true, v), (ResultFactory.Create(value: v).IsSuccess, ResultFactory.Create(value: v).Value)), 50),
-        ResultGenerators.SystemErrorGen.ToAssertion(e =>
-            Assert.True(!ResultFactory.Create<int>(error: e).IsSuccess && ResultFactory.Create<int>(error: e).Errors.Contains(e)), 50),
+        Gen.Int.ToAssertion(v => {
+            var r = ResultFactory.Create(value: v);
+            Assert.Equal((true, v), (r.IsSuccess, r.Value));
+        }, 50),
+        ResultGenerators.SystemErrorGen.ToAssertion(e => {
+            var r = ResultFactory.Create<int>(error: e);
+            Assert.True(!r.IsSuccess && r.Errors.Contains(e));
+        }, 50),
         ResultGenerators.SystemErrorArrayGen.ToAssertion(errs =>
             Assert.Equal(errs.Length, ResultFactory.Create<int>(errors: errs).Errors.Count), 50),
         Gen.Int.ToAssertion(v => {
-            bool executed = false;
-            var result = ResultFactory.Create(deferred: () => { executed = true; return ResultFactory.Create(value: v); });
+            (bool executed, var result) = (false, ResultFactory.Create(deferred: () => { executed = true; return ResultFactory.Create(value: v); }));
             Assert.Equal((true, false, v, true), (result.IsDeferred, executed, result.Value, executed));
         }, 50),
         Gen.Int.ToAssertion(v =>
@@ -40,14 +44,12 @@ public sealed class ResultFactoryTests {
             Assert.Equal(v <= 10 || v < 100,
                 ResultFactory.Create(value: v).Validate(premise: x => x > 10, conclusion: x => x < 100, error: Errors.E1).IsSuccess), 50),
         Gen.Int.ToAssertion(v => {
-            var validations = new[] {
-                (Func<int, bool>)(x => x > 0), Errors.E1),
-                (Func<int, bool>)(x => x < 100), Errors.E2),
-                (Func<int, bool>)(x => x % 2 == 0), Errors.E3)
-            };
-            var result = ResultFactory.Create(value: v).Validate(validations: validations);
-            var expectedErrors = (v <= 0 ? 1 : 0) + (v >= 100 ? 1 : 0) + (v % 2 != 0 ? 1 : 0);
-            Assert.Equal(expectedErrors == 0, result.IsSuccess);
+            var result = ResultFactory.Create(value: v).Validate(validations: [
+                ((Func<int, bool>)(x => x > 0), Errors.E1),
+                ((Func<int, bool>)(x => x < 100), Errors.E2),
+                ((Func<int, bool>)(x => x % 2 == 0), Errors.E3)
+            ]);
+            Assert.Equal((v is > 0 and < 100 && v % 2 == 0), result.IsSuccess);
         }, 50),
         Gen.Int.ToAssertion(v => {
             var result = ResultFactory.Create(value: v).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2));

@@ -90,11 +90,8 @@ public sealed class ResultMonadTests {
         TestUtilities.AssertAll(
             Gen.Int[1, 100].ToAssertion(v => Assert.True(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess), 50),
             Gen.Int[1, 100].ToAssertion(v => Assert.False(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x < 0), e1).IsSuccess), 50),
-            Gen.Int.ToAssertion(v => {
-                var result = ResultFactory.Create(value: v).Ensure(((Func<int, bool>)(x => x > 0), e1), ((Func<int, bool>)(x => x < 100), e2));
-                var expectedErrors = (v <= 0 ? 1 : 0) + (v >= 100 ? 1 : 0);
-                Assert.Equal(expectedErrors == 0, result.IsSuccess);
-            }),
+            Gen.Int.ToAssertion(v =>
+                Assert.Equal((v is > 0 and < 100), ResultFactory.Create(value: v).Ensure(((Func<int, bool>)(x => x > 0), e1), ((Func<int, bool>)(x => x < 100), e2)).IsSuccess)),
             Gen.Int.ToAssertion(v => Assert.Equal(v > 0,
                 ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess), 50));
     }
@@ -161,7 +158,7 @@ public sealed class ResultMonadTests {
         ResultGenerators.SystemErrorGen.ToAssertion(err => {
             bool executed = false;
             var deferred = ResultFactory.Create(deferred: () => { executed = true; return ResultFactory.Create<int>(error: err); });
-            Assert.False(executed && !deferred.IsSuccess || !executed && deferred.IsSuccess);
+            Assert.Equal(executed, !deferred.IsSuccess);
         }, 50),
         Gen.Int.ToAssertion(v => {
             int mapCount = 0, bindCount = 0;
