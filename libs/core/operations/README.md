@@ -1,6 +1,6 @@
 # UnifiedOperation - Parameterized Algebraic Dispatch
 
-Dense polymorphic operation system with zero duplication. **119 lines total.**
+Dense polymorphic operation system with zero duplication. **136 lines total.**
 
 ## Architecture
 
@@ -44,7 +44,7 @@ public static Result<IReadOnlyList<TOut>> Apply<TIn, TOut>(
 
 ### After (parameterized)
 ```
-119 lines (34% reduction)
+136 lines (25% reduction)
 - 0 private helper methods
 - 0 duplicated logic
 - Local functions parameterize behavior
@@ -106,4 +106,4 @@ ErrorStrategy.SkipFailed     // Continue with valid results
 **Algebraic:** Respects functor/monad/applicative laws
 **Parameterized:** Behavior defined once as lambdas
 **Polymorphic:** Handles single/batch/enumerable uniformly
-**Dense:** 119 LOC, zero boilerplate, zero duplication
+**Dense:** 136 LOC, zero boilerplate, zero duplication

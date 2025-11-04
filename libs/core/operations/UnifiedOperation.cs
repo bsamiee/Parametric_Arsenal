@@ -12,53 +12,65 @@ public static class UnifiedOperation {
 		Func<TIn, Result<IReadOnlyList<TOut>>> operation,
 		OperationConfig<TIn, TOut> config) where TIn : notnull {
 
+		Result<IReadOnlyList<TOut>> empty = ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>());
+
+		Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>, IReadOnlyList<TOut>> combine = (a, c) => (IReadOnlyList<TOut>)[.. a, .. c];
+
 		Func<TIn, Result<IReadOnlyList<TOut>>> pipeline = item =>
-			(config.InputFilter?.Invoke(item), config.ValidationMode != ValidationMode.None) switch {
-				(false, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
-				(_, false) => (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation),
-				(_, true) => ResultFactory.Create(value: item)
+			(config.InputFilter?.Invoke(item), config.ValidationMode != ValidationMode.None, config.SkipInvalid) switch {
+				(false, _, _) => empty,
+				(_, false, _) => (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation),
+				(_, true, false) => ResultFactory.Create(value: item)
+					.Validate(args: [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
+					.Bind(validated => (config.PreTransform?.Invoke(validated) ?? ResultFactory.Create(value: validated)).Bind(operation)),
+				(_, true, true) => ResultFactory.Create(value: item)
 					.Validate(args: [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
 					.Match(
 						onSuccess: validated => (config.PreTransform?.Invoke(validated) ?? ResultFactory.Create(value: validated)).Bind(operation),
-						onFailure: errors => config.SkipInvalid
-							? (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation)
-							: ResultFactory.Create<IReadOnlyList<TOut>>(errors: errors)),
+						onFailure: _ => (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation)),
 			}
 			.Match(
-				onSuccess: outputs => (config.OutputFilter, config.PostTransform) switch {
-					(null, null) => ResultFactory.Create(value: outputs),
-					(var filter, null) => ResultFactory.Create(value: (IReadOnlyList<TOut>)outputs.Where(o => filter?.Invoke(o) ?? true).ToArray()),
-					(var filter, var transform) => outputs.Where(o => filter?.Invoke(o) ?? true).Select(transform!).Aggregate(
-						ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
-						(acc, curr) => curr.IsSuccess
-							? acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, c]))
-							: config.SkipInvalid ? acc : ResultFactory.Create<IReadOnlyList<TOut>>(errors: curr.Errors)),
+				onSuccess: outputs => (config.OutputFilter, config.PostTransform, config.SkipInvalid) switch {
+					(null, null, _) => ResultFactory.Create(value: outputs),
+					(var f, null, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)outputs.Where(o => f?.Invoke(o) ?? true).ToArray()),
+					(var f, var t, var skip) => outputs
+						.Where(o => f?.Invoke(o) ?? true)
+						.Aggregate(empty, (acc, o) => t(o) switch {
+							{ IsSuccess: true } r => acc.Bind(a => r.Map(c => combine(a, [c]))),
+							{ IsSuccess: false } r when !skip => ResultFactory.Create<IReadOnlyList<TOut>>(errors: r.Errors),
+							_ => acc,
+						}),
 				},
-				onFailure: errors => ResultFactory.Create<IReadOnlyList<TOut>>(
-					errors: config.ErrorPrefix is null ? errors : errors.Select(e => e with { Message = $"{config.ErrorPrefix}: {e.Message}" }).ToArray()));
+				onFailure: errors => (config.ErrorPrefix, errors) switch {
+					(null, var e) => ResultFactory.Create<IReadOnlyList<TOut>>(errors: e),
+					(var prefix, var e) => ResultFactory.Create<IReadOnlyList<TOut>>(errors: e.Select(err => err with { Message = $"{prefix}: {err.Message}" }).ToArray()),
+				});
 
 		Func<Result<IReadOnlyList<TOut>>, Result<IReadOnlyList<TOut>>, Result<IReadOnlyList<TOut>>> accumulate = (acc, curr) =>
 			(config.ErrorStrategy, curr.IsSuccess) switch {
 				(ErrorStrategy.FailFast, false) => curr,
-				(ErrorStrategy.FailFast, true) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
-				(ErrorStrategy.AccumulateAll, _) => acc.Apply(curr.Map(c => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => (IReadOnlyList<TOut>)[.. a, .. c]))),
-				(ErrorStrategy.SkipFailed, true) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
+				(ErrorStrategy.FailFast, true) => acc.Bind(a => curr.Map(c => combine(a, c))),
+				(ErrorStrategy.AccumulateAll, _) => acc.Apply(curr.Map(c => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => combine(a, c)))),
+				(ErrorStrategy.SkipFailed, true) => acc.Bind(a => curr.Map(c => combine(a, c))),
 				_ => acc,
 			};
 
 		return (input, config.EnableParallel) switch {
-			(IReadOnlyList<TIn> { Count: 0 }, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
+			(IReadOnlyList<TIn> { Count: 0 }, _) => empty,
 			(IReadOnlyList<TIn> { Count: 1 } list, _) => Apply(list[0], operation, config),
 			(IReadOnlyList<TIn> list, true) => list.AsParallel()
 				.WithDegreeOfParallelism(config.MaxDegreeOfParallelism)
-				.Select(pipeline)
-				.Aggregate(ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()), accumulate),
-			(IReadOnlyList<TIn> list, false) => list.Aggregate(
-				ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
-				(acc, item) => pipeline(item) switch {
-					var curr when !curr.IsSuccess && config.ErrorStrategy == ErrorStrategy.FailFast && config.ShortCircuit => curr,
-					var curr => accumulate(acc, curr),
+				.Aggregate(empty, (acc, item) => accumulate(acc, pipeline(item)), accumulate),
+			(IReadOnlyList<TIn> list, false) when config.ErrorStrategy == ErrorStrategy.FailFast && config.ShortCircuit => list.Aggregate(
+				empty,
+				(acc, item) => acc.IsSuccess switch {
+					true => pipeline(item) switch {
+						{ IsSuccess: true } curr => accumulate(acc, curr),
+						var curr => curr,
+					},
+					false => acc,
 				}),
+			(IReadOnlyList<TIn> list, false) => list.Aggregate(empty, (acc, item) => accumulate(acc, pipeline(item))),
 			(IEnumerable<TIn> enumerable, _) => Apply(enumerable.ToList(), operation, config),
 			_ => pipeline(input),
 		};
@@ -108,11 +120,16 @@ public static class UnifiedOperation {
 		OperationConfig<TIn, TOut> config,
 		ConcurrentDictionary<TIn, Result<IReadOnlyList<TOut>>>? cache = null) where TIn : notnull =>
 		(config.EnableCache, input, cache ?? new ConcurrentDictionary<TIn, Result<IReadOnlyList<TOut>>>()) switch {
-			(false, _, _) => Apply(input, operation, config),
-			(true, IReadOnlyList<TIn> list, var c) => Apply(
-				list.Select(item => c.GetOrAdd(item, i => Apply(i, operation, config))).ToList(),
-				r => r,
-				config with { ValidationMode = ValidationMode.None, PreTransform = null, InputFilter = null }),
+			(false, var i, _) => Apply(i, operation, config),
+			(true, IReadOnlyList<TIn> list, var c) => list.Aggregate(
+				ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
+				(acc, item) => (config.ErrorStrategy, c.GetOrAdd(item, i => Apply(i, operation, config))) switch {
+					(ErrorStrategy.FailFast, { IsSuccess: false } curr) => curr,
+					(ErrorStrategy.FailFast, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
+					(ErrorStrategy.AccumulateAll, var curr) => acc.Apply(curr.Map(c => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => (IReadOnlyList<TOut>)[.. a, .. c]))),
+					(ErrorStrategy.SkipFailed, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
+					_ => acc,
+				}),
 			(true, IEnumerable<TIn> enumerable, var c) => ApplyCached(enumerable.ToList(), operation, config, c),
 			(true, var item, var c) => c.GetOrAdd(item, i => Apply(i, operation, config)),
 		};
