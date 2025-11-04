@@ -9,7 +9,7 @@ using Arsenal.Core.Validation;
 /// </summary>
 /// <typeparam name="TIn">Input element type</typeparam>
 /// <typeparam name="TOut">Output element type</typeparam>
-public sealed class OperationConfig<TIn, TOut> {
+public sealed record OperationConfig<TIn, TOut> {
 	/// <summary>Geometry context for validation and tolerance</summary>
 	public required IGeometryContext Context { get; init; }
 
@@ -54,39 +54,4 @@ public sealed class OperationConfig<TIn, TOut> {
 
 	/// <summary>Custom error message prefix for accumulated errors</summary>
 	public string? ErrorPrefix { get; init; }
-
-	/// <summary>Create default configuration with context only</summary>
-	public static OperationConfig<TIn, TOut> Default(IGeometryContext context) => new() {
-		Context = context,
-	};
-
-	/// <summary>Create configuration with validation mode</summary>
-	public static OperationConfig<TIn, TOut> WithValidation(
-		IGeometryContext context,
-		ValidationMode mode,
-		params object[] args) => new() {
-		Context = context,
-		ValidationMode = mode,
-		ValidationArgs = args,
-	};
-
-	/// <summary>Create configuration with transformations</summary>
-	public static OperationConfig<TIn, TOut> WithTransforms(
-		IGeometryContext context,
-		Func<TIn, Result<TIn>>? preTransform = null,
-		Func<TOut, Result<TOut>>? postTransform = null) => new() {
-		Context = context,
-		PreTransform = preTransform,
-		PostTransform = postTransform,
-	};
-
-	/// <summary>Create configuration for parallel batch operations</summary>
-	public static OperationConfig<TIn, TOut> Parallel(
-		IGeometryContext context,
-		int maxDegreeOfParallelism = -1) => new() {
-		Context = context,
-		EnableParallel = true,
-		MaxDegreeOfParallelism = maxDegreeOfParallelism,
-		ErrorStrategy = ErrorStrategy.AccumulateAll,
-	};
 }
