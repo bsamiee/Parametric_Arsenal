@@ -125,9 +125,9 @@ public static class UnifiedOperation {
 				ResultFactory.Create(value: (IReadOnlyList<TOut>)Array.Empty<TOut>()),
 				(acc, item) => (config.ErrorStrategy, c.GetOrAdd(item, i => Apply(i, operation, config))) switch {
 					(ErrorStrategy.FailFast, { IsSuccess: false } curr) => curr,
-					(ErrorStrategy.FailFast, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
-					(ErrorStrategy.AccumulateAll, var curr) => acc.Apply(curr.Map(c => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => (IReadOnlyList<TOut>)[.. a, .. c]))),
-					(ErrorStrategy.SkipFailed, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(c => (IReadOnlyList<TOut>)[.. a, .. c])),
+					(ErrorStrategy.FailFast, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(x => (IReadOnlyList<TOut>)[.. a, .. x])),
+					(ErrorStrategy.AccumulateAll, var curr) => acc.Apply(curr.Map(x => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => (IReadOnlyList<TOut>)[.. a, .. x]))),
+					(ErrorStrategy.SkipFailed, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(x => (IReadOnlyList<TOut>)[.. a, .. x])),
 					_ => acc,
 				}),
 			(true, IEnumerable<TIn> enumerable, var c) => ApplyCached(enumerable.ToList(), operation, config, c),
