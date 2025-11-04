@@ -5,19 +5,19 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{139246CB-CE69-41FD-A53C-BE0DEFFAC59E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "libs\core\Core.csproj", "{6EEBDBC4-3B88-4E08-BED3-1637B5B4113D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "libs/core/Core.csproj", "{6EEBDBC4-3B88-4E08-BED3-1637B5B4113D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rhino", "libs\rhino\Rhino.csproj", "{C43F681D-3AEA-40B3-9FAD-C4985C8A7395}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rhino", "libs/rhino/Rhino.csproj", "{C43F681D-3AEA-40B3-9FAD-C4985C8A7395}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "grasshopper", "libs\grasshopper\grasshopper.csproj", "{05AC3A13-E4DD-4AA1-AD99-69142AFDB87D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grasshopper", "libs/grasshopper/Grasshopper.csproj", "{05AC3A13-E4DD-4AA1-AD99-69142AFDB87D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{79E3FB9A-ADB7-4332-8BC5-9F16B74943AC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Core.Tests", "test\core\Arsenal.Core.Tests.csproj", "{8AE84FC1-6A43-4376-9992-3F6E148D380B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Core.Tests", "test/core/Arsenal.Core.Tests.csproj", "{8AE84FC1-6A43-4376-9992-3F6E148D380B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Rhino.Tests", "test\rhino\Arsenal.Rhino.Tests.csproj", "{318DC384-9B41-48EB-A1BC-DDD49A7DF764}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Rhino.Tests", "test/rhino/Arsenal.Rhino.Tests.csproj", "{318DC384-9B41-48EB-A1BC-DDD49A7DF764}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Tests.Shared", "test\shared\Arsenal.Tests.Shared.csproj", "{F9900C40-A408-4980-B7F6-428D1A91097B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arsenal.Tests.Shared", "test/shared/Arsenal.Tests.Shared.csproj", "{F9900C40-A408-4980-B7F6-428D1A91097B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -9,6 +9,10 @@
     <IsGrasshopperPlugin>true</IsGrasshopperPlugin>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="7.0.0" ExcludeAssets="all" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../core/Core.csproj" />
     <ProjectReference Include="../rhino/Rhino.csproj" />
