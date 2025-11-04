@@ -3,10 +3,10 @@
   <PropertyGroup Label="Paths">
     <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
     <ArtifactsPath>$(RepositoryRoot)artifacts</ArtifactsPath>
-    <BaseOutputPath>$(ArtifactsPath)\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseOutputPath>$(ArtifactsPath)/$(MSBuildProjectName)/</BaseOutputPath>
     <SolutionDir>$(RepositoryRoot)</SolutionDir>
     <SolutionName>Parametric_Arsenal</SolutionName>
-    <SolutionExt>.slnx</SolutionExt>
+    <SolutionExt>.sln</SolutionExt>
   </PropertyGroup>
 
   <PropertyGroup Label="Language">
@@ -54,13 +54,13 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <TieredCompilation>true</TieredCompilation>
-    <ReadyToRun>true</ReadyToRun>
+    <ReadyToRun Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</ReadyToRun>
   </PropertyGroup>
 
   <ItemGroup Label="Analyzers">
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.231" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup Label="SDKVersions">
