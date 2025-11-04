@@ -15,13 +15,10 @@ public sealed class ResultFactoryTests {
         Result<Result<int>>? nested, bool expectedSuccess) {
 
         // Direct call to ResultFactory.Create<int> with proper parameter handling
-        Result<int> result = ResultFactory.Create<int>(
-            value: value,
-            errors: errors,
-            error: error,
-            deferred: deferred,
-            conditionals: conditionals,
-            nested: nested);
+        Result<int> result = value switch {
+            int intValue => ResultFactory.Create<int>(value: intValue, errors: errors, error: error, deferred: deferred, conditionals: conditionals, nested: nested),
+            _ => ResultFactory.Create<int>(errors: errors, error: error, deferred: deferred, conditionals: conditionals, nested: nested)
+        };
 
         bool actualSuccess = result.IsSuccess;
 

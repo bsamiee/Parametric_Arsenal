@@ -23,18 +23,6 @@
         "resolved": "2.0.250",
         "contentHash": "+Y/z+dDTlDbI0iYsG5sad2kskprPH86jscQcS8VfnEaZxbb4WsP0bD0iEG4ZdY0XwZycdUWfRCtJrTKQX/8bJA=="
       },
-      "Microsoft.CodeAnalysis.NetAnalyzers": {
-        "type": "Direct",
-        "requested": "[9.0.0, )",
-        "resolved": "9.0.0",
-        "contentHash": "JajbvkrBgtdRghavIjcJuNHMOja4lqBmEezbhZyqWPYh2cpLhT5mPpfC7NQVDO4IehWQum9t/nwF4v+qQGtYWg=="
-      },
-      "Microsoft.VisualStudio.Threading.Analyzers": {
-        "type": "Direct",
-        "requested": "[17.14.15, )",
-        "resolved": "17.14.15",
-        "contentHash": "mXQPJsbuUD2ydq4/ffd8h8tSOFCXec+2xJOVNCvXjuMOq/+5EKHq3D2m2MC2+nUaXeFMSt66VS/J4HdKBixgcw=="
-      },
       "RhinoCommon": {
         "type": "Direct",
         "requested": "[8.24.25281.15001, )",
@@ -43,6 +31,12 @@
         "dependencies": {
           "System.Drawing.Common": "7.0.0"
         }
+      },
+      "Roslynator.Analyzers": {
+        "type": "Direct",
+        "requested": "[4.14.1, )",
+        "resolved": "4.14.1",
+        "contentHash": "yMSjze/xMYDF6PCE60/ULWx0tttNyKAndw2KijNxbKil0FX8nvDeEneDZGma8Uifk17RlfZqIXxf1mmBmhRHjg=="
       },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",

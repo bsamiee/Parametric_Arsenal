@@ -97,7 +97,7 @@
     <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">/Applications/Rhino 8.app/Contents/Frameworks</RhinoSystemDirectory>
   </PropertyGroup>
 
-  <ItemGroup Label="RhinoReferences" Condition="'$(TestFramework)' == 'NUnit' AND '$(TargetFramework)' == 'net8.0'">
+  <ItemGroup Label="RhinoReferences" Condition="'$(TestFramework)' == 'NUnit' AND '$(TargetFramework)' == 'net8.0' AND Exists('$(RhinoSystemDirectory)')">
     <Reference Include="$(RhinoSystemDirectory)\netcore\RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'" />
     <Reference Include="$(RhinoSystemDirectory)/RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'" />
   </ItemGroup>

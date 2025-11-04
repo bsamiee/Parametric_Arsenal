@@ -53,8 +53,7 @@ internal static class SpatialStrategies {
                     .Validate(args: [context, config.Mode])
                     .Map(_ => IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? [])
                     .Map(result => (IReadOnlyList<int>)result.AsReadOnly()),
-                false => ResultFactory.Create(value: IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? [])
-                    .Map(result => (IReadOnlyList<int>)result.AsReadOnly())
+                false => ResultFactory.Create(value: (IReadOnlyList<int>)(IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? []).AsReadOnly())
             }
         };
 
@@ -102,7 +101,7 @@ internal static class SpatialStrategies {
             },
             _ when config.TreeFactory is not null => ArrayPool<int>.Shared.Rent(config.BufferSize) switch {
                 var buffer => ((Func<int[]?>)(() => {
-                    var (tree, count) = (_treeCache.GetValue(source, _ => config.TreeFactory!(source)), 0);
+                    var (tree, count) = (_treeCache.GetValue(source, _ => config.TreeFactory!(source)) ?? RTree.CreateFromPointArray([]), 0);
                     try {
                         (queryTransform switch {
                             Sphere sphere => (Action)(() => tree.Search(sphere, (_, args) => count = count < buffer.Length ? (buffer[count] = args.Id, count + 1).Item2 : count)),
