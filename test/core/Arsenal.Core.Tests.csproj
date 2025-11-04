@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Arsenal.Core.Tests</AssemblyName>
+    <RootNamespace>Arsenal.Core.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+    <TestFramework>xUnit</TestFramework>
+  </PropertyGroup>
+
+</Project>

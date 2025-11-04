@@ -192,7 +192,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         return self.IsDeferred switch {
             true => ResultFactory.Create(deferred: () => self.Eval.Traverse(selector)),
             false => self.Eval switch {
-                { _isSuccess: true, _value: var value } when value is IEnumerable<object> collection =>
+                { _isSuccess: true, _value: System.Collections.IEnumerable collection } when collection is not string =>
                     collection.Cast<object>().Aggregate(
                         ResultFactory.Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
                         (acc, item) => acc.Apply(selector((T)item).Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(

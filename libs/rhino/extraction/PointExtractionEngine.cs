@@ -22,7 +22,7 @@ public static class PointExtractionEngine {
         return input switch {
             // Single geometry path with inline validation mode determination
             GeometryBase single => ResultFactory.Create(value: single)
-                .ValidateGeometry(context, method switch {
+                .Validate(args: [context, method switch {
                     ExtractionMethod.Analytical => ValidationMode.Standard | (single switch {
                         Brep => ValidationMode.MassProperties,
                         Curve or Surface => ValidationMode.AreaCentroid,
@@ -32,7 +32,7 @@ public static class PointExtractionEngine {
                     ExtractionMethod.Extremal => ValidationMode.BoundingBox,
                     ExtractionMethod.Quadrant => ValidationMode.Tolerance,
                     _ => ValidationMode.Standard,
-                })
+                }])
                 .Bind(g => ExtractionStrategies.Extract(g, method, context, count, length, includeEnds)),
 
             // Empty collection optimization

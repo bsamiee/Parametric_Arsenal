@@ -1,21 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup Label="Project Identity">
+  <PropertyGroup>
     <AssemblyName>Arsenal.Grasshopper</AssemblyName>
     <RootNamespace>Arsenal.Grasshopper</RootNamespace>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Grasshopper Library Configuration">
     <TargetExt>.gha</TargetExt>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Grasshopper Plugin Marker">
     <IsGrasshopperPlugin>true</IsGrasshopperPlugin>
   </PropertyGroup>
 
-  <ItemGroup Label="Project Dependencies">
+  <ItemGroup>
     <ProjectReference Include="../core/Core.csproj" />
     <ProjectReference Include="../rhino/Rhino.csproj" />
   </ItemGroup>

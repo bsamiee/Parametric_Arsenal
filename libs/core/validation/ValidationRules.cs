@@ -48,54 +48,33 @@ public static class ValidationRules {
             [ValidationMode.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], ValidationErrors.Geometry.Continuity.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
-    /// <summary>Gets or compiles cached validator function for specified type and validation mode combination.</summary>
+    /// <summary>Gets or compiles cached validator function for specified runtime type and validation mode combination.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<T, IGeometryContext, SystemError[]> GetOrCompileValidator<T>(ValidationMode mode) {
-        CacheKey key = new(typeof(T), mode);
-        object validator = _cache.GetOrAdd(key, k => CompileValidator<T>(k.Mode));
-        return (Func<T, IGeometryContext, SystemError[]>)validator;
+    internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, ValidationMode mode) {
+        CacheKey key = new(runtimeType, mode);
+        object validator = _cache.GetOrAdd(key, k => CompileValidator(k.Type, k.Mode));
+        return (Func<object, IGeometryContext, SystemError[]>)validator;
     }
 
-    /// <summary>Validates geometry using monadic composition with comprehensive error propagation and context awareness.</summary>
+    /// <summary>Generates validation errors using polymorphic parameter detection for tolerance values only.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ValidateGeometry<T>(this Result<T> result, IGeometryContext context, ValidationMode mode = ValidationMode.Standard) where T : GeometryBase =>
-        result.Validate(
-            predicate: geometry => For(geometry, context, mode).Length == 0,
-            error: ValidationErrors.Geometry.Invalid);
-
-    /// <summary>Generates validation errors using polymorphic parameter detection for geometry objects or tolerance values.</summary>
-    [Pure]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
-            // Tolerance validation - when T is double, treat as tolerance validation
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
-                [
-                    ..(!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ? [ValidationErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
-                    ..(!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ? [ValidationErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
-                    ..(!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ? [ValidationErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),
-                ],
-
-            // Geometry validation - standard path with context and mode
-            (Type t, var geometry, [IGeometryContext context, ValidationMode mode]) when t != typeof(double) =>
-                geometry switch {
-                    null => [ValidationErrors.Geometry.Null],
-                    _ => GetOrCompileValidator<T>(mode)(geometry, context),
-                },
-
-            // Geometry validation - with context only (default mode)
-            (Type t, var geometry, [IGeometryContext context]) when t != typeof(double) =>
-                geometry switch {
-                    null => [ValidationErrors.Geometry.Null],
-                    _ => GetOrCompileValidator<T>(ValidationMode.Standard)(geometry, context),
-                },
-
+                [..(!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
+                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidAbsolute] : (SystemError[])[]),
+                ..(!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
+                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidRelative] : (SystemError[])[]),
+                ..(!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
+                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidAngle] : (SystemError[])[]),],
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for specified type and validation mode with comprehensive reflection-based rule application.</summary>
+    /// <summary>Compiles expression tree validator for specified runtime type and validation mode with comprehensive reflection-based rule application.</summary>
     [Pure]
-    private static Func<T, IGeometryContext, SystemError[]> CompileValidator<T>(ValidationMode mode) {
-        (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(T), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
+    private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, ValidationMode mode) {
+        (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
+        ParameterExpression typedGeometry = Expression.Variable(runtimeType, "typed");
 
         (object Member, SystemError Error)[] memberValidations =
             [.. Enum.GetValues<ValidationMode>()
@@ -104,12 +83,12 @@ public static class ValidationRules {
                     (string[] properties, string[] methods, SystemError error) = _validationRules[flag];
                     return (IEnumerable<(object Member, SystemError Error)>)[
                         ..properties.Select(prop => (
-                            Member: _cache.GetOrAdd(new CacheKey(typeof(T), ValidationMode.None, prop, 1),
-                                static (key, type) => type.GetProperty(key.Member!) ?? (object)typeof(void), typeof(T)),
+                            Member: _cache.GetOrAdd(new CacheKey(runtimeType, ValidationMode.None, prop, 1),
+                                static (key, type) => type.GetProperty(key.Member!) ?? (object)typeof(void), runtimeType),
                             error)),
                         ..methods.Select(method => (
-                            Member: _cache.GetOrAdd(new CacheKey(typeof(T), ValidationMode.None, method, 2),
-                                static (key, type) => type.GetMethod(key.Member!) ?? (object)typeof(void), typeof(T)),
+                            Member: _cache.GetOrAdd(new CacheKey(runtimeType, ValidationMode.None, method, 2),
+                                static (key, type) => type.GetMethod(key.Member!) ?? (object)typeof(void), runtimeType),
                             error)),
                     ];
                 }),];
@@ -118,22 +97,22 @@ public static class ValidationRules {
             .Where(validation => validation.Member is not null and not Type { Name: "Void" })
             .Select<(object Member, SystemError Error), Expression>(validation => validation.Member switch {
                 PropertyInfo { PropertyType: Type pt } prop when pt == typeof(bool) =>
-                    Expression.Condition(Expression.Not(Expression.Property(geometry, prop)),
+                    Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         Expression.Constant(null, typeof(SystemError?))),
                 MethodInfo method => Expression.Condition(
                     (method.GetParameters(), method.ReturnType, method.Name) switch {
-                        ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(geometry, method)),
+                        ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method)),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(double) =>
-                            Expression.Not(Expression.Call(geometry, method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
-                            Expression.Not(Expression.Call(geometry, method, Expression.Constant(true))),
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(true))),
                         (_, _, string name) when string.Equals(name, "SelfIntersections", StringComparison.Ordinal) =>
-                            Expression.NotEqual(Expression.Property(Expression.Call(geometry, method), "Count"), Expression.Constant(0)),
+                            Expression.NotEqual(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method), "Count"), Expression.Constant(0)),
                         (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Property(Expression.Call(geometry, method, Expression.Constant(true)), "IsValid")),
+                            Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(true)), "IsValid")),
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(geometry, method, Expression.Constant(new Point3d(0, 0, 0)),
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(new Point3d(0, 0, 0)),
                                 Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), Expression.Constant(false))),
                         _ => Expression.Constant(false),
                     },
@@ -142,7 +121,7 @@ public static class ValidationRules {
                 _ => Expression.Constant(null, typeof(SystemError?)),
             }),];
 
-        return Expression.Lambda<Func<T, IGeometryContext, SystemError[]>>(
+        return Expression.Lambda<Func<object, IGeometryContext, SystemError[]>>(
             Expression.Call(typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray))!.MakeGenericMethod(typeof(SystemError)),
                 Expression.Call(typeof(Enumerable).GetMethods().First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2).MakeGenericMethod(typeof(SystemError?), typeof(SystemError)),
                     Expression.Call(typeof(Enumerable).GetMethods().First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2).MakeGenericMethod(typeof(SystemError?)),

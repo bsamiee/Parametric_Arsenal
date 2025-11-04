@@ -15,7 +15,7 @@ internal static class ExtractionStrategies {
         GeometryBase geometry, ExtractionMethod method,
         IGeometryContext context, int? count = null, double? length = null, bool includeEnds = true) =>
         ResultFactory.Create(value: geometry)
-            .ValidateGeometry(context, method switch {
+            .Validate(args: [context, method switch {
                 ExtractionMethod.Analytical => ValidationMode.Standard | (geometry switch {
                     Brep => ValidationMode.MassProperties,
                     Curve or Surface => ValidationMode.AreaCentroid,
@@ -25,7 +25,7 @@ internal static class ExtractionStrategies {
                 ExtractionMethod.Extremal => ValidationMode.BoundingBox,
                 ExtractionMethod.Quadrant => ValidationMode.Tolerance,
                 _ => ValidationMode.Standard,
-            })
+            }])
             .Bind(g => ExtractCore(g, method, context, count, length, includeEnds) switch {
                 Point3d[] result when result?.Length > 0 =>
                     ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
@@ -57,7 +57,7 @@ internal static class ExtractionStrategies {
                 let v = s.Domain(1).ParameterAt(includeEnds && n == 1 ? 0d : includeEnds && n > 1 ? j / (double)(n - 1) : (j + 0.5) / n)
                 select s.PointAt(u, v),],
 
-            // ANALYTICAL - Centroid + structural points merged
+            // ANALYTICAL - Centroid + structural points extraction
             (ExtractionMethod.Analytical, var g) => [
                 ..(g switch {
                     Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],

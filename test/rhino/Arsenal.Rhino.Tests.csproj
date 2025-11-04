@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Arsenal.Rhino.Tests</AssemblyName>
+    <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+    <TestFramework>NUnit</TestFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+    <Using Include="Rhino.Testing.Fixtures" />
+    <Using Include="Arsenal.Rhino.Spatial" />
+    <Using Include="Arsenal.Rhino.Extraction" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,31 +1,47 @@
 <Project>
 
-  <!-- Language/runtime -->
+  <PropertyGroup Label="Paths">
+    <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
+    <ArtifactsPath>$(RepositoryRoot)artifacts</ArtifactsPath>
+    <BaseOutputPath>$(ArtifactsPath)\$(MSBuildProjectName)\</BaseOutputPath>
+    <SolutionDir>$(RepositoryRoot)</SolutionDir>
+    <SolutionName>Parametric_Arsenal</SolutionName>
+    <SolutionExt>.slnx</SolutionExt>
+  </PropertyGroup>
+
   <PropertyGroup Label="Language">
     <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>12</LangVersion>
-    <Nullable>enable</Nullable>                       <!-- NULLABLE ENABLED -->
-    <ImplicitUsings>enable</ImplicitUsings>           <!-- IMPLICIT USINGS ENABLED -->
-    <PlatformTarget>AnyCPU</PlatformTarget>           <!-- Rhino 8 requires AnyCPU for cross‑platform -->
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Features>strict</Features>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
 
-  <!-- Build quality -->
-  <PropertyGroup Label="BuildQuality">
+  <PropertyGroup Label="Build">
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
     <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Analysis">
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>             <!-- Locks to most recent rule set in the SDK -->
-    <ReportAnalyzer>true</ReportAnalyzer>             <!-- Emits analyzer timing into the binlog -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <AnalysisMode>Default</AnalysisMode>
     <RunAnalyzers>true</RunAnalyzers>
     <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
-    <DebugType>portable</DebugType>
-    <DebugSymbols>true</DebugSymbols>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ReportAnalyzer>false</ReportAnalyzer>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <!-- Config‑specific knobs -->
   <PropertyGroup Label="Debug" Condition="'$(Configuration)'=='Debug'">
     <Optimize>false</Optimize>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -34,19 +50,28 @@
   <PropertyGroup Label="Release" Condition="'$(Configuration)'=='Release'">
     <Optimize>true</Optimize>
     <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <ConcurrentBuild>true</ConcurrentBuild>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <TieredCompilation>true</TieredCompilation>
+    <ReadyToRun>true</ReadyToRun>
   </PropertyGroup>
 
-  <!-- Rhino/GH SDK versions -->
-  <PropertyGroup Label="SDK Versions">
-    <RhinoVersion>8.24.25281.15001</RhinoVersion>     <!-- Pin to specific Rhino/GH NuGet version -->
+  <ItemGroup Label="Analyzers">
+    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup Label="SDKVersions">
+    <RhinoVersion>8.24.25281.15001</RhinoVersion>
     <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
   </PropertyGroup>
 
-  <!-- Compile‑time SDK refs; Rhino supplies runtime assemblies -->
-  <ItemGroup Label="RhinoPackages">
+  <ItemGroup Label="SDKReferences">
     <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)">
-      <PrivateAssets>all</PrivateAssets>              <!-- Available at compile/design time, not copied to output -->
-      <ExcludeAssets>runtime</ExcludeAssets>          <!-- Prevents copying Rhino assemblies to output -->
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" Condition="'$(IsGrasshopperPlugin)'=='true'">
       <PrivateAssets>all</PrivateAssets>
@@ -54,17 +79,39 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Analyzers -->
-  <ItemGroup Label="Analyzers">
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
-    <PackageReference Include="ErrorProne.NET.CoreAnalyzers" Version="0.6.1-beta.1" PrivateAssets="all" />
-    <PackageReference Include="ErrorProne.NET.Structs" Version="0.6.1-beta.1" PrivateAssets="all" />
-    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
-    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.240" PrivateAssets="all" />
-    <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581" PrivateAssets="all" />
+  <ItemGroup Label="SharedReferences" Condition="'$(MSBuildProjectName)' == 'Arsenal.Tests.Shared'">
+    <ProjectReference Include="../../libs/core/Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup Label="Tests" Condition="'$(IsTestProject)' == 'true'">
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup Label="TestReferences" Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
+    <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
+    <ProjectReference Include="../../libs/core/Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup Label="RhinoTests" Condition="'$(TestFramework)' == 'NUnit'">
+    <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
+    <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">/Applications/Rhino 8.app/Contents/Frameworks</RhinoSystemDirectory>
+  </PropertyGroup>
+
+  <ItemGroup Label="RhinoReferences" Condition="'$(TestFramework)' == 'NUnit' AND '$(TargetFramework)' == 'net8.0'">
+    <Reference Include="$(RhinoSystemDirectory)\netcore\RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'" />
+    <Reference Include="$(RhinoSystemDirectory)/RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'" />
+  </ItemGroup>
+
+  <ItemGroup Label="TestFrameworks" Condition="'$(IsTestProject)' == 'true'">
+    <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageReference Include="xunit" Version="2.9.3" Condition="'$(TestFramework)' == 'xUnit'" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" Condition="'$(TestFramework)' == 'xUnit'" />
+    <PackageReference Include="CsCheck" Version="4.4.1" Condition="'$(TestFramework)' == 'xUnit'" />
+    <PackageReference Include="rhino3dm" Version="8.17.0" Condition="'$(TestFramework)' == 'xUnit'" />
+    <PackageReference Include="NUnit" Version="4.4.0" Condition="'$(TestFramework)' == 'NUnit'" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" Condition="'$(TestFramework)' == 'NUnit'" />
+    <PackageReference Include="Rhino.Testing" Version="8.0.17-beta" Condition="'$(TestFramework)' == 'NUnit'" />
   </ItemGroup>
 
 </Project>

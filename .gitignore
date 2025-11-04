@@ -17,6 +17,7 @@ agents.md
 .kiro/steering
 tmp/
 .uv_cache/
+artifacts/
 
 # --- macOS & Editor cruft -----------------------------------------------------
 .DS_Store

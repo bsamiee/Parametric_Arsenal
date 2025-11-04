@@ -1,15 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup Label="Project Identity">
+  <PropertyGroup>
     <AssemblyName>Arsenal.Rhino</AssemblyName>
     <RootNamespace>Arsenal.Rhino</RootNamespace>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Rhino Plugin Configuration">
     <TargetExt>.rhp</TargetExt>
   </PropertyGroup>
 
-  <ItemGroup Label="Project Dependencies">
+  <ItemGroup>
     <ProjectReference Include="../core/Core.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup Label="Identity">
+  <PropertyGroup>
     <AssemblyName>Arsenal.Core</AssemblyName>
     <RootNamespace>Arsenal.Core</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

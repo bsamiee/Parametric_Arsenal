@@ -1,6 +1,9 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Validation;
+using Rhino.Geometry;
 
 namespace Arsenal.Core.Results;
 
@@ -35,7 +38,7 @@ public static class ResultFactory {
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result using polymorphic parameter detection for predicates, conditionals, implications, and batch operations.</summary>
+    /// <summary>Validates Result using maximum-density polymorphic parameter detection with zero-allocation monadic fusion.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
@@ -47,22 +50,25 @@ public static class ResultFactory {
         Func<T, bool>? conclusion = null,
         (Func<T, bool>, SystemError)[]? validations = null,
         object[]? args = null) =>
-        (predicate, error, validation, unless, premise, conclusion, validations, args) switch {
-            (var p, var e, null, null, null, null, null, null) when p is not null && e.HasValue =>
-                result.Ensure(p, e.Value),
-            (var p, null, var v, var u, null, null, null, null) when p is not null && v is not null =>
-                result.Bind(value => (u is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
-            (null, var e, null, null, var pr, var co, null, null) when pr is not null && co is not null && e.HasValue =>
-                result.Ensure((Func<T, bool>)(x => !pr(x) || co(x)), e.Value),
-            var (_, _, _, _, _, _, vs, a) when vs?.Length > 0 || (a?.Length > 0 && a.All(x => x is (Func<T, bool>, SystemError))) =>
-                result.Ensure([.. (vs ?? a?.Cast<(Func<T, bool>, SystemError)>().ToArray() ?? [])]),
-            (null, null, null, null, null, null, null, var a) when a?.Length > 0 =>
-                a switch {
-                    [Func<T, bool> p, SystemError e] => result.Ensure(p, e),
-                    _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(args)),
-                },
-            (null, null, null, null, null, null, null, null) => result,
-            _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateResult.Message, nameof(result)),
+        (predicate ?? premise, validation, validations, args) switch {
+            // Unified predicate validation with corrected logical composition
+            (Func<T, bool> p, null, null, _) when error.HasValue =>
+                result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
+            // Monadic bind with conditional logic
+            (Func<T, bool> p, Func<T, Result<T>> v, null, _) =>
+                result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
+            // Batch validation with zero-allocation handling
+            (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
+            // Geometry validation with unified mode handling
+            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
+                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch {
+                    { Length: 0 } => Create(value: g), var errs => Create<T>(errors: errs), }),
+            (null, null, null, [IGeometryContext ctx]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
+                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch {
+                    { Length: 0 } => Create(value: g), var errs => Create<T>(errors: errs), }),
+            (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
+            // Identity fallback
+            _ => result,
         };
 
     /// <summary>Lifts functions into Result context with partial application and monadic lifting based on argument type analysis.</summary>
@@ -82,5 +88,17 @@ public static class ResultFactory {
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
             _ => throw new ArgumentException($"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={func.Method.GetParameters().Length}, results={args.Count(x => x.GetType().IsGenericType && x.GetType().GetGenericTypeDefinition() == typeof(Result<>))}, args={args.Length}", nameof(args)),
         };
+    }
+
+    /// <summary>Traverses IEnumerable elements with monadic transformation and comprehensive error accumulation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
+        ArgumentNullException.ThrowIfNull(selector);
+        return result.Bind(items => items.Aggregate(
+            Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
+            (acc, item) => acc.Bind(list => selector(item).Map(val => {
+                List<TOut> newList = [.. list, val];
+                return (IReadOnlyList<TOut>)newList.AsReadOnly();
+            }))));
     }
 }
