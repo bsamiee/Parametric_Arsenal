@@ -658,6 +658,9 @@ dotnet_diagnostic.CS8714.severity = error                                      #
 [libs/core/operations/UnifiedOperation.cs]
 dotnet_diagnostic.MA0051.severity = none                                       # 90-line method allowed
 
+[libs/rhino/extraction/ExtractionStrategies.cs]
+dotnet_diagnostic.MA0051.severity = none                                       # Dense extraction dispatch logic
+
 [test/**/*.cs]
 dotnet_diagnostic.CA1062.severity = none                                       # No validation tests
 dotnet_diagnostic.CA1707.severity = none                                       # Underscores in tests
