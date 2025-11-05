@@ -9,5 +9,10 @@ public enum ExtractionMethod {
     Extremal = 4,
     Quadrant = 8,
     EdgeMidpoints = 16,
-    All = Uniform | Analytical | Extremal | Quadrant | EdgeMidpoints,
+    Greville = 32,
+    Inflection = 64,
+    Discontinuities = 128,
+    FaceCentroids = 256,
+    PositionalExtrema = 512,
+    All = Uniform | Analytical | Extremal | Quadrant | EdgeMidpoints | Greville | Inflection | Discontinuities | FaceCentroids | PositionalExtrema,
 }

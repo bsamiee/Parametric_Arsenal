@@ -25,13 +25,22 @@ internal static class ExtractionStrategies {
             [(ExtractionMethod.EdgeMidpoints, typeof(SubD))] = ValidationMode.Standard | ValidationMode.Topology,
             [(ExtractionMethod.EdgeMidpoints, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.Topology,
             [(ExtractionMethod.EdgeMidpoints, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Topology,
+            [(ExtractionMethod.Greville, typeof(NurbsCurve))] = ValidationMode.Standard,
+            [(ExtractionMethod.Greville, typeof(NurbsSurface))] = ValidationMode.Standard,
+            [(ExtractionMethod.Inflection, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
+            [(ExtractionMethod.Discontinuities, typeof(Curve))] = ValidationMode.Standard,
+            [(ExtractionMethod.FaceCentroids, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
+            [(ExtractionMethod.PositionalExtrema, typeof(Curve))] = ValidationMode.Standard,
+            [(ExtractionMethod.PositionalExtrema, typeof(Surface))] = ValidationMode.Standard | ValidationMode.BoundingBox,
+            [(ExtractionMethod.PositionalExtrema, typeof(Brep))] = ValidationMode.Standard | ValidationMode.BoundingBox,
+            [(ExtractionMethod.PositionalExtrema, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MeshSpecific,
         }.ToFrozenDictionary();
 
     /// <summary>Extracts points using specified method with validation and error mapping.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Extract(
         GeometryBase geometry, ExtractionMethod method,
-        IGeometryContext context, int? count = null, double? length = null, bool includeEnds = true) =>
+        IGeometryContext context, int? count = null, double? length = null, bool includeEnds = true, Vector3d? direction = null, Continuity continuity = Continuity.C1_continuous) =>
         ResultFactory.Create(value: geometry)
             .Validate(args: [context,
                 ((Func<ValidationMode>)(() => {
@@ -43,12 +52,14 @@ internal static class ExtractionStrategies {
                     return _validationConfig.GetValueOrDefault((method, typeof(GeometryBase)), ValidationMode.Standard);
                 }))(),
             ])
-            .Map(g => ExtractCore(g, method, context, count, length, includeEnds))
+            .Map(g => ExtractCore(g, method, context, count, length, includeEnds, direction, continuity))
             .Bind(result => result switch {
                 Point3d[] { Length: > 0 } pts => ResultFactory.Create(value: (IReadOnlyList<Point3d>)pts.AsReadOnly()),
-                null => ResultFactory.Create<IReadOnlyList<Point3d>>(error: (method, count, length) switch {
-                    (ExtractionMethod.Uniform, not null, _) => ExtractionErrors.Operation.InvalidCount,
-                    (ExtractionMethod.Uniform, _, not null) => ExtractionErrors.Operation.InvalidLength,
+                null => ResultFactory.Create<IReadOnlyList<Point3d>>(error: (method, count, length, direction) switch {
+                    (ExtractionMethod.Uniform, not null, _, _) => ExtractionErrors.Operation.InvalidCount,
+                    (ExtractionMethod.Uniform, _, not null, _) => ExtractionErrors.Operation.InvalidLength,
+                    (ExtractionMethod.PositionalExtrema, _, _, null) => ExtractionErrors.Operation.InvalidDirection,
+                    (ExtractionMethod.PositionalExtrema, _, _, Vector3d { Length: <= 0 }) => ExtractionErrors.Operation.InvalidDirection,
                     _ => ExtractionErrors.Operation.InvalidMethod,
                 }),
                 _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
@@ -58,12 +69,12 @@ internal static class ExtractionStrategies {
     [Pure]
     private static Point3d[]? ExtractCore(
         GeometryBase geometry, ExtractionMethod method,
-        IGeometryContext context, int? count, double? length, bool includeEnds) =>
+        IGeometryContext context, int? count, double? length, bool includeEnds, Vector3d? direction, Continuity continuity) =>
         (method, geometry) switch {
             (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, Extrusion extrusion) when extrusion.ToBrep(splitKinkyFaces: true) is Brep brep =>
-                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds); } finally { b.Dispose(); } }))(brep),
+                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds, direction, continuity); } finally { b.Dispose(); } }))(brep),
             (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, SubD subD) when subD.ToBrep() is Brep brep =>
-                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds); } finally { b.Dispose(); } }))(brep),
+                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds, direction, continuity); } finally { b.Dispose(); } }))(brep),
             (ExtractionMethod.Uniform, Curve curve) when count is int uniformCount =>
                 curve.DivideByCount(uniformCount, includeEnds)?.Select(curve.PointAt).ToArray(),
             (ExtractionMethod.Uniform, Curve curve) when length is double uniformLength =>
@@ -124,6 +135,39 @@ internal static class ExtractionStrategies {
                 segs.Length > 0 ? [.. segs.Select(seg => seg.PointAtNormalizedLength(0.5)),] :
                 c.TryGetPolyline(out Polyline pl) ? [.. pl.GetSegments().Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5)),] : null,
             (ExtractionMethod.EdgeMidpoints, _) => null,
+            (ExtractionMethod.Greville, NurbsCurve nc) => nc.GrevillePoints(),
+            (ExtractionMethod.Greville, Curve c) when c.ToNurbsCurve() is NurbsCurve nc =>
+                ((Func<NurbsCurve, Point3d[]?>)(n => { try { return n.GrevillePoints(); } finally { n.Dispose(); } }))(nc),
+            (ExtractionMethod.Greville, NurbsSurface ns) when ns.Points is NurbsSurfacePointList pts =>
+                [.. from u in Enumerable.Range(0, pts.CountU)
+                    from v in Enumerable.Range(0, pts.CountV)
+                    let gp = pts.GetGrevillePoint(u, v)
+                    select ns.PointAt(gp.X, gp.Y),
+                ],
+            (ExtractionMethod.Greville, Surface s) when s.ToNurbsSurface() is NurbsSurface ns =>
+                ((Func<NurbsSurface, Point3d[]?>)(n => { try { return n.Points is NurbsSurfacePointList pts ? [.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select n.PointAt(gp.X, gp.Y),] : null; } finally { n.Dispose(); } }))(ns),
+            (ExtractionMethod.Inflection, NurbsCurve nc) when nc.InflectionPoints() is double[] ts && ts.Length > 0 =>
+                ts.Select(nc.PointAt).ToArray(),
+            (ExtractionMethod.Inflection, Curve c) when c.ToNurbsCurve() is NurbsCurve nc =>
+                ((Func<NurbsCurve, Point3d[]?>)(n => { try { return n.InflectionPoints() is double[] ts && ts.Length > 0 ? ts.Select(n.PointAt).ToArray() : null; } finally { n.Dispose(); } }))(nc),
+            (ExtractionMethod.Discontinuities, Curve c) => ((Func<List<Point3d>>)(() => { List<Point3d> pts = []; double t0 = c.Domain.Min; while (c.GetNextDiscontinuity(continuity, t0, c.Domain.Max, out double t)) { pts.Add(c.PointAt(t)); t0 = t; } return pts; }))() switch { { Count: > 0 } list => [.. list,], _ => null },
+            (ExtractionMethod.FaceCentroids, Brep b) => [.. b.Faces.Select(f =>
+                ((Func<Brep, Point3d>)(dup => { try { return AreaMassProperties.Compute(dup)?.Centroid ?? Point3d.Unset; } finally { dup.Dispose(); } }))(f.DuplicateFace(duplicateMeshes: false))
+            ).Where(p => p != Point3d.Unset),],
+            (ExtractionMethod.PositionalExtrema, Curve c) when direction is Vector3d dir && dir.Length > context.AbsoluteTolerance =>
+                c.ExtremeParameters(dir)?.Select(c.PointAt).ToArray(),
+            (ExtractionMethod.PositionalExtrema, Surface s) when direction is Vector3d dir && dir.Length > context.AbsoluteTolerance && (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) =>
+                [.. new[] { (u.Min, v.Min), (u.Max, v.Min), (u.Max, v.Max), (u.Min, v.Max) }
+                    .Select(uv => (Point: s.PointAt(uv.Item1, uv.Item2), uv))
+                    .OrderBy(x => x.Point * dir)
+                    .Take(1).Concat(
+                    new[] { (u.Min, v.Min), (u.Max, v.Min), (u.Max, v.Max), (u.Min, v.Max) }
+                    .Select(uv => (Point: s.PointAt(uv.Item1, uv.Item2), uv))
+                    .OrderByDescending(x => x.Point * dir)
+                    .Take(1))
+                    .Select(x => x.Point),
+                ],
+            (ExtractionMethod.PositionalExtrema, _) when direction is null => null,
             _ => null,
         };
 }
