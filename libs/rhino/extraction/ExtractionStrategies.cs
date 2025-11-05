@@ -43,8 +43,9 @@ internal static class ExtractionStrategies {
                 }
                 return _validationConfig.GetValueOrDefault((method, typeof(GeometryBase)), ValidationMode.Standard);
             }))(),])
-            .Bind(g => ExtractCore(g, method, context, count, length, includeEnds) switch {
-                Point3d[] { Length: > 0 } result => ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
+            .Map(g => ExtractCore(g, method, context, count, length, includeEnds))
+            .Bind(result => result switch {
+                Point3d[] { Length: > 0 } pts => ResultFactory.Create(value: (IReadOnlyList<Point3d>)pts.AsReadOnly()),
                 null => ResultFactory.Create<IReadOnlyList<Point3d>>(error: (method, count, length) switch {
                     (ExtractionMethod.Uniform, not null, _) => ExtractionErrors.Operation.InvalidCount,
                     (ExtractionMethod.Uniform, _, not null) => ExtractionErrors.Operation.InvalidLength,
@@ -67,13 +68,12 @@ internal static class ExtractionStrategies {
                 curve.DivideByCount(uniformCount, includeEnds)?.Select(curve.PointAt).ToArray(),
             (ExtractionMethod.Uniform, Curve curve) when length is double uniformLength =>
                 curve.DivideByLength(uniformLength, includeEnds)?.Select(curve.PointAt).ToArray(),
-            (ExtractionMethod.Uniform, Surface surface) =>
-                [.. from uIndex in Enumerable.Range(0, count ?? 10)
-                    from vIndex in Enumerable.Range(0, count ?? 10)
-                    let density = count ?? 10
-                    let uParameter = density switch { 1 => 0.5, _ => includeEnds ? uIndex / (double)(density - 1) : (uIndex + 0.5) / density }
-                    let vParameter = density switch { 1 => 0.5, _ => includeEnds ? vIndex / (double)(density - 1) : (vIndex + 0.5) / density }
-                    select surface.PointAt(surface.Domain(0).ParameterAt(uParameter), surface.Domain(1).ParameterAt(vParameter)),],
+            (ExtractionMethod.Uniform, Surface s) when (count ?? 10, s.Domain(0), s.Domain(1)) is (int d, Interval u, Interval v) =>
+                [.. from ui in Enumerable.Range(0, d)
+                    from vi in Enumerable.Range(0, d)
+                    let up = d switch { 1 => 0.5, _ => includeEnds ? ui / (double)(d - 1) : (ui + 0.5) / d }
+                    let vp = d switch { 1 => 0.5, _ => includeEnds ? vi / (double)(d - 1) : (vi + 0.5) / d }
+                    select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),],
             (ExtractionMethod.Uniform, _) => null,
             (ExtractionMethod.Analytical, GeometryBase analytic) => [..
                 (analytic switch {
@@ -81,7 +81,8 @@ internal static class ExtractionStrategies {
                     Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct,],
                     Surface s when AreaMassProperties.Compute(s)?.Centroid is { IsValid: true } cs => [cs,],
                     Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m)?.Centroid is { IsValid: true } cm => [cm,],
-                    PointCloud pc when pc.Count > 0 => [pc.GetPoints().Aggregate(Point3d.Origin, (Point3d sum, Point3d pt) => sum + pt) / pc.Count,],
+                    PointCloud pc when pc.Count > 0 && pc.GetPoints() is Point3d[] pts =>
+                        [pts.Aggregate(Point3d.Origin, (sum, pt) => sum + pt) / pc.Count,],
                     _ => Enumerable.Empty<Point3d>(),
                 }),
                 .. (analytic switch {
@@ -113,12 +114,9 @@ internal static class ExtractionStrategies {
                 .Select(i => m.TopologyEdges.EdgeLine(i))
                 .Where(ln => ln.IsValid)
                 .Select(ln => ln.PointAt(0.5)),],
-            (ExtractionMethod.EdgeMidpoints, Curve c) => c.DuplicateSegments() switch {
-                Curve[] segs when segs.Length > 0 => [.. segs.Select(seg => seg.PointAtNormalizedLength(0.5)),],
-                _ => c.TryGetPolyline(out Polyline pl)
-                    ? [.. pl.GetSegments().Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5)),]
-                    : null,
-            },
+            (ExtractionMethod.EdgeMidpoints, Curve c) when c.DuplicateSegments() is Curve[] segs =>
+                segs.Length > 0 ? [.. segs.Select(seg => seg.PointAtNormalizedLength(0.5)),] :
+                c.TryGetPolyline(out Polyline pl) ? [.. pl.GetSegments().Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5)),] : null,
             (ExtractionMethod.EdgeMidpoints, _) => null,
             _ => null,
         };
