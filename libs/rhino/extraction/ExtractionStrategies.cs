@@ -35,8 +35,7 @@ internal static class ExtractionStrategies {
                     (ExtractionMethod.Uniform, _, not null) => ExtractionErrors.Operation.InvalidLength,
                     _ => ExtractionErrors.Operation.InvalidMethod,
                 }),
-                [] => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
-                _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
+                _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
             });
 
     /// <summary>Core extraction logic with Rhino SDK geometry type dispatch.</summary>
@@ -45,42 +44,28 @@ internal static class ExtractionStrategies {
         GeometryBase geometry, ExtractionMethod method,
         IGeometryContext context, int? count, double? length, bool includeEnds) =>
         (method, geometry) switch {
-            // UNIFORM - Rhino SDK validates parameters via null returns
-            (ExtractionMethod.Uniform, Curve c) when count is int n =>
-                c.DivideByCount(n, includeEnds)?.Select(c.PointAt).ToArray(),
-            (ExtractionMethod.Uniform, Curve c) when length is double len =>
-                c.DivideByLength(len, includeEnds)?.Select(c.PointAt).ToArray(),
-            (ExtractionMethod.Uniform, Surface s) => [..
-                from i in Enumerable.Range(0, count ?? 10)
-                from j in Enumerable.Range(0, count ?? 10)
-                let n = count ?? 10
-                let paramU = (n, includeEnds) switch {
-                    (1, _) => 0.5,
-                    (_, true) => i / (double)(n - 1),
-                    (_, false) => (i + 0.5) / n,
-                }
-                let paramV = (n, includeEnds) switch {
-                    (1, _) => 0.5,
-                    (_, true) => j / (double)(n - 1),
-                    (_, false) => (j + 0.5) / n,
-                }
-                select s.PointAt(s.Domain(0).ParameterAt(paramU), s.Domain(1).ParameterAt(paramV)),
+            (ExtractionMethod.Uniform, Curve c) when count is int n => c.DivideByCount(n, includeEnds)?.Select(c.PointAt).ToArray(),
+            (ExtractionMethod.Uniform, Curve c) when length is double len => c.DivideByLength(len, includeEnds)?.Select(c.PointAt).ToArray(),
+            (ExtractionMethod.Uniform, Surface s) => [.. from i in Enumerable.Range(0, count ?? 10)
+                                                         from j in Enumerable.Range(0, count ?? 10)
+                                                         let n = count ?? 10
+                                                         let paramU = n switch { 1 => 0.5, _ => includeEnds ? i / (double)(n - 1) : (i + 0.5) / n }
+                                                         let paramV = n switch { 1 => 0.5, _ => includeEnds ? j / (double)(n - 1) : (j + 0.5) / n }
+                                                         select s.PointAt(s.Domain(0).ParameterAt(paramU), s.Domain(1).ParameterAt(paramV)),
             ],
-            // ANALYTICAL - Centroid and structural points via Rhino SDK
-            (ExtractionMethod.Analytical, GeometryBase g) => [
-                .. (g switch {
-                    Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],
-                    Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct],
-                    Surface s when AreaMassProperties.Compute(s)?.Centroid is { IsValid: true } cs => [cs],
-                    Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m)?.Centroid is { IsValid: true } mc => [mc],
-                    PointCloud pc when pc.Count > 0 => [pc.GetPoints().Aggregate(Point3d.Origin, (a, p) => a + p) / pc.Count],
-                    _ => Enumerable.Empty<Point3d>(),
-                }),
+            (ExtractionMethod.Analytical, GeometryBase g) => [.. (g switch {
+                Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],
+                Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct],
+                Surface s when AreaMassProperties.Compute(s)?.Centroid is { IsValid: true } cs => [cs],
+                Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m)?.Centroid is { IsValid: true } mc => [mc],
+                PointCloud pc when pc.Count > 0 => [pc.GetPoints().Aggregate(Point3d.Origin, (a, p) => a + p) / pc.Count],
+                _ => Enumerable.Empty<Point3d>(),
+            }),
                 .. (g switch {
                     NurbsCurve nc => nc.Points.Select(p => p.Location),
                     NurbsSurface ns => from i in Enumerable.Range(0, ns.Points.CountU * ns.Points.CountV)
                                        select ns.Points.GetControlPoint(i / ns.Points.CountV, i % ns.Points.CountV).Location,
-                    Curve c => [c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd],
+                    Curve c => [c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd,],
                     Surface s => [s.PointAt(s.Domain(0).Min, s.Domain(1).Min),
                         s.PointAt(s.Domain(0).Max, s.Domain(1).Min),
                         s.PointAt(s.Domain(0).Max, s.Domain(1).Max),
@@ -92,12 +77,10 @@ internal static class ExtractionStrategies {
                     _ => [],
                 }),
             ],
-            // EXTREMAL - Boundary points via Rhino SDK
             (ExtractionMethod.Extremal, Curve c) => [c.PointAtStart, c.PointAtEnd],
             (ExtractionMethod.Extremal, Surface s) when s.Domain(0) is Interval u && s.Domain(1) is Interval v =>
                 [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)],
             (ExtractionMethod.Extremal, GeometryBase g) => g.GetBoundingBox(accurate: true).GetCorners(),
-            // QUADRANT - Shape-specific points via Rhino SDK
             (ExtractionMethod.Quadrant, Curve c) when c.TryGetCircle(out Circle circle, context.AbsoluteTolerance) =>
                 [.. Enumerable.Range(0, 4).Select(i => circle.PointAt(i * Math.PI / 2))],
             (ExtractionMethod.Quadrant, Curve c) when c.TryGetEllipse(out Ellipse e, context.AbsoluteTolerance) =>
