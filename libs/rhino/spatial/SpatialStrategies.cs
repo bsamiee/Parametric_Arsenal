@@ -81,13 +81,13 @@ internal static class SpatialStrategies {
             });
 
         return (method, source, needles, k, limitDistance) switch {
-            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, int kVal, _) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, int kVal, _) =>
                 RTree.Point3dKNeighbors(pts, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, _, double lim) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, _, double lim) =>
                 RTree.Point3dClosestPoints(pts, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, int kVal, _) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, int kVal, _) =>
                 RTree.PointCloudKNeighbors(cloud, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, _, double lim) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, _, double lim) =>
                 RTree.PointCloudClosestPoints(cloud, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
             // Mesh overlap detection using cached RTree face trees with tolerance-aware SearchOverlaps algorithm
             (SpatialMethod.MeshOverlap, ValueTuple<Mesh, Mesh> meshes, _, _, _) => ArrayPool<int>.Shared.Rent(config.BufferSize) switch {
