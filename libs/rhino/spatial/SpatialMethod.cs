@@ -32,7 +32,4 @@ public enum SpatialMethod {
 
     /// <summary>Brep range queries using manual RTree construction with bounding box insertion.</summary>
     BrepRange = 256,
-
-    /// <summary>Dynamic tree construction using RTree.Insert/Remove for incremental spatial indexing.</summary>
-    DynamicInsertion = 512,
 }
