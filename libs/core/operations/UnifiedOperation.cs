@@ -14,7 +14,7 @@ public static class UnifiedOperation {
 		object operation,
 		OperationConfig<TIn, TOut> config,
 		ConcurrentDictionary<(object, Type), object>? externalCache = null) where TIn : notnull {
-		var cache = externalCache ?? (config.EnableCache ? _threadCache.Value! : new());
+		ConcurrentDictionary<(object, Type), object> cache = externalCache ?? (config.EnableCache ? _threadCache.Value! : new());
 
 		Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
 			Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
@@ -24,8 +24,8 @@ public static class UnifiedOperation {
 			IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
 				ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 				(acc, op) => (config.AccumulateErrors, op(item)) switch {
-					(true, var res) => acc.Apply(res.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(v => list => [.. list, v])),
-					(_, var res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
+					(true, Result<TOut> res) => acc.Apply(res.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(v => list => [.. list, v])),
+					(_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
 				}),
 			(Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
 				pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
@@ -34,7 +34,7 @@ public static class UnifiedOperation {
 		};
 
 		Result<IReadOnlyList<TOut>> execute(TIn item) =>
-			cache.TryGetValue((item, operation.GetType()), out var cached) && config.EnableCache
+			cache.TryGetValue((item, operation.GetType()), out object? cached) && config.EnableCache
 				? (Result<IReadOnlyList<TOut>>)cached
 				: (Result<IReadOnlyList<TOut>>)cache.AddOrUpdate(
 					(item, operation.GetType()),
@@ -48,15 +48,15 @@ public static class UnifiedOperation {
 						.Bind(resolveOp)
 						.Map(outputs => (IReadOnlyList<TOut>)(config.OutputFilter switch {
 							null => outputs,
-							var filter => outputs.Where(filter).ToList()
+							Func<TOut, bool> filter => outputs.Where(filter).ToList()
 						}))
 						.Bind(outputs => config.PostTransform switch {
 							null => ResultFactory.Create(value: outputs),
-							var transform => outputs.Aggregate(
+							Func<TOut, Result<TOut>> transform => outputs.Aggregate(
 								ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 								(acc, output) => (config.SkipInvalid, transform(output)) switch {
 									(true, { IsSuccess: false }) => acc,
-									(_, var res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
+									(_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
 								})
 						}),
 					(_, existing) => config.EnableCache ? existing : execute(item));
@@ -64,7 +64,7 @@ public static class UnifiedOperation {
 		return (input, config) switch {
 			(IReadOnlyList<TIn> { Count: 0 }, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 			(IReadOnlyList<TIn> { Count: 1 } list, _) => execute(list[0]),
-			(IReadOnlyList<TIn> list, { EnableParallel: true, AccumulateErrors: var acc, SkipInvalid: var skip, MaxDegreeOfParallelism: var max }) =>
+			(IReadOnlyList<TIn> list, { EnableParallel: true, AccumulateErrors: bool acc, SkipInvalid: bool skip, MaxDegreeOfParallelism: int max }) =>
 				list.AsParallel().WithDegreeOfParallelism(max).Select(execute).Aggregate(
 					ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 					(a, c) => (acc, skip && !c.IsSuccess) switch {
@@ -75,7 +75,7 @@ public static class UnifiedOperation {
 			(IReadOnlyList<TIn> list, { ShortCircuit: true, AccumulateErrors: false }) =>
 				list.Aggregate(ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 					(a, item) => a.IsSuccess ? a.Bind(prev => execute(item).Map(items => (IReadOnlyList<TOut>)[.. prev, .. items])) : a),
-			(IReadOnlyList<TIn> list, { AccumulateErrors: var acc, SkipInvalid: var skip }) =>
+			(IReadOnlyList<TIn> list, { AccumulateErrors: bool acc, SkipInvalid: bool skip }) =>
 				list.Select(execute).Aggregate(
 					ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
 					(a, c) => (acc, skip && !c.IsSuccess) switch {
