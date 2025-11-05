@@ -70,7 +70,7 @@ internal static class AnalysisStrategies {
                 .Map(data => (data.DomainU, data.DomainV, Actual: (data.Requested.Item1 ?? data.DomainU.ParameterAt(0.5), data.Requested.Item2 ?? data.DomainV.ParameterAt(0.5)), Order: data.Order))
                 .Validate(predicate: data => data.DomainU.IncludesParameter(data.Actual.Item1) && data.DomainV.IncludesParameter(data.Actual.Item2), error: AnalysisErrors.Parameters.ParameterOutOfDomain)
                 .Bind(data => surface.Evaluate(data.Actual.Item1, data.Actual.Item2, data.Order is 0 ? 1 : data.Order, out Point3d location, out Vector3d[] derivatives) switch {
-                    true => ResultFactory.Create(value: (Location: location, Derivatives: derivatives, U: data.Actual.Item1, V: data.Actual.Item2, Curvature: SurfaceCurvature.Compute(surface, data.Actual.Item1, data.Actual.Item2), Frame: surface.FrameAt(data.Actual.Item1, data.Actual.Item2, out Plane computed) ? computed : new Plane(location, surface.NormalAt(data.Actual.Item1, data.Actual.Item2))))
+                    true => ResultFactory.Create(value: (Location: location, Derivatives: derivatives, U: data.Actual.Item1, V: data.Actual.Item2, Curvature: surface.CurvatureAt(data.Actual.Item1, data.Actual.Item2), Frame: surface.FrameAt(data.Actual.Item1, data.Actual.Item2, out Plane computed) ? computed : new Plane(location, surface.NormalAt(data.Actual.Item1, data.Actual.Item2))))
                         .Map(tuple => new AnalysisPacket(
                             tuple.Location,
                             Array.AsReadOnly<Vector3d>(tuple.Derivatives),
