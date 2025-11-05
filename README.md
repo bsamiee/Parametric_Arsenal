@@ -15,34 +15,33 @@ PLACEHOLDER
 
 ## Development Setup
 
-### Pre-commit Hooks
+### Pre-commit Hooks ⚡
 
-This repository uses pre-commit hooks to enforce code quality standards before commits. The hooks automatically check:
+This repository uses pre-commit hooks to automatically enforce code quality on every commit:
 
-- **C#/.NET**: Analyzers (Roslynator, Meziantou, IDisposableAnalyzers), `.editorconfig` rules, and formatting
-- **Python**: Ruff linting/formatting, mypy and basedpyright type checking
-- **General**: File quality checks (trailing whitespace, line endings, etc.)
+- ✅ **.NET**: Analyzers (Roslynator, Meziantou, IDisposableAnalyzers), `.editorconfig` rules, formatting
+- ✅ **Python**: Ruff linting/formatting (if installed)
+- ✅ **General**: File quality checks (merge conflicts, large files, etc.)
 
-#### Quick Setup
+#### Quick Setup (30 seconds)
 
-**Linux/macOS:**
+**Option 1: Automated Script**
 ```bash
+# Linux/macOS
 ./scripts/setup-precommit.sh
-```
 
-**Windows:**
-```powershell
+# Windows
 .\scripts\setup-precommit.ps1
 ```
 
-#### Manual Setup
-
+**Option 2: Manual**
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-For detailed information, see [Pre-commit Hooks Guide](docs/PRE-COMMIT.md).
+📖 **New to pre-commit?** See [Quick Start Guide](docs/PRE-COMMIT-QUICKSTART.md)  
+📚 **Advanced usage:** See [Complete Guide](docs/PRE-COMMIT.md)
 
 ## License
 

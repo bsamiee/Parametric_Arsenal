@@ -5,11 +5,16 @@
 # - .NET analyzers (Roslynator, Meziantou, IDisposableAnalyzers)
 # - .editorconfig settings enforcement
 # - Python linting (ruff)
-# - Python type checking (mypy, basedpyright)
 # - Formatting standards
 #
 # Install: pre-commit install
 # Run manually: pre-commit run --all-files
+#
+# IMPORTANT: Pre-commit hooks run FULL solution builds. If there are any
+# existing build errors in the solution (even in files not being committed),
+# the commit will be blocked. This ensures the entire codebase remains in a
+# buildable state. To bypass this check temporarily:
+#   git commit --no-verify -m "message"
 # =============================================================================
 
 default_language_version:
