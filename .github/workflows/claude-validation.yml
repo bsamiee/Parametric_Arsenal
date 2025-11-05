@@ -1,0 +1,52 @@
+name: Claude Code Validation
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-analyze:
+    name: Build with Analyzers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Parametric_Arsenal.sln
+
+      - name: Build with analyzers (warnings as errors)
+        run: |
+          dotnet build Parametric_Arsenal.sln \
+            --configuration Release \
+            --no-restore \
+            -p:TreatWarningsAsErrors=true \
+            -p:EnforceCodeStyleInBuild=true \
+            -warnaserror
+
+      - name: Build summary
+        if: success()
+        run: |
+          echo "✅ Build succeeded - all analyzer rules passed!"
+          echo "- Zero warnings"
+          echo "- Zero code style violations"
+          echo "- Zero analyzer errors"
+
+      - name: Build failed
+        if: failure()
+        run: |
+          echo "❌ Build failed - check logs above for:"
+          echo "- Compiler errors"
+          echo "- Analyzer violations (Roslynator, Meziantou, IDisposableAnalyzers)"
+          echo "- Code style violations (.editorconfig)"
+          exit 1
