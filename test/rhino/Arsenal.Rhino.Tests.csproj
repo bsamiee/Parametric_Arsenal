@@ -18,4 +18,8 @@
     <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Rhino.Testing.Configs.xml" CopyToOutputDirectory="always" />
+  </ItemGroup>
+
 </Project>

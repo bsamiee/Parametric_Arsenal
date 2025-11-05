@@ -27,7 +27,7 @@ public readonly struct SystemError(ErrorDomain domain, int code, string message)
     public bool Equals(SystemError other) =>
         this.Domain == other.Domain && this.Code == other.Code && string.Equals(this.Message, other.Message, StringComparison.Ordinal);
 
-    /// <summary>Creates new error with additional context information for enhanced debugging.</summary>
+    /// <summary>Creates new error with additional context information.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SystemError WithContext(string context) =>
         new(this.Domain, this.Code, $"{this.Message} (Context: {context})");

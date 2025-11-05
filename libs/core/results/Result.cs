@@ -6,7 +6,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Monadic result container with lazy evaluation, error accumulation, and comprehensive functional composition.</summary>
+/// <summary>Monadic result container with lazy evaluation and functional composition.</summary>
 [StructLayout(LayoutKind.Auto)]
 public readonly struct Result<T> : IEquatable<Result<T>> {
     private readonly T _value;
@@ -50,7 +50,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         (this.IsSuccess, this.IsSuccess ? this.Value : default, this.IsSuccess ? [] : this.Errors)
         .Equals((other.IsSuccess, other.IsSuccess ? other.Value : default, other.IsSuccess ? [] : other.Errors));
 
-    /// <summary>Attempts to extract value with safe null handling and boolean success indication.</summary>
+    /// <summary>Attempts to extract value with safe null handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGet([MaybeNullWhen(false)] out T value) =>
         this.IsSuccess switch {
@@ -58,7 +58,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             false => (value = default, false).Item2,
         };
 
-    /// <summary>Transforms success values to new type with monadic functor semantics.</summary>
+    /// <summary>Transforms success values using monadic functor semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Map<TOut>(Func<T, TOut> transform) {
         ArgumentNullException.ThrowIfNull(transform);
@@ -70,7 +70,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Chains monadic operations together with flatMap semantics and error propagation.</summary>
+    /// <summary>Chains monadic operations with flatMap semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Bind<TOut>(Func<T, Result<TOut>> operation) {
         ArgumentNullException.ThrowIfNull(operation);
@@ -82,7 +82,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Filters values with validation predicate and error specification for failed conditions.</summary>
+    /// <summary>Filters values using validation predicate with error specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Filter(Func<T, bool> predicate, SystemError error) {
         ArgumentNullException.ThrowIfNull(predicate);
@@ -95,7 +95,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Pattern matches success and failure cases with comprehensive result transformation.</summary>
+    /// <summary>Pattern matches success and failure cases for result transformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<SystemError[], TResult> onFailure) {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -104,7 +104,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Executes side effects without changing Result state for debugging and logging purposes.</summary>
+    /// <summary>Executes side effects without changing Result state.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Apply(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
@@ -113,7 +113,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             onFailure: errors => { onFailure?.Invoke(errors); return self; });
     }
 
-    /// <summary>Applicative Apply for parallel validation with comprehensive error accumulation across multiple Results.</summary>
+    /// <summary>Applicative Apply for parallel validation with error accumulation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Apply<TOut>(Result<Func<T, TOut>> func) {
         Result<T> self = this;
@@ -131,7 +131,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Reduces Result to accumulated value with optional error handling and seed value transformation.</summary>
+    /// <summary>Reduces Result to accumulated value with optional error handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TAcc Reduce<TAcc>(TAcc seed, Func<TAcc, T, TAcc> onSuccess, Func<TAcc, SystemError[], TAcc>? onFailure = null) {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -143,7 +143,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Handles errors with transformation, recovery, and monadic error composition strategies.</summary>
+    /// <summary>Handles errors with transformation and recovery strategies.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnError(Func<SystemError[], SystemError[]>? mapError = null, Func<SystemError[], T>? recover = null, Func<SystemError[], Result<T>>? recoverWith = null) {
         Result<T> self = this;
@@ -160,7 +160,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Ensures predicate holds or accumulates errors with polymorphic validation parameter handling.</summary>
+    /// <summary>Ensures predicate holds or accumulates validation errors.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(params object[] validations) {
         Result<T> self = this;
@@ -184,7 +184,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Transforms collection elements to Results with comprehensive error accumulation and monadic sequencing capabilities.</summary>
+    /// <summary>Transforms collection elements to Results with error accumulation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<IReadOnlyList<TOut>> Traverse<TOut>(Func<T, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);

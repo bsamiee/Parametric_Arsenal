@@ -12,9 +12,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Reflection-driven polymorphic validation system using compiled expression trees and zero-allocation caching.</summary>
+/// <summary>Polymorphic validation system using compiled expression trees and cached validators.</summary>
 public static class ValidationRules {
-    /// <summary>Unified cache key structure for zero-allocation lookups with type, mode, and member discrimination.</summary>
+    /// <summary>Cache key structure for validator lookups with type, mode, and member discrimination.</summary>
     private readonly struct CacheKey(Type type, ValidationMode mode = ValidationMode.None, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
         public readonly ValidationMode Mode = mode;
@@ -48,7 +48,7 @@ public static class ValidationRules {
             [ValidationMode.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], ValidationErrors.Geometry.Continuity.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
-    /// <summary>Gets or compiles cached validator function for specified runtime type and validation mode combination.</summary>
+    /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, ValidationMode mode) {
         CacheKey key = new(runtimeType, mode);
@@ -56,25 +56,24 @@ public static class ValidationRules {
         return (Func<object, IGeometryContext, SystemError[]>)validator;
     }
 
-    /// <summary>Generates validation errors using polymorphic parameter detection for tolerance values only.</summary>
+    /// <summary>Generates validation errors for tolerance values using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
                 [..(!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
-                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidAbsolute] : (SystemError[])[]),
+                    [ValidationErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
                 ..(!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidRelative] : (SystemError[])[]),
+                    [ValidationErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
                 ..(!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
-                    (SystemError[])[ValidationErrors.Context.Tolerance.InvalidAngle] : (SystemError[])[]),],
+                    [ValidationErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),],
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for specified runtime type and validation mode with comprehensive reflection-based rule application.</summary>
+    /// <summary>Compiles expression tree validator for runtime type and validation mode using reflection-based rule application.</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, ValidationMode mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
-        ParameterExpression typedGeometry = Expression.Variable(runtimeType, "typed");
 
         (object Member, SystemError Error)[] memberValidations =
             [.. Enum.GetValues<ValidationMode>()

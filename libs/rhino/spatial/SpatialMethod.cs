@@ -1,38 +1,38 @@
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Unified spatial method combining index types and operations into bitwise flags.</summary>
+/// <summary>Spatial indexing algorithms using RhinoCommon RTree SDK with bitwise combinable operations.</summary>
 [Flags]
 public enum SpatialMethod {
     /// <summary>No spatial operation specified.</summary>
     None = 0,
 
-    /// <summary>Point3d array with range queries using RTree.CreateFromPointArray and RTree.Search methods.</summary>
+    /// <summary>Point array range queries using RTree.CreateFromPointArray with spatial bounds search.</summary>
     PointsRange = 1,
 
-    /// <summary>Point3d array with proximity queries using RTree.Point3dKNeighbors and RTree.Point3dClosestPoints.</summary>
+    /// <summary>Point array proximity queries using RTree.Point3dKNeighbors and RTree.Point3dClosestPoints algorithms.</summary>
     PointsProximity = 2,
 
-    /// <summary>PointCloud with range queries using RTree.CreatePointCloudTree and RTree.Search methods.</summary>
+    /// <summary>PointCloud range queries using RTree.CreatePointCloudTree with spatial bounds search.</summary>
     PointCloudRange = 4,
 
-    /// <summary>PointCloud with proximity queries using RTree.PointCloudKNeighbors and RTree.PointCloudClosestPoints.</summary>
+    /// <summary>PointCloud proximity queries using RTree.PointCloudKNeighbors and RTree.PointCloudClosestPoints algorithms.</summary>
     PointCloudProximity = 8,
 
-    /// <summary>Mesh with range queries using RTree.CreateMeshFaceTree and RTree.Search methods.</summary>
+    /// <summary>Mesh face range queries using RTree.CreateMeshFaceTree with spatial bounds search.</summary>
     MeshRange = 16,
 
-    /// <summary>Mesh with overlap queries using RTree.CreateMeshFaceTree and RTree.SearchOverlaps methods.</summary>
+    /// <summary>Mesh overlap detection using RTree.CreateMeshFaceTree and RTree.SearchOverlaps with tolerance handling.</summary>
     MeshOverlap = 32,
 
-    /// <summary>Curve with range queries using manual RTree.Insert and RTree.Search methods.</summary>
+    /// <summary>Curve range queries using manual RTree construction with bounding box insertion.</summary>
     CurveRange = 64,
 
-    /// <summary>Surface with range queries using manual RTree.Insert and RTree.Search methods.</summary>
+    /// <summary>Surface range queries using manual RTree construction with bounding box insertion.</summary>
     SurfaceRange = 128,
 
-    /// <summary>Brep with range queries using manual RTree.Insert and RTree.Search methods.</summary>
+    /// <summary>Brep range queries using manual RTree construction with bounding box insertion.</summary>
     BrepRange = 256,
 
-    /// <summary>Dynamic tree building using RTree.Insert/Remove for incremental spatial indexing.</summary>
+    /// <summary>Dynamic tree construction using RTree.Insert/Remove for incremental spatial indexing.</summary>
     DynamicInsertion = 512,
 }

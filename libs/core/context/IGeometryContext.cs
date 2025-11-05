@@ -3,7 +3,7 @@ using Rhino;
 
 namespace Arsenal.Core.Context;
 
-/// <summary>Contract for tolerance-aware geometry evaluation and unit conversion services.</summary>
+/// <summary>Contract for tolerance-aware geometry evaluation and unit conversion.</summary>
 public interface IGeometryContext {
     public double AbsoluteTolerance { get; }
     public double RelativeTolerance { get; }

@@ -17,19 +17,17 @@ public sealed record GeometryContext(
     double RelativeTolerance,
     double AngleToleranceRadians,
     UnitSystem Units) : IGeometryContext {
-    private string? _debuggerDisplay;
-
     [Pure]
-    private string DebuggerDisplay => this._debuggerDisplay ??=
+    private string DebuggerDisplay =>
         string.Create(CultureInfo.InvariantCulture,
             $"Abs={this.AbsoluteTolerance:g3}, Rel={this.RelativeTolerance:g3}, Ang={this.AngleToleranceRadians:g3}, Units={this.Units}");
 
-    /// <summary>Creates context with standard default tolerance values for specified unit system.</summary>
+    /// <summary>Creates context with default tolerance values for specified unit system.</summary>
     [Pure]
     public static Result<GeometryContext> CreateWithDefaults(UnitSystem units) =>
         Create(0.01, 0d, RhinoMath.ToRadians(1.0), units);
 
-    /// <summary>Creates context from existing RhinoDoc tolerance settings with validation.</summary>
+    /// <summary>Creates context from RhinoDoc tolerance settings with validation.</summary>
     [Pure]
     public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
         ArgumentNullException.ThrowIfNull(doc);
@@ -40,7 +38,7 @@ public sealed record GeometryContext(
             doc.ModelUnitSystem);
     }
 
-    /// <summary>Converts length value between unit systems with comprehensive validation and error handling.</summary>
+    /// <summary>Converts length value between unit systems with validation.</summary>
     [Pure]
     public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
         targetUnits switch {
@@ -52,7 +50,7 @@ public sealed record GeometryContext(
             },
         };
 
-    /// <summary>Creates validated geometry context with normalized tolerance values and comprehensive error checking.</summary>
+    /// <summary>Creates validated geometry context with normalized tolerance values.</summary>
     [Pure]
     public static Result<GeometryContext> Create(
         double absoluteTolerance,

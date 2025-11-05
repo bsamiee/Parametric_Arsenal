@@ -1,15 +1,22 @@
 <Project>
 
-  <PropertyGroup Label="Paths">
+  <!-- ============================================ -->
+  <!-- Paths & Output Configuration                 -->
+  <!-- ============================================ -->
+  <PropertyGroup>
     <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
     <ArtifactsPath>$(RepositoryRoot)artifacts</ArtifactsPath>
     <BaseOutputPath>$(ArtifactsPath)/$(MSBuildProjectName)/</BaseOutputPath>
     <SolutionDir>$(RepositoryRoot)</SolutionDir>
     <SolutionName>Parametric_Arsenal</SolutionName>
     <SolutionExt>.sln</SolutionExt>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
   </PropertyGroup>
 
-  <PropertyGroup Label="Language">
+  <!-- ============================================ -->
+  <!-- Language & Platform Configuration            -->
+  <!-- ============================================ -->
+  <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
@@ -19,8 +26,10 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
 
-  <PropertyGroup Label="Build">
-    <UseArtifactsOutput>true</UseArtifactsOutput>
+  <!-- ============================================ -->
+  <!-- Build Configuration                          -->
+  <!-- ============================================ -->
+  <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
@@ -28,9 +37,31 @@
     <Deterministic>true</Deterministic>
     <DebugType>portable</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <DisableRAR1001Warning>true</DisableRAR1001Warning>
   </PropertyGroup>
 
-  <PropertyGroup Label="Analysis">
+  <!-- Debug Configuration -->
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <Optimize>false</Optimize>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <!-- Release Configuration -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <ConcurrentBuild>true</ConcurrentBuild>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <TieredCompilation>true</TieredCompilation>
+  </PropertyGroup>
+
+  <!-- ============================================ -->
+  <!-- Code Analysis Configuration                  -->
+  <!-- ============================================ -->
+  <PropertyGroup>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <AnalysisMode>Default</AnalysisMode>
@@ -38,80 +69,101 @@
     <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <ReportAnalyzer>false</ReportAnalyzer>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <PropertyGroup Label="Debug" Condition="'$(Configuration)'=='Debug'">
-    <Optimize>false</Optimize>
-    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Release" Condition="'$(Configuration)'=='Release'">
-    <Optimize>true</Optimize>
-    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
-    <ConcurrentBuild>true</ConcurrentBuild>
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-    <TieredCompilation>true</TieredCompilation>
-    <ReadyToRun Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</ReadyToRun>
-  </PropertyGroup>
-
-  <ItemGroup Label="Analyzers">
+  <!-- ============================================ -->
+  <!-- Code Analyzers                               -->
+  <!-- ============================================ -->
+  <ItemGroup>
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
     <PackageReference Include="Meziantou.Analyzer" Version="2.0.231" PrivateAssets="all" />
   </ItemGroup>
 
-  <PropertyGroup Label="SDKVersions">
+  <!-- ============================================ -->
+  <!-- Rhino & Grasshopper SDK Configuration        -->
+  <!-- ============================================ -->
+  <PropertyGroup>
     <RhinoVersion>8.24.25281.15001</RhinoVersion>
     <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
   </PropertyGroup>
 
-  <ItemGroup Label="SDKReferences">
+  <!-- RhinoCommon Package Reference -->
+  <ItemGroup>
     <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" Condition="'$(IsGrasshopperPlugin)'=='true'">
+  </ItemGroup>
+
+  <!-- Grasshopper Package Reference (Windows Only) -->
+  <ItemGroup Condition="'$(IsGrasshopperPlugin)'=='true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">
+    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup Label="SharedReferences" Condition="'$(MSBuildProjectName)' == 'Arsenal.Tests.Shared'">
-    <ProjectReference Include="../../libs/core/Core.csproj" />
+  <!-- Grasshopper Direct References (macOS) -->
+  <PropertyGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">
+    <GrasshopperPluginPath>/Applications/Rhino 8.app/Contents/Frameworks/RhCore.framework/Versions/A/Resources/ManagedPlugIns/GrasshopperPlugin.rhp</GrasshopperPluginPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true' AND Exists('$(GrasshopperPluginPath)')">
+    <Reference Include="$(GrasshopperPluginPath)/Grasshopper.dll" Private="False" />
+    <Reference Include="$(GrasshopperPluginPath)/GH_IO.dll" Private="False" />
+    <Reference Include="$(GrasshopperPluginPath)/GH_Util.dll" Private="False" />
   </ItemGroup>
 
-  <PropertyGroup Label="Tests" Condition="'$(IsTestProject)' == 'true'">
+  <!-- ============================================ -->
+  <!-- Test Project Configuration                   -->
+  <!-- ============================================ -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <ItemGroup Label="TestReferences" Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
+  <!-- Test Project References -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
     <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
     <ProjectReference Include="../../libs/core/Core.csproj" />
   </ItemGroup>
 
-  <PropertyGroup Label="RhinoTests" Condition="'$(TestFramework)' == 'NUnit'">
+  <!-- Shared Test Project References -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Tests.Shared'">
+    <ProjectReference Include="../../libs/core/Core.csproj" />
+  </ItemGroup>
+
+  <!-- Test Framework Packages -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+  </ItemGroup>
+
+  <!-- xUnit Test Framework -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'xUnit'">
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <PackageReference Include="CsCheck" Version="4.4.1" Condition="'$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'" />
+  </ItemGroup>
+
+  <!-- NUnit Test Framework & Rhino Testing -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'NUnit'">
+    <PackageReference Include="NUnit" Version="4.4.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" />
+    <PackageReference Include="Rhino.Testing" Version="8.0.17-beta" />
+  </ItemGroup>
+
+  <!-- Rhino Testing Configuration (NUnit) -->
+  <PropertyGroup Condition="'$(TestFramework)' == 'NUnit'">
     <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
     <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">/Applications/Rhino 8.app/Contents/Frameworks</RhinoSystemDirectory>
   </PropertyGroup>
 
-  <ItemGroup Label="RhinoReferences" Condition="'$(TestFramework)' == 'NUnit' AND '$(TargetFramework)' == 'net8.0' AND Exists('$(RhinoSystemDirectory)')">
+  <!-- Rhino Direct References (NUnit Tests) -->
+  <ItemGroup Condition="'$(TestFramework)' == 'NUnit' AND Exists('$(RhinoSystemDirectory)')">
     <Reference Include="$(RhinoSystemDirectory)\netcore\RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'" />
     <Reference Include="$(RhinoSystemDirectory)/RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'" />
-  </ItemGroup>
-
-  <ItemGroup Label="TestFrameworks" Condition="'$(IsTestProject)' == 'true'">
-    <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
-    <PackageReference Include="xunit" Version="2.9.3" Condition="'$(TestFramework)' == 'xUnit'" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" Condition="'$(TestFramework)' == 'xUnit'" />
-    <PackageReference Include="CsCheck" Version="4.4.1" Condition="'$(TestFramework)' == 'xUnit'" />
-    <PackageReference Include="rhino3dm" Version="8.17.0" Condition="'$(TestFramework)' == 'xUnit'" />
-    <PackageReference Include="NUnit" Version="4.4.0" Condition="'$(TestFramework)' == 'NUnit'" />
-    <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" Condition="'$(TestFramework)' == 'NUnit'" />
-    <PackageReference Include="Rhino.Testing" Version="8.0.17-beta" Condition="'$(TestFramework)' == 'NUnit'" />
   </ItemGroup>
 
 </Project>

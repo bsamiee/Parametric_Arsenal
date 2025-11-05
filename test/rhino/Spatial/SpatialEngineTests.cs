@@ -1,5 +1,6 @@
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Tests.Spatial;
@@ -11,32 +12,32 @@ namespace Arsenal.Rhino.Tests.Spatial;
 [TestFixture]
 public sealed class SpatialEngineTests : RhinoTestFixture {
 
-    private static readonly IGeometryContext Context = GeometryContext.Default;
+    private static readonly IGeometryContext Context = GeometryContext.CreateWithDefaults(UnitSystem.Millimeters).Value;
 
     /// <summary>Test data generator using pattern matching for different spatial scenarios.</summary>
     private static IEnumerable<TestCaseData> SpatialRangeTestCases() {
         // Generate test point arrays with different distributions
-        var uniformGrid = (
+        Point3d[] uniformGrid = [.. (
             from i in Enumerable.Range(0, 10)
             from j in Enumerable.Range(0, 10)
             select new Point3d(i * 10.0, j * 10.0, 0.0)
-        ).ToArray();
+        ),];
 
-        var clusteredPoints = new[] {
+        Point3d[] clusteredPoints = [
             new Point3d(0, 0, 0), new Point3d(1, 1, 0), new Point3d(2, 2, 0),
-            new Point3d(100, 100, 0), new Point3d(101, 101, 0), new Point3d(102, 102, 0)
-        };
+            new Point3d(100, 100, 0), new Point3d(101, 101, 0), new Point3d(102, 102, 0),
+        ];
 
-        var singlePoint = new[] { new Point3d(5, 5, 5) };
+        Point3d[] singlePoint = [new Point3d(5, 5, 5)];
 
         // Pattern match to generate test cases with descriptive names
         return new (string Name, Point3d[] Points, Sphere Query, int Expected)[] {
             ("Uniform grid with sphere query", uniformGrid, new Sphere(new Point3d(50, 50, 0), 25), 9),
             ("Clustered points with small sphere", clusteredPoints, new Sphere(new Point3d(1, 1, 0), 5), 3),
             ("Single point exact match", singlePoint, new Sphere(new Point3d(5, 5, 5), 1), 1),
-            ("Empty result outside range", uniformGrid, new Sphere(new Point3d(1000, 1000, 0), 10), 0)
+            ("Empty result outside range", uniformGrid, new Sphere(new Point3d(1000, 1000, 0), 10), 0),
         }.Select(test => new TestCaseData(test.Points, test.Query, test.Expected)
-            .SetName($"RangeQuery_{test.Name.Replace(" ", "_")}"));
+            .SetName($"RangeQuery_{test.Name.Replace(' ', '_')}"));
     }
 
     /// <summary>
@@ -44,9 +45,9 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
     /// Validates: Result monad, spatial indexing, polymorphic geometry handling.
     /// </summary>
     [Test, TestCaseSource(nameof(SpatialRangeTestCases))]
-    public void SpatialRangeQuery_ReturnsExpectedIndices(Point3d[] points, Sphere queryShape, int expectedCount) {
+    public void SpatialRangeQueryReturnsExpectedIndices(Point3d[] points, Sphere queryShape, int expectedCount) {
         // Act - monadic composition with pattern matching
-        var result = SpatialEngine.Index(
+        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
             input: points,
             method: SpatialMethod.PointsRange,
             context: Context,
@@ -54,10 +55,9 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
         );
 
         // Assert - pattern match on Result monad
-        var assertion = result.Match(
+        (bool IsSuccess, int Count, string Message) = result.Match(
             onSuccess: indices => (
-                IsSuccess: true,
-                Count: indices.Count,
+                IsSuccess: true, indices.Count,
                 Message: $"Found {indices.Count} points"
             ),
             onFailure: errors => (
@@ -67,8 +67,8 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
             )
         );
 
-        Assert.That(assertion.IsSuccess, Is.True, assertion.Message);
-        Assert.That(assertion.Count, Is.EqualTo(expectedCount));
+        Assert.That(IsSuccess, Is.True, Message);
+        Assert.That(Count, Is.EqualTo(expectedCount));
     }
 
     /// <summary>Test proximity queries with k-nearest neighbor search.</summary>
@@ -83,14 +83,14 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
                 new[] { new Point3d(0, 0, 0), new Point3d(1, 1, 1) },
                 new Point3d(0.5, 0.5, 0.5),
                 10,
-                2)
+                2),
         }.Select(test => new TestCaseData(test.Points, test.Needle, test.K, test.Expected)
-            .SetName($"Proximity_{test.Name.Replace(" ", "_")}"));
+            .SetName($"Proximity_{test.Name.Replace(' ', '_')}"));
 
     [Test, TestCaseSource(nameof(ProximityTestCases))]
-    public void SpatialProximity_FindsNearestNeighbors(Point3d[] points, Point3d needle, int k, int expectedCount) {
+    public void SpatialProximityFindsNearestNeighbors(Point3d[] points, Point3d needle, int k, int expectedCount) {
         // Act
-        var result = SpatialEngine.Index(
+        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
             input: points,
             method: SpatialMethod.PointsProximity,
             context: Context,
@@ -99,75 +99,89 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
         );
 
         // Assert - algebraic pattern matching
-        result.Match(
+        _ = result.Match(
             onSuccess: indices => {
                 Assert.That(indices.Count, Is.EqualTo(expectedCount));
                 Assert.That(indices.All(i => i >= 0 && i < points.Length), Is.True, "All indices should be valid");
+                return 0;
             },
-            onFailure: errors => Assert.Fail($"Expected success but got errors: {string.Join(", ", errors.Select(e => e.Message))}")
+            onFailure: errors => {
+                Assert.Fail($"Expected success but got errors: {string.Join(", ", errors.Select(e => e.Message))}");
+                return 0;
+            }
         );
     }
 
     /// <summary>Test error paths using pattern matching - no if/else chains.</summary>
     [Test]
-    public void SpatialEngine_InvalidParameters_ReturnsError() {
-        var points = new[] { new Point3d(0, 0, 0), new Point3d(1, 1, 1) };
+    public void SpatialEngineInvalidParametersReturnsError() {
+        Point3d[] points = [new Point3d(0, 0, 0), new Point3d(1, 1, 1)];
 
         // Pattern match over different error scenarios
-        var errorScenarios = new (string Name, Func<Result<IReadOnlyList<int>>> Operation)[] {
+        (string Name, Func<Result<IReadOnlyList<int>>> Operation)[] errorScenarios = [
             ("Invalid K value (<=0)", () => SpatialEngine.Index(
-                points, SpatialMethod.PointsProximity, Context, k: 0, needles: [Point3d.Origin])),
+                points, SpatialMethod.PointsProximity, Context, needles: [Point3d.Origin], k: 0)),
             ("Invalid distance value (<=0)", () => SpatialEngine.Index(
-                points, SpatialMethod.PointsProximity, Context, k: 1, limitDistance: -5, needles: [Point3d.Origin]))
-        };
+                points, SpatialMethod.PointsProximity, Context, needles: [Point3d.Origin], k: 1, limitDistance: -5)),
+        ];
 
-        foreach (var scenario in errorScenarios) {
-            var result = scenario.Operation();
-            result.Match(
-                onSuccess: _ => Assert.Fail($"{scenario.Name}: Expected error but got success"),
-                onFailure: errors => Assert.That(errors, Is.Not.Empty, $"{scenario.Name} should return errors")
+        foreach ((string Name, Func<Result<IReadOnlyList<int>>> Operation) in errorScenarios) {
+            Result<IReadOnlyList<int>> result = Operation();
+            _ = result.Match(
+                onSuccess: _ => {
+                    Assert.Fail($"{Name}: Expected error but got success");
+                    return 0;
+                },
+                onFailure: errors => {
+                    Assert.That(errors, Is.Not.Empty, $"{Name} should return errors");
+                    return 0;
+                }
             );
         }
     }
 
     /// <summary>Test geometry-based spatial queries (polymorphic dispatch).</summary>
     [Test]
-    public void SpatialEngine_GeometryInput_HandlesPolymorphically() {
+    public void SpatialEngineGeometryInputHandlesPolymorphically() {
         // Arrange - create test geometry
-        var curve = new LineCurve(new Point3d(0, 0, 0), new Point3d(100, 0, 0));
-        var points = Enumerable.Range(0, 20).Select(i => new Point3d(i * 5, i * 5, 0)).ToArray();
+        using LineCurve curve = new(new Point3d(0, 0, 0), new Point3d(100, 0, 0));
+        Point3d[] points = [.. Enumerable.Range(0, 20).Select(i => new Point3d(i * 5, i * 5, 0))];
 
         // Act - polymorphic dispatch on GeometryBase
-        var result = SpatialEngine.Index(
+        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
             input: curve,
-            method: SpatialMethod.GeometryRange,
+            method: SpatialMethod.CurveRange,
             context: Context,
             queryShape: new Sphere(new Point3d(50, 0, 0), 10)
         );
 
         // Assert - pattern match on result
-        result.Match(
+        _ = result.Match(
             onSuccess: indices => {
                 Assert.That(indices, Is.Not.Empty);
                 Assert.That(indices.All(i => i >= 0), Is.True, "All indices should be non-negative");
+                return 0;
             },
-            onFailure: errors => Assert.Fail($"Expected success but got: {string.Join(", ", errors.Select(e => e.Message))}")
+            onFailure: errors => {
+                Assert.Fail($"Expected success but got: {string.Join(", ", errors.Select(e => e.Message))}");
+                return 0;
+            }
         );
     }
 
     /// <summary>Test collection handling (recursive polymorphic dispatch).</summary>
     [Test]
-    public void SpatialEngine_CollectionInput_TraversesMonadically() {
+    public void SpatialEngineCollectionInputTraversesMonadically() {
         // Arrange - collection of point arrays
-        var collections = new[] {
-            new[] { new Point3d(0, 0, 0), new Point3d(1, 1, 1) },
-            new[] { new Point3d(10, 10, 10), new Point3d(11, 11, 11) }
-        };
+        Point3d[][] collections = [
+            [new Point3d(0, 0, 0), new Point3d(1, 1, 1)],
+            [new Point3d(10, 10, 10), new Point3d(11, 11, 11)],
+        ];
 
-        var queryShape = new Sphere(new Point3d(0.5, 0.5, 0.5), 2);
+        Sphere queryShape = new(new Point3d(0.5, 0.5, 0.5), 2);
 
         // Act - polymorphic collection handling with monadic traversal
-        var result = SpatialEngine.Index(
+        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
             input: collections,
             method: SpatialMethod.PointsRange,
             context: Context,
@@ -175,9 +189,15 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
         );
 
         // Assert
-        result.Match(
-            onSuccess: indices => Assert.That(indices, Is.Not.Empty),
-            onFailure: errors => Assert.Fail($"Collection traversal failed: {string.Join(", ", errors.Select(e => e.Message))}")
+        _ = result.Match(
+            onSuccess: indices => {
+                Assert.That(indices, Is.Not.Empty);
+                return 0;
+            },
+            onFailure: errors => {
+                Assert.Fail($"Collection traversal failed: {string.Join(", ", errors.Select(e => e.Message))}");
+                return 0;
+            }
         );
     }
 }

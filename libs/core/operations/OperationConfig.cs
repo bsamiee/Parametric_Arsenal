@@ -1,57 +1,53 @@
-namespace Arsenal.Core.Operations;
-
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 
-/// <summary>
-/// Configuration for unified operation execution with composable transformations and validation
-/// </summary>
-/// <typeparam name="TIn">Input element type</typeparam>
-/// <typeparam name="TOut">Output element type</typeparam>
+namespace Arsenal.Core.Operations;
+
+/// <summary>Polymorphic operation configuration enabling composable transformations, validation, and error handling strategies.</summary>
 public sealed record OperationConfig<TIn, TOut> {
-	/// <summary>Geometry context for validation and tolerance</summary>
+	/// <summary>Polymorphic geometry context providing validation and tolerance contracts</summary>
 	public required IGeometryContext Context { get; init; }
 
-	/// <summary>Validation mode applied before operation (default: None)</summary>
+	/// <summary>Validation mode applied before operation execution</summary>
 	public ValidationMode ValidationMode { get; init; } = ValidationMode.None;
 
-	/// <summary>Additional validation arguments</summary>
+	/// <summary>Additional validation arguments passed to validation contracts</summary>
 	public object[]? ValidationArgs { get; init; }
 
-	/// <summary>Error accumulation strategy</summary>
-	public ErrorStrategy ErrorStrategy { get; init; } = ErrorStrategy.FailFast;
+	/// <summary>Accumulate all errors using applicative functor semantics instead of fail-fast monadic bind</summary>
+	public bool AccumulateErrors { get; init; }
 
-	/// <summary>Pre-operation transformation (identity if null)</summary>
+	/// <summary>Composable pre-operation transformation applied to inputs</summary>
 	public Func<TIn, Result<TIn>>? PreTransform { get; init; }
 
-	/// <summary>Post-operation transformation (identity if null)</summary>
+	/// <summary>Composable post-operation transformation applied to outputs</summary>
 	public Func<TOut, Result<TOut>>? PostTransform { get; init; }
 
-	/// <summary>Predicate to filter inputs (all pass if null)</summary>
+	/// <summary>Input filtering predicate for selective operation execution</summary>
 	public Func<TIn, bool>? InputFilter { get; init; }
 
-	/// <summary>Predicate to filter outputs (all pass if null)</summary>
+	/// <summary>Output filtering predicate for result refinement</summary>
 	public Func<TOut, bool>? OutputFilter { get; init; }
 
-	/// <summary>Enable parallel execution for batches (default: false)</summary>
+	/// <summary>Enable parallel execution for batch operations</summary>
 	public bool EnableParallel { get; init; }
 
-	/// <summary>Maximum degree of parallelism (default: -1 = unlimited)</summary>
+	/// <summary>Maximum degree of parallelism for concurrent execution</summary>
 	public int MaxDegreeOfParallelism { get; init; } = -1;
 
-	/// <summary>Skip invalid inputs instead of failing (default: false)</summary>
+	/// <summary>Skip invalid inputs instead of failing operation</summary>
 	public bool SkipInvalid { get; init; }
 
-	/// <summary>Flatten nested results automatically (default: true)</summary>
+	/// <summary>Automatically flatten nested monadic results</summary>
 	public bool AutoFlatten { get; init; } = true;
 
-	/// <summary>Short-circuit on first error (fail-fast mode only)</summary>
+	/// <summary>Short-circuit execution on first error in fail-fast mode</summary>
 	public bool ShortCircuit { get; init; } = true;
 
-	/// <summary>Enable operation result caching (default: false)</summary>
+	/// <summary>Enable memoization caching for operation results</summary>
 	public bool EnableCache { get; init; }
 
-	/// <summary>Custom error message prefix for accumulated errors</summary>
+	/// <summary>Custom error message prefix for error accumulation</summary>
 	public string? ErrorPrefix { get; init; }
 }

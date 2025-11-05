@@ -62,4 +62,10 @@ public static class ValidationErrors {
         }
         public static readonly SystemError InvalidUnitConversion = new(ErrorDomain.Validation, 4220, "Invalid unit conversion scale");
     }
+
+    /// <summary>Operation validation errors (4300-4399).</summary>
+    public static class Operations {
+        public static readonly SystemError UnsupportedOperationType = new(ErrorDomain.Validation, 4300, "Unsupported operation type");
+        public static readonly SystemError InputFiltered = new(ErrorDomain.Validation, 4301, "Input filtered");
+    }
 }

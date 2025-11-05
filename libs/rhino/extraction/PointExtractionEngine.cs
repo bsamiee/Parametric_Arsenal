@@ -7,9 +7,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Polymorphic point extraction using unified operation dispatch.</summary>
+/// <summary>Polymorphic point extraction engine with unified operation dispatch.</summary>
 public static class PointExtractionEngine {
-    /// <summary>Extracts points from geometry with automatic validation and error accumulation.</summary>
+    /// <summary>Extracts points from geometry with validation and error handling.</summary>
     [Pure]
     public static Result<IReadOnlyList<Point3d>> Extract<T>(
         T input,
@@ -19,14 +19,14 @@ public static class PointExtractionEngine {
         double? length = null,
         bool includeEnds = true) where T : notnull =>
         UnifiedOperation.Apply(
-            (object)input!,
-            (object item) => item switch {
+            input,
+            (Func<object, Result<IReadOnlyList<Point3d>>>)(item => item switch {
                 GeometryBase g => ExtractionStrategies.Extract(g, method, context, count, length, includeEnds),
                 _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ValidationErrors.Geometry.Invalid),
-            },
+            }),
             new OperationConfig<object, Point3d> {
                 Context = context,
-                ValidationMode = ValidationMode.None,  // ExtractionStrategies already validates
-                ErrorStrategy = ErrorStrategy.FailFast,
+                ValidationMode = ValidationMode.None,  // Validation handled by ExtractionStrategies
+                AccumulateErrors = false,
             });
 }

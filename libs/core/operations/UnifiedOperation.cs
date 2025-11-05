@@ -1,137 +1,90 @@
-namespace Arsenal.Core.Operations;
-
 using System.Collections.Concurrent;
-using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 
-/// <summary>Polymorphic single/batch operation execution with parameterized algebraic dispatch</summary>
-public static class UnifiedOperation {
+namespace Arsenal.Core.Operations;
 
+/// <summary>Polymorphic operation execution engine with unified dispatch and embedded caching.</summary>
+public static class UnifiedOperation {
+	private static readonly ThreadLocal<ConcurrentDictionary<(object, Type), object>> _threadCache = new(() => new());
+
+	/// <summary>Executes polymorphic operations with automatic type detection, validation, and caching.</summary>
 	public static Result<IReadOnlyList<TOut>> Apply<TIn, TOut>(
 		TIn input,
-		Func<TIn, Result<IReadOnlyList<TOut>>> operation,
-		OperationConfig<TIn, TOut> config) where TIn : notnull {
+		object operation,
+		OperationConfig<TIn, TOut> config,
+		ConcurrentDictionary<(object, Type), object>? externalCache = null) where TIn : notnull {
+		var cache = externalCache ?? (config.EnableCache ? _threadCache.Value! : new());
 
-		var empty = ResultFactory.Create(value: (IReadOnlyList<TOut>)[]);
-
-		Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>, IReadOnlyList<TOut>> combine = (a, c) => (IReadOnlyList<TOut>)[.. a, .. c];
-
-		Func<TIn, Result<IReadOnlyList<TOut>>> pipeline = item =>
-			((config.InputFilter?.Invoke(item), config.ValidationMode != ValidationMode.None, config.SkipInvalid) switch {
-				(false, _, _) => empty,
-				(_, false, _) => (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation),
-				(_, true, false) => ResultFactory.Create(value: item)
-					.Validate(args: [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
-					.Bind(validated => (config.PreTransform?.Invoke(validated) ?? ResultFactory.Create(value: validated)).Bind(operation)),
-				(_, true, true) => ResultFactory.Create(value: item)
-					.Validate(args: [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
-					.Match(
-						onSuccess: validated => (config.PreTransform?.Invoke(validated) ?? ResultFactory.Create(value: validated)).Bind(operation),
-						onFailure: _ => (config.PreTransform?.Invoke(item) ?? ResultFactory.Create(value: item)).Bind(operation)),
-			})
-			.Match(
-				onSuccess: outputs => (config.OutputFilter, config.PostTransform, config.SkipInvalid) switch {
-					(null, null, _) => ResultFactory.Create(value: outputs),
-					(var f, null, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)outputs.Where(o => f?.Invoke(o) ?? true).ToArray()),
-					(var f, var t, var skip) => outputs
-						.Where(o => f?.Invoke(o) ?? true)
-						.Aggregate(empty, (acc, o) => t(o) switch {
-							{ IsSuccess: true } r => acc.Bind(a => r.Map(c => combine(a, [c]))),
-							{ IsSuccess: false } r when !skip => ResultFactory.Create<IReadOnlyList<TOut>>(errors: r.Errors.ToArray()),
-							_ => acc,
-						}),
-				},
-				onFailure: errors => (config.ErrorPrefix, errors) switch {
-					(null, var e) => ResultFactory.Create<IReadOnlyList<TOut>>(errors: e.ToArray()),
-					(var prefix, var e) => ResultFactory.Create<IReadOnlyList<TOut>>(errors: e.Select(err => new SystemError(err.Domain, err.Code, $"{prefix}: {err.Message}")).ToArray()),
-				});
-
-		Func<Result<IReadOnlyList<TOut>>, Result<IReadOnlyList<TOut>>, Result<IReadOnlyList<TOut>>> accumulate = (acc, curr) =>
-			(config.ErrorStrategy, curr.IsSuccess) switch {
-				(ErrorStrategy.FailFast, false) => curr,
-				(ErrorStrategy.FailFast, true) => acc.Bind(a => curr.Map(c => combine(a, c))),
-				(ErrorStrategy.AccumulateAll, _) => acc.Apply(curr.Map(c => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => combine(a, c)))),
-				(ErrorStrategy.SkipFailed, true) => acc.Bind(a => curr.Map(c => combine(a, c))),
-				_ => acc,
-			};
-
-		return (input, config.EnableParallel) switch {
-			(IReadOnlyList<TIn> { Count: 0 }, _) => empty,
-			(IReadOnlyList<TIn> { Count: 1 } list, _) => Apply(list[0], operation, config),
-			(IReadOnlyList<TIn> list, true) => list.AsParallel()
-				.WithDegreeOfParallelism(config.MaxDegreeOfParallelism)
-				.Aggregate(empty, (acc, item) => accumulate(acc, pipeline(item)), x => x),
-			(IReadOnlyList<TIn> list, false) when config.ErrorStrategy == ErrorStrategy.FailFast && config.ShortCircuit => list.Aggregate(
-				empty,
-				(acc, item) => acc.IsSuccess switch {
-					true => pipeline(item) switch {
-						{ IsSuccess: true } curr => accumulate(acc, curr),
-						var curr => curr,
-					},
-					false => acc,
+		Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
+			Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
+			Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
+			Func<TIn, Result<Result<IReadOnlyList<TOut>>>> nested => nested(item).Bind(inner => inner),
+			Func<TIn, Result<TOut>> single => single(item).Map(v => (IReadOnlyList<TOut>)[v]),
+			IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
+				ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+				(acc, op) => (config.AccumulateErrors, op(item)) switch {
+					(true, var res) => acc.Apply(res.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(v => list => [.. list, v])),
+					(_, var res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
 				}),
-			(IReadOnlyList<TIn> list, false) => list.Aggregate(empty, (acc, item) => accumulate(acc, pipeline(item))),
-			(IEnumerable<TIn> enumerable, _) => Apply((TIn)(object)enumerable.ToList(), operation, config),
-			_ => pipeline(input),
+			(Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
+				pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+			_ => ResultFactory.Create<IReadOnlyList<TOut>>(
+				error: ValidationErrors.Operations.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}"))
+		};
+
+		Result<IReadOnlyList<TOut>> execute(TIn item) =>
+			cache.TryGetValue((item, operation.GetType()), out var cached) && config.EnableCache
+				? (Result<IReadOnlyList<TOut>>)cached
+				: (Result<IReadOnlyList<TOut>>)cache.AddOrUpdate(
+					(item, operation.GetType()),
+					ResultFactory.Create(value: item)
+						.Filter(config.InputFilter ?? (_ => true),
+							config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
+						.Validate(args: config.ValidationMode is ValidationMode.None ? null :
+							[config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
+						.OnError(recover: config.SkipInvalid ? _ => item : null)
+						.Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
+						.Bind(resolveOp)
+						.Map(outputs => (IReadOnlyList<TOut>)(config.OutputFilter switch {
+							null => outputs,
+							var filter => outputs.Where(filter).ToList()
+						}))
+						.Bind(outputs => config.PostTransform switch {
+							null => ResultFactory.Create(value: outputs),
+							var transform => outputs.Aggregate(
+								ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+								(acc, output) => (config.SkipInvalid, transform(output)) switch {
+									(true, { IsSuccess: false }) => acc,
+									(_, var res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v]))
+								})
+						}),
+					(_, existing) => config.EnableCache ? existing : execute(item));
+
+		return (input, config) switch {
+			(IReadOnlyList<TIn> { Count: 0 }, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+			(IReadOnlyList<TIn> { Count: 1 } list, _) => execute(list[0]),
+			(IReadOnlyList<TIn> list, { EnableParallel: true, AccumulateErrors: var acc, SkipInvalid: var skip, MaxDegreeOfParallelism: var max }) =>
+				list.AsParallel().WithDegreeOfParallelism(max).Select(execute).Aggregate(
+					ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+					(a, c) => (acc, skip && !c.IsSuccess) switch {
+						(true, _) => a.Apply(c.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(items => prev => [.. prev, .. items])),
+						(_, true) => a,
+						_ => a.Bind(prev => c.Map(items => (IReadOnlyList<TOut>)[.. prev, .. items]))
+					}),
+			(IReadOnlyList<TIn> list, { ShortCircuit: true, AccumulateErrors: false }) =>
+				list.Aggregate(ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+					(a, item) => a.IsSuccess ? a.Bind(prev => execute(item).Map(items => (IReadOnlyList<TOut>)[.. prev, .. items])) : a),
+			(IReadOnlyList<TIn> list, { AccumulateErrors: var acc, SkipInvalid: var skip }) =>
+				list.Select(execute).Aggregate(
+					ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+					(a, c) => (acc, skip && !c.IsSuccess) switch {
+						(true, _) => a.Apply(c.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(items => prev => [.. prev, .. items])),
+						(_, true) => a,
+						_ => a.Bind(prev => c.Map(items => (IReadOnlyList<TOut>)[.. prev, .. items]))
+					}),
+			(IEnumerable<TIn> enumerable, _) => Apply((TIn)(object)enumerable.ToList(), operation, config, cache),
+			_ => execute(input)
 		};
 	}
-
-	public static Result<IReadOnlyList<TOut>> ApplyDeferred<TIn, TOut>(
-		TIn input,
-		Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> operation,
-		OperationConfig<TIn, TOut> config) where TIn : notnull =>
-		Apply(input, item => operation(item, config.ValidationMode), config with { ValidationMode = ValidationMode.None });
-
-	public static Result<IReadOnlyList<TOut>> ApplyFlat<TIn, TOut>(
-		TIn input,
-		Func<TIn, Result<Result<IReadOnlyList<TOut>>>> operation,
-		OperationConfig<TIn, TOut> config) where TIn : notnull =>
-		Apply(input, item => operation(item).Bind(nested => nested), config);
-
-	public static Result<IReadOnlyList<TOut>> Traverse<TIn, TOut>(
-		TIn input,
-		Func<TIn, Result<TOut>> operation,
-		OperationConfig<TIn, TOut> config) where TIn : notnull =>
-		Apply(input, item => operation(item).Map(single => (IReadOnlyList<TOut>)[single]), config);
-
-	public static Result<IReadOnlyList<TOut>> Compose<TIn, TOut>(
-		TIn input,
-		IReadOnlyList<Func<TIn, Result<TOut>>> operations,
-		OperationConfig<TIn, TOut> config) where TIn : notnull =>
-		operations.Aggregate(
-			ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-			(acc, op) => acc.Apply(Traverse(input, op, config)
-				.Map(results => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(
-					existing => (IReadOnlyList<TOut>)[.. existing, .. results]))));
-
-	public static Result<IReadOnlyList<TOut>> ApplyWhen<TIn, TOut>(
-		TIn input,
-		Func<TIn, bool> predicate,
-		Func<TIn, Result<IReadOnlyList<TOut>>> operation,
-		OperationConfig<TIn, TOut> config) where TIn : notnull =>
-		Apply(input, item => predicate(item) switch {
-			true => operation(item),
-			false => ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-		}, config);
-
-	public static Result<IReadOnlyList<TOut>> ApplyCached<TIn, TOut>(
-		TIn input,
-		Func<TIn, Result<IReadOnlyList<TOut>>> operation,
-		OperationConfig<TIn, TOut> config,
-		ConcurrentDictionary<TIn, Result<IReadOnlyList<TOut>>>? cache = null) where TIn : notnull =>
-		(config.EnableCache, input, cache ?? new ConcurrentDictionary<TIn, Result<IReadOnlyList<TOut>>>()) switch {
-			(false, var i, _) => Apply(i, operation, config),
-			(true, IReadOnlyList<TIn> list, var c) => list.Aggregate(
-				ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-				(acc, item) => (config.ErrorStrategy, c.GetOrAdd(item, i => Apply(i, operation, config))) switch {
-					(ErrorStrategy.FailFast, { IsSuccess: false } curr) => curr,
-					(ErrorStrategy.FailFast, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(x => (IReadOnlyList<TOut>)[.. a, .. x])),
-					(ErrorStrategy.AccumulateAll, var curr) => acc.Apply(curr.Map(x => new Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>(a => (IReadOnlyList<TOut>)[.. a, .. x]))),
-					(ErrorStrategy.SkipFailed, { IsSuccess: true } curr) => acc.Bind(a => curr.Map(x => (IReadOnlyList<TOut>)[.. a, .. x])),
-					_ => acc,
-				}),
-			(true, IEnumerable<TIn> enumerable, var c) => ApplyCached((TIn)(object)enumerable.ToList(), operation, config, c),
-			(true, var item, var c) => c.GetOrAdd(item, i => Apply(i, operation, config)),
-		};
 }

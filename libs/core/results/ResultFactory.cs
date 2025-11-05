@@ -7,9 +7,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Polymorphic factory for creating and manipulating Result instances with advanced composition strategies.</summary>
+/// <summary>Polymorphic factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
-    /// <summary>Creates Result using polymorphic parameter detection for values, errors, deferred execution, conditionals, or nested Results.</summary>
+    /// <summary>Creates Result using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
         T? value = default,
@@ -38,7 +38,7 @@ public static class ResultFactory {
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result using maximum-density polymorphic parameter detection with zero-allocation monadic fusion.</summary>
+    /// <summary>Validates Result using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
@@ -51,15 +51,15 @@ public static class ResultFactory {
         (Func<T, bool>, SystemError)[]? validations = null,
         object[]? args = null) =>
         (predicate ?? premise, validation, validations, args) switch {
-            // Unified predicate validation with corrected logical composition
+            // Predicate validation with logical composition
             (Func<T, bool> p, null, null, _) when error.HasValue =>
                 result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
             // Monadic bind with conditional logic
             (Func<T, bool> p, Func<T, Result<T>> v, null, _) =>
                 result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
-            // Batch validation with zero-allocation handling
+            // Batch validation
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
-            // Geometry validation with unified mode handling
+            // Geometry validation
             (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
                 result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch {
                     { Length: 0 } => Create(value: g), var errs => Create<T>(errors: errs), }),
@@ -71,7 +71,7 @@ public static class ResultFactory {
             _ => result,
         };
 
-    /// <summary>Lifts functions into Result context with partial application and monadic lifting based on argument type analysis.</summary>
+    /// <summary>Lifts functions into Result context with partial application.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Lift<TResult>(Delegate func, params object[] args) {
         ArgumentNullException.ThrowIfNull(func);
@@ -90,7 +90,7 @@ public static class ResultFactory {
         };
     }
 
-    /// <summary>Traverses IEnumerable elements with monadic transformation and comprehensive error accumulation.</summary>
+    /// <summary>Traverses IEnumerable elements with monadic transformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);

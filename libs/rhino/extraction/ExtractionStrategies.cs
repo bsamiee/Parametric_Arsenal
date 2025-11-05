@@ -7,9 +7,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Internal extraction algorithms with geometry-specific strategy dispatch and Rhino SDK integration.</summary>
+/// <summary>Internal extraction algorithms with Rhino SDK geometry processing.</summary>
 internal static class ExtractionStrategies {
-    /// <summary>Dispatches extraction methods with inline validation and automatic null-to-error mapping.</summary>
+    /// <summary>Extracts points using specified method with validation and error mapping.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Extract(
         GeometryBase geometry, ExtractionMethod method,
@@ -25,11 +25,11 @@ internal static class ExtractionStrategies {
                 ExtractionMethod.Extremal => ValidationMode.BoundingBox,
                 ExtractionMethod.Quadrant => ValidationMode.Tolerance,
                 _ => ValidationMode.Standard,
-            }])
+            },])
             .Bind(g => ExtractCore(g, method, context, count, length, includeEnds) switch {
                 Point3d[] result when result?.Length > 0 =>
                     ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
-                // Rhino SDK returns null for invalid parameters - map to appropriate errors
+                // Map Rhino SDK null returns to appropriate errors
                 null when method == ExtractionMethod.Uniform && count is not null =>
                     ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
                 null when method == ExtractionMethod.Uniform && length is not null =>
@@ -38,13 +38,13 @@ internal static class ExtractionStrategies {
                 _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
             });
 
-    /// <summary>Core extraction logic with geometry type detection and method-specific algorithm selection.</summary>
+    /// <summary>Core extraction logic with Rhino SDK geometry type dispatch.</summary>
     [Pure]
     private static Point3d[]? ExtractCore(
         GeometryBase geometry, ExtractionMethod method,
         IGeometryContext context, int? count, double? length, bool includeEnds) =>
         (method, geometry) switch {
-            // UNIFORM - Let Rhino SDK validate parameters by returning null for invalid inputs
+            // UNIFORM - Rhino SDK validates parameters via null returns
             (ExtractionMethod.Uniform, Curve c) when count is { } n =>
                 c.DivideByCount(n, includeEnds)?.Select(c.PointAt).ToArray(),
             (ExtractionMethod.Uniform, Curve c) when length is { } len =>
@@ -57,7 +57,7 @@ internal static class ExtractionStrategies {
                 let v = s.Domain(1).ParameterAt(includeEnds && n == 1 ? 0d : includeEnds && n > 1 ? j / (double)(n - 1) : (j + 0.5) / n)
                 select s.PointAt(u, v),],
 
-            // ANALYTICAL - Centroid + structural points extraction
+            // ANALYTICAL - Centroid and structural points via Rhino SDK
             (ExtractionMethod.Analytical, var g) => [
                 ..(g switch {
                     Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],
@@ -80,13 +80,13 @@ internal static class ExtractionStrategies {
                     _ => [],
                 }),],
 
-            // EXTREMAL - Boundary extraction
+            // EXTREMAL - Boundary points via Rhino SDK
             (ExtractionMethod.Extremal, Curve c) => [c.PointAtStart, c.PointAtEnd],
             (ExtractionMethod.Extremal, Surface s) when s.Domain(0) is var u && s.Domain(1) is var v =>
                 [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)],
             (ExtractionMethod.Extremal, var g) => g.GetBoundingBox(accurate: true).GetCorners(),
 
-            // QUADRANT - Shape-specific extraction
+            // QUADRANT - Shape-specific points via Rhino SDK
             (ExtractionMethod.Quadrant, Curve c) when c.TryGetCircle(out Circle circle, context.AbsoluteTolerance) =>
                 [.. Enumerable.Range(0, 4).Select(i => circle.PointAt(i * Math.PI / 2))],
             (ExtractionMethod.Quadrant, Curve c) when c.TryGetEllipse(out Ellipse e, context.AbsoluteTolerance) =>

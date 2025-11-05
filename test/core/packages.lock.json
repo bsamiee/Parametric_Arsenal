@@ -22,9 +22,9 @@
       },
       "Meziantou.Analyzer": {
         "type": "Direct",
-        "requested": "[2.0.250, )",
-        "resolved": "2.0.250",
-        "contentHash": "+Y/z+dDTlDbI0iYsG5sad2kskprPH86jscQcS8VfnEaZxbb4WsP0bD0iEG4ZdY0XwZycdUWfRCtJrTKQX/8bJA=="
+        "requested": "[2.0.231, )",
+        "resolved": "2.0.231",
+        "contentHash": "h5FQkDk22R291JofPXFDxrgNyk1RGCqeIQKcrCRXYz+p5v2Ade2C9PpRiatasVqSDPyFk2q/B5AflWM2a9TVwQ=="
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
@@ -35,12 +35,6 @@
           "Microsoft.CodeCoverage": "18.0.0",
           "Microsoft.TestPlatform.TestHost": "18.0.0"
         }
-      },
-      "Rhino3dm": {
-        "type": "Direct",
-        "requested": "[8.17.0, )",
-        "resolved": "8.17.0",
-        "contentHash": "3uoZ7sNs9NIJ8Vi1b3nO0XCU9KfwH9fef6a6cZPC05aIVtsWTYLzWAIopF07Xksvi9KDj0LAE0JTHqNwQQhLxw=="
       },
       "RhinoCommon": {
         "type": "Direct",
@@ -174,6 +168,7 @@
         "type": "Project",
         "dependencies": {
           "Arsenal.Core": "[1.0.0, )",
+          "CsCheck": "[4.4.1, )",
           "Microsoft.NET.Test.Sdk": "[18.0.0, )",
           "xunit.abstractions": "[2.0.3, )"
         }

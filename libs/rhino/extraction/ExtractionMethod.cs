@@ -1,6 +1,6 @@
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Point extraction strategies with bitwise combination for geometry-specific algorithm selection.</summary>
+/// <summary>Point extraction strategies with bitwise flags for geometry-specific algorithms.</summary>
 [Flags]
 public enum ExtractionMethod {
     None = 0,

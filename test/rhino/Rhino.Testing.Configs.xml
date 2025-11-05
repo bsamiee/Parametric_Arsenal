@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Settings>
-  <!-- Cross-platform Rhino system directory -->
-  <RhinoSystemDirectory>/Applications/Rhino 8.app/Contents/Frameworks</RhinoSystemDirectory>
 
-  <!-- Headless configuration for automated testing -->
+<!-- Headless configuration for automated testing -->
+<Settings>
   <CreateRhinoDoc>false</CreateRhinoDoc>
   <CreateRhinoView>false</CreateRhinoView>
   <LoadEto>false</LoadEto>

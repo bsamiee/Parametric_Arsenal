@@ -1,6 +1,6 @@
 namespace Arsenal.Core.Validation;
 
-/// <summary>Bitwise combinable validation modes for comprehensive geometric validation operations.</summary>
+/// <summary>Combinable validation modes for geometric validation operations.</summary>
 [Flags]
 public enum ValidationMode {
     None = 0,

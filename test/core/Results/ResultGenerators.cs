@@ -12,7 +12,7 @@ public static class ResultGenerators {
         var t when t == typeof(string) => (Gen<T>)(object)Gen.String.Matching(static s => s is not null),
         var t when t == typeof(double) => (Gen<T>)(object)Gen.Double,
         var t when t == typeof(bool) => (Gen<T>)(object)Gen.Bool,
-        _ => throw new NotSupportedException($"Type {typeof(T)} not supported")
+        _ => throw new NotSupportedException($"Type {typeof(T)} not supported"),
     };
 
     /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
@@ -53,15 +53,15 @@ public static class ResultGenerators {
 
     /// <summary>Generates monadic functions using constant result capture.</summary>
     public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
-        GetGenForType<TResult>().ToResultGen(SystemErrorGen).Select<Func<T, Result<TResult>>>(static result => _ => result);
+        GetGenForType<TResult>().ToResultGen(SystemErrorGen).SelectMany(result => Gen.Const<Func<T, Result<TResult>>>(_ => result));
 
     /// <summary>Generates pure functions using constant value capture.</summary>
     public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
-        GetGenForType<TResult>().Select<Func<T, TResult>>(static value => _ => value);
+        GetGenForType<TResult>().SelectMany(value => Gen.Const<Func<T, TResult>>(_ => value));
 
     /// <summary>Generates predicates using constant boolean capture.</summary>
     public static Gen<Func<T, bool>> PredicateGen<T>() where T : notnull =>
-        Gen.Bool.Select<Func<T, bool>>(static result => _ => result);
+        Gen.Bool.SelectMany(result => Gen.Const<Func<T, bool>>(_ => result));
 
     /// <summary>Generates validation arrays using Cartesian composition.</summary>
     public static Gen<(Func<T, bool>, SystemError)[]> ValidationArrayGen<T>() where T : notnull =>
