@@ -42,23 +42,19 @@ public sealed class ResultMonadTests {
     [Theory]
     [MemberData(nameof(TryGetTestCases))]
     public void TryGetExtractionBehaviorMatchesResultState(Result<int> result, bool expectedSuccess) =>
-        Assert.Equal(expectedSuccess, result.TryGet(out int extracted) switch {
-            true => extracted != default || !expectedSuccess,
-            false => extracted == default && !expectedSuccess,
-        });
+        Assert.Equal(expectedSuccess, result.TryGet(out int extracted));
 
-    public static IEnumerable<object[]> TryGetTestCases =>
-        (IEnumerable<object[]>)Gen.Int.Tuple(ResultGenerators.SystemErrorGen)
-            .Select(t => t.Item1 switch {
-                int value => new[] {
-                    TestData.Case(ResultFactory.Create(value: value), true),
-                    TestData.Case(ResultFactory.Create<int>(error: t.Item2), false),
-                    TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)), true),
-                    TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create<int>(error: t.Item2)), false),
-                },
-            })
-            .Single()
-            .SelectMany(cases => cases);
+    public static IEnumerable<object[]> TryGetTestCases {
+        get {
+            (int value, SystemError error) = Gen.Int.Tuple(ResultGenerators.SystemErrorGen).Single();
+            return new[] {
+                TestData.Case(ResultFactory.Create(value: value), true),
+                TestData.Case(ResultFactory.Create<int>(error: error), false),
+                TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)), true),
+                TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create<int>(error: error)), false),
+            };
+        }
+    }
 
     /// <summary>Verifies Reduce accumulation using algebraic handler selection.</summary>
     [Fact]

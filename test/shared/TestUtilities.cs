@@ -13,6 +13,21 @@ public static class TestUtilities {
         (assertion switch {
             Func<T, bool> property => new Action(() => gen.Sample(property, iter: iterations)),
             Action<T> sample => new Action(() => gen.Sample(v => { sample(v); return true; }, iter: iterations)),
+            _ when typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
+                assertion switch {
+                    Action<object, object> action => new Action(() => gen.Sample(v => {
+                        dynamic tuple = v;
+                        action(tuple.Item1, tuple.Item2);
+                        return true;
+                    }, iter: iterations)),
+                    _ => throw new ArgumentException($"Unsupported tuple assertion type: {assertion.GetType()}", nameof(assertion)),
+                },
+            _ when typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ValueTuple<,,>) =>
+                assertion.GetType().GetGenericArguments() switch {
+                    [var t1, var t2, var t3] when assertion.GetType().GetGenericTypeDefinition() == typeof(Func<,,,>) =>
+                        new Action(() => gen.Sample(v => (bool)assertion.DynamicInvoke(((dynamic)v).Item1, ((dynamic)v).Item2, ((dynamic)v).Item3)!, iter: iterations)),
+                    _ => throw new ArgumentException($"Unsupported triple tuple assertion type: {assertion.GetType()}", nameof(assertion)),
+                },
             _ => throw new ArgumentException($"Unsupported assertion type: {assertion.GetType()}", nameof(assertion)),
         })();
 

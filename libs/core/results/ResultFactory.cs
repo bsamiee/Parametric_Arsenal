@@ -19,21 +19,21 @@ public static class ResultFactory {
         (Func<T, bool> Condition, SystemError Error)[]? conditionals = null,
         Result<Result<T>>? nested = null) =>
         (value, errors, error, deferred, conditionals, nested) switch {
-            (var v, null, null, null, null, null) when v is not null =>
-                new Result<T>(isSuccess: true, v, [], deferred: null),
-            (null, var e, null, null, null, null) when e?.Length > 0 =>
+            (var v, null, null, null, null, null) when v is not null || (typeof(T).IsValueType && !EqualityComparer<T>.Default.Equals(v!, default)) =>
+                new Result<T>(isSuccess: true, v!, [], deferred: null),
+            (_, var e, null, null, null, null) when e?.Length > 0 =>
                 new Result<T>(isSuccess: false, default!, e, deferred: null),
-            (null, null, var e, null, null, null) when e.HasValue =>
+            (_, null, var e, null, null, null) when e.HasValue =>
                 new Result<T>(isSuccess: false, default!, [e.Value], deferred: null),
-            (null, null, null, var d, null, null) when d is not null =>
+            (_, null, null, var d, null, null) when d is not null =>
                 new Result<T>(isSuccess: false, default!, [], deferred: d),
-            (var v, null, null, null, var conds, null) when v is not null && conds is not null =>
-                new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
-            (null, null, null, null, null, var n) when n.HasValue =>
+            (var v, null, null, null, var conds, null) when (v is not null || (typeof(T).IsValueType && !EqualityComparer<T>.Default.Equals(v!, default))) && conds is not null =>
+                new Result<T>(isSuccess: true, v!, [], deferred: null).Ensure([.. conds]),
+            (_, null, null, null, null, var n) when n.HasValue =>
                 n.Value.Match(
                     onSuccess: inner => inner,
                     onFailure: errors => new Result<T>(isSuccess: false, default!, errors, deferred: null)),
-            (null, null, null, null, null, null) =>
+            (_, null, null, null, null, null) =>
                 new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided], deferred: null),
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
         };
