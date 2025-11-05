@@ -9,15 +9,6 @@ namespace Arsenal.Core.Results;
 
 /// <summary>Polymorphic factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
-    /// <summary>Marker struct for distinguishing no-value from default-value in Create.</summary>
-    public readonly struct NoValue {
-        public static readonly NoValue Instance;
-    }
-
-    /// <summary>Creates Result with explicit no-value error.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Create<T>(NoValue _) => new(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided], deferred: null);
-
     /// <summary>Creates Result using polymorphic parameter detection with explicit value semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
