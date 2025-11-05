@@ -26,11 +26,15 @@ internal static class IntersectionStrategies {
             [(IntersectionMethod.CurveCurve, typeof(Curve), typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
             [(IntersectionMethod.CurveSurface, typeof(Curve), typeof(Surface))] = ValidationMode.Standard,
             [(IntersectionMethod.CurveBrep, typeof(Curve), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
+            [(IntersectionMethod.CurvePlane, typeof(Curve), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Degeneracy,
+            [(IntersectionMethod.CurveLine, typeof(Curve), typeof(Line))] = ValidationMode.Standard | ValidationMode.Degeneracy,
             [(IntersectionMethod.BrepBrep, typeof(Brep), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
+            [(IntersectionMethod.BrepPlane, typeof(Brep), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Topology,
+            [(IntersectionMethod.SurfaceSurface, typeof(Surface), typeof(Surface))] = ValidationMode.Standard,
             [(IntersectionMethod.MeshMesh, typeof(Mesh), typeof(Mesh))] = ValidationMode.MeshSpecific,
             [(IntersectionMethod.MeshRay, typeof(Mesh), typeof(Ray3d))] = ValidationMode.MeshSpecific,
             [(IntersectionMethod.MeshPlane, typeof(Mesh), typeof(Plane))] = ValidationMode.MeshSpecific,
-            [(IntersectionMethod.LineBox, typeof(Line), typeof(BoundingBox))] = ValidationMode.BoundingBox,
+            [(IntersectionMethod.MeshLine, typeof(Mesh), typeof(Line))] = ValidationMode.MeshSpecific,
             [(IntersectionMethod.CurveSelf, typeof(Curve), typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
         }.ToFrozenDictionary();
 
@@ -131,6 +135,91 @@ internal static class IntersectionStrategies {
                         [l.PointAt(lineParameters.Min)],
                         method,
                         ParametersA: [lineParameters.Min])),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.CurvePlane, Curve c, Plane p) =>
+                Intersection.CurvePlane(c, p, tol) switch {
+                    CurveIntersections { Count: > 0 } r => ResultFactory.Create(value: new IntersectionResult(
+                        [.. from e in r select e.PointA],
+                        method,
+                        ParametersA: [.. from e in r select e.ParameterA])),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.CurveLine, Curve c, Line l) =>
+                Intersection.CurveLine(c, l, tol, tol) switch {
+                    CurveIntersections { Count: > 0 } r => ResultFactory.Create(value: new IntersectionResult(
+                        [.. from e in r select e.PointA],
+                        method,
+                        ParametersA: [.. from e in r select e.ParameterA],
+                        ParametersB: [.. from e in r select e.ParameterB])),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.BrepPlane, Brep b, Plane p) =>
+                Intersection.BrepPlane(b, p, tol, out Curve[] curves, out Point3d[] points) switch {
+                    true when points.Length > 0 || curves.Length > 0 => ResultFactory.Create(value: new IntersectionResult(
+                        [.. points],
+                        method,
+                        Curves: curves.Length > 0 ? [.. curves] : null)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.SurfaceSurface, Surface s1, Surface s2) =>
+                Intersection.SurfaceSurface(s1, s2, tol, out Curve[] curves, out Point3d[] points) switch {
+                    true when points.Length > 0 || curves.Length > 0 => ResultFactory.Create(value: new IntersectionResult(
+                        [.. points],
+                        method,
+                        Curves: curves.Length > 0 ? [.. curves] : null)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.MeshLine, Mesh m, Line l) =>
+                Intersection.MeshLine(m, l, out int[] faceIds) switch {
+                    Point3d[] { Length: > 0 } pts => ResultFactory.Create(value: new IntersectionResult(
+                        [.. pts],
+                        method,
+                        FaceIndices: faceIds?.Length > 0 ? [.. faceIds] : null)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.LinePlane, Line l, Plane p) =>
+                Intersection.LinePlane(l, p, out double param) switch {
+                    true => ResultFactory.Create(value: new IntersectionResult(
+                        [l.PointAt(param)],
+                        method,
+                        ParametersA: [param])),
+                    false => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.LineSphere, Line l, Sphere s) =>
+                Intersection.LineSphere(l, s, out Point3d p1, out Point3d p2) switch {
+                    LineSphereIntersection.Double => ResultFactory.Create(value: new IntersectionResult([p1, p2], method)),
+                    LineSphereIntersection.Single => ResultFactory.Create(value: new IntersectionResult([p1], method)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.LineCylinder, Line l, Cylinder cyl) =>
+                Intersection.LineCylinder(l, cyl, out Point3d p1, out Point3d p2) switch {
+                    LineCylinderIntersection.Double => ResultFactory.Create(value: new IntersectionResult([p1, p2], method)),
+                    LineCylinderIntersection.Single => ResultFactory.Create(value: new IntersectionResult([p1], method)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.PlanePlane, Plane p1, Plane p2) =>
+                Intersection.PlanePlane(p1, p2, out Line line) switch {
+                    true => ResultFactory.Create(value: new IntersectionResult(
+                        [],
+                        method,
+                        Curves: [new LineCurve(line)])),
+                    false => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.SphereSphere, Sphere s1, Sphere s2) =>
+                Intersection.SphereSphere(s1, s2, out Circle circle) switch {
+                    PlanePlaneIntersection.Circle => ResultFactory.Create(value: new IntersectionResult(
+                        [],
+                        method,
+                        Curves: [new ArcCurve(circle)])),
+                    PlanePlaneIntersection.Point => ResultFactory.Create(value: new IntersectionResult([circle.Center], method)),
+                    _ => ResultFactory.Create(value: new IntersectionResult([], method)),
+                },
+            (IntersectionMethod.CircleCircle, Circle c1, Circle c2) =>
+                Intersection.CircleCircle(c1, c2, out Point3d p1, out Point3d p2) switch {
+                    PlaneCircleIntersection.Tangent or PlaneCircleIntersection.Secant => ResultFactory.Create(value: new IntersectionResult(
+                        p1.DistanceTo(p2) > context.AbsoluteTolerance ? [p1, p2] : [p1],
+                        method)),
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.CurveSelf, Curve c, _) =>
