@@ -68,22 +68,21 @@ public static class Diagnostics {
         [CallerFilePath] string callerFile = "",
         [CallerLineNumber] int callerLine = 0) {
 #if DEBUG
-        (Activity? activity, long startBytes, Stopwatch stopwatch) = (_activitySource.StartActivity(operation), GC.GetTotalMemory(forceFullCollection: false), Stopwatch.StartNew());
-        Result<T> eval = result.Match(
-            onSuccess: value => { stopwatch.Stop(); return ResultFactory.Create(value: value); },
-            onFailure: errors => { stopwatch.Stop(); return ResultFactory.Create<T>(errors: errors); });
-        (long allocated, DiagnosticContext ctx) = (GC.GetTotalMemory(forceFullCollection: false) - startBytes,
-            new DiagnosticContext(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, eval.IsSuccess ? null : eval.Errors.Count));
+        (Activity? activity, long startBytes, Stopwatch stopwatch) = (_activitySource.StartActivity(operation), GC.GetAllocatedBytesForCurrentThread(), Stopwatch.StartNew());
+        _ = result.IsSuccess;
+        stopwatch.Stop();
+        (long allocated, DiagnosticContext ctx) = (GC.GetAllocatedBytesForCurrentThread() - startBytes,
+            new(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, result.IsSuccess ? null : result.Errors.Count));
         activity?.SetTag("operation", operation)
             .SetTag("elapsed_ms", stopwatch.Elapsed.TotalMilliseconds)
             .SetTag("allocations", allocated)
             .SetTag("caller", $"{callerFile}:{callerLine.ToString(CultureInfo.InvariantCulture)} ({callerMember})")
-            .SetTag("success", eval.IsSuccess)
+            .SetTag("success", result.IsSuccess)
             .SetTag("validation", validationApplied?.ToString() ?? "None")
             .SetTag("cache_hit", cacheHit?.ToString() ?? "N/A")
             .Dispose();
-        _ = _metadata.AddOrUpdate(eval, ctx);
-        return eval;
+        _ = _metadata.AddOrUpdate(result, ctx);
+        return result;
 #else
         return result;
 #endif
