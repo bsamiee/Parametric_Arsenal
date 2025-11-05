@@ -8,8 +8,10 @@ namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic tests for ResultFactory operations using zero-boilerplate composition and pattern matching.</summary>
 public sealed class ResultFactoryTests {
-    private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors =
-        (new(ErrorDomain.Results, 1001, "E1"), new(ErrorDomain.Results, 1002, "E2"), new(ErrorDomain.Results, 1003, "E3"));
+    private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
+        new(ErrorDomain.Results, 1001, "E1"),
+        new(ErrorDomain.Results, 1002, "E2"),
+        new(ErrorDomain.Results, 1003, "E3"));
 
     /// <summary>Verifies Create parameter polymorphism using algebraic sum type semantics.</summary>
     [Fact]
@@ -61,7 +63,7 @@ public sealed class ResultFactoryTests {
     /// <summary>Verifies Lift using algebraic applicative composition and partial application.</summary>
     [Fact]
     public void LiftFunctionLiftingAccumulatesErrorsApplicatively() {
-        Func<int, int, int> add = (x, y) => x + y;
+        Func<int, int, int> add = static (x, y) => x + y;
         TestUtilities.AssertAll(
             Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: a), ResultFactory.Create(value: b));

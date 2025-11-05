@@ -83,7 +83,10 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies Ensure validation using algebraic error accumulation and partition logic.</summary>
     [Fact]
     public void EnsureMultipleValidationsAccumulatesErrors() {
-        (SystemError e1, SystemError e2, SystemError e3) = (TestError, new SystemError(ErrorDomain.Results, 1002, "E2"), new SystemError(ErrorDomain.Results, 1003, "E3"));
+        (SystemError e1, SystemError e2, SystemError e3) = (
+            TestError,
+            new(ErrorDomain.Results, 1002, "E2"),
+            new(ErrorDomain.Results, 1003, "E3"));
         TestUtilities.AssertAll(
             Gen.Int[1, 100].ToAssertion((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50),
             Gen.Int[1, 100].ToAssertion((Action<int>)(v => Assert.False(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x < 0), e1).IsSuccess)), 50),
@@ -195,7 +198,7 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies OnError transformation and recovery using algebraic error morphisms.</summary>
     [Fact]
     public void OnErrorErrorHandlingTransformsAndRecovers() {
-        (SystemError e1, SystemError e2) = (TestError, new SystemError(ErrorDomain.Results, 1002, "E2"));
+        (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
         TestUtilities.AssertAll(
             () => {
                 Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError(mapError: _ => [e2]);
