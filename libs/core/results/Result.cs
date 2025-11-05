@@ -169,13 +169,11 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             (_, { _isSuccess: false }) => self,
             (_, { _value: var value }) => validations switch {
                 [Func<T, bool> predicate, SystemError error] => predicate(value) ? self : ResultFactory.Create<T>(errors: [error]),
-                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch {
-                    { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
+                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
                     _ => self,
                 },
                 _ when validations.All(v => v is (Func<T, bool>, SystemError)) =>
-                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch {
-                        { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
+                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
                         _ => self,
                     },
                 [] => self,
@@ -191,14 +189,11 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         Result<T> self = this;
         return self.IsDeferred switch {
             true => ResultFactory.Create(deferred: () => self.Eval.Traverse(selector)),
-            false => self.Eval switch {
-                { _isSuccess: true, _value: System.Collections.IEnumerable collection } when collection is not string =>
-                    collection.Cast<object>().Aggregate(
-                        ResultFactory.Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-                        (acc, item) => acc.Apply(selector((T)item).Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(
-                            val => list => [.. list, val]))),
-                { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]),
-                { _errors: var errs } => ResultFactory.Create<IReadOnlyList<TOut>>(errors: errs ?? []),
+            false => self.Eval switch { { _isSuccess: true, _value: System.Collections.IEnumerable collection } when collection is not string =>
+                                            collection.Cast<object>().Aggregate(
+                                                ResultFactory.Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
+                                                (acc, item) => acc.Apply(selector((T)item).Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(
+                                                    val => list => [.. list, val]))), { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]), { _errors: var errs } => ResultFactory.Create<IReadOnlyList<TOut>>(errors: errs ?? []),
             },
         };
     }

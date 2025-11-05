@@ -109,7 +109,8 @@ internal static class SpatialStrategies {
                         (queryTransform switch {
                             Sphere sphere => (Action)(() => tree.Search(sphere, (_, args) => count = count < buffer.Length ? (buffer[count] = args.Id, count + 1).Item2 : count)),
                             BoundingBox box => () => tree.Search(box, (_, args) => count = count < buffer.Length ? (buffer[count] = args.Id, count + 1).Item2 : count),
-                            _ => () => { },
+                            _ => () => { }
+                            ,
                         })();
                         return count > 0 ? [.. buffer[..count]] : [];
                     } finally { ArrayPool<int>.Shared.Return(buffer, clearArray: true); }

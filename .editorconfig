@@ -146,6 +146,9 @@ csharp_style_prefer_local_over_anonymous_function = true:error
 # FORMATTING & STYLE (K&R + MINIMAL VERTICAL SPACE)
 # ====================================================================
 
+# --- TRAILING COMMAS (Meziantou) ---
+dotnet_diagnostic.MA0007.severity = error
+
 # --- K&R BRACE STYLE ---
 csharp_new_line_before_open_brace = none
 csharp_new_line_before_else = false

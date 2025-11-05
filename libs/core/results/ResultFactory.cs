@@ -61,11 +61,13 @@ public static class ResultFactory {
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
             // Geometry validation
             (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
-                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch {
-                    { Length: 0 } => Create(value: g), var errs => Create<T>(errors: errs), }),
+                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
+                    var errs => Create<T>(errors: errs),
+                }),
             (null, null, null, [IGeometryContext ctx]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
-                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch {
-                    { Length: 0 } => Create(value: g), var errs => Create<T>(errors: errs), }),
+                result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
+                    var errs => Create<T>(errors: errs),
+                }),
             (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
             // Identity fallback
             _ => result,

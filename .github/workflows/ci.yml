@@ -29,9 +29,13 @@ jobs:
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
+      - name: Verify Formatting
+        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity diagnostic
+
       - name: Summary
         if: success()
         run: |
           echo "✅ Build passed"
           echo "• Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
           echo "• Code Style: .editorconfig enforced"
+          echo "• Formatting: Verified"

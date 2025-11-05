@@ -21,11 +21,16 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
             from i in Enumerable.Range(0, 10)
             from j in Enumerable.Range(0, 10)
             select new Point3d(i * 10.0, j * 10.0, 0.0)
-        ),];
+        ),
+        ];
 
         Point3d[] clusteredPoints = [
-            new Point3d(0, 0, 0), new Point3d(1, 1, 0), new Point3d(2, 2, 0),
-            new Point3d(100, 100, 0), new Point3d(101, 101, 0), new Point3d(102, 102, 0),
+            new Point3d(0, 0, 0),
+            new Point3d(1, 1, 0),
+            new Point3d(2, 2, 0),
+            new Point3d(100, 100, 0),
+            new Point3d(101, 101, 0),
+            new Point3d(102, 102, 0),
         ];
 
         Point3d[] singlePoint = [new Point3d(5, 5, 5)];

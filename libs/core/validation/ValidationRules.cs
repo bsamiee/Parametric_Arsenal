@@ -61,12 +61,13 @@ public static class ValidationRules {
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
-                [..(!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
+                [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
                     [ValidationErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
-                ..(!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
+                    .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
                     [ValidationErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
-                ..(!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
-                    [ValidationErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),],
+                    .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
+                    [ValidationErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),
+                ],
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(args)),
         };
 
@@ -81,16 +82,17 @@ public static class ValidationRules {
                 .SelectMany(flag => {
                     (string[] properties, string[] methods, SystemError error) = _validationRules[flag];
                     return (IEnumerable<(object Member, SystemError Error)>)[
-                        ..properties.Select(prop => (
+                        .. properties.Select(prop => (
                             Member: _cache.GetOrAdd(new CacheKey(runtimeType, ValidationMode.None, prop, 1),
                                 static (key, type) => type.GetProperty(key.Member!) ?? (object)typeof(void), runtimeType),
                             error)),
-                        ..methods.Select(method => (
+                        .. methods.Select(method => (
                             Member: _cache.GetOrAdd(new CacheKey(runtimeType, ValidationMode.None, method, 2),
                                 static (key, type) => type.GetMethod(key.Member!) ?? (object)typeof(void), runtimeType),
                             error)),
                     ];
-                }),];
+                }),
+            ];
 
         Expression[] validationExpressions = [.. memberValidations
             .Where(validation => validation.Member is not null and not Type { Name: "Void" })
@@ -118,7 +120,8 @@ public static class ValidationRules {
                     Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                     Expression.Constant(null, typeof(SystemError?))),
                 _ => Expression.Constant(null, typeof(SystemError?)),
-            }),];
+            }),
+        ];
 
         return Expression.Lambda<Func<object, IGeometryContext, SystemError[]>>(
             Expression.Call(typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray))!.MakeGenericMethod(typeof(SystemError)),

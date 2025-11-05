@@ -58,7 +58,7 @@ public sealed record GeometryContext(
         double angleToleranceRadians,
         UnitSystem units) =>
         (absoluteTolerance <= 0d ? 0.01 : absoluteTolerance,
-         angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians) switch {
+        angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians) switch {
             (double normalizedAbsolute, double normalizedAngle) =>
                 ValidationRules.For(normalizedAbsolute, relativeTolerance, normalizedAngle) switch {
                     SystemError[] { Length: > 0 } errors => ResultFactory.Create<GeometryContext>(errors: errors),
