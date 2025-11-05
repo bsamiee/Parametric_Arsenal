@@ -2,6 +2,7 @@
 
 <!-- Headless configuration for automated testing -->
 <Settings>
+  <RhinoSystemDirectory Condition="'$(OS)' == 'Windows_NT'">C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
   <CreateRhinoDoc>false</CreateRhinoDoc>
   <CreateRhinoView>false</CreateRhinoView>
   <LoadEto>false</LoadEto>
