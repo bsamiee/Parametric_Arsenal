@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Contracts;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 
@@ -9,6 +11,7 @@ public static class UnifiedOperation {
     private static readonly ThreadLocal<ConcurrentDictionary<(object, Type), object>> _threadCache = new(() => new());
 
     /// <summary>Executes polymorphic operations with automatic type detection, validation, and caching.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> Apply<TIn, TOut>(
         TIn input,
         object operation,

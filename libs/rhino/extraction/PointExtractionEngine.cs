@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
@@ -10,7 +11,7 @@ namespace Arsenal.Rhino.Extraction;
 /// <summary>Polymorphic point extraction engine with unified operation dispatch.</summary>
 public static class PointExtractionEngine {
     /// <summary>Extracts points from geometry with validation and error handling.</summary>
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Extract<T>(
         T input,
         ExtractionMethod method,
