@@ -33,8 +33,8 @@ repos:
         pass_filenames: false
       
       - id: check-large-files
-        name: Check for large files
-        entry: bash -c 'for file in "$@"; do size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null); if [ "$size" -gt 512000 ]; then echo "File $file is too large (${size} bytes > 500KB)"; exit 1; fi; done' --
+        name: Check for large files (>500KB)
+        entry: bash -c 'MAX_SIZE=512000; for file in "$@"; do size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null); if [ "$size" -gt "$MAX_SIZE" ]; then echo "File $file is too large (${size} bytes > 500KB)"; exit 1; fi; done' --
         language: system
 
   # ---------------------------------------------------------------------------

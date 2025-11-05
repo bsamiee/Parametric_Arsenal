@@ -85,7 +85,7 @@ main() {
 
     log_info "Setup complete! Pre-commit hooks are now active."
     log_info "Hooks will run automatically on git commit."
-    log_info ""
+    echo ""
     log_info "Useful commands:"
     echo "  - Run on all files:     pre-commit run --all-files"
     echo "  - Run on staged files:  pre-commit run"
