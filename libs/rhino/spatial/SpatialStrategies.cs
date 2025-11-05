@@ -42,9 +42,9 @@ internal static class SpatialStrategies {
         double? limitDistance,
         double? toleranceBuffer = null) =>
         (method, source, needles, k, limitDistance) switch {
-            (SpatialMethod m, _, _, { } int kVal, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && kVal <= 0 =>
+            (SpatialMethod m, _, _, int kVal, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && kVal <= 0 =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidCount),
-            (SpatialMethod m, _, _, _, { } double dist) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && dist <= 0 =>
+            (SpatialMethod m, _, _, _, double dist) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && dist <= 0 =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidDistance),
             (SpatialMethod m, _, null, _, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidNeedles),
@@ -71,23 +71,23 @@ internal static class SpatialStrategies {
         // Tolerance-aware query shape transformation with buffer expansion for spatial accuracy
         ((ValidationMode Mode, Func<object, RTree?>? TreeFactory, int BufferSize, bool RequiresDoubleBuffer) config, object queryTransform) = (_spatialConfig.GetValueOrDefault((method, source.GetType())),
             (queryShape, toleranceBuffer, context.AbsoluteTolerance) switch {
-                (Sphere { Center: Point3d c, Radius: double r }, { } double buf, _) => new Sphere(c, r + buf),
-                (BoundingBox { Min: Point3d min, Max: Point3d max }, { } double buf, _) => new BoundingBox(min - new Vector3d(buf, buf, buf), max + new Vector3d(buf, buf, buf)),
+                (Sphere { Center: Point3d c, Radius: double r }, double buf, _) => new Sphere(c, r + buf),
+                (BoundingBox { Min: Point3d min, Max: Point3d max }, double buf, _) => new BoundingBox(min - new Vector3d(buf, buf, buf), max + new Vector3d(buf, buf, buf)),
                 (Point3d point, _, double tol) => new Sphere(point, tol + (toleranceBuffer ?? 0)),
-                (GeometryBase geom, { } double buf, _) => geom.GetBoundingBox(accurate: true) switch {
+                (GeometryBase geom, double buf, _) => geom.GetBoundingBox(accurate: true) switch {
                     BoundingBox bbox => new BoundingBox(bbox.Min - new Vector3d(buf, buf, buf), bbox.Max + new Vector3d(buf, buf, buf)),
                 },
                 _ => queryShape ?? new Sphere(Point3d.Origin, context.AbsoluteTolerance),
             });
 
         return (method, source, needles, k, limitDistance) switch {
-            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d>? n, { } int kVal, _) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, int kVal, _) =>
                 RTree.Point3dKNeighbors(pts, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d>? n, _, { } double lim) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d> n, _, double lim) =>
                 RTree.Point3dClosestPoints(pts, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d>? n, { } int kVal, _) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, int kVal, _) =>
                 RTree.PointCloudKNeighbors(cloud, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d>? n, _, { } double lim) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d> n, _, double lim) =>
                 RTree.PointCloudClosestPoints(cloud, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
             // Mesh overlap detection using cached RTree face trees with tolerance-aware SearchOverlaps algorithm
             (SpatialMethod.MeshOverlap, ValueTuple<Mesh, Mesh> meshes, _, _, _) => ArrayPool<int>.Shared.Rent(config.BufferSize) switch {
