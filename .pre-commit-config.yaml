@@ -22,20 +22,35 @@ default_language_version:
 
 repos:
   # ---------------------------------------------------------------------------
-  # General File Quality Checks (Local)
+  # General File Quality Checks (QOL improvements)
   # ---------------------------------------------------------------------------
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
     hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: ['--markdown-linebreak-ext=md']
+      - id: end-of-file-fixer
+        name: Fix end of files (add missing newline)
+      - id: mixed-line-ending
+        name: Fix mixed line endings (normalize to LF)
+        args: ['--fix=lf']
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
       - id: check-merge-conflict
-        name: Check for merge conflicts
-        entry: bash -c 'if git diff --cached | grep -E "^(<<<<<<<|=======|>>>>>>>)"; then echo "Merge conflict markers found"; exit 1; fi'
-        language: system
-        pass_filenames: false
-      
-      - id: check-large-files
+        name: Check for merge conflict markers
+      - id: check-added-large-files
         name: Check for large files (>500KB)
-        entry: bash -c 'MAX_SIZE=512000; for file in "$@"; do size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null); if [ "$size" -gt "$MAX_SIZE" ]; then echo "File $file is too large (${size} bytes > 500KB)"; exit 1; fi; done' --
-        language: system
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+        name: Check for case conflicts in filenames
+      - id: detect-private-key
+        name: Detect private keys (security)
+        exclude: '^test/'
 
   # ---------------------------------------------------------------------------
   # .NET Build & Analysis (Analyzers + EditorConfig)
@@ -64,12 +79,11 @@ repos:
         files: '\.(cs|csproj)$'
         pass_filenames: false
 
-      - id: dotnet-format-verify
-        name: .NET Format verification
+      - id: dotnet-format
+        name: .NET Format (auto-fix)
         entry: dotnet format
         args:
           - 'Parametric_Arsenal.sln'
-          - '--verify-no-changes'
           - '--verbosity'
           - 'normal'
         language: system

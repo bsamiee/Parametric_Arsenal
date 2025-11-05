@@ -26,11 +26,24 @@ jobs:
       - name: Restore
         run: dotnet restore Parametric_Arsenal.sln
 
+      - name: Format Code
+        run: dotnet format Parametric_Arsenal.sln --verbosity diagnostic
+
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
-      - name: Verify Formatting
-        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity diagnostic
+      - name: Check for changes after formatting
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "❌ Code formatting changes detected. Files were auto-formatted:"
+            git diff --name-only
+            echo ""
+            echo "The following changes were made:"
+            git diff
+            exit 1
+          else
+            echo "✅ No formatting changes needed"
+          fi
 
       - name: Summary
         if: success()
