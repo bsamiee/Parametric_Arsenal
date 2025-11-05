@@ -1,0 +1,47 @@
+name: Rhino Tests
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-rhino:
+    name: Rhino Tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Rhino
+        uses: mcneel/setup-rhino3d@v2
+        with:
+          email-address: ${{ secrets.RHINO_EMAIL }}
+
+      - name: Restore Dependencies
+        run: dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj
+
+      - name: Build Rhino Tests
+        run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
+
+      - name: Run Rhino Tests
+        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --verbosity normal
+        env:
+          RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "Rhino tests completed successfully"
+          echo "Test Framework: NUnit + Rhino.Testing v8.0.17-beta"
+          echo "Headless Mode: Enabled"
