@@ -48,7 +48,7 @@ internal static class SpatialStrategies {
             (SpatialMethod m, _, null, _, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidNeedles),
             _ => (_spatialConfig.TryGetValue((method, source switch { GeometryBase g => g.GetType(), Point3d[] => typeof(Point3d[]), _ => source.GetType() }), out (ValidationMode Mode, Func<object, RTree?>? TreeFactory, int BufferSize, bool RequiresDoubleBuffer) config) ? config : default((ValidationMode, Func<object, RTree?>?, int, bool)?)) switch {
-                (ValidationMode mode, _, _, _) cfg when cfg.HasValue => ResultFactory.Create(value: source)
+                (ValidationMode mode, _, _, _) => ResultFactory.Create(value: source)
                     .Validate(args: [context, mode])
                     .Map(_ => (IReadOnlyList<int>)(IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? []).AsReadOnly()),
                 null => ResultFactory.Create(value: (IReadOnlyList<int>)(IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? []).AsReadOnly()),

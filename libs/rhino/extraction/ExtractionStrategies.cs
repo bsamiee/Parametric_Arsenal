@@ -54,15 +54,15 @@ internal static class ExtractionStrategies {
                 from i in Enumerable.Range(0, count ?? 10)
                 from j in Enumerable.Range(0, count ?? 10)
                 let n = count ?? 10
-                let paramU = (n, includeEnds, i) switch {
-                    (1, _, _) => 0.5,
-                    (_, true, var idx) => idx / (double)(n - 1),
-                    (_, false, var idx) => (idx + 0.5) / n,
+                let paramU = (n, includeEnds) switch {
+                    (1, _) => 0.5,
+                    (_, true) => i / (double)(n - 1),
+                    (_, false) => (i + 0.5) / n,
                 }
-                let paramV = (n, includeEnds, j) switch {
-                    (1, _, _) => 0.5,
-                    (_, true, var idx) => idx / (double)(n - 1),
-                    (_, false, var idx) => (idx + 0.5) / n,
+                let paramV = (n, includeEnds) switch {
+                    (1, _) => 0.5,
+                    (_, true) => j / (double)(n - 1),
+                    (_, false) => (j + 0.5) / n,
                 }
                 select s.PointAt(s.Domain(0).ParameterAt(paramU), s.Domain(1).ParameterAt(paramV)),
             ],
