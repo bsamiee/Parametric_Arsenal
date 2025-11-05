@@ -42,8 +42,8 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     public override int GetHashCode() {
         Result<T> eval = this.Eval;
         return eval._isSuccess switch {
-            true => (eval._isSuccess, eval._value).GetHashCode(),
-            false => (eval._isSuccess, eval._errors).GetHashCode(),
+            true => (true, eval._value).GetHashCode(),
+            false => (false, eval._errors).GetHashCode(),
         };
     }
 
