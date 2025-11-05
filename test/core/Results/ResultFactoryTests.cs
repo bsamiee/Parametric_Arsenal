@@ -15,7 +15,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies Create parameter polymorphism using algebraic sum type semantics.</summary>
     [Fact]
-    public void CreateAllParameterCombinationsBehavesCorrectly() => TestUtilities.AssertAll(
+    public void CreateAllParameterCombinationsBehavesCorrectly() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v => {
             Result<int> r = ResultFactory.Create(value: v);
             Assert.Equal((true, v), (r.IsSuccess, r.Value));
@@ -37,7 +37,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies Validate polymorphism using algebraic validation pattern matching.</summary>
     [Fact]
-    public void ValidateAllParameterCombinationsValidatesCorrectly() => TestUtilities.AssertAll(
+    public void ValidateAllParameterCombinationsValidatesCorrectly() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v =>
             Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(predicate: x => x > 0, error: Errors.E1).IsSuccess)), 50),
         Gen.Int.ToAssertion((Action<int>)(v =>
@@ -64,7 +64,7 @@ public sealed class ResultFactoryTests {
     [Fact]
     public void LiftFunctionLiftingAccumulatesErrorsApplicatively() {
         Func<int, int, int> add = static (x, y) => x + y;
-        TestUtilities.AssertAll(
+        TestGen.RunAll(
             Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: a), ResultFactory.Create(value: b));
                 Assert.Equal((true, a + b), (result.IsSuccess, result.Value));
@@ -83,7 +83,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies TraverseElements using algebraic collection monadic composition.</summary>
     [Fact]
-    public void TraverseElementsCollectionTransformationAccumulatesErrors() => TestUtilities.AssertAll(
+    public void TraverseElementsCollectionTransformationAccumulatesErrors() => TestGen.RunAll(
         Gen.Int.List[1, 10].ToAssertion((Action<List<int>>)(items => {
             Result<IReadOnlyList<int>> result = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: x * 2));
             Assert.Equal((true, items.Count, items.Select(x => x * 2)), (result.IsSuccess, result.Value.Count, result.Value));
@@ -100,7 +100,7 @@ public sealed class ResultFactoryTests {
     [Fact]
     public void NullArgumentsThrowCorrectly() {
         (Result<int> success, Result<int> failure) = (ResultFactory.Create(value: 42), ResultFactory.Create<int>(error: Errors.E1));
-        TestUtilities.AssertAll(
+        TestGen.RunAll(
             () => Assert.Throws<ArgumentNullException>(() => success.Map((Func<int, int>)null!)),
             () => Assert.Throws<ArgumentNullException>(() => success.Bind((Func<int, Result<int>>)null!)),
             () => Assert.Throws<ArgumentNullException>(() => success.Match(null!, _ => 0)),
@@ -113,7 +113,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies error handling using algebraic transformation and recovery morphisms.</summary>
     [Fact]
-    public void ErrorHandlingTransformationAndRecoveryBehavesCorrectly() => TestUtilities.AssertAll(
+    public void ErrorHandlingTransformationAndRecoveryBehavesCorrectly() => TestGen.RunAll(
         ResultGenerators.SystemErrorGen.ToAssertion((Action<SystemError>)(origErr => {
             Result<int> result = ResultFactory.Create<int>(error: origErr).OnError(mapError: _ => [Errors.E2]);
             Assert.True(!result.IsSuccess && result.Errors.Contains(Errors.E2) && !result.Errors.Contains(origErr));
@@ -126,7 +126,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies Validate batch validations accumulate all errors.</summary>
     [Fact]
-    public void ValidateBatchValidationsAccumulatesAllErrors() => TestUtilities.AssertAll(
+    public void ValidateBatchValidationsAccumulatesAllErrors() => TestGen.RunAll(
         () => {
             Result<int> result = ResultFactory.Create(value: 151).Validate(validations: [
                 (x => x > 0, Errors.E1),
@@ -146,7 +146,7 @@ public sealed class ResultFactoryTests {
 
     /// <summary>Verifies Lift with arity mismatch throws correctly.</summary>
     [Fact]
-    public void LiftArityMismatchThrowsArgumentException() => TestUtilities.AssertAll(
+    public void LiftArityMismatchThrowsArgumentException() => TestGen.RunAll(
         () => Assert.Throws<ArgumentException>(() =>
             ResultFactory.Lift<int>((Func<int, int, int>)((x, y) => x + y), [ResultFactory.Create(value: 1)])),
         () => Assert.Throws<ArgumentException>(() =>

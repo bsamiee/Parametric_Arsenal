@@ -13,8 +13,8 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies functor category laws: identity and composition.</summary>
     [Fact]
-    public void FunctorLaws() => TestUtilities.AssertAll(
-        () => LawVerification.FunctorIdentity(ResultGenerators.ResultGen<int>()),
+    public void FunctorLaws() => TestGen.RunAll(
+        () => TestLaw.Verify<int>("FunctorIdentity", ResultGenerators.ResultGen<int>()),
         () => LawVerification.FunctorComposition(
             ResultGenerators.ResultGen<int>(),
             f: x => x.ToString(CultureInfo.InvariantCulture),
@@ -22,7 +22,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Map actually transforms values with concrete examples.</summary>
     [Fact]
-    public void MapValueTransformationAppliesCorrectly() => TestUtilities.AssertAll(
+    public void MapValueTransformationAppliesCorrectly() => TestGen.RunAll(
         () => Assert.Equal(10, ResultFactory.Create(value: 5).Map(static x => x * 2).Value),
         () => Assert.Equal("42", ResultFactory.Create(value: 42).Map(static x => x.ToString(CultureInfo.InvariantCulture)).Value),
         () => Assert.Equal(3, ResultFactory.Create(value: "abc").Map(static s => s.Length).Value),
@@ -31,7 +31,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Bind actually chains transformations with concrete examples.</summary>
     [Fact]
-    public void BindValueTransformationChainsCorrectly() => TestUtilities.AssertAll(
+    public void BindValueTransformationChainsCorrectly() => TestGen.RunAll(
         () => Assert.Equal(15, ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: x * 3)).Value),
         () => Assert.Equal("10", ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: (x * 2).ToString(CultureInfo.InvariantCulture))).Value),
         Gen.Int.ToAssertion((Action<int>)(n => Assert.Equal((n * 2) + 10,
@@ -41,9 +41,9 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies monad category laws: left identity, right identity, and associativity.</summary>
     [Fact]
-    public void MonadLaws() => TestUtilities.AssertAll(
+    public void MonadLaws() => TestGen.RunAll(
         () => LawVerification.MonadLeftIdentity(Gen.Int, ResultGenerators.MonadicFunctionGen<int, string>()),
-        () => LawVerification.MonadRightIdentity(ResultGenerators.ResultGen<int>()),
+        () => TestLaw.Verify<int>("MonadRightIdentity", ResultGenerators.ResultGen<int>()),
         () => LawVerification.MonadAssociativity(
             ResultGenerators.ResultGen<int>(),
             ResultGenerators.MonadicFunctionGen<int, string>(),
@@ -51,9 +51,9 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies applicative functor and equality laws.</summary>
     [Fact]
-    public void ApplicativeAndEqualityLaws() => TestUtilities.AssertAll(
-        () => LawVerification.ApplicativeIdentity(ResultGenerators.ResultGen<int>()),
-        () => LawVerification.EqualityReflexive(ResultGenerators.ResultGen<int>()),
+    public void ApplicativeAndEqualityLaws() => TestGen.RunAll(
+        () => TestLaw.Verify<int>("ApplicativeIdentity", ResultGenerators.ResultGen<int>()),
+        () => TestLaw.Verify<int>("EqualityReflexive", ResultGenerators.ResultGen<int>()),
         () => LawVerification.EqualitySymmetric(ResultGenerators.ResultGen<int>(), ResultGenerators.ResultGen<int>()),
         () => LawVerification.HashCodeConsistent(Gen.Int, v => ResultFactory.Create(value: v)));
 
@@ -67,17 +67,17 @@ public sealed class ResultMonadTests {
         get {
             (int value, SystemError error) = Gen.Int.Tuple(ResultGenerators.SystemErrorGen).Single();
             return new[] {
-                TestData.Case(ResultFactory.Create(value: value), true),
-                TestData.Case(ResultFactory.Create<int>(error: error), false),
-                TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)), true),
-                TestData.Case(ResultFactory.Create(deferred: () => ResultFactory.Create<int>(error: error)), false),
+                [ResultFactory.Create(value: value), true),
+                [ResultFactory.Create<int>(error: error), false),
+                [ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)), true),
+                [ResultFactory.Create(deferred: () => ResultFactory.Create<int>(error: error)), false),
             };
         }
     }
 
     /// <summary>Verifies Reduce accumulation using algebraic handler selection.</summary>
     [Fact]
-    public void ReduceAccumulationBehaviorAppliesCorrectHandler() => TestUtilities.AssertAll(
+    public void ReduceAccumulationBehaviorAppliesCorrectHandler() => TestGen.RunAll(
         Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((value, seed) =>
             Assert.Equal(seed + value, ResultFactory.Create(value: value).Reduce(seed, (s, v) => s + v)))),
         ResultGenerators.SystemErrorArrayGen.Tuple(Gen.Int).ToAssertion((Action<SystemError[], int>)((errors, seed) =>
@@ -88,7 +88,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Filter using predicate pattern matching and error propagation.</summary>
     [Fact]
-    public void FilterPredicateValidationFiltersCorrectly() => TestUtilities.AssertAll(
+    public void FilterPredicateValidationFiltersCorrectly() => TestGen.RunAll(
         Gen.Int[1, 100].ToAssertion((Action<int>)(value =>
             Assert.True(ResultFactory.Create(value: value).Filter(x => x > 0, TestError).IsSuccess))),
         Gen.Int[1, 100].ToAssertion((Action<int>)(value =>
@@ -106,7 +106,7 @@ public sealed class ResultMonadTests {
             TestError,
             new(ErrorDomain.Results, 1002, "E2"),
             new(ErrorDomain.Results, 1003, "E3"));
-        TestUtilities.AssertAll(
+        TestGen.RunAll(
             Gen.Int[1, 100].ToAssertion((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50),
             Gen.Int[1, 100].ToAssertion((Action<int>)(v => Assert.False(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x < 0), e1).IsSuccess)), 50),
             Gen.Int.ToAssertion((Action<int>)(v =>
@@ -117,7 +117,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Match using algebraic pattern exhaustion.</summary>
     [Fact]
-    public void MatchPatternMatchingInvokesCorrectHandler() => TestUtilities.AssertAll(
+    public void MatchPatternMatchingInvokesCorrectHandler() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v => Assert.Equal(v * 2, ResultFactory.Create(value: v).Match(x => x * 2, _ => -1)))),
         ResultGenerators.SystemErrorArrayGen.ToAssertion((Action<SystemError[]>)(errs =>
             Assert.Equal(errs.Length, ResultFactory.Create<int>(errors: errs).Match(v => v * 2, e => e.Length)))),
@@ -130,7 +130,7 @@ public sealed class ResultMonadTests {
         (SystemError funcErr, SystemError valErr) = (
             new(ErrorDomain.Results, 5001, "Function error"),
             new(ErrorDomain.Results, 5002, "Value error"));
-        TestUtilities.AssertAll(
+        TestGen.RunAll(
             Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
                 Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
                 Assert.Equal((true, a + b), (applied.IsSuccess, applied.Value));
@@ -151,7 +151,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Traverse using monadic collection transformation algebra.</summary>
     [Fact]
-    public void TraverseCollectionTransformationTransformsAndAccumulates() => TestUtilities.AssertAll(
+    public void TraverseCollectionTransformationTransformsAndAccumulates() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v => Assert.Single(ResultFactory.Create(value: v).Traverse(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture))).Value))),
         Gen.Int.List[1, 10].ToAssertion((Action<List<int>>)(items => {
             Result<IReadOnlyList<int>> traversed = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: x * 2));
@@ -166,7 +166,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies deferred execution using lazy evaluation algebra and resource safety.</summary>
     [Fact]
-    public void DeferredExecutionLazyEvaluationBehavesCorrectly() => TestUtilities.AssertAll(
+    public void DeferredExecutionLazyEvaluationBehavesCorrectly() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v => {
             int count = 0;
             Result<int> deferred = ResultFactory.Create(deferred: () => { count++; return ResultFactory.Create(value: v); });
@@ -198,7 +198,7 @@ public sealed class ResultMonadTests {
 
     /// <summary>Verifies Apply side effects preserve Result state using algebraic identity preservation.</summary>
     [Fact]
-    public void ApplyMethodSideEffectsPreservesState() => TestUtilities.AssertAll(
+    public void ApplyMethodSideEffectsPreservesState() => TestGen.RunAll(
         Gen.Int.ToAssertion((Action<int>)(v => {
             int captured = 0;
             Result<int> result = ResultFactory.Create(value: v).Apply(onSuccess: x => captured = x);
@@ -220,7 +220,7 @@ public sealed class ResultMonadTests {
     [Fact]
     public void OnErrorErrorHandlingTransformsAndRecovers() {
         (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
-        TestUtilities.AssertAll(
+        TestGen.RunAll(
             () => {
                 Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError(mapError: _ => [e2]);
                 Assert.True(!mapped.IsSuccess && mapped.Errors.Contains(e2) && !mapped.Errors.Contains(e1));

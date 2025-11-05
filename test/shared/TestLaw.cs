@@ -4,9 +4,8 @@ using CsCheck;
 
 namespace Arsenal.Tests.Common;
 
-/// <summary>Algebraic law verification using FrozenDictionary dispatch and zero-duplication parameterized composition.</summary>
+/// <summary>Category theory law verification using FrozenDictionary dispatch.</summary>
 public static class TestLaw {
-    /// <summary>Unified law verifier supporting identity, symmetry, and hash consistency laws via FrozenDictionary dispatch.</summary>
     private static readonly FrozenDictionary<string, Delegate> _laws = new Dictionary<string, Delegate>(StringComparer.Ordinal) {
         ["FunctorIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Map(static x => x).Equals(r), iter: iter)),
         ["MonadRightIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Bind(static x => ResultFactory.Create(value: x)).Equals(r), iter: iter)),
@@ -18,7 +17,7 @@ public static class TestLaw {
             gen.Sample((object v) => { (Result<object> r1, Result<object> r2) = (toResult(v), toResult(v)); return r1.Equals(r2) && r1.GetHashCode() == r2.GetHashCode(); }, iter: iter)),
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    /// <summary>Verifies category theory laws using polymorphic FrozenDictionary O(1) dispatch with params for flexible arity.</summary>
+    /// <summary>Verifies category theory laws using FrozenDictionary O(1) dispatch with polymorphic arity.</summary>
     public static void Verify<T>(string law, params object[] args) where T : notnull {
         switch (law, args) {
             case ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", [Gen<Result<T>> gen, int iter,]):
@@ -41,13 +40,13 @@ public static class TestLaw {
         }
     }
 
-    /// <summary>Verifies functor composition and identity laws: fmap id ≡ id, fmap (f ∘ g) ≡ fmap f ∘ fmap g.</summary>
+    /// <summary>Verifies functor identity and composition laws.</summary>
     public static void VerifyFunctor<T, T2, T3>(Gen<Result<T>> gen, Func<T, T2> f, Func<T2, T3> g, int iter = 100) where T : notnull where T2 : notnull where T3 : notnull {
         gen.Sample(static (Result<T> r) => r.Map(static x => x).Equals(r), iter: iter);
         gen.Sample((Result<T> r) => r.Map(x => g(f(x))).Equals(r.Map(f).Map(g)), iter: iter);
     }
 
-    /// <summary>Verifies monad laws: left identity, right identity, and associativity.</summary>
+    /// <summary>Verifies monad left identity, right identity, and associativity laws.</summary>
     public static void VerifyMonad<T, T2, T3>(Gen<T> valueGen, Gen<Result<T>> rGen, Gen<Func<T, Result<T2>>> fGen, Gen<Func<T2, Result<T3>>> gGen, int iter = 100) where T : notnull where T2 : notnull where T3 : notnull {
         valueGen.Select(fGen).Sample((T v, Func<T, Result<T2>> f) => ResultFactory.Create(value: v).Bind(f).Equals(f(v)), iter: iter);
         rGen.Sample(static (Result<T> r) => r.Bind(static x => ResultFactory.Create(value: x)).Equals(r), iter: iter);
