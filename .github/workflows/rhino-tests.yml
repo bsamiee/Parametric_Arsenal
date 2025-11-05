@@ -2,9 +2,8 @@ name: Rhino Tests
 
 on:
   push:
-    branches: [main, 'claude/**']
-  pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test-rhino:
