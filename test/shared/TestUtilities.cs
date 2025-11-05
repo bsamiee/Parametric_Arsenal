@@ -11,13 +11,13 @@ public static class TestUtilities {
             (Type t, Action<T> act) => new Action(() => gen.Sample(v => { act(v); return true; }, iter: iterations)),
             (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
                 new Action(() => gen.Sample(v => {
-                    object?[] args = [v.GetType().GetField("Item1")!.GetValue(v), v.GetType().GetField("Item2")!.GetValue(v)];
+                    object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v.GetType().GetField("Item2")!.GetValue(v)!,];
                     object? result = d.DynamicInvoke(args);
                     return result switch { bool b => b, null => true, _ => true };
                 }, iter: iterations)),
             (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,,>) =>
                 new Action(() => gen.Sample(v => {
-                    object?[] args = [v.GetType().GetField("Item1")!.GetValue(v), v.GetType().GetField("Item2")!.GetValue(v), v.GetType().GetField("Item3")!.GetValue(v)];
+                    object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v.GetType().GetField("Item2")!.GetValue(v)!, v.GetType().GetField("Item3")!.GetValue(v)!,];
                     object? result = d.DynamicInvoke(args);
                     return result switch { bool b => b, null => true, _ => true };
                 }, iter: iterations)),
