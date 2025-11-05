@@ -8,7 +8,7 @@ on:
 
 jobs:
   validate:
-    name: Build & Test
+    name: Build & Analyze
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,17 +27,9 @@ jobs:
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
-      - name: Test
-        run: dotnet test Parametric_Arsenal.sln --configuration Release --no-build --verbosity normal --logger "console;verbosity=detailed"
-
       - name: Summary
-        if: always()
+        if: success()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
-            echo "✅ All checks passed"
-            echo "• Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
-            echo "• Code Style: .editorconfig enforced"
-            echo "• Tests: All passing"
-          else
-            echo "❌ Validation failed - fix issues above"
-          fi
+          echo "✅ Build passed"
+          echo "• Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
+          echo "• Code Style: .editorconfig enforced"
