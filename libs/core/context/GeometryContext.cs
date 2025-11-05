@@ -42,11 +42,11 @@ public sealed record GeometryContext(
     [Pure]
     public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
         targetUnits switch {
-            var units when units == this.Units => ResultFactory.Create(value: value),
-            var units => RhinoMath.UnitScale(this.Units, units) switch {
-                var scale when !RhinoMath.IsValidDouble(scale) || scale <= RhinoMath.ZeroTolerance =>
+            UnitSystem units when units == this.Units => ResultFactory.Create(value: value),
+            UnitSystem units => RhinoMath.UnitScale(this.Units, units) switch {
+                double scale when !RhinoMath.IsValidDouble(scale) || scale <= RhinoMath.ZeroTolerance =>
                     ResultFactory.Create<double>(errors: [ValidationErrors.Context.InvalidUnitConversion]),
-                var scale => ResultFactory.Create(value: value * scale),
+                double scale => ResultFactory.Create(value: value * scale),
             },
         };
 
@@ -56,14 +56,13 @@ public sealed record GeometryContext(
         double absoluteTolerance,
         double relativeTolerance,
         double angleToleranceRadians,
-        UnitSystem units) {
-        double normalizedAbsolute = absoluteTolerance <= 0d ? 0.01 : absoluteTolerance;
-        double normalizedAngle = angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians;
-
-        SystemError[] errors = ValidationRules.For(normalizedAbsolute, relativeTolerance, normalizedAngle);
-        return errors.Length > 0
-            ? ResultFactory.Create<GeometryContext>(errors: errors)
-            : ResultFactory.Create(
-                value: new GeometryContext(normalizedAbsolute, relativeTolerance, normalizedAngle, units));
-    }
+        UnitSystem units) =>
+        (absoluteTolerance <= 0d ? 0.01 : absoluteTolerance,
+         angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians) switch {
+            (double normalizedAbsolute, double normalizedAngle) =>
+                ValidationRules.For(normalizedAbsolute, relativeTolerance, normalizedAngle) switch {
+                    { Length: > 0 } errors => ResultFactory.Create<GeometryContext>(errors: errors),
+                    _ => ResultFactory.Create(value: new GeometryContext(normalizedAbsolute, relativeTolerance, normalizedAngle, units)),
+                },
+        };
 }

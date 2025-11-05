@@ -42,11 +42,11 @@ internal static class SpatialStrategies {
         double? limitDistance,
         double? toleranceBuffer = null) =>
         (method, source, needles, k, limitDistance) switch {
-            (var m, _, _, { } kVal, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && kVal <= 0 =>
+            (SpatialMethod m, _, _, { } kVal, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && kVal <= 0 =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidCount),
-            (var m, _, _, _, { } dist) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && dist <= 0 =>
+            (SpatialMethod m, _, _, _, { } dist) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None && dist <= 0 =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidDistance),
-            (var m, _, null, _, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None =>
+            (SpatialMethod m, _, null, _, _) when (m & (SpatialMethod.PointsProximity | SpatialMethod.PointCloudProximity)) != SpatialMethod.None =>
                 ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidNeedles),
             _ => _spatialConfig.TryGetValue((method, source switch { GeometryBase g => g.GetType(), Point3d[] => typeof(Point3d[]), _ => source.GetType() }), out (ValidationMode Mode, Func<object, RTree?>? TreeFactory, int BufferSize, bool RequiresDoubleBuffer) config) switch {
                 true => ResultFactory.Create(value: source)
@@ -71,27 +71,27 @@ internal static class SpatialStrategies {
         // Tolerance-aware query shape transformation with buffer expansion for spatial accuracy
         ((ValidationMode Mode, Func<object, RTree?>? TreeFactory, int BufferSize, bool RequiresDoubleBuffer) config, object queryTransform) = (_spatialConfig.GetValueOrDefault((method, source.GetType())),
             (queryShape, toleranceBuffer, context.AbsoluteTolerance) switch {
-                (Sphere { Center: var c, Radius: var r }, { } buf, _) => new Sphere(c, r + buf),
-                (BoundingBox { Min: var min, Max: var max }, { } buf, _) => new BoundingBox(min - new Vector3d(buf, buf, buf), max + new Vector3d(buf, buf, buf)),
-                (Point3d point, _, var tol) => new Sphere(point, tol + (toleranceBuffer ?? 0)),
+                (Sphere { Center: Point3d c, Radius: double r }, { } buf, _) => new Sphere(c, r + buf),
+                (BoundingBox { Min: Point3d min, Max: Point3d max }, { } buf, _) => new BoundingBox(min - new Vector3d(buf, buf, buf), max + new Vector3d(buf, buf, buf)),
+                (Point3d point, _, double tol) => new Sphere(point, tol + (toleranceBuffer ?? 0)),
                 (GeometryBase geom, { } buf, _) => geom.GetBoundingBox(accurate: true) switch {
-                    var bbox => new BoundingBox(bbox.Min - new Vector3d(buf, buf, buf), bbox.Max + new Vector3d(buf, buf, buf)),
+                    BoundingBox bbox => new BoundingBox(bbox.Min - new Vector3d(buf, buf, buf), bbox.Max + new Vector3d(buf, buf, buf)),
                 },
                 _ => queryShape ?? new Sphere(Point3d.Origin, context.AbsoluteTolerance),
             });
 
         return (method, source, needles, k, limitDistance) switch {
-            (SpatialMethod.PointsProximity, Point3d[] pts, var n, { } kVal, _) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d>? n, { } kVal, _) when n is not null =>
                 RTree.Point3dKNeighbors(pts, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointsProximity, Point3d[] pts, var n, _, { } lim) when n is not null =>
+            (SpatialMethod.PointsProximity, Point3d[] pts, IEnumerable<Point3d>? n, _, { } lim) when n is not null =>
                 RTree.Point3dClosestPoints(pts, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, var n, { } kVal, _) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d>? n, { } kVal, _) when n is not null =>
                 RTree.PointCloudKNeighbors(cloud, n, kVal)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
-            (SpatialMethod.PointCloudProximity, PointCloud cloud, var n, _, { } lim) when n is not null =>
+            (SpatialMethod.PointCloudProximity, PointCloud cloud, IEnumerable<Point3d>? n, _, { } lim) when n is not null =>
                 RTree.PointCloudClosestPoints(cloud, n, lim)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray(),
             // Mesh overlap detection using cached RTree face trees with tolerance-aware SearchOverlaps algorithm
             (SpatialMethod.MeshOverlap, ValueTuple<Mesh, Mesh> meshes, _, _, _) => ArrayPool<int>.Shared.Rent(config.BufferSize) switch {
-                var buffer => ((Func<int[]>)(() => {
+                int[] buffer => ((Func<int[]>)(() => {
                     (RTree t1, RTree t2, int count) = (_treeCache.GetValue(meshes.Item1, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
                                             _treeCache.GetValue(meshes.Item2, static m => RTree.CreateMeshFaceTree((Mesh)m)!), 0);
                     try {
@@ -103,7 +103,7 @@ internal static class SpatialStrategies {
             },
             // General RTree search using cached trees with sphere/bounding box query shape dispatch
             _ when config.TreeFactory is not null => ArrayPool<int>.Shared.Rent(config.BufferSize) switch {
-                var buffer => ((Func<int[]>)(() => {
+                int[] buffer => ((Func<int[]>)(() => {
                     (RTree tree, int count) = (_treeCache.GetValue(source, _ => config.TreeFactory!(source)!) ?? RTree.CreateFromPointArray([]), 0);
                     try {
                         (queryTransform switch {

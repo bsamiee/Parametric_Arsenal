@@ -58,7 +58,7 @@ internal static class ExtractionStrategies {
                 select s.PointAt(u, v),],
 
             // ANALYTICAL - Centroid and structural points via Rhino SDK
-            (ExtractionMethod.Analytical, var g) => [
+            (ExtractionMethod.Analytical, GeometryBase g) => [
                 ..(g switch {
                     Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],
                     Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct],
@@ -82,9 +82,9 @@ internal static class ExtractionStrategies {
 
             // EXTREMAL - Boundary points via Rhino SDK
             (ExtractionMethod.Extremal, Curve c) => [c.PointAtStart, c.PointAtEnd],
-            (ExtractionMethod.Extremal, Surface s) when s.Domain(0) is var u && s.Domain(1) is var v =>
+            (ExtractionMethod.Extremal, Surface s) when s.Domain(0) is Interval u && s.Domain(1) is Interval v =>
                 [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)],
-            (ExtractionMethod.Extremal, var g) => g.GetBoundingBox(accurate: true).GetCorners(),
+            (ExtractionMethod.Extremal, GeometryBase g) => g.GetBoundingBox(accurate: true).GetCorners(),
 
             // QUADRANT - Shape-specific points via Rhino SDK
             (ExtractionMethod.Quadrant, Curve c) when c.TryGetCircle(out Circle circle, context.AbsoluteTolerance) =>
