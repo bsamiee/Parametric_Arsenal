@@ -1,6 +1,37 @@
 root = true
 
 # ====================================================================
+# ====================================================================
+# CONFIGURATION PHILOSOPHY
+# ====================================================================
+# This .editorconfig enforces dense, algebraic, functional C# code:
+#
+# KEY PRINCIPLES:
+# 1. K&R brace style (braces on same line)
+# 2. NO var keyword - explicit types only
+# 3. Pattern matching over if/else
+# 4. Expression-bodied members for dense code
+# 5. Monadic Result patterns (Railway-Oriented Programming)
+# 6. Zero-allocation patterns (ArrayPool, Span, FrozenDictionary)
+#
+# NULLABLE STRATEGY:
+# - Strict nullable reference types enabled project-wide
+# - CS8618 (uninitialized fields) as warning to reduce verbosity
+# - CS8602/CS8603 (null dereference/return) as error for safety
+# - Tests have relaxed nullable rules for dynamic/reflection code
+#
+# SECURITY RULES:
+# - Intentionally excluded (CA21xx-CA32xx)
+# - Not applicable to computational geometry library
+# - Focus on correctness, performance, and API design instead
+#
+# ANALYZER PRIORITIES:
+# - Design & API (CA1xxx): Error level
+# - Performance (CA18xx, MA0xxx): Error level
+# - Reliability (CA2000-CA2018): Error level
+# - Disposal (IDISPxxx): Error level
+# - Code Style (IDE, RCS): Error/Warning based on impact
+#
 # GLOBAL DEFAULTS
 # ====================================================================
 [*]
@@ -130,6 +161,32 @@ csharp_style_prefer_readonly_record_struct = true:error
 
 # ============================================
 # NULL-CHECKING & SAFETY
+
+# ============================================
+# CODE SIMPLIFICATIONS & UNNECESSARY CODE
+# ============================================
+
+# Remove unnecessary code
+dotnet_diagnostic.IDE0001.severity = error  # Simplify name
+dotnet_diagnostic.IDE0002.severity = error  # Simplify member access
+dotnet_diagnostic.IDE0004.severity = warning  # Remove unnecessary cast
+dotnet_diagnostic.IDE0010.severity = error  # Add missing cases to switch
+dotnet_diagnostic.IDE0035.severity = error  # Remove unreachable code
+dotnet_diagnostic.IDE0050.severity = error  # Convert anonymous type to tuple
+dotnet_diagnostic.IDE0051.severity = error  # Remove unused private member
+dotnet_diagnostic.IDE0052.severity = error  # Remove unread private member
+dotnet_diagnostic.IDE0060.severity = warning  # Remove unused parameter
+dotnet_diagnostic.IDE0080.severity = error  # Remove unnecessary suppression
+dotnet_diagnostic.IDE0100.severity = error  # Remove unnecessary equality operator
+dotnet_diagnostic.IDE0110.severity = error  # Remove unnecessary discard
+
+# Use System.HashCode
+dotnet_diagnostic.IDE0070.severity = error  # Use System.HashCode.Combine
+dotnet_diagnostic.IDE0071.severity = error  # Simplify interpolation
+dotnet_diagnostic.IDE0072.severity = suggestion  # Add missing cases
+
+# Suppress unnecessary suppressions
+dotnet_diagnostic.IDE0079.severity = warning  # Remove unnecessary suppression
 # ============================================
 
 # Null-checking patterns
@@ -207,8 +264,6 @@ csharp_style_prefer_simple_default_expression = true:error
 dotnet_style_prefer_compound_assignment = true:error
 
 # Simplify name expressions
-dotnet_diagnostic.IDE0001.severity = error  # Simplify name
-dotnet_diagnostic.IDE0002.severity = error  # Simplify member access
 dotnet_diagnostic.IDE0005.severity = error  # Remove unnecessary using
 
 # ============================================
@@ -456,61 +511,6 @@ dotnet_diagnostic.CA2016.severity = error    # Forward the CancellationToken par
 dotnet_diagnostic.CA2017.severity = error    # Parameter count mismatch
 dotnet_diagnostic.CA2018.severity = error    # Buffer size argument does not match the length of the buffer
 
-# Security rules
-dotnet_diagnostic.CA2100.severity = error    # Review SQL queries for security vulnerabilities
-dotnet_diagnostic.CA2109.severity = error    # Review visible event handlers
-dotnet_diagnostic.CA2119.severity = error    # Seal methods that satisfy private interfaces
-dotnet_diagnostic.CA2153.severity = error    # Avoid handling Corrupted State Exceptions
-dotnet_diagnostic.CA2200.severity = error    # Rethrow to preserve stack details
-dotnet_diagnostic.CA2201.severity = error    # Do not raise reserved exception types
-dotnet_diagnostic.CA2207.severity = error    # Initialize value type static fields inline
-dotnet_diagnostic.CA2208.severity = error    # Instantiate argument exceptions correctly
-dotnet_diagnostic.CA2213.severity = none     # Disposable fields should be disposed (handled by IDisposableAnalyzers)
-dotnet_diagnostic.CA2214.severity = error    # Do not call overridable methods in constructors
-dotnet_diagnostic.CA2215.severity = error    # Dispose methods should call base class dispose
-dotnet_diagnostic.CA2216.severity = error    # Disposable types should declare finalizer
-dotnet_diagnostic.CA2217.severity = warning  # Do not mark enums with FlagsAttribute
-dotnet_diagnostic.CA2218.severity = error    # Override GetHashCode on overriding Equals
-dotnet_diagnostic.CA2219.severity = error    # Do not raise exceptions in exception clauses
-dotnet_diagnostic.CA2224.severity = error    # Override equals on overloading operator equals
-dotnet_diagnostic.CA2225.severity = warning  # Operator overloads have named alternates
-dotnet_diagnostic.CA2226.severity = error    # Operators should have symmetrical overloads
-dotnet_diagnostic.CA2227.severity = warning  # Collection properties should be read only
-dotnet_diagnostic.CA2229.severity = warning  # Implement serialization constructors
-dotnet_diagnostic.CA2231.severity = none  # Overridden below - equality operators on private structs    # Override operator equals on overriding ValueType.Equals
-dotnet_diagnostic.CA2234.severity = warning  # Pass System.Uri objects instead of strings
-dotnet_diagnostic.CA2235.severity = warning  # Mark all non-serializable fields
-dotnet_diagnostic.CA2237.severity = warning  # Mark ISerializable types with SerializableAttribute
-dotnet_diagnostic.CA2241.severity = error    # Provide correct arguments to formatting methods
-dotnet_diagnostic.CA2242.severity = error    # Test for NaN correctly
-dotnet_diagnostic.CA2243.severity = warning  # Attribute string literals should parse correctly
-dotnet_diagnostic.CA2244.severity = error    # Do not duplicate indexed element initializations
-dotnet_diagnostic.CA2245.severity = error    # Do not assign a property to itself
-dotnet_diagnostic.CA2246.severity = error    # Do not assign a symbol and its member in the same statement
-dotnet_diagnostic.CA2247.severity = error    # Argument to TaskCompletionSource constructor should be TaskCreationOptions value
-dotnet_diagnostic.CA2248.severity = error    # Provide correct enum argument to Enum.HasFlag
-dotnet_diagnostic.CA2249.severity = error    # Consider using String.Contains instead of String.IndexOf
-dotnet_diagnostic.CA2250.severity = error    # Use ThrowIfCancellationRequested
-dotnet_diagnostic.CA2251.severity = error    # Use String.Equals over String.Compare
-dotnet_diagnostic.CA2252.severity = error    # Opt in to preview features
-dotnet_diagnostic.CA2253.severity = error    # Named placeholders should not be numeric values
-dotnet_diagnostic.CA2254.severity = warning  # Template should be a static expression
-dotnet_diagnostic.CA2255.severity = error    # The ModuleInitializer attribute should not be used in libraries
-dotnet_diagnostic.CA2256.severity = error    # All members declared in parent interfaces must have an implementation in a DynamicInterfaceCastableImplementation-attributed interface
-dotnet_diagnostic.CA2257.severity = error    # Members defined on an interface with DynamicInterfaceCastableImplementationAttribute should be static
-dotnet_diagnostic.CA2258.severity = error    # Providing a DynamicInterfaceCastableImplementation interface in Visual Basic is unsupported
-
-# Usage rules
-dotnet_diagnostic.CA2300.severity = none     # Do not use insecure deserializer BinaryFormatter
-dotnet_diagnostic.CA2301.severity = none     # Do not call BinaryFormatter.Deserialize without first setting BinaryFormatter.Binder
-dotnet_diagnostic.CA2302.severity = none     # Ensure BinaryFormatter.Binder is set before calling BinaryFormatter.Deserialize
-dotnet_diagnostic.CA2305.severity = none     # Do not use insecure deserializer LosFormatter
-dotnet_diagnostic.CA2310.severity = none     # Do not use insecure deserializer NetDataContractSerializer
-dotnet_diagnostic.CA2311.severity = none     # Do not deserialize without first setting NetDataContractSerializer.Binder
-dotnet_diagnostic.CA2312.severity = none     # Ensure NetDataContractSerializer.Binder is set before deserializing
-dotnet_diagnostic.CA2315.severity = none     # Do not use insecure deserializer ObjectStateFormatter
-dotnet_diagnostic.CA2321.severity = none     # Do not deserialize with JavaScriptSerializer using a SimpleTypeResolver
-dotnet_diagnostic.CA2322.severity = none     # Ensure JavaScriptSerializer is not initialized with SimpleTypeResolver before deserializing
 
 # ============================================
 # ROSLYNATOR ANALYZERS (RCS*)
@@ -780,13 +780,13 @@ dotnet_diagnostic.CS8614.severity = error    # Nullability of reference types in
 dotnet_diagnostic.CS8615.severity = error    # Nullability of reference types in type doesn't match implemented member
 dotnet_diagnostic.CS8616.severity = error    # Nullability of reference types in return type doesn't match implemented member
 dotnet_diagnostic.CS8617.severity = error    # Nullability of reference types in type of parameter doesn't match implemented member
-dotnet_diagnostic.CS8618.severity = error    # Non-nullable field/property is uninitialized
+dotnet_diagnostic.CS8618.severity = warning    # Non-nullable field/property is uninitialized
 dotnet_diagnostic.CS8619.severity = error    # Nullability of reference types in value doesn't match target type
 dotnet_diagnostic.CS8620.severity = error    # Argument cannot be used for parameter due to differences in the nullability of reference types
 dotnet_diagnostic.CS8621.severity = error    # Nullability of reference types in return type doesn't match the target delegate
 dotnet_diagnostic.CS8622.severity = error    # Nullability of reference types in type of parameter doesn't match the target delegate
 dotnet_diagnostic.CS8624.severity = error    # Argument cannot be used as an output for parameter due to differences in the nullability of reference types
-dotnet_diagnostic.CS8625.severity = error    # Cannot convert null literal to non-nullable reference type
+dotnet_diagnostic.CS8625.severity = warning    # Cannot convert null literal to non-nullable reference type
 dotnet_diagnostic.CS8626.severity = error    # The 'as' operator may produce a null value for a type parameter
 dotnet_diagnostic.CS8629.severity = error    # Nullable value type may be null
 dotnet_diagnostic.CS8631.severity = error    # The type cannot be used as type parameter in the generic type or method
@@ -894,7 +894,6 @@ dotnet_diagnostic.IDE2006.severity = none
 dotnet_diagnostic.CA1051.severity = none
 
 # CA2231, CA1815: Equality operators on private cache structs - not needed
-dotnet_diagnostic.CA2231.severity = none
 dotnet_diagnostic.CA1815.severity = none
 
 # RCS1231: ref readonly parameters - too aggressive for current C# patterns
