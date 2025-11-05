@@ -6,52 +6,34 @@ using Xunit;
 
 namespace Arsenal.Tests.Common;
 
-/// <summary>Algebraic test utilities using dispatch-based assertion with zero duplication.</summary>
+/// <summary>Algebraic test utilities using polymorphic dispatch with zero duplication.</summary>
 public static class TestUtilities {
-    /// <summary>Unified assertion dispatcher using algebraic delegate pattern matching.</summary>
+    /// <summary>Unified assertion dispatcher using pattern matching on delegate type and generic arity.</summary>
     public static void Assert<T>(this Gen<T> gen, Delegate assertion, int iterations = 100) =>
-        (assertion switch {
-            Func<T, bool> property => new Action(() => gen.Sample(property, iter: iterations)),
-            Action<T> sample => new Action(() => gen.Sample(v => { sample(v); return true; }, iter: iterations)),
-            _ when typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
-                assertion switch {
-                    Action<object, object> action => new Action(() => gen.Sample(v => {
-                        dynamic tuple = v;
-                        action(tuple.Item1, tuple.Item2);
-                        return true;
-                    }, iter: iterations)),
-                    _ => throw new ArgumentException($"Unsupported tuple assertion type: {assertion.GetType()}", nameof(assertion)),
-                },
-            _ when typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ValueTuple<,,>) =>
-                assertion.GetType().GetGenericArguments() switch {
-                    [var t1, var t2, var t3] when assertion.GetType().GetGenericTypeDefinition() == typeof(Func<,,,>) =>
-                        new Action(() => gen.Sample(v => (bool)assertion.DynamicInvoke(((dynamic)v).Item1, ((dynamic)v).Item2, ((dynamic)v).Item3)!, iter: iterations)),
-                    _ => throw new ArgumentException($"Unsupported triple tuple assertion type: {assertion.GetType()}", nameof(assertion)),
-                },
-            _ => throw new ArgumentException($"Unsupported assertion type: {assertion.GetType()}", nameof(assertion)),
-        })();
+        (typeof(T), assertion) switch {
+            (Type t, Func<T, bool> prop) when !t.IsGenericType => new Action(() => gen.Sample(prop, iter: iterations)),
+            (Type t, Action<T> act) when !t.IsGenericType => new Action(() => gen.Sample(v => (act(v), true).Item2, iter: iterations)),
+            (Type { IsGenericType: true } t, Action<object, object> act) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
+                new Action(() => gen.Sample(v => ((dynamic d) => (act(d.Item1, d.Item2), true).Item2)(v), iter: iterations)),
+            (Type { IsGenericType: true } t, Func<T1, T2, bool>) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
+                new Action(() => gen.Sample(v => (bool)assertion.DynamicInvoke(((dynamic)v).Item1, ((dynamic)v).Item2)!, iter: iterations)),
+            (Type { IsGenericType: true } t, Action<T1, T2> act) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
+                new Action(() => gen.Sample(v => ((dynamic d) => (act(d.Item1, d.Item2), true).Item2)(v), iter: iterations)),
+            _ => throw new ArgumentException($"Unsupported assertion pattern: {typeof(T)}, {assertion.GetType()}", nameof(assertion)),
+        }();
 
-    /// <summary>Unified tuple assertion dispatcher with arity-2 algebraic decomposition.</summary>
-    public static void Assert<T1, T2>(this Gen<(T1, T2)> gen, Delegate assertion, int iterations = 100) =>
-        (assertion switch {
-            Func<T1, T2, bool> property => new Action(() => gen.Sample(t => property(t.Item1, t.Item2), iter: iterations)),
-            Action<T1, T2> sample => new Action(() => gen.Sample(t => { sample(t.Item1, t.Item2); return true; }, iter: iterations)),
-            _ => throw new ArgumentException($"Unsupported assertion type: {assertion.GetType()}", nameof(assertion)),
-        })();
-
-    /// <summary>Algebraic generator composition using Cartesian product.</summary>
+    /// <summary>Algebraic generator composition using Cartesian product and select.</summary>
     public static Gen<(T1, T2)> Tuple<T1, T2>(this Gen<T1> gen1, Gen<T2> gen2) => gen1.Select(gen2);
 
-    /// <summary>Algebraic generator composition with arity-3.</summary>
+    /// <summary>Algebraic generator composition with arity-3 Cartesian product.</summary>
     public static Gen<(T1, T2, T3)> Tuple<T1, T2, T3>(this Gen<T1> gen1, Gen<T2> gen2, Gen<T3> gen3) => gen1.Select(gen2, gen3);
 
-    /// <summary>Monadic filter using pattern matching predicate.</summary>
+    /// <summary>Monadic filter using predicate pattern matching.</summary>
     public static Gen<T> Matching<T>(this Gen<T> gen, Func<T, bool> pattern) => gen.Where(pattern);
 
-    /// <summary>Parallel assertion execution using algebraic composition.</summary>
+    /// <summary>Parallel assertion execution using algebraic for-each composition.</summary>
     public static void AssertAll(params Action[] assertions) => Array.ForEach(assertions, static action => action());
 
-    /// <summary>Assertion composition builder using delegate type dispatch.</summary>
-    public static Action ToAssertion<T>(this Gen<T> gen, Delegate assertion, int iterations = 100) =>
-        () => gen.Assert(assertion, iterations);
+    /// <summary>Assertion composition builder using closure over gen and assertion.</summary>
+    public static Action ToAssertion<T>(this Gen<T> gen, Delegate assertion, int iterations = 100) => () => gen.Assert(assertion, iterations);
 }
