@@ -72,8 +72,6 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- Report all analyzer diagnostics, not just errors -->
     <ReportAnalyzer>true</ReportAnalyzer>
-    <!-- Ensure code style analyzers emit in build output -->
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <!-- ============================================ -->
