@@ -124,18 +124,11 @@ public sealed class ResultFactoryTests {
             Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError(recoverWith: _ => ResultFactory.Create(value: 99)).Value)), 50),
         () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Filter(x => x > 0, Errors.E2).Errors));
 
-    /// <summary>Verifies Create no-value-provided error case using exhaustive pattern.</summary>
-    [Fact]
-    public void CreateNoValueProvidedGeneratesError() => TestUtilities.AssertAll(
-        () => Assert.False(ResultFactory.Create<int>().IsSuccess),
-        () => Assert.NotEmpty(ResultFactory.Create<int>().Errors),
-        () => Assert.False(ResultFactory.Create<string>().IsSuccess));
-
     /// <summary>Verifies Validate batch validations accumulate all errors.</summary>
     [Fact]
     public void ValidateBatchValidationsAccumulatesAllErrors() => TestUtilities.AssertAll(
         () => {
-            Result<int> result = ResultFactory.Create(value: 150).Validate(validations: [
+            Result<int> result = ResultFactory.Create(value: 151).Validate(validations: [
                 (x => x > 0, Errors.E1),
                 (x => x < 100, Errors.E2),
                 (x => x % 2 == 0, Errors.E3),

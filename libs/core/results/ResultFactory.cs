@@ -1,15 +1,15 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Validation;
-using Rhino.Geometry;
 
 namespace Arsenal.Core.Results;
 
 /// <summary>Polymorphic factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
-    /// <summary>Creates Result using polymorphic parameter detection.</summary>
+    /// <summary>Creates Result using polymorphic parameter detection with explicit value semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
         T? value = default,
@@ -19,16 +19,16 @@ public static class ResultFactory {
         (Func<T, bool> Condition, SystemError Error)[]? conditionals = null,
         Result<Result<T>>? nested = null) =>
         (value, errors, error, deferred, conditionals, nested) switch {
-            (var v, null, null, null, null, null) when v is not null || (typeof(T).IsValueType && !EqualityComparer<T>.Default.Equals(v!, default)) =>
-                new Result<T>(isSuccess: true, v!, [], deferred: null),
+            (var v, null, null, null, null, null) when v is not null =>
+                new Result<T>(isSuccess: true, v, [], deferred: null),
             (_, var e, null, null, null, null) when e?.Length > 0 =>
                 new Result<T>(isSuccess: false, default!, e, deferred: null),
             (_, null, var e, null, null, null) when e.HasValue =>
                 new Result<T>(isSuccess: false, default!, [e.Value], deferred: null),
             (_, null, null, var d, null, null) when d is not null =>
                 new Result<T>(isSuccess: false, default!, [], deferred: d),
-            (var v, null, null, null, var conds, null) when (v is not null || (typeof(T).IsValueType && !EqualityComparer<T>.Default.Equals(v!, default))) && conds is not null =>
-                new Result<T>(isSuccess: true, v!, [], deferred: null).Ensure([.. conds]),
+            (var v, null, null, null, var conds, null) when v is not null && conds is not null =>
+                new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue =>
                 n.Value.Match(
                     onSuccess: inner => inner,
@@ -59,12 +59,12 @@ public static class ResultFactory {
                 result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
             // Batch validation
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
-            // Geometry validation
-            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
+            // Geometry validation (deferred type check to avoid assembly loading)
+            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when IsGeometryType(typeof(T)) =>
                 result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
                     var errs => Create<T>(errors: errs),
                 }),
-            (null, null, null, [IGeometryContext ctx]) when typeof(T).IsAssignableTo(typeof(GeometryBase)) =>
+            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) =>
                 result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
                     var errs => Create<T>(errors: errs),
                 }),
@@ -73,22 +73,41 @@ public static class ResultFactory {
             _ => result,
         };
 
-    /// <summary>Lifts functions into Result context with partial application.</summary>
+    /// <summary>Lifts functions into Result context with partial application and Result unwrapping.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Lift<TResult>(Delegate func, params object[] args) {
         ArgumentNullException.ThrowIfNull(func);
         ArgumentNullException.ThrowIfNull(args);
 
-        return (func.Method.GetParameters().Length, args.Count(x => x.GetType().IsGenericType && x.GetType().GetGenericTypeDefinition() == typeof(Result<>)), args) switch {
-            (var arity, 0, var a) when arity > a.Length =>
-                Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
-            (var arity, var resultCount, var a) when arity == a.Length && resultCount == arity =>
-                a.Cast<Result<object>>().Aggregate(
+        (int arity, int resultCount, int nonResultCount, object[] a) = (
+            func.Method.GetParameters().Length,
+            args.Count(x => x.GetType().IsGenericType && x.GetType().GetGenericTypeDefinition() == typeof(Result<>)),
+            args.Count(x => !(x.GetType().IsGenericType && x.GetType().GetGenericTypeDefinition() == typeof(Result<>))),
+            args);
+        return (arity, resultCount, nonResultCount, a) switch {
+            // Partial application: non-Result args only
+            (var ar, 0, var nrc, var argList) when ar > argList.Length && nrc == argList.Length =>
+                Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. argList, .. remaining])!),
+            // Full application: all Result args
+            (var ar, var rc, 0, var argList) when ar == argList.Length && rc == ar =>
+                argList.Cast<Result<object>>().Aggregate(
                     Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
                     (acc, curr) => acc.Apply(curr.Map<Func<IReadOnlyList<object>, IReadOnlyList<object>>>(
                         value => list => [.. list, value])))
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
-            _ => throw new ArgumentException($"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={func.Method.GetParameters().Length}, results={args.Count(x => x.GetType().IsGenericType && x.GetType().GetGenericTypeDefinition() == typeof(Result<>))}, args={args.Length}", nameof(args)),
+            // Partial application with Result unwrapping: only Results, arity>=3 to avoid ambiguity
+            (var ar, var rc, 0, var argList) when rc == argList.Length && ar >= 3 && ar > argList.Length =>
+                argList.Aggregate(
+                    Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                    (acc, arg) => UnwrapResultArg(acc, arg))
+                .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
+            // Partial application with Result unwrapping: mixed args
+            (var ar, var rc, var nrc, var argList) when rc > 0 && nrc > 0 && ar > argList.Length =>
+                argList.Aggregate(
+                    Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                    (acc, arg) => UnwrapResultArg(acc, arg))
+                .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
+            _ => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={arity.ToString(CultureInfo.InvariantCulture)}, results={resultCount.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
         };
     }
 
@@ -102,5 +121,21 @@ public static class ResultFactory {
                 List<TOut> newList = [.. list, val];
                 return (IReadOnlyList<TOut>)newList.AsReadOnly();
             }))));
+    }
+
+    /// <summary>Checks if type is Geometry without loading Rhino assembly using string comparison.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsGeometryType(Type type) =>
+        type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
+
+    /// <summary>Unwraps Result argument or appends non-Result argument to accumulator.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<object>> UnwrapResultArg(Result<IReadOnlyList<object>> acc, object arg) {
+        Type argType = arg.GetType();
+        return argType is { IsGenericType: true } && argType.GetGenericTypeDefinition() == typeof(Result<>) ? ((bool)argType.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, argType.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)argType.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
+                (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!]),
+                (false, _, var errs) => Create<IReadOnlyList<object>>(errors: errs),
+                _ => acc,
+            } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg]);
     }
 }

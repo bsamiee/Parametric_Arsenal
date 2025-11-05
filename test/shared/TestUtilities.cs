@@ -7,17 +7,19 @@ public static class TestUtilities {
     /// <summary>Unified assertion dispatcher using pattern matching on delegate type and generic arity.</summary>
     public static Action Assert<T>(this Gen<T> gen, Delegate assertion, int iterations = 100) =>
         (typeof(T), assertion) switch {
-            (Type t, Func<T, bool> prop) when !t.IsGenericType => new Action(() => gen.Sample(prop, iter: iterations)),
-            (Type t, Action<T> act) when !t.IsGenericType => new Action(() => gen.Sample(v => { act(v); return true; }, iter: iterations)),
-            (Type { IsGenericType: true } t, Action<object, object> act) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
-                new Action(() => gen.Sample(v => v switch {
-                    ValueTuple<object, object>(object item1, object item2) => ((Func<bool>)(() => { act(item1, item2); return true; }))(),
-                    _ => throw new InvalidOperationException($"Expected ValueTuple<,>, got {v?.GetType()}"),
+            (Type t, Func<T, bool> prop) => new Action(() => gen.Sample(prop, iter: iterations)),
+            (Type t, Action<T> act) => new Action(() => gen.Sample(v => { act(v); return true; }, iter: iterations)),
+            (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
+                new Action(() => gen.Sample(v => {
+                    object?[] args = [v.GetType().GetField("Item1")!.GetValue(v), v.GetType().GetField("Item2")!.GetValue(v)];
+                    object? result = d.DynamicInvoke(args);
+                    return result switch { bool b => b, null => true, _ => true };
                 }, iter: iterations)),
-            (Type { IsGenericType: true } t, Func<object, object, bool> func) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
-                new Action(() => gen.Sample(v => v switch {
-                    ValueTuple<object, object>(object item1, object item2) => assertion.DynamicInvoke(item1, item2) is bool result && result,
-                    _ => throw new InvalidOperationException($"Expected ValueTuple<,>, got {v?.GetType()}"),
+            (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,,>) =>
+                new Action(() => gen.Sample(v => {
+                    object?[] args = [v.GetType().GetField("Item1")!.GetValue(v), v.GetType().GetField("Item2")!.GetValue(v), v.GetType().GetField("Item3")!.GetValue(v)];
+                    object? result = d.DynamicInvoke(args);
+                    return result switch { bool b => b, null => true, _ => true };
                 }, iter: iterations)),
             _ => throw new ArgumentException($"Unsupported assertion pattern: {typeof(T)}, {assertion.GetType()}", nameof(assertion)),
         };
