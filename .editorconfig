@@ -26,6 +26,12 @@ root = true
 # - Focus on correctness, performance, and API design instead
 #
 # ANALYZER PRIORITIES:
+#
+# UNUSED MEMBER DETECTION:
+# - IDE0051/IDE0052 (unused private members) intentionally excluded
+# - Libs are under active development with unconsumed APIs
+# - IDE0060 (unused parameters) kept as warning for visibility
+# - Unnecessary code rules (IDE0035, IDE0100, etc.) kept at error
 # - Design & API (CA1xxx): Error level
 # - Performance (CA18xx, MA0xxx): Error level
 # - Reliability (CA2000-CA2018): Error level
@@ -166,15 +172,13 @@ csharp_style_prefer_readonly_record_struct = true:error
 # CODE SIMPLIFICATIONS & UNNECESSARY CODE
 # ============================================
 
-# Remove unnecessary code
+# Remove unnecessary code (not unused members - libs still under development)
 dotnet_diagnostic.IDE0001.severity = error  # Simplify name
 dotnet_diagnostic.IDE0002.severity = error  # Simplify member access
 dotnet_diagnostic.IDE0004.severity = warning  # Remove unnecessary cast
 dotnet_diagnostic.IDE0010.severity = error  # Add missing cases to switch
 dotnet_diagnostic.IDE0035.severity = error  # Remove unreachable code
 dotnet_diagnostic.IDE0050.severity = error  # Convert anonymous type to tuple
-dotnet_diagnostic.IDE0051.severity = error  # Remove unused private member
-dotnet_diagnostic.IDE0052.severity = error  # Remove unread private member
 dotnet_diagnostic.IDE0060.severity = warning  # Remove unused parameter
 dotnet_diagnostic.IDE0080.severity = error  # Remove unnecessary suppression
 dotnet_diagnostic.IDE0100.severity = error  # Remove unnecessary equality operator
