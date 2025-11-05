@@ -35,16 +35,14 @@ internal static class ExtractionStrategies {
         GeometryBase geometry, ExtractionMethod method,
         IGeometryContext context, int? count = null, double? length = null, bool includeEnds = true) =>
         ResultFactory.Create(value: geometry)
-            .Validate(args: [context, ((Func<Type, ValidationMode>)(type => {
-                Type? currentType = type;
-                while (currentType is not null && currentType != typeof(object)) {
-                    if (_validationConfig.TryGetValue((method, currentType), out ValidationMode mode)) {
-                        return mode;
+            .Validate(args: [context, ((Func<ValidationMode>)(() => {
+                for (Type? t = geometry.GetType(); t is not null && t != typeof(object); t = t.BaseType) {
+                    if (_validationConfig.TryGetValue((method, t), out ValidationMode m)) {
+                        return m;
                     }
-                    currentType = currentType.BaseType;
                 }
                 return _validationConfig.GetValueOrDefault((method, typeof(GeometryBase)), ValidationMode.Standard);
-            }))(geometry.GetType()),])
+            }))(),])
             .Bind(g => ExtractCore(g, method, context, count, length, includeEnds) switch {
                 Point3d[] { Length: > 0 } result => ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
                 null => ResultFactory.Create<IReadOnlyList<Point3d>>(error: (method, count, length) switch {
@@ -61,20 +59,10 @@ internal static class ExtractionStrategies {
         GeometryBase geometry, ExtractionMethod method,
         IGeometryContext context, int? count, double? length, bool includeEnds) =>
         (method, geometry) switch {
-            (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, Extrusion extrusion) when extrusion.ToBrep(splitKinkyFaces: true) is Brep brep => ((Func<Point3d[]?>)(() => {
-                try {
-                    return ExtractCore(brep, method, context, count, length, includeEnds);
-                } finally {
-                    brep.Dispose();
-                }
-            }))(),
-            (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, SubD subD) when subD.ToBrep() is Brep brep => ((Func<Point3d[]?>)(() => {
-                try {
-                    return ExtractCore(brep, method, context, count, length, includeEnds);
-                } finally {
-                    brep.Dispose();
-                }
-            }))(),
+            (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, Extrusion extrusion) when extrusion.ToBrep(splitKinkyFaces: true) is Brep brep =>
+                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds); } finally { b.Dispose(); } }))(brep),
+            (ExtractionMethod.Analytical or ExtractionMethod.EdgeMidpoints, SubD subD) when subD.ToBrep() is Brep brep =>
+                ((Func<Brep, Point3d[]?>)(b => { try { return ExtractCore(b, method, context, count, length, includeEnds); } finally { b.Dispose(); } }))(brep),
             (ExtractionMethod.Uniform, Curve curve) when count is int uniformCount =>
                 curve.DivideByCount(uniformCount, includeEnds)?.Select(curve.PointAt).ToArray(),
             (ExtractionMethod.Uniform, Curve curve) when length is double uniformLength =>
@@ -89,50 +77,46 @@ internal static class ExtractionStrategies {
             (ExtractionMethod.Uniform, _) => null,
             (ExtractionMethod.Analytical, GeometryBase analytic) => [..
                 (analytic switch {
-                    Brep brep when VolumeMassProperties.Compute(brep)?.Centroid is { IsValid: true } centroid => [centroid,],
-                    Curve curve when AreaMassProperties.Compute(curve)?.Centroid is { IsValid: true } centroid => [centroid,],
-                    Surface surface when AreaMassProperties.Compute(surface)?.Centroid is { IsValid: true } centroid => [centroid,],
-                    Mesh mesh when mesh.Vertices.Count > 0 && VolumeMassProperties.Compute(mesh)?.Centroid is { IsValid: true } centroid => [centroid,],
-                    PointCloud cloud when cloud.Count > 0 => [cloud.GetPoints().Aggregate(Point3d.Origin, (Point3d sum, Point3d point) => sum + point) / cloud.Count,],
+                    Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c,],
+                    Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct,],
+                    Surface s when AreaMassProperties.Compute(s)?.Centroid is { IsValid: true } cs => [cs,],
+                    Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m)?.Centroid is { IsValid: true } cm => [cm,],
+                    PointCloud pc when pc.Count > 0 => [pc.GetPoints().Aggregate(Point3d.Origin, (Point3d sum, Point3d pt) => sum + pt) / pc.Count,],
                     _ => Enumerable.Empty<Point3d>(),
                 }),
                 .. (analytic switch {
-                    NurbsCurve nurbsCurve => nurbsCurve.Points.Select(point => point.Location),
-                    NurbsSurface nurbsSurface => from index in Enumerable.Range(0, nurbsSurface.Points.CountU * nurbsSurface.Points.CountV)
-                        select nurbsSurface.Points.GetControlPoint(index / nurbsSurface.Points.CountV, index % nurbsSurface.Points.CountV).Location,
-                    Curve curve => [curve.PointAtStart, curve.PointAt(curve.Domain.ParameterAt(0.5)), curve.PointAtEnd,],
-                    Surface surface => [surface.PointAt(surface.Domain(0).Min, surface.Domain(1).Min),
-                        surface.PointAt(surface.Domain(0).Max, surface.Domain(1).Min),
-                        surface.PointAt(surface.Domain(0).Max, surface.Domain(1).Max),
-                        surface.PointAt(surface.Domain(0).Min, surface.Domain(1).Max),],
-                    Brep brep => brep.Vertices.Select(vertex => vertex.Location),
-                    Mesh mesh => mesh.Vertices.ToPoint3dArray().AsEnumerable(),
-                    PointCloud cloud => cloud.GetPoints().AsEnumerable(),
-                    _ => Array.Empty<Point3d>(),
+                    NurbsCurve nc => nc.Points.Select(cp => cp.Location),
+                    NurbsSurface ns => from i in Enumerable.Range(0, ns.Points.CountU * ns.Points.CountV)
+                        select ns.Points.GetControlPoint(i / ns.Points.CountV, i % ns.Points.CountV).Location,
+                    Curve c => [c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd,],
+                    Surface s when (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) =>
+                        [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max),],
+                    Brep b => b.Vertices.Select(v => v.Location),
+                    Mesh m => m.Vertices.ToPoint3dArray(),
+                    PointCloud pc => pc.GetPoints(),
+                    _ => [],
                 }),],
-            (ExtractionMethod.Extremal, Curve curve) => [curve.PointAtStart, curve.PointAtEnd,],
-            (ExtractionMethod.Extremal, Surface surface) when surface.Domain(0) is Interval intervalU && surface.Domain(1) is Interval intervalV =>
-                [surface.PointAt(intervalU.Min, intervalV.Min), surface.PointAt(intervalU.Max, intervalV.Min), surface.PointAt(intervalU.Max, intervalV.Max), surface.PointAt(intervalU.Min, intervalV.Max),],
-            (ExtractionMethod.Extremal, GeometryBase geometryBase) => geometryBase.GetBoundingBox(accurate: true).GetCorners(),
-            (ExtractionMethod.Quadrant, Curve curve) when curve.TryGetCircle(out Circle circle, context.AbsoluteTolerance) =>
-                [.. Enumerable.Range(0, 4).Select(index => circle.PointAt(index * Math.PI / 2)),],
-            (ExtractionMethod.Quadrant, Curve curve) when curve.TryGetEllipse(out Ellipse ellipse, context.AbsoluteTolerance) =>
-                [ellipse.Center + (ellipse.Plane.XAxis * ellipse.Radius1),
-                    ellipse.Center + (ellipse.Plane.YAxis * ellipse.Radius2),
-                    ellipse.Center - (ellipse.Plane.XAxis * ellipse.Radius1),
-                    ellipse.Center - (ellipse.Plane.YAxis * ellipse.Radius2),],
-            (ExtractionMethod.Quadrant, Curve curve) when curve.TryGetPolyline(out Polyline polyline) => [.. polyline,],
-            (ExtractionMethod.Quadrant, Curve curve) when curve.IsLinear(context.AbsoluteTolerance) => [curve.PointAtStart, curve.PointAtEnd,],
+            (ExtractionMethod.Extremal, Curve c) => [c.PointAtStart, c.PointAtEnd,],
+            (ExtractionMethod.Extremal, Surface s) when (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) =>
+                [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max),],
+            (ExtractionMethod.Extremal, GeometryBase g) => g.GetBoundingBox(accurate: true).GetCorners(),
+            (ExtractionMethod.Quadrant, Curve c) when c.TryGetCircle(out Circle circ, context.AbsoluteTolerance) =>
+                [circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2),],
+            (ExtractionMethod.Quadrant, Curve c) when c.TryGetEllipse(out Ellipse e, context.AbsoluteTolerance) =>
+                [e.Center + (e.Plane.XAxis * e.Radius1), e.Center + (e.Plane.YAxis * e.Radius2),
+                    e.Center - (e.Plane.XAxis * e.Radius1), e.Center - (e.Plane.YAxis * e.Radius2),],
+            (ExtractionMethod.Quadrant, Curve c) when c.TryGetPolyline(out Polyline pl) => [.. pl,],
+            (ExtractionMethod.Quadrant, Curve c) when c.IsLinear(context.AbsoluteTolerance) => [c.PointAtStart, c.PointAtEnd,],
             (ExtractionMethod.Quadrant, _) => null,
-            (ExtractionMethod.EdgeMidpoints, Brep brep) => [.. brep.Edges.Select(edge => edge.PointAtNormalizedLength(0.5)),],
-            (ExtractionMethod.EdgeMidpoints, Mesh mesh) => [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
-                .Select(index => mesh.TopologyEdges.EdgeLine(index))
-                .Where(line => line.IsValid)
-                .Select(line => line.PointAt(0.5)),],
-            (ExtractionMethod.EdgeMidpoints, Curve curve) => curve.DuplicateSegments() switch {
-                Curve[] segments when segments.Length > 0 => [.. segments.Select(segment => segment.PointAtNormalizedLength(0.5)),],
-                _ => curve.TryGetPolyline(out Polyline polyline)
-                    ? [.. polyline.GetSegments().Where(line => line.IsValid).Select(line => line.PointAt(0.5)),]
+            (ExtractionMethod.EdgeMidpoints, Brep b) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5)),],
+            (ExtractionMethod.EdgeMidpoints, Mesh m) => [.. Enumerable.Range(0, m.TopologyEdges.Count)
+                .Select(i => m.TopologyEdges.EdgeLine(i))
+                .Where(ln => ln.IsValid)
+                .Select(ln => ln.PointAt(0.5)),],
+            (ExtractionMethod.EdgeMidpoints, Curve c) => c.DuplicateSegments() switch {
+                Curve[] segs when segs.Length > 0 => [.. segs.Select(seg => seg.PointAtNormalizedLength(0.5)),],
+                _ => c.TryGetPolyline(out Polyline pl)
+                    ? [.. pl.GetSegments().Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5)),]
                     : null,
             },
             (ExtractionMethod.EdgeMidpoints, _) => null,
