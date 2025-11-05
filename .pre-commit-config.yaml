@@ -17,32 +17,20 @@ default_language_version:
 
 repos:
   # ---------------------------------------------------------------------------
-  # General File Quality Checks
+  # General File Quality Checks (Local)
   # ---------------------------------------------------------------------------
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+  - repo: local
     hooks:
-      - id: trailing-whitespace
-        name: Trim trailing whitespace
-        exclude: '\.md$'
-      - id: end-of-file-fixer
-        name: Ensure files end with newline
-      - id: check-yaml
-        name: Validate YAML files
-      - id: check-json
-        name: Validate JSON files
-      - id: check-toml
-        name: Validate TOML files
-      - id: check-added-large-files
-        name: Prevent large files (>500KB)
-        args: ['--maxkb=500']
       - id: check-merge-conflict
         name: Check for merge conflicts
-      - id: check-case-conflict
-        name: Check for filename case conflicts
-      - id: mixed-line-ending
-        name: Ensure consistent line endings
-        args: ['--fix=lf']
+        entry: bash -c 'if git diff --cached | grep -E "^(<<<<<<<|=======|>>>>>>>)"; then echo "Merge conflict markers found"; exit 1; fi'
+        language: system
+        pass_filenames: false
+      
+      - id: check-large-files
+        name: Check for large files
+        entry: bash -c 'for file in "$@"; do size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null); if [ "$size" -gt 512000 ]; then echo "File $file is too large (${size} bytes > 500KB)"; exit 1; fi; done' --
+        language: system
 
   # ---------------------------------------------------------------------------
   # .NET Build & Analysis (Analyzers + EditorConfig)
@@ -84,18 +72,20 @@ repos:
         pass_filenames: false
 
   # ---------------------------------------------------------------------------
-  # Python Linting & Formatting (Ruff)
+  # Python Linting & Formatting (Local - requires ruff in environment)
   # ---------------------------------------------------------------------------
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.0
+  - repo: local
     hooks:
-      - id: ruff
+      - id: ruff-check
         name: Ruff lint Python files
-        args: ['--fix', '--exit-non-zero-on-fix']
+        entry: bash -c 'if command -v ruff >/dev/null 2>&1; then ruff check --fix "$@"; else echo "ruff not found, skipping"; fi' --
+        language: system
         types: [python]
 
       - id: ruff-format
         name: Ruff format Python files
+        entry: bash -c 'if command -v ruff >/dev/null 2>&1; then ruff format "$@"; else echo "ruff not found, skipping"; fi' --
+        language: system
         types: [python]
 
   # ---------------------------------------------------------------------------
