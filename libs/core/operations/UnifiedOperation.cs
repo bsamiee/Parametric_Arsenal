@@ -51,7 +51,7 @@ public static class UnifiedOperation {
                 .Bind(resolveOp)
                 .Map(outputs => config.OutputFilter switch {
                     null => outputs,
-                    Func<TOut, bool> filter => outputs.Where(filter).ToList(),
+                    Func<TOut, bool> filter => outputs.Where(filter).ToArray(),
                 })
                 .Bind(outputs => config.PostTransform switch {
                     null => ResultFactory.Create(value: outputs),
