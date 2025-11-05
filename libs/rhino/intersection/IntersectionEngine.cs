@@ -23,30 +23,20 @@ public static class IntersectionEngine {
         (geometryA, geometryB) switch {
             (GeometryBase ga, GeometryBase gb) => IntersectionStrategies.Intersect(ga, gb, method, context, tolerance, projectionDirection, maxHitCount)
                 .Map(r => (r.Points, r.Curves, r.ParametersA, r.ParametersB, r.FaceIndices, r.Sections)),
-            (System.Collections.IEnumerable collA, GeometryBase gb) when collA is not string and collA is not GeometryBase =>
+            var (a, b) when (a is System.Collections.IEnumerable && a is not string && a is not GeometryBase && b is GeometryBase) || (b is System.Collections.IEnumerable && b is not string && b is not GeometryBase && a is GeometryBase) =>
                 UnifiedOperation.Apply(
-                    collA.Cast<object>(),
-                    (Func<object, Result<IntersectionResult>>)(item => IntersectionStrategies.Intersect(item, gb, method, context, tolerance, projectionDirection, maxHitCount)),
+                    (a is System.Collections.IEnumerable && a is not string && a is not GeometryBase ? (System.Collections.IEnumerable)a : (System.Collections.IEnumerable)b).Cast<object>(),
+                    (Func<object, Result<IntersectionResult>>)(item => a is GeometryBase
+                        ? IntersectionStrategies.Intersect((GeometryBase)(object)a, item, method, context, tolerance, projectionDirection, maxHitCount)
+                        : IntersectionStrategies.Intersect(item, (GeometryBase)(object)b, method, context, tolerance, projectionDirection, maxHitCount)),
                     new OperationConfig<object, IntersectionResult> { Context = context, ValidationMode = ValidationMode.None, AccumulateErrors = true, })
                 .Map(results => (
                     (IReadOnlyList<Point3d>)[.. results.SelectMany(r => r.Points)],
-                    results.Any(r => r.Curves is not null) ? (IReadOnlyList<Curve>?)[.. results.SelectMany(r => r.Curves ?? [])] : null,
-                    results.Any(r => r.ParametersA is not null) ? (IReadOnlyList<double>?)[.. results.SelectMany(r => r.ParametersA ?? [])] : null,
-                    results.Any(r => r.ParametersB is not null) ? (IReadOnlyList<double>?)[.. results.SelectMany(r => r.ParametersB ?? [])] : null,
-                    results.Any(r => r.FaceIndices is not null) ? (IReadOnlyList<int>?)[.. results.SelectMany(r => r.FaceIndices ?? [])] : null,
-                    results.Any(r => r.Sections is not null) ? (IReadOnlyList<Polyline>?)[.. results.SelectMany(r => r.Sections ?? [])] : null)),
-            (GeometryBase ga, System.Collections.IEnumerable collB) when collB is not string and collB is not GeometryBase =>
-                UnifiedOperation.Apply(
-                    collB.Cast<object>(),
-                    (Func<object, Result<IntersectionResult>>)(item => IntersectionStrategies.Intersect(ga, item, method, context, tolerance, projectionDirection, maxHitCount)),
-                    new OperationConfig<object, IntersectionResult> { Context = context, ValidationMode = ValidationMode.None, AccumulateErrors = true, })
-                .Map(results => (
-                    (IReadOnlyList<Point3d>)[.. results.SelectMany(r => r.Points)],
-                    results.Any(r => r.Curves is not null) ? (IReadOnlyList<Curve>?)[.. results.SelectMany(r => r.Curves ?? [])] : null,
-                    results.Any(r => r.ParametersA is not null) ? (IReadOnlyList<double>?)[.. results.SelectMany(r => r.ParametersA ?? [])] : null,
-                    results.Any(r => r.ParametersB is not null) ? (IReadOnlyList<double>?)[.. results.SelectMany(r => r.ParametersB ?? [])] : null,
-                    results.Any(r => r.FaceIndices is not null) ? (IReadOnlyList<int>?)[.. results.SelectMany(r => r.FaceIndices ?? [])] : null,
-                    results.Any(r => r.Sections is not null) ? (IReadOnlyList<Polyline>?)[.. results.SelectMany(r => r.Sections ?? [])] : null)),
+                    [.. results.SelectMany(r => r.Curves ?? [])] is { Count: > 0 } curves ? (IReadOnlyList<Curve>?)curves : null,
+                    [.. results.SelectMany(r => r.ParametersA ?? [])] is { Count: > 0 } paramsA ? (IReadOnlyList<double>?)paramsA : null,
+                    [.. results.SelectMany(r => r.ParametersB ?? [])] is { Count: > 0 } paramsB ? (IReadOnlyList<double>?)paramsB : null,
+                    [.. results.SelectMany(r => r.FaceIndices ?? [])] is { Count: > 0 } indices ? (IReadOnlyList<int>?)indices : null,
+                    [.. results.SelectMany(r => r.Sections ?? [])] is { Count: > 0 } sections ? (IReadOnlyList<Polyline>?)sections : null)),
             (Point3d[] points, GeometryBase[] targets) when (method & (IntersectionMethod.ProjectPointsToBreps | IntersectionMethod.ProjectPointsToMeshes | IntersectionMethod.ProjectPointsToBrepsEx | IntersectionMethod.ProjectPointsToMeshesEx)) != IntersectionMethod.None =>
                 IntersectionStrategies.Intersect(points, targets, method, context, tolerance, projectionDirection, maxHitCount)
                     .Map(r => (r.Points, r.Curves, r.ParametersA, r.ParametersB, r.FaceIndices, r.Sections)),
