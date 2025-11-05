@@ -1,0 +1,279 @@
+using System.Globalization;
+using Arsenal.Core.Errors;
+using Arsenal.Core.Results;
+using Arsenal.Tests.Common;
+using CsCheck;
+using Xunit;
+
+namespace Arsenal.Core.Tests.Results;
+
+/// <summary>Comprehensive edge case tests for Result operations covering untested branches and boundary conditions.</summary>
+public sealed class ResultEdgeCaseTests {
+    private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
+        new(ErrorDomain.Results, 7001, "Edge1"),
+        new(ErrorDomain.Results, 7002, "Edge2"),
+        new(ErrorDomain.Results, 7003, "Edge3"));
+
+    /// <summary>Verifies value type default handling using zero-value semantics.</summary>
+    [Fact]
+    public void ValueTypeDefaultHandlingCreatesSuccessfully() => TestUtilities.AssertAll(
+        () => Assert.Equal((true, 0), (ResultFactory.Create(value: 0).IsSuccess, ResultFactory.Create(value: 0).Value)),
+        () => Assert.Equal((true, 0.0), (ResultFactory.Create(value: 0.0).IsSuccess, ResultFactory.Create(value: 0.0).Value)),
+        () => Assert.Equal((true, false), (ResultFactory.Create(value: false).IsSuccess, ResultFactory.Create(value: false).Value)),
+        () => Assert.True(ResultFactory.Create(value: default(int)).IsSuccess),
+        () => Assert.True(ResultFactory.Create(value: default(double)).IsSuccess),
+        () => Assert.True(ResultFactory.Create(value: default(bool)).IsSuccess));
+
+    /// <summary>Verifies Ensure with empty validation array returns identity.</summary>
+    [Fact]
+    public void EnsureEmptyValidationArrayReturnsIdentity() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<int> original = ResultFactory.Create(value: v);
+            Result<int> ensured = original.Ensure();
+            Assert.Equal((original.IsSuccess, original.Value), (ensured.IsSuccess, ensured.Value));
+        })),
+        () => Assert.True(ResultFactory.Create(value: 42).Ensure().IsSuccess),
+        () => Assert.Equal(42, ResultFactory.Create(value: 42).Ensure().Value));
+
+    /// <summary>Verifies OnError parameter precedence using mutually exclusive handlers.</summary>
+    [Fact]
+    public void OnErrorParameterPrecedenceAppliesCorrectly() => TestUtilities.AssertAll(
+        () => {
+            Result<int> mapped = ResultFactory.Create<int>(error: Errors.E1).OnError(mapError: _ => [Errors.E2]);
+            Assert.Equal(Errors.E2, mapped.Error);
+        },
+        () => {
+            Result<int> recovered = ResultFactory.Create<int>(error: Errors.E1).OnError(recover: _ => 99);
+            Assert.Equal((true, 99), (recovered.IsSuccess, recovered.Value));
+        },
+        () => {
+            Result<int> recoveredWith = ResultFactory.Create<int>(error: Errors.E1).OnError(recoverWith: _ => ResultFactory.Create(value: 77));
+            Assert.Equal((true, 77), (recoveredWith.IsSuccess, recoveredWith.Value));
+        },
+        () => {
+            Result<int> mapThenRecover = ResultFactory.Create<int>(error: Errors.E1).OnError(mapError: _ => [Errors.E2], recover: _ => 50);
+            Assert.Equal(Errors.E2, mapThenRecover.Error);
+        });
+
+    /// <summary>Verifies Traverse with single values versus collections using type-based dispatch.</summary>
+    [Fact]
+    public void TraverseSingleValueVersusCollectionBehavesCorrectly() => TestUtilities.AssertAll(
+        () => {
+            Result<IReadOnlyList<string>> single = ResultFactory.Create(value: 42).Traverse(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture)));
+            Assert.Equal((true, 1, "42"), (single.IsSuccess, single.Value.Count, single.Value[0]));
+        },
+        Gen.Int.List[1, 5].ToAssertion((Action<List<int>>)(items => {
+            Result<IReadOnlyList<string>> traversed = ResultFactory.Create<System.Collections.IEnumerable>(value: items)
+                .Traverse(x => ResultFactory.Create(value: ((int)x).ToString(CultureInfo.InvariantCulture)));
+            Assert.Equal((true, items.Count), (traversed.IsSuccess, traversed.Value.Count));
+        }), 20),
+        () => {
+            Result<IReadOnlyList<int>> failed = ResultFactory.Create(value: new[] { 1, 2, 3 })
+                .Traverse(x => x == 2 ? ResultFactory.Create<int>(error: Errors.E1) : ResultFactory.Create(value: x * 10));
+            Assert.False(failed.IsSuccess);
+        });
+
+    /// <summary>Verifies TraverseElements with empty collections and error propagation.</summary>
+    [Fact]
+    public void TraverseElementsEmptyAndErrorPropagationHandlesCorrectly() => TestUtilities.AssertAll(
+        () => {
+            Result<IReadOnlyList<int>> empty = ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: x * 2));
+            Assert.Equal((true, 0), (empty.IsSuccess, empty.Value.Count));
+        },
+        () => {
+            Result<IReadOnlyList<int>> errorSource = ResultFactory.Create<IEnumerable<int>>(error: Errors.E1).TraverseElements(x => ResultFactory.Create(value: x * 2));
+            Assert.False(errorSource.IsSuccess);
+        },
+        Gen.Int.List[1, 10].ToAssertion((Action<List<int>>)(items => {
+            int count = 0;
+            int threshold = items.Count / 2;
+            Result<IReadOnlyList<int>> partial = ResultFactory.Create<IEnumerable<int>>(value: items)
+                .TraverseElements(x => count++ == threshold ? ResultFactory.Create<int>(error: Errors.E1) : ResultFactory.Create(value: x));
+            Assert.False(partial.IsSuccess);
+        }), 20));
+
+    /// <summary>Verifies Lift partial application actually executes returned function.</summary>
+    [Fact]
+    public void LiftPartialApplicationExecutesCorrectly() => TestUtilities.AssertAll(
+        () => {
+            Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
+                (Func<int, int, int, int>)((x, y, z) => x + y + z),
+                [ResultFactory.Create(value: 10)]);
+            Assert.True(partial.IsSuccess);
+            int result = partial.Value([20, 30]);
+            Assert.Equal(60, result);
+        },
+        Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
+            Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
+                (Func<int, int, int>)((x, y) => x * y),
+                [ResultFactory.Create(value: a)]);
+            Assert.Equal(a * b, partial.Value([b]));
+        }), 20));
+
+    /// <summary>Verifies Filter with deferred results evaluates lazily then filters.</summary>
+    [Fact]
+    public void FilterDeferredEvaluationThenFiltersCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            int count = 0;
+            Result<int> deferred = ResultFactory.Create(deferred: () => { count++; return ResultFactory.Create(value: v); });
+            Result<int> filtered = deferred.Filter(x => x > 0, Errors.E1);
+            Assert.Equal(0, count);
+            bool success = filtered.IsSuccess;
+            Assert.Equal(1, count);
+            Assert.Equal(v > 0, success);
+        }), 20));
+
+    /// <summary>Verifies Reduce with only success handler defaults to seed on failure.</summary>
+    [Fact]
+    public void ReduceWithoutFailureHandlerDefaultsToSeed() => TestUtilities.AssertAll(
+        Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((seed, val) =>
+            Assert.Equal(seed + val, ResultFactory.Create(value: val).Reduce(seed, (s, v) => s + v)))),
+        Gen.Int.ToAssertion((Action<int>)(seed =>
+            Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Reduce(seed, (s, v) => s + v)))),
+        () => Assert.Equal(100, ResultFactory.Create<int>(error: Errors.E1).Reduce(100, (s, v) => s + v)));
+
+    /// <summary>Verifies Match executes correct branch with exhaustive pattern coverage.</summary>
+    [Fact]
+    public void MatchExecutesCorrectBranchExhaustively() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            bool successCalled = false, failureCalled = false;
+            int result = ResultFactory.Create(value: v).Match(
+                onSuccess: x => { successCalled = true; return x * 2; },
+                onFailure: _ => { failureCalled = true; return -1; });
+            Assert.Equal((v * 2, true, false), (result, successCalled, failureCalled));
+        })),
+        ResultGenerators.SystemErrorArrayGen.ToAssertion((Action<SystemError[]>)(errs => {
+            bool successCalled = false, failureCalled = false;
+            int result = ResultFactory.Create<int>(errors: errs).Match(
+                onSuccess: x => { successCalled = true; return x * 2; },
+                onFailure: e => { failureCalled = true; return e.Length; });
+            Assert.Equal((errs.Length, false, true), (result, successCalled, failureCalled));
+        }), 20));
+
+    /// <summary>Verifies Apply side-effect method preserves Result identity.</summary>
+    [Fact]
+    public void ApplyMethodPreservesResultIdentity() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<int> original = ResultFactory.Create(value: v);
+            Result<int> applied = original.Apply(onSuccess: _ => { });
+            Assert.True(ReferenceEquals(original, applied) || original.Equals(applied));
+        })),
+        ResultGenerators.SystemErrorGen.ToAssertion((Action<SystemError>)(err => {
+            Result<int> original = ResultFactory.Create<int>(error: err);
+            Result<int> applied = original.Apply(onFailure: _ => { });
+            Assert.Equal(original.IsSuccess, applied.IsSuccess);
+        }), 20));
+
+    /// <summary>Verifies Validate with premise and conclusion implements logical implication.</summary>
+    [Fact]
+    public void ValidatePremiseConclusionImplementsImplication() => TestUtilities.AssertAll(
+        () => Assert.True(ResultFactory.Create(value: 5).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
+        () => Assert.True(ResultFactory.Create(value: 50).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
+        () => Assert.False(ResultFactory.Create(value: 150).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
+        Gen.Int.ToAssertion((Action<int>)(v =>
+            Assert.Equal(v is <= 10 or < 100,
+                ResultFactory.Create(value: v).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess))));
+
+    /// <summary>Verifies Validate unless parameter inverts predicate logic.</summary>
+    [Fact]
+    public void ValidateUnlessParameterInvertsPredicateLogic() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v =>
+            Assert.Equal(v >= 0, ResultFactory.Create(value: v).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess))),
+        () => Assert.True(ResultFactory.Create(value: 5).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess),
+        () => Assert.False(ResultFactory.Create(value: -5).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess));
+
+    /// <summary>Verifies Validate with monadic validation executes conditional bind.</summary>
+    [Fact]
+    public void ValidateMonadicValidationExecutesConditionalBind() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<int> validated = ResultFactory.Create(value: v).Validate(
+                predicate: x => x > 10,
+                validation: x => ResultFactory.Create(value: x * 2));
+            Assert.Equal(v > 10 ? v * 2 : v, validated.Value);
+        })),
+        () => Assert.Equal(5, ResultFactory.Create(value: 5).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2)).Value),
+        () => Assert.Equal(30, ResultFactory.Create(value: 15).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2)).Value));
+
+    /// <summary>Verifies Create with conditionals executes inline validation.</summary>
+    [Fact]
+    public void CreateWithConditionalsExecutesInlineValidation() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v =>
+            Assert.Equal(v is > 0 and < 100, ResultFactory.Create(
+                value: v,
+                conditionals: [(x => x > 0, Errors.E1), (x => x < 100, Errors.E2)]).IsSuccess))),
+        () => Assert.True(ResultFactory.Create(value: 50, conditionals: [(x => x > 0, Errors.E1)]).IsSuccess),
+        () => Assert.False(ResultFactory.Create(value: -5, conditionals: [(x => x > 0, Errors.E1)]).IsSuccess));
+
+    /// <summary>Verifies Create with nested Result flattens correctly.</summary>
+    [Fact]
+    public void CreateWithNestedResultFlattensCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<Result<int>> nested = ResultFactory.Create(value: ResultFactory.Create(value: v));
+            Result<int> flattened = ResultFactory.Create(nested: nested);
+            Assert.Equal((true, v), (flattened.IsSuccess, flattened.Value));
+        })),
+        () => {
+            Result<Result<int>> nestedError = ResultFactory.Create<Result<int>>(error: Errors.E1);
+            Result<int> flattened = ResultFactory.Create(nested: nestedError);
+            Assert.False(flattened.IsSuccess);
+        },
+        () => {
+            Result<Result<int>> innerError = ResultFactory.Create(value: ResultFactory.Create<int>(error: Errors.E1));
+            Result<int> flattened = ResultFactory.Create(nested: innerError);
+            Assert.False(flattened.IsSuccess);
+        });
+
+    /// <summary>Verifies TryGet extracts value correctly with out parameter pattern.</summary>
+    [Fact]
+    public void TryGetExtractsValueWithOutParameterPattern() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<int> result = ResultFactory.Create(value: v);
+            bool success = result.TryGet(out int extracted);
+            Assert.Equal((true, v), (success, extracted));
+        })),
+        ResultGenerators.SystemErrorGen.ToAssertion((Action<SystemError>)(err => {
+            Result<int> result = ResultFactory.Create<int>(error: err);
+            bool success = result.TryGet(out int extracted);
+            Assert.Equal((false, default(int)), (success, extracted));
+        }), 20));
+
+    /// <summary>Verifies deferred Result with Map/Bind chains evaluates lazily then correctly.</summary>
+    [Fact]
+    public void DeferredResultWithChainsEvaluatesLazilyThenCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            int evalCount = 0, mapCount = 0, bindCount = 0;
+            Result<int> deferred = ResultFactory.Create(deferred: () => { evalCount++; return ResultFactory.Create(value: v); });
+            Result<int> chained = deferred.Map(x => { mapCount++; return x * 2; }).Bind(x => { bindCount++; return ResultFactory.Create(value: x + 10); });
+            Assert.Equal((0, 0, 0), (evalCount, mapCount, bindCount));
+            int final = chained.Value;
+            Assert.Equal(((v * 2) + 10, 1, 1, 1), (final, evalCount, mapCount, bindCount));
+        }), 20));
+
+    /// <summary>Verifies OnError does not execute handlers on success.</summary>
+    [Fact]
+    public void OnErrorDoesNotExecuteHandlersOnSuccess() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            bool mapCalled = false, recoverCalled = false, recoverWithCalled = false;
+            Result<int> result = ResultFactory.Create(value: v).OnError(
+                mapError: _ => { mapCalled = true; return [Errors.E1]; },
+                recover: _ => { recoverCalled = true; return 0; },
+                recoverWith: _ => { recoverWithCalled = true; return ResultFactory.Create(value: 0); });
+            Assert.Equal((v, false, false, false), (result.Value, mapCalled, recoverCalled, recoverWithCalled));
+        })));
+
+    /// <summary>Verifies Ensure with mixed validation array formats handles correctly.</summary>
+    [Fact]
+    public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => TestUtilities.AssertAll(
+        Gen.Int.ToAssertion((Action<int>)(v => {
+            Result<int> result = ResultFactory.Create(value: v).Ensure(
+                ((Func<int, bool>)(x => x > 0), Errors.E1),
+                ((Func<int, bool>)(x => x < 100), Errors.E2));
+            Assert.Equal(v is > 0 and < 100, result.IsSuccess);
+        })),
+        () => {
+            Result<int> result = ResultFactory.Create(value: 50).Ensure(
+                [(Func<int, bool>)(x => x > 0), Errors.E1],
+                [(Func<int, bool>)(x => x < 100), Errors.E2]);
+            Assert.True(result.IsSuccess);
+        });
+}

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Tests.Common;
@@ -63,23 +64,43 @@ public static class ResultGenerators {
     /// <summary>Generates collections of Results using static cast.</summary>
     public static Gen<IEnumerable<Result<T>>> ResultCollectionGen<T>() where T : notnull => ResultGen<T>().List[0, 10].Select(static list => (IEnumerable<Result<T>>)list);
 
-    /// <summary>Generates monadic functions using constant result capture and inline type dispatch.</summary>
-    public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull => (typeof(TResult) switch {
-        Type t when t == typeof(int) => (Gen<TResult>)(object)Gen.Int,
-        Type t when t == typeof(string) => (Gen<TResult>)(object)Gen.String.Matching(static s => s is not null),
-        Type t when t == typeof(double) => (Gen<TResult>)(object)Gen.Double,
-        Type t when t == typeof(bool) => (Gen<TResult>)(object)Gen.Bool,
-        _ => throw new NotSupportedException($"Type {typeof(TResult)} not supported"),
-    }).ToResultGen(SystemErrorGen).SelectMany(result => Gen.Const<Func<T, Result<TResult>>>(_ => result));
+    /// <summary>Generates monadic functions with actual transformations using value-dependent logic.</summary>
+    public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
+        (typeof(T), typeof(TResult)) switch {
+            (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
+                Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                    (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
+                        succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
+                                 : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, $"Failed at {x}")))),
+            (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
+                Gen.Double.Tuple(Gen.Bool).Select(static (multiplier, succeeds) =>
+                    (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
+                        succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
+            (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
+                Gen.Double.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                    (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
+                        succeeds && double.TryParse(s, out double val) ? ResultFactory.Create(value: val + offset)
+                                                                        : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
+            (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
+                Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                    (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
+                        succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
+            _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
+        };
 
-    /// <summary>Generates pure functions using constant value capture and inline type dispatch.</summary>
-    public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull => (typeof(TResult) switch {
-        Type t when t == typeof(int) => (Gen<TResult>)(object)Gen.Int,
-        Type t when t == typeof(string) => (Gen<TResult>)(object)Gen.String.Matching(static s => s is not null),
-        Type t when t == typeof(double) => (Gen<TResult>)(object)Gen.Double,
-        Type t when t == typeof(bool) => (Gen<TResult>)(object)Gen.Bool,
-        _ => throw new NotSupportedException($"Type {typeof(TResult)} not supported"),
-    }).SelectMany(value => Gen.Const<Func<T, TResult>>(_ => value));
+    /// <summary>Generates pure functions with actual transformations using value-dependent operations.</summary>
+    public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
+        (typeof(T), typeof(TResult)) switch {
+            (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, string>(x => (x + offset).ToString(CultureInfo.InvariantCulture))),
+            (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
+                Gen.Double.Select(static multiplier => (Func<T, TResult>)(object)new Func<int, double>(x => x * multiplier)),
+            (Type t, Type r) when t == typeof(int) && r == typeof(int) =>
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, int>(x => x + offset)),
+            (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<string, int>(s => s.Length + offset)),
+            _ => throw new NotSupportedException($"Pure function generation not supported for {typeof(T)} -> {typeof(TResult)}"),
+        };
 
     /// <summary>Generates predicates using constant boolean capture.</summary>
     public static Gen<Func<T, bool>> PredicateGen<T>() where T : notnull => Gen.Bool.SelectMany(result => Gen.Const<Func<T, bool>>(_ => result));
