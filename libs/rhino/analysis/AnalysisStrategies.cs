@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -9,13 +8,27 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Dense analysis strategy dispatcher leveraging ResultFactory and Unified validation.</summary>
+/// <summary>Dense analysis result containing point, derivatives, frame, curvature, and metrics.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Internal result type colocated with strategies")]
+internal sealed record AnalysisResult(
+    Point3d Point,
+    Vector3d[] Derivatives,
+    Plane Frame,
+    (double? Gaussian, double? Mean, double? Min, double? Max, Vector3d? MinDir, Vector3d? MaxDir, Vector3d? Curve)? Curvature,
+    (double? Length, double? Area, double? Volume)? Metrics,
+    Interval[]? Domains,
+    (Vector3d[]? TangentBasis, Vector3d? Normal, Plane? OrientationFrame)? Orientation,
+    (double? CurveParam, (double, double)? SurfaceParams, int? MeshIndex, int DerivativeOrder) EvaluatedParams);
+
+/// <summary>Dense analysis strategy dispatcher following extraction pattern with separate validation and core.</summary>
 internal static class AnalysisStrategies {
+    /// <summary>Validation configuration mapping geometry types to required validation modes.</summary>
     private static readonly FrozenDictionary<Type, ValidationMode> _validation =
         new Dictionary<Type, ValidationMode> {
             [typeof(Curve)] = ValidationMode.Standard | ValidationMode.Degeneracy,
             [typeof(Surface)] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
-            [typeof(Brep)] = ValidationMode.Standard | ValidationMode.Topology | ValidationMode.SurfaceContinuity,
+            [typeof(BrepFace)] = ValidationMode.Standard | ValidationMode.Topology | ValidationMode.SurfaceContinuity,
+            [typeof(Brep)] = ValidationMode.Standard | ValidationMode.Topology | ValidationMode.MassProperties,
             [typeof(SubD)] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
             [typeof(Mesh)] = ValidationMode.MeshSpecific,
             [typeof(PointCloud)] = ValidationMode.Standard | ValidationMode.Degeneracy,
@@ -24,121 +37,79 @@ internal static class AnalysisStrategies {
             [typeof(Vector3d)] = ValidationMode.None,
         }.ToFrozenDictionary();
 
+    /// <summary>Analyzes geometry with validation dispatch and parameter checking.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<AnalysisPacket>> Analyze(object source, IGeometryContext context, AnalysisParameters parameters) {
-        Type runtime = source switch {
-            BrepFace => typeof(Surface),
-            Surface => typeof(Surface),
-            Point3d[] => typeof(Point3d[]),
-            PointCloud => typeof(PointCloud),
-            Point3d => typeof(Point3d),
-            Vector3d => typeof(Vector3d),
-            GeometryBase geometry => geometry.GetType(),
-            _ => source.GetType(),
+    internal static Result<IReadOnlyList<AnalysisResult>> Analyze(
+        object source, IGeometryContext context,
+        double? curveParam, (double, double)? surfaceParams, int? meshIndex,
+        int derivativeOrder, bool includeMetrics, bool includeDomains, bool includeOrientation) =>
+        (source switch {
+            BrepFace face => (typeof(BrepFace), face),
+            GeometryBase geom => (geom.GetType(), geom),
+            Point3d[] pts => (typeof(Point3d[]), pts),
+            Point3d pt => (typeof(Point3d), pt),
+            Vector3d vec => (typeof(Vector3d), vec),
+            _ => (source.GetType(), source),
+        }) switch {
+            (Type t, object obj) => ResultFactory.Create(value: obj)
+                .Validate(args: _validation.TryGetValue(t, out ValidationMode mode) && mode != ValidationMode.None
+                    ? [context, mode] : null)
+                .Map(_ => AnalyzeCore(obj, context, curveParam, surfaceParams, meshIndex,
+                    derivativeOrder, includeMetrics, includeDomains, includeOrientation))
+                .Bind(result => result switch {
+                    AnalysisResult r => ResultFactory.Create(value: (IReadOnlyList<AnalysisResult>)[r]),
+                    null when obj is Point3d[] pts => ResultFactory.Create(value: (IReadOnlyList<AnalysisResult>)
+                        Array.ConvertAll(pts, pt => new AnalysisResult(Point: pt, Derivatives: [], Frame: new Plane(pt, Vector3d.ZAxis),
+                            Curvature: null, Metrics: null, Domains: null, Orientation: null,
+                            EvaluatedParams: (curveParam, surfaceParams, meshIndex, derivativeOrder)))),
+                    _ => ResultFactory.Create<IReadOnlyList<AnalysisResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                }),
         };
-        ValidationMode mode = _validation.GetValueOrDefault(runtime);
-        return ResultFactory.Create(value: source)
-            .Validate(args: mode == ValidationMode.None ? null : [context, mode])
-            .Bind(_ => AnalyzeCore(source, context, parameters));
-    }
 
+    /// <summary>Core analysis logic with ultra-dense switch expressions and inline tuple operations.</summary>
     [Pure]
-    private static Result<IReadOnlyList<AnalysisPacket>> AnalyzeCore(object source, IGeometryContext context, AnalysisParameters parameters) =>
-        source switch {
-            Curve curve => ResultFactory.Create(value: (Domain: curve.Domain, Parameter: parameters.CurveParameter ?? curve.Domain.ParameterAt(0.5), Order: parameters.DerivativeOrder < 0 ? 0 : parameters.DerivativeOrder))
-                .Validate(predicate: data => data.Order >= 0, error: AnalysisErrors.Parameters.InvalidDerivativeOrder)
-                .Validate(predicate: data => data.Domain.IncludesParameter(data.Parameter), error: AnalysisErrors.Parameters.ParameterOutOfDomain)
-                .Map(data => (Location: curve.PointAt(data.Parameter), Tangent: curve.TangentAt(data.Parameter), Parameter: data.Parameter, Curvature: curve.CurvatureAt(data.Parameter), Frame: curve.FrameAt(data.Parameter, out Plane computed) ? computed : new Plane(curve.PointAt(data.Parameter), Vector3d.ZAxis), Domain: data.Domain))
-                .Map(tuple => new AnalysisPacket(
-                    tuple.Location,
-                    (IReadOnlyList<Vector3d>)new Vector3d[] { tuple.Tangent },
-                    tuple.Frame,
-                    tuple.Curvature.IsValid ? new AnalysisCurvature(null, null, null, null, null, null, tuple.Curvature) : null,
-                    new AnalysisMetrics(parameters.IncludeGlobalMetrics ? curve.GetLength() : null, null, null),
-                    parameters.IncludeDomains ? new Interval[] { tuple.Domain } : Array.Empty<Interval>(),
-                    parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { tuple.Frame.XAxis, tuple.Frame.YAxis }, tuple.Frame.ZAxis, tuple.Frame) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null),
-                    parameters with { CurveParameter = tuple.Parameter }))
-                .Map(packet => (IReadOnlyList<AnalysisPacket>)[packet]),
-            Surface surface => ResultFactory.Create(value: (DomainU: surface.Domain(0), DomainV: surface.Domain(1), Requested: parameters.SurfaceParameters ?? (surface.Domain(0).ParameterAt(0.5), surface.Domain(1).ParameterAt(0.5))))
-                .Map(data => (data.DomainU, data.DomainV, Actual: (data.Requested.Item1 ?? data.DomainU.ParameterAt(0.5), data.Requested.Item2 ?? data.DomainV.ParameterAt(0.5))))
-                .Validate(predicate: data => data.DomainU.IncludesParameter(data.Actual.Item1) && data.DomainV.IncludesParameter(data.Actual.Item2), error: AnalysisErrors.Parameters.ParameterOutOfDomain)
-                .Map(data => (Location: surface.PointAt(data.Actual.Item1, data.Actual.Item2), U: data.Actual.Item1, V: data.Actual.Item2, Normal: surface.NormalAt(data.Actual.Item1, data.Actual.Item2), Curvature: surface.CurvatureAt(data.Actual.Item1, data.Actual.Item2), Frame: surface.FrameAt(data.Actual.Item1, data.Actual.Item2, out Plane computed) ? computed : new Plane(surface.PointAt(data.Actual.Item1, data.Actual.Item2), surface.NormalAt(data.Actual.Item1, data.Actual.Item2))))
-                .Map(tuple => new AnalysisPacket(
-                    tuple.Location,
-                    (IReadOnlyList<Vector3d>)new Vector3d[] { tuple.Frame.XAxis, tuple.Frame.YAxis },
-                    tuple.Frame,
-                    new AnalysisCurvature(tuple.Curvature.Gaussian, tuple.Curvature.Mean, tuple.Curvature.Kappa(0), tuple.Curvature.Kappa(1), tuple.Curvature.Direction(0), tuple.Curvature.Direction(1), null),
-                    new AnalysisMetrics(null, parameters.IncludeGlobalMetrics ? surface switch { BrepFace face => AreaMassProperties.Compute(face)?.Area, _ => AreaMassProperties.Compute(surface)?.Area } : null, parameters.IncludeGlobalMetrics && surface is BrepFace faceVolume ? VolumeMassProperties.Compute(faceVolume.Brep)?.Volume : null),
-                    parameters.IncludeDomains ? new Interval[] { surface.Domain(0), surface.Domain(1) } : Array.Empty<Interval>(),
-                    parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { tuple.Frame.XAxis, tuple.Frame.YAxis }, tuple.Frame.ZAxis, tuple.Frame) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null),
-                    parameters with { SurfaceParameters = (tuple.U, tuple.V) }))
-                .Map(packet => (IReadOnlyList<AnalysisPacket>)[packet]),
-            Brep brep => ResultFactory.Create(value: (brep, Index: parameters.MeshElementIndex ?? 0))
-                .Validate(predicate: data => data.Index >= 0 && data.Index < data.brep.Faces.Count, error: AnalysisErrors.Parameters.InvalidMeshElement)
-                .Bind(data => AnalyzeCore(brep.Faces[data.Index], context, parameters with { MeshElementIndex = data.Index })
-                    .Map(packets => packets.Count == 0 ? packets : (IReadOnlyList<AnalysisPacket>)[packets[0] with {
-                        Metrics = new AnalysisMetrics(
-                            packets[0].Metrics.Length,
-                            parameters.IncludeGlobalMetrics ? AreaMassProperties.Compute(brep)?.Area : packets[0].Metrics.Area,
-                            parameters.IncludeGlobalMetrics ? VolumeMassProperties.Compute(brep)?.Volume : packets[0].Metrics.Volume),
-                        EvaluatedParameters = packets[0].EvaluatedParameters with { SurfaceParameters = parameters.SurfaceParameters ?? packets[0].EvaluatedParameters.SurfaceParameters }
-                    }])),
-            SubD subd => ResultFactory.Create(value: subd.ToBrep())
-                .Bind(brep => brep is null || brep.Faces.Count == 0
-                    ? ResultFactory.Create<IReadOnlyList<AnalysisPacket>>(error: AnalysisErrors.Operation.UnsupportedGeometry)
-                    : AnalyzeCore(brep.Faces[0], context, parameters)
-                        .Map(packets => packets.Count == 0 ? packets : (IReadOnlyList<AnalysisPacket>)[packets[0] with {
-                            Metrics = new AnalysisMetrics(
-                                packets[0].Metrics.Length,
-                                parameters.IncludeGlobalMetrics ? AreaMassProperties.Compute(brep)?.Area : packets[0].Metrics.Area,
-                                parameters.IncludeGlobalMetrics ? VolumeMassProperties.Compute(brep)?.Volume : packets[0].Metrics.Volume)
-                        }])),
-            Mesh mesh => ResultFactory.Create(value: parameters.MeshElementIndex ?? 0)
-                .Validate(predicate: index => index >= 0 && index < mesh.Vertices.Count, error: AnalysisErrors.Parameters.InvalidMeshElement)
-                .Map(index => (Index: index, Point: mesh.Vertices.Point3dAt(index), Normal: mesh.Normals.Count > index ? mesh.Normals[index] : Vector3d.Unset))
-                .Map(tuple => tuple.Normal.IsValid ? tuple : tuple with { Normal = mesh.Normals.ComputeNormals() && mesh.Normals.Count > tuple.Index ? mesh.Normals[tuple.Index] : Vector3d.ZAxis })
-                .Map(tuple => new AnalysisPacket(
-                    tuple.Point,
-                    (IReadOnlyList<Vector3d>)Array.Empty<Vector3d>(),
-                    new Plane(tuple.Point, tuple.Normal.IsValid ? tuple.Normal : Vector3d.ZAxis),
-                    null,
-                    new AnalysisMetrics(null, parameters.IncludeGlobalMetrics ? AreaMassProperties.Compute(mesh)?.Area : null, parameters.IncludeGlobalMetrics ? VolumeMassProperties.Compute(mesh)?.Volume : null),
-                    parameters.IncludeDomains ? new Interval[] { new Interval(0, mesh.Vertices.Count) } : Array.Empty<Interval>(),
-                    parameters.IncludeOrientation ? new AnalysisOrientation(Array.Empty<Vector3d>(), tuple.Normal.IsValid ? tuple.Normal : null, new Plane(tuple.Point, tuple.Normal.IsValid ? tuple.Normal : Vector3d.ZAxis)) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null),
-                    parameters with { MeshElementIndex = tuple.Index }))
-                .Map(packet => (IReadOnlyList<AnalysisPacket>)[packet]),
-            PointCloud cloud => cloud.Count switch {
-                0 => ResultFactory.Create<IReadOnlyList<AnalysisPacket>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-                _ => ResultFactory.Create(value: cloud.GetPoints())
-                    .Map(points => (Points: points, Box: cloud.GetBoundingBox(true)))
-                    .Map(tuple => (tuple.Points, Plane: Plane.FitPlaneToPoints(tuple.Points, out Plane fitted) == PlaneFitResult.Success ? fitted : new Plane(tuple.Box.Center, Vector3d.ZAxis), tuple.Box.Center))
-                    .Map(tuple => new AnalysisPacket(
-                        tuple.Center,
-                        (IReadOnlyList<Vector3d>)Array.Empty<Vector3d>(),
-                        new Plane(tuple.Center, tuple.Plane.XAxis, tuple.Plane.YAxis),
-                        null,
-                        new AnalysisMetrics(null, null, null),
-                        parameters.IncludeDomains ? new Interval[] { new Interval(0, cloud.Count) } : Array.Empty<Interval>(),
-                        parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { tuple.Plane.XAxis, tuple.Plane.YAxis }, tuple.Plane.ZAxis, tuple.Plane) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null),
-                        parameters))
-                    .Map(packet => (IReadOnlyList<AnalysisPacket>)[packet]),
+    private static AnalysisResult? AnalyzeCore(object source, IGeometryContext context, double? cP, (double, double)? sP,
+        int? mI, int dO, bool iM, bool iD, bool iO) => source switch {
+            Curve c when c.Domain.IncludesParameter(cP ?? c.Domain.ParameterAt(0.5)) && (cP ?? c.Domain.ParameterAt(0.5), c.FrameAt(cP ?? c.Domain.ParameterAt(0.5), out Plane f) ? f : new(c.PointAt(cP ?? c.Domain.ParameterAt(0.5)), Vector3d.ZAxis)) is (var t, var frame) =>
+                new(c.PointAt(t), [c.TangentAt(t)], frame, c.CurvatureAt(t).IsValid ? (null, null, c.CurvatureAt(t).Length, null, null, null, c.CurvatureAt(t)) : null,
+                    iM ? (c.GetLength(), null, null) : null, iD ? [c.Domain] : null, iO ? ([frame.XAxis, frame.YAxis], frame.ZAxis, frame) : null,
+                    (t, sP, mI, dO)),
+            Surface s when s.Domain(0).IncludesParameter((sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item1) && s.Domain(1).IncludesParameter((sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item2) && (sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5)), s.FrameAt((sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item1, (sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item2, out Plane f) ? f : Plane.WorldXY, s.CurvatureAt((sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item1, (sP ?? (s.Domain(0).ParameterAt(0.5), s.Domain(1).ParameterAt(0.5))).Item2)) is ((var u, var v), var frame, var sc) =>
+                new(s.PointAt(u, v), [frame.XAxis, frame.YAxis], frame, (sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1), sc.Direction(0), sc.Direction(1), null),
+                    iM ? (null, s is BrepFace bf ? AreaMassProperties.Compute(bf)?.Area : AreaMassProperties.Compute(s)?.Area, s is BrepFace { Brep: Brep b } ? VolumeMassProperties.Compute(b)?.Volume : null) : null,
+                    iD ? [s.Domain(0), s.Domain(1)] : null, iO ? ([frame.XAxis, frame.YAxis], frame.ZAxis, frame) : null,
+                    (cP, (u, v), mI, dO)),
+            BrepFace face => AnalyzeCore(face.UnderlyingSurface(), context, cP, sP, mI, dO, iM, iD, iO) switch {
+                AnalysisResult r => r with { Metrics = iM ? (null, AreaMassProperties.Compute(face)?.Area, face.Brep is Brep b ? VolumeMassProperties.Compute(b)?.Volume : null) : null },
+                _ => null,
             },
-            Point3d[] points => points.Length switch {
-                0 => ResultFactory.Create<IReadOnlyList<AnalysisPacket>>(value: Array.Empty<AnalysisPacket>()),
-                _ => ResultFactory.Create(value: (points, Plane: Plane.FitPlaneToPoints(points, out Plane fitted) == PlaneFitResult.Success ? fitted : new Plane(points[0], Vector3d.ZAxis)))
-                    .Map(tuple => (IReadOnlyList<AnalysisPacket>)Array.ConvertAll(tuple.points, point => new AnalysisPacket(
-                        point,
-                        (IReadOnlyList<Vector3d>)Array.Empty<Vector3d>(),
-                        new Plane(point, tuple.Plane.XAxis, tuple.Plane.YAxis),
-                        null,
-                        new AnalysisMetrics(null, null, null),
-                        parameters.IncludeDomains ? new Interval[] { new Interval(0, tuple.points.Length) } : Array.Empty<Interval>(),
-                        parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { tuple.Plane.XAxis, tuple.Plane.YAxis }, tuple.Plane.ZAxis, tuple.Plane) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null),
-                        parameters)))
-                    .Map(packets => (IReadOnlyList<AnalysisPacket>)packets),
+            Brep brep when (mI ?? 0) >= 0 && (mI ?? 0) < brep.Faces.Count => AnalyzeCore(brep.Faces[mI ?? 0], context, cP, sP, mI ?? 0, dO, iM, iD, iO) switch {
+                AnalysisResult r => r with { Metrics = iM ? (null, AreaMassProperties.Compute(brep)?.Area, VolumeMassProperties.Compute(brep)?.Volume) : null },
+                _ => null,
             },
-            Point3d point => ResultFactory.Create(value: (IReadOnlyList<AnalysisPacket>)[new AnalysisPacket(point, (IReadOnlyList<Vector3d>)Array.Empty<Vector3d>(), new Plane(point, Vector3d.XAxis, Vector3d.YAxis), null, new AnalysisMetrics(null, null, null), parameters.IncludeDomains ? new Interval[] { new Interval(0, 1) } : Array.Empty<Interval>(), parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { Vector3d.XAxis, Vector3d.YAxis }, Vector3d.ZAxis, new Plane(point, Vector3d.XAxis, Vector3d.YAxis)) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null), parameters)]),
-            Vector3d vector => ResultFactory.Create(value: (IReadOnlyList<AnalysisPacket>)[new AnalysisPacket(Point3d.Origin, (IReadOnlyList<Vector3d>)new Vector3d[] { vector }, new Plane(Point3d.Origin, vector), null, new AnalysisMetrics(null, null, null), Array.Empty<Interval>(), parameters.IncludeOrientation ? new AnalysisOrientation(new Vector3d[] { vector }, null, new Plane(Point3d.Origin, vector)) : new AnalysisOrientation(Array.Empty<Vector3d>(), null, null), parameters)]),
-            _ => ResultFactory.Create<IReadOnlyList<AnalysisPacket>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+            SubD subd => subd.ToBrep() switch {
+                Brep b when b.Faces.Count > 0 => ((Func<AnalysisResult?>)(() => {
+                    try {
+                        return AnalyzeCore(b.Faces[0], context, cP, sP, 0, dO, iM, iD, iO) switch {
+                            AnalysisResult r => r with { Metrics = iM ? (null, AreaMassProperties.Compute(b)?.Area, VolumeMassProperties.Compute(b)?.Volume) : null },
+                            _ => null,
+                        };
+                    } finally { b.Dispose(); }
+                }))(),
+                _ => null,
+            },
+            Mesh m when (mI ?? 0) >= 0 && (mI ?? 0) < m.Vertices.Count && (m.Vertices.Point3dAt(mI ?? 0), m.Normals.Count > (mI ?? 0) ? m.Normals[mI ?? 0] : m.Normals.ComputeNormals() && m.Normals.Count > (mI ?? 0) ? m.Normals[mI ?? 0] : Vector3d.ZAxis) is (var pt, var n) =>
+                new(pt, [], new Plane(pt, n.IsValid ? n : Vector3d.ZAxis), Curvature: null,
+                    iM ? (null, AreaMassProperties.Compute(m)?.Area, VolumeMassProperties.Compute(m)?.Volume) : null,
+                    iD ? [new(0, m.Vertices.Count)] : null, iO ? ([], n.IsValid ? n : null, new Plane(pt, n.IsValid ? n : Vector3d.ZAxis)) : null,
+                    (cP, sP, mI ?? 0, dO)),
+            PointCloud cloud when cloud.Count > 0 && (cloud.GetPoints(), cloud.GetBoundingBox(accurate: true).Center, Plane.FitPlaneToPoints(cloud.GetPoints(), out Plane fitted) == PlaneFitResult.Success ? fitted : Plane.WorldXY) is (var pts, var center, var plane) =>
+                new(Point: center, Derivatives: [], Frame: plane, Curvature: null, Metrics: null, Domains: iD ? [new(0, cloud.Count)] : null, Orientation: iO ? ([plane.XAxis, plane.YAxis], plane.ZAxis, plane) : null,
+                    EvaluatedParams: (cP, sP, mI, dO)),
+            Point3d pt => new(Point: pt, Derivatives: [], Frame: Plane.WorldXY, Curvature: null, Metrics: null, Domains: null, Orientation: null,
+                EvaluatedParams: (cP, sP, mI, dO)),
+            Vector3d vec => new(Point: Point3d.Origin, Derivatives: [vec], Frame: new Plane(Point3d.Origin, vec), Curvature: null, Metrics: null, Domains: null, Orientation: iO ? ([vec], null, new Plane(Point3d.Origin, vec)) : null,
+                EvaluatedParams: (cP, sP, mI, dO)),
+            _ => null,
         };
 }

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -9,64 +8,49 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Unified analysis engine providing dense evaluation packets for Rhino geometry.</summary>
+/// <summary>Polymorphic analysis engine with unified operation dispatch.</summary>
 public static class AnalysisEngine {
-    /// <summary>Aggregates analysis packets for arbitrary Rhino geometry inputs.</summary>
+    /// <summary>Analyzes geometry producing evaluation data with derivatives, curvature, and metrics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<AnalysisPacket>> Analyze<T>(
+    public static Result<IReadOnlyList<(
+        Point3d Point, Vector3d[] Derivatives, Plane Frame,
+        (double? Gaussian, double? Mean, double? Min, double? Max, Vector3d? MinDir, Vector3d? MaxDir, Vector3d? Curve)? Curvature,
+        (double? Length, double? Area, double? Volume)? Metrics,
+        Interval[]? Domains,
+        (Vector3d[]? TangentBasis, Vector3d? Normal, Plane? OrientationFrame)? Orientation,
+        (double? CurveParam, (double, double)? SurfaceParams, int? MeshIndex, int DerivativeOrder) EvaluatedParams)>> Analyze<T>(
         T input,
         IGeometryContext context,
-        AnalysisParameters parameters = default) where T : notnull =>
+        double? curveParameter = null,
+        (double, double)? surfaceParameters = null,
+        int? meshIndex = null,
+        int derivativeOrder = 2,
+        bool includeMetrics = true,
+        bool includeDomains = true,
+        bool includeOrientation = true) where T : notnull =>
         UnifiedOperation.Apply(
             input,
-            (T item) => AnalysisStrategies.Analyze(item, context, parameters),
-            new OperationConfig<T, AnalysisPacket> {
+            (Func<object, Result<IReadOnlyList<(Point3d, Vector3d[], Plane,
+                (double?, double?, double?, double?, Vector3d?, Vector3d?, Vector3d?)?,
+                (double?, double?, double?)?, Interval[]?,
+                (Vector3d[]?, Vector3d?, Plane?)?,
+                (double?, (double, double)?, int?, int))>>>)(item =>
+                AnalysisStrategies.Analyze(item, context, curveParameter, surfaceParameters,
+                    meshIndex, derivativeOrder, includeMetrics, includeDomains, includeOrientation)
+                    .Map(results => (IReadOnlyList<(Point3d, Vector3d[], Plane,
+                        (double?, double?, double?, double?, Vector3d?, Vector3d?, Vector3d?)?,
+                        (double?, double?, double?)?, Interval[]?,
+                        (Vector3d[]?, Vector3d?, Plane?)?,
+                        (double?, (double, double)?, int?, int))>)[.. results.Select(r =>
+                        (r.Point, r.Derivatives, r.Frame, r.Curvature, r.Metrics, r.Domains, r.Orientation, r.EvaluatedParams)),
+                        ])),
+            new OperationConfig<object, (Point3d, Vector3d[], Plane,
+                (double?, double?, double?, double?, Vector3d?, Vector3d?, Vector3d?)?,
+                (double?, double?, double?)?, Interval[]?,
+                (Vector3d[]?, Vector3d?, Plane?)?,
+                (double?, (double, double)?, int?, int))> {
                 Context = context,
                 ValidationMode = ValidationMode.None,
-                AccumulateErrors = true,
-                SkipInvalid = true,
+                AccumulateErrors = false,
             });
 }
-
-/// <summary>Optional analysis parameters controlling evaluation sampling.</summary>
-public readonly record struct AnalysisParameters(
-    double? CurveParameter = null,
-    (double? U, double? V)? SurfaceParameters = null,
-    int DerivativeOrder = 2,
-    int? MeshElementIndex = null,
-    bool IncludeGlobalMetrics = true,
-    bool IncludeDomains = true,
-    bool IncludeOrientation = true);
-
-/// <summary>Dense analysis payload exposing evaluated geometry state.</summary>
-public readonly record struct AnalysisPacket(
-    Point3d Point,
-    IReadOnlyList<Vector3d> Derivatives,
-    Plane Frame,
-    AnalysisCurvature? Curvature,
-    AnalysisMetrics Metrics,
-    IReadOnlyList<Interval> Domains,
-    AnalysisOrientation Orientation,
-    AnalysisParameters EvaluatedParameters);
-
-/// <summary>Curvature data across geometry categories.</summary>
-public readonly record struct AnalysisCurvature(
-    double? Gaussian,
-    double? Mean,
-    double? Minimum,
-    double? Maximum,
-    Vector3d? MinimumDirection,
-    Vector3d? MaximumDirection,
-    Vector3d? CurveVector);
-
-/// <summary>Metric aggregates derived from Rhino mass property solvers.</summary>
-public readonly record struct AnalysisMetrics(
-    double? Length,
-    double? Area,
-    double? Volume);
-
-/// <summary>Orientation vectors providing tangent/normal frames.</summary>
-public readonly record struct AnalysisOrientation(
-    IReadOnlyList<Vector3d> TangentBasis,
-    Vector3d? Normal,
-    Plane? Frame);
