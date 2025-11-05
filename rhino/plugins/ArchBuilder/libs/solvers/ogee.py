@@ -95,7 +95,7 @@ def solve_ogee_parameters(  # noqa: PLR0912, PLR0915
         cx_lower = mid_x - perp_dx * t  # Flip direction
         cy_lower = mid_y - perp_dy * t
 
-    lower_radius = math.sqrt((cx_lower + half_span) ** 2 + cy_lower ** 2)
+    lower_radius = math.sqrt((cx_lower + half_span) ** 2 + cy_lower**2)
 
     # Step 2: Tangent at inflection (perpendicular to radius)
     radius_dx = -inflection_x - cx_lower

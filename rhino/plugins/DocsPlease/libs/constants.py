@@ -20,6 +20,7 @@ import Rhino
 # --- Constants Section ----------------------------------------------------
 class Constants:
     """Application-wide constants including layers, scales, and unit systems."""
+
     # Layer Names
     DETAIL_LAYER = "Utility_Layers::Detail_Views"
     CAPTION_LAYER = "ANNO::ANNO_DETL"
@@ -124,32 +125,33 @@ class Constants:
             "document_sets": ["A", "S", "E", "M", "P", "F"],
             "designation_level": "L2",
             "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
-            "default_scale_metric": "SCALE: 1:50"
+            "default_scale_metric": "SCALE: 1:50",
         },
         "Arch Only": {
             "document_sets": ["A"],
             "designation_level": "L2",
             "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
-            "default_scale_metric": "SCALE: 1:50"
+            "default_scale_metric": "SCALE: 1:50",
         },
         "MEP": {
             "document_sets": ["M", "E", "P", "F"],
             "designation_level": "L2",
             "default_scale_imperial": 'SCALE: 1/4" = 1\'-0"',
-            "default_scale_metric": "SCALE: 1:50"
+            "default_scale_metric": "SCALE: 1:50",
         },
         "Civil": {
             "document_sets": ["C", "L"],
             "designation_level": "L2",
             "default_scale_imperial": 'SCALE: 1" = 20\'',
-            "default_scale_metric": "SCALE: 1:200"
-        }
+            "default_scale_metric": "SCALE: 1:200",
+        },
     }
 
 
 # --- Metadata Keys --------------------------------------------------------
 class Metadata:
     """Metadata key constants for layout and detail view user strings."""
+
     PROJECT_NAME = "meta_project_name"
     PAGE_SCALE = "page_scale"
     DESIGNATION_LEVEL = "meta_designation_level"
@@ -362,6 +364,7 @@ L2_CHOICES_BY_MASTER = {
 # --- Strings Section ------------------------------------------------------
 class Strings:
     """User-facing strings, prompts, and messages."""
+
     # Alignment
     PROMPT_SELECT_PARENT = "Select Parent Reference View"
     PROMPT_SELECT_CHILD = "Select Child View to Align"

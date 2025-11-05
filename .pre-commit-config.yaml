@@ -49,18 +49,6 @@ repos:
         files: '\.cs$'
         pass_filenames: false
 
-      - id: ruff-check
-        name: Ruff lint
-        entry: bash -c 'if command -v ruff >/dev/null 2>&1; then ruff check --fix "$@"; fi' --
-        language: system
-        types: [python]
-
-      - id: ruff-format
-        name: Ruff format
-        entry: bash -c 'if command -v ruff >/dev/null 2>&1; then ruff format "$@"; fi' --
-        language: system
-        types: [python]
-
 ci:
   autofix_commit_msg: 'style: auto-fix pre-commit hooks'
   autofix_prs: true

@@ -160,11 +160,7 @@ def _solve_with_fixed_tangent(
     )
 
     h2 = next(
-        (
-            candidate
-            for candidate in h2_candidates
-            if candidate > y_t + tolerance and candidate < rise * 2.0
-        ),
+        (candidate for candidate in h2_candidates if candidate > y_t + tolerance and candidate < rise * 2.0),
         None,
     )
     if h2 is None:

@@ -171,10 +171,7 @@ class ArchCommandOptions:
         try:
             return cls()
         except TypeError as exc:  # pragma: no cover - defensive path for future subclasses
-            msg = (
-                f"{cls.__name__} must implement 'from_geometry' because it requires "
-                "parameters without defaults."
-            )
+            msg = f"{cls.__name__} must implement 'from_geometry' because it requires parameters without defaults."
             raise NotImplementedError(msg) from exc
 
 

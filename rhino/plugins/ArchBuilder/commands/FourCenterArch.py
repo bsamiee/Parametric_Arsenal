@@ -56,7 +56,9 @@ class FourCenterArchCommand(ArchCommandBase):
 
         half_span = profile.span * 0.5
         shoulder_ratio = params.tangent_x / half_span if half_span else default_options.shoulder_ratio
-        shoulder_height_ratio = params.tangent_y / profile.rise if profile.rise else default_options.shoulder_height_ratio  # noqa: E501
+        shoulder_height_ratio = (
+            params.tangent_y / profile.rise if profile.rise else default_options.shoulder_height_ratio
+        )
 
         clamped_ratio = max(0.05, min(0.95, shoulder_ratio))
         clamped_height = max(0.2, min(0.95, shoulder_height_ratio))
@@ -66,10 +68,8 @@ class FourCenterArchCommand(ArchCommandBase):
             or abs(clamped_height - default_options.shoulder_height_ratio) > 1e-3
         ):
             Rhino.RhinoApp.WriteLine(
-
-                    "ArchBuilder: adjusted four-center shoulder parameters to "
-                    f"sr={clamped_ratio:.3f}, sh={clamped_height:.3f} to satisfy geometry."
-
+                "ArchBuilder: adjusted four-center shoulder parameters to "
+                f"sr={clamped_ratio:.3f}, sh={clamped_height:.3f} to satisfy geometry."
             )
 
         options = self.options_type(
@@ -92,10 +92,8 @@ class FourCenterArchCommand(ArchCommandBase):
             )
         except ValueError as exc:
             raise RuntimeError(
-
-                    "Failed to construct four-center profile with resolved parameters "
-                    f"(span={spec.span:.3f}, rise={spec.rise:.3f}): {exc}"
-
+                "Failed to construct four-center profile with resolved parameters "
+                f"(span={spec.span:.3f}, rise={spec.rise:.3f}): {exc}"
             ) from exc
         return ArchBuilderUtils.close_with_baseline(
             profile.segments,

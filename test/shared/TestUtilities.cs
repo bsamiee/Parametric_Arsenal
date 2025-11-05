@@ -11,12 +11,12 @@ public static class TestUtilities {
             (Type t, Action<T> act) when !t.IsGenericType => new Action(() => gen.Sample(v => { act(v); return true; }, iter: iterations)),
             (Type { IsGenericType: true } t, Action<object, object> act) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
                 new Action(() => gen.Sample(v => v switch {
-                    ValueTuple<object, object> (object item1, object item2) => ((Func<bool>)(() => { act(item1, item2); return true; }))(),
+                    ValueTuple<object, object>(object item1, object item2) => ((Func<bool>)(() => { act(item1, item2); return true; }))(),
                     _ => throw new InvalidOperationException($"Expected ValueTuple<,>, got {v?.GetType()}"),
                 }, iter: iterations)),
             (Type { IsGenericType: true } t, Func<object, object, bool> func) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>) =>
                 new Action(() => gen.Sample(v => v switch {
-                    ValueTuple<object, object> (object item1, object item2) => assertion.DynamicInvoke(item1, item2) is bool result && result,
+                    ValueTuple<object, object>(object item1, object item2) => assertion.DynamicInvoke(item1, item2) is bool result && result,
                     _ => throw new InvalidOperationException($"Expected ValueTuple<,>, got {v?.GetType()}"),
                 }, iter: iterations)),
             _ => throw new ArgumentException($"Unsupported assertion pattern: {typeof(T)}, {assertion.GetType()}", nameof(assertion)),

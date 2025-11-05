@@ -5,11 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## CRITICAL: Code Density Requirements
 
 **MANDATORY**: Super dense algebraic code only. Study these exemplars:
+
 - `libs/core/validation/ValidationRules.cs` - Expression tree compilation, zero allocations
 - `libs/core/results/ResultFactory.cs` - Polymorphic parameter detection patterns
 - `libs/core/operations/UnifiedOperation.cs` - 90 lines handling all dispatch logic
 
 ### Strict Rules
+
 - **NO if/else** - Pattern matching and switch expressions only
 - **NO var** - Explicit types always
 - **NO helpers/extracting** - Improve logic instead (300 LOC hard limit)
@@ -20,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Dense Code Patterns
 
 **UnifiedOperation Pattern** - Always use for polymorphic dispatch:
+
 ```csharp
 UnifiedOperation.Apply(
     input,
@@ -31,6 +34,7 @@ UnifiedOperation.Apply(
 ```
 
 **FrozenDictionary Configuration** - Compile-time lookups:
+
 ```csharp
 private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode Mode, Func<object, RTree?>? TreeFactory)> _config =
     new Dictionary<(SpatialMethod, Type), (ValidationMode, Func<object, RTree?>?)> {
@@ -40,6 +44,7 @@ private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode 
 ```
 
 **Inline tuple operations** - Never extract:
+
 ```csharp
 // Cache with inline tree construction
 s => _treeCache.GetValue(s, _ => { RTree t = new(); _ = ((Curve[])s).Select((c, i) => (t.Insert(c.GetBoundingBox(true), i), 0).Item2).ToArray(); return t; })
@@ -57,6 +62,7 @@ dotnet test --filter "FullyQualifiedName~Result" # Run specific test
 ## Core Architecture
 
 ### Result Monad (ALWAYS USE)
+
 ```csharp
 Result<T> // Lazy evaluation, monadic composition
 ResultFactory.Create(value: x) // Never new Result
@@ -69,6 +75,7 @@ ResultFactory.Create(value: x) // Never new Result
 ```
 
 ### Polymorphic Patterns
+
 ```csharp
 // Parameter detection through pattern matching
 (value, errors, deferred, nested) switch {
@@ -80,9 +87,11 @@ ResultFactory.Create(value: x) // Never new Result
 ```
 
 ### Expression Tree Compilation
+
 ValidationRules compiles validators at runtime using expression trees - never handwrite validation logic.
 
 ### Error Pattern (Each folder has own errors)
+
 ```csharp
 // libs/core/validation/ValidationErrors.cs
 public static class ValidationErrors {
@@ -100,12 +109,14 @@ public static class SpatialErrors {
 ```
 
 ### Analyzers Enforced
+
 - MA0051: Method length max 60 lines
 - IDE0301-0305: Collection expressions required
 - IDE0290: Primary constructors required
 - File-scoped namespaces mandatory
 
 ### Key Techniques
+
 - **ConditionalWeakTable** for auto-memory managed caching
 - **ArrayPool<T>** for zero-allocation buffers
 - **Expression.Compile()** for runtime validator generation
@@ -113,6 +124,7 @@ public static class SpatialErrors {
 - **ValueTuple patterns** for multi-value dispatch
 
 ### Platform
+
 - .NET 8.0, C# preview, Rhino 8 SDK
 - xUnit + CsCheck (core), NUnit + Rhino.Testing (rhino)
 - Artifacts to /artifacts/

@@ -350,9 +350,7 @@ def apply_to_layout() -> None:
     existing_ids = LayoutTools.existing_sheet_ids()
 
     if sheet_id in existing_ids:
-        raise ValidationError(
-            f"Sheet ID '{sheet_id}' already exists. Please use a different sheet number."
-        )
+        raise ValidationError(f"Sheet ID '{sheet_id}' already exists. Please use a different sheet number.")
 
     # Apply to viewport
     vp = sc.doc.Views.ActiveView.ActiveViewport

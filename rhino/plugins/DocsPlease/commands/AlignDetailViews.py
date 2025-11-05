@@ -60,7 +60,6 @@ def align_detail_views() -> None:
     # Choose Alignment Type
     align_choice = rs.GetString(Strings.PROMPT_DIRECTION, Strings.DEFAULT_DIRECTION, Strings.DIRECTION_OPTIONS)
     if not align_choice:
-
         raise UserCancelledError("Alignment type selection cancelled")
 
     align_choice = align_choice.capitalize()
@@ -74,7 +73,6 @@ def align_detail_views() -> None:
         transform = Rhino.Geometry.Transform.Translation(translation_vector)
 
         if not rs.TransformObject(child_detail_id, transform):
-
             raise TransformError(Strings.MSG_FAILED_TRANSFORM)
 
         # Select child detail for further adjustment

@@ -81,9 +81,7 @@ class ArchCommandBase:
         try:
             profile_local = self.builder(spec)
         except ValueError as exc:
-            raise RuntimeError(
-                f"Failed to build {self.family.value.replace('_', ' ')} arch profile: {exc}"
-            ) from exc
+            raise RuntimeError(f"Failed to build {self.family.value.replace('_', ' ')} arch profile: {exc}") from exc
         result = ArchAssembler.build(spec, profile_local)
 
         self.add_to_document(result.all_curves, spec)
