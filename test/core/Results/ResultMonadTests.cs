@@ -20,6 +20,25 @@ public sealed class ResultMonadTests {
             f: x => x.ToString(CultureInfo.InvariantCulture),
             g: s => s.Length));
 
+    /// <summary>Verifies Map actually transforms values with concrete examples.</summary>
+    [Fact]
+    public void MapValueTransformationAppliesCorrectly() => TestUtilities.AssertAll(
+        () => Assert.Equal(10, ResultFactory.Create(value: 5).Map(static x => x * 2).Value),
+        () => Assert.Equal("42", ResultFactory.Create(value: 42).Map(static x => x.ToString(CultureInfo.InvariantCulture)).Value),
+        () => Assert.Equal(3, ResultFactory.Create(value: "abc").Map(static s => s.Length).Value),
+        Gen.Int.ToAssertion((Action<int>)(n => Assert.Equal(n + 100, ResultFactory.Create(value: n).Map(x => x + 100).Value))),
+        () => Assert.False(ResultFactory.Create<int>(error: TestError).Map(static x => x * 2).IsSuccess));
+
+    /// <summary>Verifies Bind actually chains transformations with concrete examples.</summary>
+    [Fact]
+    public void BindValueTransformationChainsCorrectly() => TestUtilities.AssertAll(
+        () => Assert.Equal(15, ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: x * 3)).Value),
+        () => Assert.Equal("10", ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: (x * 2).ToString(CultureInfo.InvariantCulture))).Value),
+        Gen.Int.ToAssertion((Action<int>)(n => Assert.Equal(n * 2 + 10,
+            ResultFactory.Create(value: n).Bind(x => ResultFactory.Create(value: x * 2)).Bind(x => ResultFactory.Create(value: x + 10)).Value))),
+        () => Assert.False(ResultFactory.Create<int>(error: TestError).Bind(static x => ResultFactory.Create(value: x * 2)).IsSuccess),
+        () => Assert.False(ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create<int>(error: TestError)).IsSuccess));
+
     /// <summary>Verifies monad category laws: left identity, right identity, and associativity.</summary>
     [Fact]
     public void MonadLaws() => TestUtilities.AssertAll(
@@ -105,28 +124,30 @@ public sealed class ResultMonadTests {
         Gen.Int.ToAssertion((Action<int>)(v => Assert.Equal(v.ToString(CultureInfo.InvariantCulture),
             ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Match(x => x.ToString(CultureInfo.InvariantCulture), _ => "error"))), 50));
 
-    /// <summary>Verifies Apply applicative functor using algebraic error accumulation matrix.</summary>
+    /// <summary>Verifies Apply applicative functor using algebraic error accumulation matrix with ordering.</summary>
     [Fact]
-    public void ApplyApplicativeFunctorAccumulatesErrorsInParallel() => TestUtilities.AssertAll(
-        Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
-            Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
-            Assert.True(applied.IsSuccess);
-            Assert.Equal(a + b, applied.Value);
-        })),
-        ResultGenerators.SystemErrorGen.Tuple(Gen.Int).ToAssertion((Action<SystemError, int>)((err, b) => {
-            Result<int> applied = ResultFactory.Create<int>(error: err).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
-            Assert.False(applied.IsSuccess);
-            Assert.Contains(err, applied.Errors);
-        }), 50),
-        Gen.Int.Tuple(ResultGenerators.SystemErrorGen).ToAssertion((Action<int, SystemError>)((a, err) => {
-            Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(error: err));
-            Assert.False(applied.IsSuccess);
-            Assert.Contains(err, applied.Errors);
-        }), 50),
-        ResultGenerators.SystemErrorGen.Tuple(ResultGenerators.SystemErrorGen).ToAssertion((Action<SystemError, SystemError>)((e1, e2) => {
-            Result<int> applied = ResultFactory.Create<int>(error: e1).Apply(ResultFactory.Create<Func<int, int>>(error: e2));
-            Assert.Equal(2, applied.Errors.Count);
-        }), 50));
+    public void ApplyApplicativeFunctorAccumulatesErrorsInParallel() {
+        (SystemError funcErr, SystemError valErr) = (
+            new(ErrorDomain.Results, 5001, "Function error"),
+            new(ErrorDomain.Results, 5002, "Value error"));
+        TestUtilities.AssertAll(
+            Gen.Int.Tuple(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
+                Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
+                Assert.Equal((true, a + b), (applied.IsSuccess, applied.Value));
+            })),
+            () => {
+                Result<int> applied = ResultFactory.Create<int>(error: valErr).Apply(ResultFactory.Create<Func<int, int>>(value: static x => x + 10));
+                Assert.Equal((false, 1, valErr), (applied.IsSuccess, applied.Errors.Count, applied.Error));
+            },
+            () => {
+                Result<int> applied = ResultFactory.Create(value: 5).Apply(ResultFactory.Create<Func<int, int>>(error: funcErr));
+                Assert.Equal((false, 1, funcErr), (applied.IsSuccess, applied.Errors.Count, applied.Error));
+            },
+            () => {
+                Result<int> applied = ResultFactory.Create<int>(error: valErr).Apply(ResultFactory.Create<Func<int, int>>(error: funcErr));
+                Assert.Equal((false, 2, funcErr, valErr), (applied.IsSuccess, applied.Errors.Count, applied.Errors[0], applied.Errors[1]));
+            });
+    }
 
     /// <summary>Verifies Traverse using monadic collection transformation algebra.</summary>
     [Fact]
