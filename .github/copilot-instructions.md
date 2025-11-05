@@ -17,9 +17,9 @@ Parametric_Arsenal/
 ├── rhino/                          # Rhino plugins (Python/C#)
 │   └── plugins/                    # Rhino plugin implementations
 ├── test/                           # Test projects
-│   ├── Arsenal.Core.Tests/         # xUnit + CsCheck tests for core
-│   ├── Arsenal.Rhino.Tests/        # NUnit + Rhino.Testing tests
-│   └── Arsenal.Tests.Shared/       # Shared test utilities
+│   ├── core/                       # xUnit + CsCheck tests for core (Arsenal.Core.Tests)
+│   ├── rhino/                      # NUnit + Rhino.Testing tests (Arsenal.Rhino.Tests)
+│   └── shared/                     # Shared test utilities (Arsenal.Tests.Shared)
 ├── grasshopper/                    # Grasshopper components
 ├── CLAUDE.md                       # Detailed C# coding standards (MANDATORY READ)
 ├── Directory.Build.props           # MSBuild configuration
@@ -34,7 +34,7 @@ Parametric_Arsenal/
 dotnet build
 
 # Build specific project
-dotnet build libs/core/Core.csproj
+dotnet build libs/core/
 
 # Run all tests
 dotnet test
@@ -179,8 +179,9 @@ These are automatically enforced during build:
 ## Artifact Locations
 
 Build artifacts are output to:
-- C# libraries: `/artifacts/[ProjectName]/[Configuration]/`
+- C# libraries: `/artifacts/[ProjectName]/debug/`
 - Example: `/artifacts/Core/debug/Arsenal.Core.dll`
+- Note: Configuration is lowercase `debug` (not `Debug`)
 
 ## Dependencies and Package Management
 
