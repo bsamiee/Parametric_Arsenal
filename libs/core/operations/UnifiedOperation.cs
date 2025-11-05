@@ -27,7 +27,7 @@ public static class UnifiedOperation {
             IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
                 ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
                 (acc, op) => (config.AccumulateErrors, op(item)) switch {
-                    (true, Result<TOut> res) => acc.Apply(res.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(v => list => [.. list, v])),
+                    (true, Result<TOut> res) => acc.Accumulate(res),
                     (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
                 }),
             (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
