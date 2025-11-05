@@ -30,12 +30,14 @@ public static class TestGen {
                 break;
             case (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>):
                 gen.Sample(v => {
+                    // Note: Reflection used for tuple field access. Performance acceptable for test code (cold path).
                     object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v.GetType().GetField("Item2")!.GetValue(v)!,];
                     return d.DynamicInvoke(args) switch { bool b => b, _ => true, };
                 }, iter: iter);
                 break;
             case (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,,>):
                 gen.Sample(v => {
+                    // Note: Reflection used for tuple field access. Performance acceptable for test code (cold path).
                     object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v.GetType().GetField("Item2")!.GetValue(v)!, v.GetType().GetField("Item3")!.GetValue(v)!,];
                     return d.DynamicInvoke(args) switch { bool b => b, _ => true, };
                 }, iter: iter);

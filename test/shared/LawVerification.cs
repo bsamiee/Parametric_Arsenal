@@ -16,7 +16,7 @@ public static class LawVerification {
     /// <summary>Verifies monad left identity: return a >>= f ≡ f a.</summary>
     public static void MonadLeftIdentity<T, T2>(Gen<T> valueGen, Gen<Func<T, Result<T2>>> funcGen, int iter = 100) where T : notnull where T2 : notnull =>
         valueGen.Select(funcGen).Run((T v, Func<T, Result<T2>> f) =>
-            { bool _ = ResultFactory.Create(value: v).Bind(f).Equals(f(v)); }, iter);
+            ResultFactory.Create(value: v).Bind(f).Equals(f(v)), iter);
 
     /// <summary>Verifies monad right identity: m >>= return ≡ m.</summary>
     public static void MonadRightIdentity<T>(Gen<Result<T>> gen, int iter = 100) where T : notnull =>
@@ -25,7 +25,7 @@ public static class LawVerification {
     /// <summary>Verifies monad associativity: (m >>= f) >>= g ≡ m >>= (λx → f x >>= g).</summary>
     public static void MonadAssociativity<T, T2, T3>(Gen<Result<T>> rGen, Gen<Func<T, Result<T2>>> fGen, Gen<Func<T2, Result<T3>>> gGen, int iter = 50) where T : notnull where T2 : notnull where T3 : notnull =>
         rGen.Select(fGen, gGen).Run((Result<T> r, Func<T, Result<T2>> f, Func<T2, Result<T3>> g) =>
-            { bool _ = r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))); }, iter);
+            r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))), iter);
 
     /// <summary>Verifies applicative identity: pure id <*> v ≡ v.</summary>
     public static void ApplicativeIdentity<T>(Gen<Result<T>> gen, int iter = 100) where T : notnull =>
