@@ -96,7 +96,7 @@ internal static class SpatialStrategies {
                     try {
                         _ = RTree.SearchOverlaps(t1, t2, context.AbsoluteTolerance + (toleranceBuffer ?? 0),
                             (_, args) => count = count + 1 < buffer.Length ? ((buffer[count], buffer[count + 1]) = (args.Id, args.IdB), count += 2).Item2 : count);
-                        return count > 0 ? [.. buffer[..count]] : [];
+                        return count > 0 ? buffer[..count].ToArray() : [];
                     } finally { ArrayPool<int>.Shared.Return(buffer, clearArray: true); }
                 }))(),
             },
@@ -111,7 +111,7 @@ internal static class SpatialStrategies {
                             _ => () => { }
                             ,
                         })();
-                        return count > 0 ? [.. buffer[..count]] : [];
+                        return count > 0 ? buffer[..count].ToArray() : [];
                     } finally { ArrayPool<int>.Shared.Return(buffer, clearArray: true); }
                 }))(),
             },

@@ -39,16 +39,26 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     public override bool Equals(object? obj) => obj is Result<T> o && this.Equals(o);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override int GetHashCode() =>
-        (this.IsSuccess, this.IsSuccess ? this.Value : default, this.IsSuccess ? [] : this.Errors).GetHashCode();
+    public override int GetHashCode() {
+        Result<T> eval = this.Eval;
+        return eval._isSuccess switch {
+            true => (eval._isSuccess, eval._value).GetHashCode(),
+            false => (eval._isSuccess, eval._errors).GetHashCode(),
+        };
+    }
 
     [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
     private static TReturn Throw<TReturn>() => throw new InvalidOperationException(ResultErrors.State.InvalidAccess.Message);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(Result<T> other) =>
-        (this.IsSuccess, this.IsSuccess ? this.Value : default, this.IsSuccess ? [] : this.Errors)
-        .Equals((other.IsSuccess, other.IsSuccess ? other.Value : default, other.IsSuccess ? [] : other.Errors));
+    public bool Equals(Result<T> other) {
+        (Result<T> selfEval, Result<T> otherEval) = (this.Eval, other.Eval);
+        return (selfEval._isSuccess, otherEval._isSuccess) switch {
+            (true, true) => EqualityComparer<T>.Default.Equals(selfEval._value, otherEval._value),
+            (false, false) => (selfEval._errors ?? []).SequenceEqual(otherEval._errors ?? []),
+            _ => false,
+        };
+    }
 
     /// <summary>Attempts to extract value with safe null handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

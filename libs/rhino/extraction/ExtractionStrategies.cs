@@ -65,7 +65,7 @@ internal static class ExtractionStrategies {
                     Brep b when VolumeMassProperties.Compute(b)?.Centroid is { IsValid: true } c => [c],
                     Curve c when AreaMassProperties.Compute(c)?.Centroid is { IsValid: true } ct => [ct],
                     Surface s when AreaMassProperties.Compute(s)?.Centroid is { IsValid: true } cs => [cs],
-                    Mesh m when m.Vertices.Count > 0 => [m.Vertices.ToPoint3dArray().Aggregate(Point3d.Origin, (a, p) => a + p) / m.Vertices.Count],
+                    Mesh m when m.Vertices.Count > 0 => [VolumeMassProperties.Compute(m)?.Centroid ?? Point3d.Origin],
                     PointCloud pc when pc.Count > 0 => [pc.GetPoints().Aggregate(Point3d.Origin, (a, p) => a + p) / pc.Count],
                     _ => Enumerable.Empty<Point3d>(),
                 }),
