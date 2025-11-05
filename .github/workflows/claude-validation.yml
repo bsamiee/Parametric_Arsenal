@@ -23,16 +23,20 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore Parametric_Arsenal.sln
+        run: |
+          dotnet restore libs/core/Core.csproj
+          dotnet restore libs/rhino/Rhino.csproj
+          dotnet restore test/shared/Arsenal.Tests.Shared.csproj
+          dotnet restore test/core/Arsenal.Core.Tests.csproj
+          dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj
 
       - name: Build with analyzers (warnings as errors)
         run: |
-          dotnet build Parametric_Arsenal.sln \
-            --configuration Release \
-            --no-restore \
-            -p:TreatWarningsAsErrors=true \
-            -p:EnforceCodeStyleInBuild=true \
-            -warnaserror
+          dotnet build libs/core/Core.csproj --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
+          dotnet build libs/rhino/Rhino.csproj --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
+          dotnet build test/shared/Arsenal.Tests.Shared.csproj --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
+          dotnet build test/core/Arsenal.Core.Tests.csproj --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
+          dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
       - name: Build summary
         if: success()
@@ -41,6 +45,8 @@ jobs:
           echo "- Zero warnings"
           echo "- Zero code style violations"
           echo "- Zero analyzer errors"
+          echo ""
+          echo "Note: Grasshopper project skipped (Windows/macOS only)"
 
       - name: Build failed
         if: failure()
