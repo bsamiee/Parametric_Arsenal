@@ -41,22 +41,14 @@ internal static class IntersectionStrategies {
         IntersectionMethod method,
         IGeometryContext context,
         double? tolerance = null) where T1 : notnull where T2 : notnull =>
-        (method, geometryA, geometryB, _config.TryGetValue((method, typeof(T1), typeof(T2)), out ValidationMode mode)) switch {
-            (IntersectionMethod.CurveSelf, Curve c, _, true) =>
-                ResultFactory.Create(value: c)
-                    .Validate(args: [context, mode])
-                    .Bind(_ => IntersectCore(c, default(T2)!, method, context, tolerance)),
-            (_, GeometryBase ga, GeometryBase gb, true) =>
-                ResultFactory.Create(value: ga)
-                    .Validate(args: [context, mode])
-                    .Bind(_ => ResultFactory.Create(value: gb).Validate(args: [context, mode]))
-                    .Bind(_ => IntersectCore(geometryA, geometryB, method, context, tolerance)),
-            (_, GeometryBase ga, _, true) =>
-                ResultFactory.Create(value: ga)
-                    .Validate(args: [context, mode])
-                    .Bind(_ => IntersectCore(geometryA, geometryB, method, context, tolerance)),
-            (_, _, _, true) => IntersectCore(geometryA, geometryB, method, context, tolerance),
-            _ => ResultFactory.Create<IntersectionResult>(error: IntersectionErrors.Operation.UnsupportedMethod),
+        _config.TryGetValue((method, typeof(T1), typeof(T2)), out ValidationMode mode) switch {
+            true => (method, geometryA, geometryB) switch {
+                (IntersectionMethod.CurveSelf, Curve c, _) => ResultFactory.Create(value: c).Validate(args: [context, mode]).Bind(_ => IntersectCore(c, default(T2)!, method, context, tolerance)),
+                (_, GeometryBase ga, GeometryBase gb) => ResultFactory.Create(value: (ga, gb)).Validate(args: [context, mode]).Bind(_ => IntersectCore(geometryA, geometryB, method, context, tolerance)),
+                (_, GeometryBase ga, _) => ResultFactory.Create(value: ga).Validate(args: [context, mode]).Bind(_ => IntersectCore(geometryA, geometryB, method, context, tolerance)),
+                _ => IntersectCore(geometryA, geometryB, method, context, tolerance),
+            },
+            false => ResultFactory.Create<IntersectionResult>(error: IntersectionErrors.Operation.UnsupportedMethod),
         };
 
     [Pure]
@@ -65,30 +57,31 @@ internal static class IntersectionStrategies {
         T2 geometryB,
         IntersectionMethod method,
         IGeometryContext context,
-        double? tolerance) where T1 : notnull where T2 : notnull =>
-        (method, geometryA, geometryB) switch {
+        double? tolerance) where T1 : notnull where T2 : notnull {
+        double tol = tolerance ?? context.AbsoluteTolerance;
+        return (method, geometryA, geometryB) switch {
             (IntersectionMethod.CurveCurve, Curve c1, Curve c2) =>
-                Intersection.CurveCurve(c1, c2, tolerance ?? context.AbsoluteTolerance, tolerance ?? context.AbsoluteTolerance) switch {
+                Intersection.CurveCurve(c1, c2, tol, tol) switch {
                     CurveIntersections { Count: > 0 } r => ResultFactory.Create(value: new IntersectionResult(
-                        [.. r.Select(e => e.PointA)],
+                        [.. from e in r select e.PointA],
                         method,
-                        Curves: r.Any(e => e.OverlapA is not null) ? [.. r.Where(e => e.OverlapA is not null).Select(e => e.OverlapA!)] : null,
-                        ParametersA: [.. r.Select(e => e.ParameterA)],
-                        ParametersB: [.. r.Select(e => e.ParameterB)])),
+                        Curves: [.. from e in r where e.OverlapA is not null select e.OverlapA],
+                        ParametersA: [.. from e in r select e.ParameterA],
+                        ParametersB: [.. from e in r select e.ParameterB])),
                     CurveIntersections { Count: 0 } => ResultFactory.Create(value: new IntersectionResult([], method)),
                     null => ResultFactory.Create<IntersectionResult>(error: IntersectionErrors.Operation.ComputationFailed),
                 },
             (IntersectionMethod.CurveSurface, Curve c, Surface s) =>
-                Intersection.CurveSurface(c, s, tolerance ?? context.AbsoluteTolerance, tolerance ?? context.AbsoluteTolerance) switch {
+                Intersection.CurveSurface(c, s, tol, tol) switch {
                     CurveIntersections { Count: > 0 } r => ResultFactory.Create(value: new IntersectionResult(
-                        [.. r.Select(e => e.PointA)],
+                        [.. from e in r select e.PointA],
                         method,
-                        ParametersA: [.. r.Select(e => e.ParameterA)],
-                        ParametersB: [.. r.Select(e => e.ParameterB)])),
+                        ParametersA: [.. from e in r select e.ParameterA],
+                        ParametersB: [.. from e in r select e.ParameterB])),
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.CurveBrep, Curve c, Brep b) =>
-                Intersection.CurveBrep(c, b, tolerance ?? context.AbsoluteTolerance, out Curve[] curves, out Point3d[] points) switch {
+                Intersection.CurveBrep(c, b, tol, out Curve[] curves, out Point3d[] points) switch {
                     true when points.Length > 0 || curves.Length > 0 => ResultFactory.Create(value: new IntersectionResult(
                         [.. points],
                         method,
@@ -96,7 +89,7 @@ internal static class IntersectionStrategies {
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.BrepBrep, Brep b1, Brep b2) =>
-                Intersection.BrepBrep(b1, b2, tolerance ?? context.AbsoluteTolerance, out Curve[] curves, out Point3d[] points) switch {
+                Intersection.BrepBrep(b1, b2, tol, out Curve[] curves, out Point3d[] points) switch {
                     true when points.Length > 0 || curves.Length > 0 => ResultFactory.Create(value: new IntersectionResult(
                         [.. points],
                         method,
@@ -104,9 +97,9 @@ internal static class IntersectionStrategies {
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.MeshMesh, Mesh m1, Mesh m2) =>
-                Intersection.MeshMeshFast(m1, m2, tolerance ?? context.AbsoluteTolerance) switch {
+                Intersection.MeshMeshFast(m1, m2, tol) switch {
                     Polyline[] { Length: > 0 } polylines => ResultFactory.Create(value: new IntersectionResult(
-                        [.. polylines.SelectMany(pl => pl)],
+                        [.. from pl in polylines from pt in pl select pt],
                         method,
                         Sections: [.. polylines])),
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
@@ -123,13 +116,13 @@ internal static class IntersectionStrategies {
             (IntersectionMethod.MeshPlane, Mesh m, Plane p) =>
                 Intersection.MeshPlane(m, p) switch {
                     Polyline[] { Length: > 0 } sections => ResultFactory.Create(value: new IntersectionResult(
-                        [.. sections.SelectMany(pl => pl)],
+                        [.. from pl in sections from pt in pl select pt],
                         method,
                         Sections: [.. sections])),
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.LineBox, Line l, BoundingBox b) =>
-                Intersection.LineBox(l, b, tolerance ?? context.AbsoluteTolerance, out Interval lineParameters) switch {
+                Intersection.LineBox(l, b, tol, out Interval lineParameters) switch {
                     LineBoundingBoxIntersection.Overlap => ResultFactory.Create(value: new IntersectionResult(
                         [l.PointAt(lineParameters.Min), l.PointAt(lineParameters.Max)],
                         method,
@@ -141,13 +134,14 @@ internal static class IntersectionStrategies {
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             (IntersectionMethod.CurveSelf, Curve c, _) =>
-                Intersection.CurveSelf(c, tolerance ?? context.AbsoluteTolerance) switch {
+                Intersection.CurveSelf(c, tol) switch {
                     CurveIntersections { Count: > 0 } r => ResultFactory.Create(value: new IntersectionResult(
-                        [.. r.Select(e => e.PointA)],
+                        [.. from e in r select e.PointA],
                         method,
-                        ParametersA: [.. r.Select(e => e.ParameterA)])),
+                        ParametersA: [.. from e in r select e.ParameterA])),
                     _ => ResultFactory.Create(value: new IntersectionResult([], method)),
                 },
             _ => ResultFactory.Create<IntersectionResult>(error: IntersectionErrors.Operation.UnsupportedMethod),
         };
+    }
 }
