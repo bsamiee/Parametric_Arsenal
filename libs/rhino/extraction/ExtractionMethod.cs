@@ -8,5 +8,6 @@ public enum ExtractionMethod {
     Analytical = 2,
     Extremal = 4,
     Quadrant = 8,
-    All = Uniform | Analytical | Extremal | Quadrant,
+    EdgeMidpoints = 16,
+    All = Uniform | Analytical | Extremal | Quadrant | EdgeMidpoints,
 }
