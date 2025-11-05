@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -11,7 +10,6 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Polymorphic spatial indexing engine with RhinoCommon RTree SDK integration and unified operation dispatch.</summary>
 public static class SpatialEngine {
-
     /// <summary>Performs spatial indexing operations using RhinoCommon RTree algorithms with tolerance-aware geometry processing.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<int>> Index<T>(

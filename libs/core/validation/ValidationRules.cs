@@ -22,15 +22,19 @@ public static class ValidationRules {
         public readonly byte Kind = kind;
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(CacheKey left, CacheKey right) => left.Equals(right);
+
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(CacheKey left, CacheKey right) => !left.Equals(right);
+
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
+        public override int GetHashCode() => (this.Type, this.Mode, this.Member, this.Kind).GetHashCode();
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(CacheKey other) =>
-            this.Type == other.Type && this.Mode == other.Mode &&
-            string.Equals(this.Member, other.Member, StringComparison.Ordinal) && this.Kind == other.Kind;
+        public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
     }
     private static readonly ConcurrentDictionary<CacheKey, object> _cache = new();
 

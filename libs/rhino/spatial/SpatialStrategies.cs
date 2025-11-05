@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
@@ -95,8 +94,8 @@ internal static class SpatialStrategies {
                     (RTree t1, RTree t2, int count) = (_treeCache.GetValue(meshes.Item1, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
                                             _treeCache.GetValue(meshes.Item2, static m => RTree.CreateMeshFaceTree((Mesh)m)!), 0);
                     try {
-                        RTree.SearchOverlaps(t1, t2, context.AbsoluteTolerance + (toleranceBuffer ?? 0),
-                            (_, args) => count = count + 1 < buffer.Length ? (buffer[count] = args.Id, buffer[count + 1] = args.IdB, count + 2).Item3 : count);
+                        _ = RTree.SearchOverlaps(t1, t2, context.AbsoluteTolerance + (toleranceBuffer ?? 0),
+                            (_, args) => count = count + 1 < buffer.Length ? ((buffer[count], buffer[count + 1]) = (args.Id, args.IdB), count += 2).Item2 : count);
                         return count > 0 ? [.. buffer[..count]] : [];
                     } finally { ArrayPool<int>.Shared.Return(buffer, clearArray: true); }
                 }))(),

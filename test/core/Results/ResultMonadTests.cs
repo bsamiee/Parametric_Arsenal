@@ -34,10 +34,10 @@ public sealed class ResultMonadTests {
     public void BindValueTransformationChainsCorrectly() => TestUtilities.AssertAll(
         () => Assert.Equal(15, ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: x * 3)).Value),
         () => Assert.Equal("10", ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: (x * 2).ToString(CultureInfo.InvariantCulture))).Value),
-        Gen.Int.ToAssertion((Action<int>)(n => Assert.Equal(n * 2 + 10,
+        Gen.Int.ToAssertion((Action<int>)(n => Assert.Equal((n * 2) + 10,
             ResultFactory.Create(value: n).Bind(x => ResultFactory.Create(value: x * 2)).Bind(x => ResultFactory.Create(value: x + 10)).Value))),
         () => Assert.False(ResultFactory.Create<int>(error: TestError).Bind(static x => ResultFactory.Create(value: x * 2)).IsSuccess),
-        () => Assert.False(ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create<int>(error: TestError)).IsSuccess));
+        () => Assert.False(ResultFactory.Create(value: 5).Bind(static _ => ResultFactory.Create<int>(error: TestError)).IsSuccess));
 
     /// <summary>Verifies monad category laws: left identity, right identity, and associativity.</summary>
     [Fact]
