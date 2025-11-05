@@ -6,4 +6,5 @@ public enum ErrorDomain {
     Results = 1000,
     Geometry = 2000,
     Validation = 3000,
+    Diagnostics = 5000,
 }
