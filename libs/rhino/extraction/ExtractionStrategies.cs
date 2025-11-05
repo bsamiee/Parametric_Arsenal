@@ -73,7 +73,7 @@ internal static class ExtractionStrategies {
         };
 
     /// <summary>Extracts points from converted Brep with proper disposal.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #pragma warning disable IDISP007 // Don't dispose injected - we own the Brep created by ToBrep()
     private static Point3d[]? ExtractWithBrepConversion(
         Brep? brep, ExtractionMethod method, IGeometryContext context, int? count, double? length, bool includeEnds) {
@@ -112,7 +112,7 @@ internal static class ExtractionStrategies {
                 [surface.PointAt(intervalU.Min, intervalV.Min), surface.PointAt(intervalU.Max, intervalV.Min), surface.PointAt(intervalU.Max, intervalV.Max), surface.PointAt(intervalU.Min, intervalV.Max),],
             (ExtractionMethod.Extremal, GeometryBase geometryBase) => geometryBase.GetBoundingBox(accurate: true).GetCorners(),
             (ExtractionMethod.Quadrant, Curve curve) => ExtractQuadrant(curve, context),
-            (ExtractionMethod.EdgeMidpoints, Brep brep) => [.. brep.Edges.Select(edge => edge.PointAt(edge.Domain.ParameterAt(0.5))),],
+            (ExtractionMethod.EdgeMidpoints, Brep brep) => [.. brep.Edges.Select(edge => edge.PointAtNormalizedLength(0.5)),],
             (ExtractionMethod.EdgeMidpoints, Mesh mesh) => [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
                 .Select(index => mesh.TopologyEdges.EdgeLine(index))
                 .Where(line => line.IsValid)
@@ -127,7 +127,7 @@ internal static class ExtractionStrategies {
         };
 
     /// <summary>Extracts analytical centroids and feature points.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Point3d[] ExtractAnalytical(GeometryBase analytic) =>
         [.. (analytic switch {
             Brep brep when VolumeMassProperties.Compute(brep)?.Centroid is { IsValid: true } centroid => [centroid,],
@@ -153,7 +153,7 @@ internal static class ExtractionStrategies {
             }),];
 
     /// <summary>Extracts quadrant points from curve primitives.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Point3d[]? ExtractQuadrant(Curve curve, IGeometryContext context) =>
         curve switch {
             _ when curve.TryGetCircle(out Circle circle, context.AbsoluteTolerance) =>
