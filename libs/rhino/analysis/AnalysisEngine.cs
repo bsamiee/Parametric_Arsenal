@@ -5,6 +5,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
@@ -18,8 +19,8 @@ public static class AnalysisEngine {
         AnalysisParameters parameters = default) where T : notnull =>
         UnifiedOperation.Apply(
             input,
-            (Func<object, Result<IReadOnlyList<AnalysisPacket>>>)(item => AnalysisStrategies.Analyze(item, context, parameters)),
-            new OperationConfig<object, AnalysisPacket> {
+            (T item) => AnalysisStrategies.Analyze(item, context, parameters),
+            new OperationConfig<T, AnalysisPacket> {
                 Context = context,
                 ValidationMode = ValidationMode.None,
                 AccumulateErrors = true,
@@ -39,12 +40,12 @@ public readonly record struct AnalysisParameters(
 
 /// <summary>Dense analysis payload exposing evaluated geometry state.</summary>
 public readonly record struct AnalysisPacket(
-    Rhino.Geometry.Point3d Point,
-    IReadOnlyList<Rhino.Geometry.Vector3d> Derivatives,
-    Rhino.Geometry.Plane Frame,
+    Point3d Point,
+    IReadOnlyList<Vector3d> Derivatives,
+    Plane Frame,
     AnalysisCurvature? Curvature,
     AnalysisMetrics Metrics,
-    IReadOnlyList<Rhino.Geometry.Interval> Domains,
+    IReadOnlyList<Interval> Domains,
     AnalysisOrientation Orientation,
     AnalysisParameters EvaluatedParameters);
 
@@ -54,9 +55,9 @@ public readonly record struct AnalysisCurvature(
     double? Mean,
     double? Minimum,
     double? Maximum,
-    Rhino.Geometry.Vector3d? MinimumDirection,
-    Rhino.Geometry.Vector3d? MaximumDirection,
-    Rhino.Geometry.Vector3d? CurveVector);
+    Vector3d? MinimumDirection,
+    Vector3d? MaximumDirection,
+    Vector3d? CurveVector);
 
 /// <summary>Metric aggregates derived from Rhino mass property solvers.</summary>
 public readonly record struct AnalysisMetrics(
@@ -66,6 +67,6 @@ public readonly record struct AnalysisMetrics(
 
 /// <summary>Orientation vectors providing tangent/normal frames.</summary>
 public readonly record struct AnalysisOrientation(
-    IReadOnlyList<Rhino.Geometry.Vector3d> TangentBasis,
-    Rhino.Geometry.Vector3d? Normal,
-    Rhino.Geometry.Plane? Frame);
+    IReadOnlyList<Vector3d> TangentBasis,
+    Vector3d? Normal,
+    Plane? Frame);
