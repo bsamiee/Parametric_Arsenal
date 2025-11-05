@@ -29,13 +29,12 @@ internal static class ExtractionStrategies {
                 },
             ])
             .Bind(g => ExtractCore(g, method, context, count, length, includeEnds) switch {
-                Point3d[] result when result?.Length > 0 =>
-                    ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
-                // Map Rhino SDK null returns to appropriate errors
-                null when method == ExtractionMethod.Uniform && count is not null =>
-                    ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
-                null when method == ExtractionMethod.Uniform && length is not null =>
-                    ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength),
+                Point3d[] { Length: > 0 } result => ResultFactory.Create(value: (IReadOnlyList<Point3d>)result.AsReadOnly()),
+                null => ResultFactory.Create<IReadOnlyList<Point3d>>(error: (method, count, length) switch {
+                    (ExtractionMethod.Uniform, not null, _) => ExtractionErrors.Operation.InvalidCount,
+                    (ExtractionMethod.Uniform, _, not null) => ExtractionErrors.Operation.InvalidLength,
+                    _ => ExtractionErrors.Operation.InvalidMethod,
+                }),
                 [] => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
                 _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
             });
@@ -55,9 +54,17 @@ internal static class ExtractionStrategies {
                 from i in Enumerable.Range(0, count ?? 10)
                 from j in Enumerable.Range(0, count ?? 10)
                 let n = count ?? 10
-                let u = s.Domain(0).ParameterAt(includeEnds && n == 1 ? 0d : includeEnds && n > 1 ? i / (double)(n - 1) : (i + 0.5) / n)
-                let v = s.Domain(1).ParameterAt(includeEnds && n == 1 ? 0d : includeEnds && n > 1 ? j / (double)(n - 1) : (j + 0.5) / n)
-                select s.PointAt(u, v),
+                let paramU = (n, includeEnds) switch {
+                    (1, _) => 0.5,
+                    (_, true) => i / (double)(n - 1),
+                    (_, false) => (i + 0.5) / n,
+                }
+                let paramV = (n, includeEnds) switch {
+                    (1, _) => 0.5,
+                    (_, true) => j / (double)(n - 1),
+                    (_, false) => (j + 0.5) / n,
+                }
+                select s.PointAt(s.Domain(0).ParameterAt(paramU), s.Domain(1).ParameterAt(paramV)),
             ],
             // ANALYTICAL - Centroid and structural points via Rhino SDK
             (ExtractionMethod.Analytical, GeometryBase g) => [

@@ -50,8 +50,7 @@ internal static class SpatialStrategies {
             _ => _spatialConfig.TryGetValue((method, source switch { GeometryBase g => g.GetType(), Point3d[] => typeof(Point3d[]), _ => source.GetType() }), out (ValidationMode Mode, Func<object, RTree?>? TreeFactory, int BufferSize, bool RequiresDoubleBuffer) config) switch {
                 true => ResultFactory.Create(value: source)
                     .Validate(args: [context, config.Mode])
-                    .Map(_ => IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? [])
-                    .Map(result => (IReadOnlyList<int>)result.AsReadOnly()),
+                    .Map(_ => (IReadOnlyList<int>)(IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? []).AsReadOnly()),
                 false => ResultFactory.Create(value: (IReadOnlyList<int>)(IndexCore(source, method, context, queryShape, needles, k, limitDistance, toleranceBuffer) ?? []).AsReadOnly()),
             },
         };
