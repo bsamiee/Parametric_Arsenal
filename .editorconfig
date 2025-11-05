@@ -101,6 +101,8 @@ dotnet_diagnostic.RCS0027.severity = error
 # --- READONLY MEMBER OPTIMIZATION (Meziantou) ---
 dotnet_diagnostic.MA0102.severity = error
 
+
+
 # --- INDICES & RANGES ---
 csharp_style_prefer_index_operator = true:error
 csharp_style_prefer_range_operator = true:error
@@ -213,6 +215,14 @@ dotnet_diagnostic.IDE0048.severity = none  # Parentheses preferences handled abo
 dotnet_diagnostic.IDE0049.severity = none  # Parentheses preferences handled above
 dotnet_diagnostic.IDE0050.severity = none  # Parentheses preferences handled above
 dotnet_diagnostic.RCS1032.severity = none  # Allow parentheses for clarity in complex expressions
+
+# ====================================================================
+# FILE-SPECIFIC CONFIGURATION
+# ====================================================================
+
+# --- UNIFIED OPERATION (Dense polymorphic dispatch exemplar) ---
+[libs/core/operations/UnifiedOperation.cs]
+dotnet_diagnostic.MA0051.severity = none  # 90-line method is intentional dense code exemplar
 
 # ====================================================================
 # TEST-SPECIFIC SUPPRESSIONS

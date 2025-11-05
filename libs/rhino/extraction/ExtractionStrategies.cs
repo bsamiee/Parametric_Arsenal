@@ -45,9 +45,9 @@ internal static class ExtractionStrategies {
         IGeometryContext context, int? count, double? length, bool includeEnds) =>
         (method, geometry) switch {
             // UNIFORM - Rhino SDK validates parameters via null returns
-            (ExtractionMethod.Uniform, Curve c) when count is { } int n =>
+            (ExtractionMethod.Uniform, Curve c) when count is int n =>
                 c.DivideByCount(n, includeEnds)?.Select(c.PointAt).ToArray(),
-            (ExtractionMethod.Uniform, Curve c) when length is { } double len =>
+            (ExtractionMethod.Uniform, Curve c) when length is double len =>
                 c.DivideByLength(len, includeEnds)?.Select(c.PointAt).ToArray(),
             (ExtractionMethod.Uniform, Surface s) => [..
                 from i in Enumerable.Range(0, count ?? 10)
