@@ -14,6 +14,8 @@ public sealed class ResultEdgeCaseTests {
         new(ErrorDomain.Results, 7002, "Edge2"),
         new(ErrorDomain.Results, 7003, "Edge3"));
 
+    private static readonly int[] TestArray = [1, 2, 3];
+
     /// <summary>Verifies value type default handling using zero-value semantics.</summary>
     [Fact]
     public void ValueTypeDefaultHandlingCreatesSuccessfully() => TestUtilities.AssertAll(
@@ -63,13 +65,13 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal((true, 1, "42"), (single.IsSuccess, single.Value.Count, single.Value[0]));
         },
         Gen.Int.List[1, 5].ToAssertion((Action<List<int>>)(items => {
-            Result<IReadOnlyList<string>> traversed = ResultFactory.Create<System.Collections.IEnumerable>(value: items)
-                .Traverse(x => ResultFactory.Create(value: ((int)x).ToString(CultureInfo.InvariantCulture)));
+            Result<IReadOnlyList<string>> traversed = ResultFactory.Create<IEnumerable<int>>(value: items)
+                .TraverseElements(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture)));
             Assert.Equal((true, items.Count), (traversed.IsSuccess, traversed.Value.Count));
         }), 20),
         () => {
-            Result<IReadOnlyList<int>> failed = ResultFactory.Create(value: new[] { 1, 2, 3 })
-                .Traverse(x => x == 2 ? ResultFactory.Create<int>(error: Errors.E1) : ResultFactory.Create(value: x * 10));
+            Result<IReadOnlyList<int>> failed = ResultFactory.Create<IEnumerable<int>>(value: TestArray)
+                .TraverseElements(x => x == 2 ? ResultFactory.Create<int>(error: Errors.E1) : ResultFactory.Create(value: x * 10));
             Assert.False(failed.IsSuccess);
         });
 
@@ -156,7 +158,7 @@ public sealed class ResultEdgeCaseTests {
         Gen.Int.ToAssertion((Action<int>)(v => {
             Result<int> original = ResultFactory.Create(value: v);
             Result<int> applied = original.Apply(onSuccess: _ => { });
-            Assert.True(ReferenceEquals(original, applied) || original.Equals(applied));
+            Assert.True(original.Equals(applied));
         })),
         ResultGenerators.SystemErrorGen.ToAssertion((Action<SystemError>)(err => {
             Result<int> original = ResultFactory.Create<int>(error: err);
@@ -209,17 +211,17 @@ public sealed class ResultEdgeCaseTests {
     public void CreateWithNestedResultFlattensCorrectly() => TestUtilities.AssertAll(
         Gen.Int.ToAssertion((Action<int>)(v => {
             Result<Result<int>> nested = ResultFactory.Create(value: ResultFactory.Create(value: v));
-            Result<int> flattened = ResultFactory.Create(nested: nested);
+            Result<int> flattened = ResultFactory.Create<int>(nested: nested);
             Assert.Equal((true, v), (flattened.IsSuccess, flattened.Value));
         })),
         () => {
             Result<Result<int>> nestedError = ResultFactory.Create<Result<int>>(error: Errors.E1);
-            Result<int> flattened = ResultFactory.Create(nested: nestedError);
+            Result<int> flattened = ResultFactory.Create<int>(nested: nestedError);
             Assert.False(flattened.IsSuccess);
         },
         () => {
             Result<Result<int>> innerError = ResultFactory.Create(value: ResultFactory.Create<int>(error: Errors.E1));
-            Result<int> flattened = ResultFactory.Create(nested: innerError);
+            Result<int> flattened = ResultFactory.Create<int>(nested: innerError);
             Assert.False(flattened.IsSuccess);
         });
 
@@ -234,7 +236,7 @@ public sealed class ResultEdgeCaseTests {
         ResultGenerators.SystemErrorGen.ToAssertion((Action<SystemError>)(err => {
             Result<int> result = ResultFactory.Create<int>(error: err);
             bool success = result.TryGet(out int extracted);
-            Assert.Equal((false, default(int)), (success, extracted));
+            Assert.Equal((false, default), (success, extracted));
         }), 20));
 
     /// <summary>Verifies deferred Result with Map/Bind chains evaluates lazily then correctly.</summary>
@@ -271,9 +273,11 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal(v is > 0 and < 100, result.IsSuccess);
         })),
         () => {
-            Result<int> result = ResultFactory.Create(value: 50).Ensure(
-                [(Func<int, bool>)(x => x > 0), Errors.E1],
-                [(Func<int, bool>)(x => x < 100), Errors.E2]);
+            (Func<int, bool>, SystemError)[] validations = [
+                (x => x > 0, Errors.E1),
+                (x => x < 100, Errors.E2),
+            ];
+            Result<int> result = ResultFactory.Create(value: 50).Ensure(validations);
             Assert.True(result.IsSuccess);
         });
 }

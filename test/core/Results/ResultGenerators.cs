@@ -71,7 +71,7 @@ public static class ResultGenerators {
                 Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
                         succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
-                                 : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, $"Failed at {x}")))),
+                                 : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
                 Gen.Double.Tuple(Gen.Bool).Select(static (multiplier, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
@@ -79,8 +79,8 @@ public static class ResultGenerators {
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
                 Gen.Double.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
-                        succeeds && double.TryParse(s, out double val) ? ResultFactory.Create(value: val + offset)
-                                                                        : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
+                        succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: val + offset)
+                                                                                                       : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
@@ -99,7 +99,7 @@ public static class ResultGenerators {
                 Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, int>(x => x + offset)),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<string, int>(s => s.Length + offset)),
-            _ => throw new NotSupportedException($"Pure function generation not supported for {typeof(T)} -> {typeof(TResult)}"),
+            _ => throw new NotSupportedException(string.Create(CultureInfo.InvariantCulture, $"Pure function generation not supported for {typeof(T)} -> {typeof(TResult)}")),
         };
 
     /// <summary>Generates predicates using constant boolean capture.</summary>

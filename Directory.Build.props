@@ -64,12 +64,16 @@
   <PropertyGroup>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <AnalysisMode>Default</AnalysisMode>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
     <RunAnalyzers>true</RunAnalyzers>
     <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Report all analyzer diagnostics, not just errors -->
+    <ReportAnalyzer>true</ReportAnalyzer>
+    <!-- Ensure code style analyzers emit in build output -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <!-- ============================================ -->
