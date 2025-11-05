@@ -12,22 +12,22 @@ public static class ResultFactory {
     /// <summary>Creates Result using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
-        Optional<T> value = default,
+        T? value = default,
         SystemError[]? errors = null,
         SystemError? error = null,
         Func<Result<T>>? deferred = null,
         (Func<T, bool> Condition, SystemError Error)[]? conditionals = null,
         Result<Result<T>>? nested = null) =>
         (value, errors, error, deferred, conditionals, nested) switch {
-            (var v, null, null, null, null, null) when v.HasValue => new Result<T>(isSuccess: true, v.Value, [], deferred: null),
+            (var v, null, null, null, null, null) when v is not null => new Result<T>(isSuccess: true, v, [], deferred: null),
             (_, var e, null, null, null, null) when e?.Length > 0 =>
                 new Result<T>(isSuccess: false, default!, e, deferred: null),
             (_, null, var e, null, null, null) when e.HasValue =>
                 new Result<T>(isSuccess: false, default!, [e.Value], deferred: null),
             (_, null, null, var d, null, null) when d is not null =>
                 new Result<T>(isSuccess: false, default!, [], deferred: d),
-            (var v, null, null, null, var conds, null) when v.HasValue && conds is not null =>
-                new Result<T>(isSuccess: true, v.Value, [], deferred: null).Ensure([.. conds]),
+            (var v, null, null, null, var conds, null) when v is not null && conds is not null =>
+                new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue =>
                 n.Value.Match(
                     onSuccess: inner => inner,
@@ -36,15 +36,6 @@ public static class ResultFactory {
                 new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided], deferred: null),
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
         };
-
-    /// <summary>Optional wrapper to distinguish between no value and default value.</summary>
-    [StructLayout(LayoutKind.Auto)]
-    public readonly struct Optional<T> {
-        public readonly T Value;
-        public readonly bool HasValue;
-        public Optional(T value) { Value = value; HasValue = true; }
-        public static implicit operator Optional<T>(T value) => new(value);
-    }
 
     /// <summary>Validates Result using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
