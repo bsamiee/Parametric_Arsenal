@@ -12,14 +12,14 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     private readonly T _value;
     private readonly SystemError[] _errors;
     private readonly bool _isSuccess;
-    private readonly Func<Result<T>>? _deferred;
+    private readonly Lazy<Result<T>>? _deferred;
 
     [Pure] public bool IsDeferred => this._deferred is not null;
     [Pure] public bool IsSuccess => this.Eval._isSuccess;
     [Pure] public T Value => this.Eval._isSuccess ? this.Eval._value : Throw<T>();
     [Pure] public IReadOnlyList<SystemError> Errors => this.Eval._isSuccess ? [] : this.Eval._errors;
     [Pure] public SystemError Error => this.Eval switch { { _errors: [var head, ..] } => head, _ => default };
-    [Pure] private Result<T> Eval => this._deferred is not null ? this._deferred().Eval : this;
+    [Pure] private Result<T> Eval => this._deferred is not null ? this._deferred.Value.Eval : this;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(Result<T> left, Result<T> right) => left.Equals(right);
@@ -28,7 +28,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     public static bool operator !=(Result<T> left, Result<T> right) => !left.Equals(right);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Result(bool isSuccess, T value, SystemError[] errors, Func<Result<T>>? deferred) {
+    internal Result(bool isSuccess, T value, SystemError[] errors, Lazy<Result<T>>? deferred) {
         this._isSuccess = isSuccess;
         this._value = value;
         this._errors = errors;

@@ -22,7 +22,7 @@ public static class ResultFactory {
             (var v, null, null, null, null, null) when v is not null => new Result<T>(isSuccess: true, v, [], deferred: null),
             (_, var e, null, null, null, null) when e?.Length > 0 => new Result<T>(isSuccess: false, default!, e, deferred: null),
             (_, null, var e, null, null, null) when e.HasValue => new Result<T>(isSuccess: false, default!, [e.Value,], deferred: null),
-            (_, null, null, var d, null, null) when d is not null => new Result<T>(isSuccess: false, default!, [], deferred: d),
+            (_, null, null, var d, null, null) when d is not null => new Result<T>(isSuccess: false, default!, [], deferred: new Lazy<Result<T>>(d)),
             (var v, null, null, null, var conds, null) when v is not null && conds is not null => new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue => n.Value.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, deferred: null)),
             (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided,], deferred: null),
