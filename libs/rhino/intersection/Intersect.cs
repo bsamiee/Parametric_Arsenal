@@ -208,6 +208,8 @@ public static class Intersect {
 #pragma warning restore IDISP004
                 (Curve ca, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
+                (Curve ca, BrepFace bf, _) =>
+                    fromBrepIntersection(RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2),
                 (Brep ba, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.BrepBrep(ba, bb, tolerance, out Curve[] c3, out Point3d[] p3), c3, p3),
                 (Brep ba, Plane pb, _) =>
