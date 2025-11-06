@@ -137,7 +137,7 @@ public static class Analysis {
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>
-                AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: false)),
+                AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: enableDiagnostics)),
             new OperationConfig<object, IResult> {
                 Context = context,
                 ValidationMode = Core.Validation.ValidationMode.None,
