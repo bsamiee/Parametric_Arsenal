@@ -23,7 +23,7 @@ public static class UnifiedOperation {
 
         Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
             Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
-            Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
+            Func<TIn, ValidationConfig, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationConfig),
             Func<TIn, Result<Result<IReadOnlyList<TOut>>>> nested => nested(item).Bind(inner => inner),
             Func<TIn, Result<TOut>> single => single(item).Map(v => (IReadOnlyList<TOut>)[v]),
             IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
@@ -35,7 +35,7 @@ public static class UnifiedOperation {
             (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
                 pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
             _ => ResultFactory.Create<IReadOnlyList<TOut>>(
-                error: ValidationErrors.Operations.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
+                error: ErrorRegistry.Validation.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
         };
 
         Result<IReadOnlyList<TOut>> execute(TIn item) {
@@ -44,14 +44,14 @@ public static class UnifiedOperation {
 
             Result<IReadOnlyList<TOut>> instrument(Result<IReadOnlyList<TOut>> r, bool hit) =>
                 config.EnableDiagnostics && config.OperationName is not null
-                    ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
+                    ? r.Capture(config.OperationName, validationApplied: config.ValidationConfig, cacheHit: hit)
                     : r;
 
             Result<TIn> validated = ResultFactory.Create(value: item)
                 .Ensure(config.InputFilter ?? (_ => true),
-                    config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
-                .Validate(args: config.ValidationMode is ValidationMode.None ? null :
-                    [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []]);
+                    config.ErrorPrefix is null ? ErrorRegistry.Validation.InputFiltered : ErrorRegistry.Validation.InputFiltered.WithContext(config.ErrorPrefix))
+                .Validate(args: config.ValidationConfig == ValidationConfig.None ? null :
+                    [config.Context, config.ValidationConfig, .. config.ValidationArgs ?? []]);
 
             Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError(_ => item) : validated)
                 .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))

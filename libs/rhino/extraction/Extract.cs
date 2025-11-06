@@ -38,16 +38,16 @@ public static class Extract {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
         spec switch {
-            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
-            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength),
-            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
-            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength),
-            Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidDirection),
+            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidCount),
+            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidLength),
+            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidCount),
+            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidLength),
+            Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidDirection),
             int or double or (int, bool) or (double, bool) or Vector3d or Continuity or Semantic =>
                 UnifiedOperation.Apply(
                     input,
                     (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = ValidationMode.None }),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
+                    new OperationConfig<T, Point3d> { Context = context, ValidationConfig = ValidationConfig.None }),
+            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidMethod),
         };
 }

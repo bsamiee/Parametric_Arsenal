@@ -11,31 +11,31 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Internal extraction algorithms with Rhino SDK geometry processing.</summary>
 internal static class ExtractionCore {
-    private static readonly FrozenDictionary<(byte, Type), ValidationMode> _validationConfig =
-        new Dictionary<(byte, Type), ValidationMode> {
-            [(1, typeof(GeometryBase))] = ValidationMode.Standard,
-            [(1, typeof(Brep))] = ValidationMode.Standard | ValidationMode.MassProperties,
-            [(1, typeof(Curve))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(1, typeof(Surface))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(1, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MassProperties,
-            [(1, typeof(PointCloud))] = ValidationMode.Standard,
-            [(2, typeof(GeometryBase))] = ValidationMode.BoundingBox,
-            [(3, typeof(NurbsCurve))] = ValidationMode.Standard,
-            [(3, typeof(NurbsSurface))] = ValidationMode.Standard,
-            [(3, typeof(Curve))] = ValidationMode.Standard,
-            [(3, typeof(Surface))] = ValidationMode.Standard,
-            [(4, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(5, typeof(Curve))] = ValidationMode.Tolerance,
-            [(6, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(6, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MeshSpecific,
-            [(6, typeof(Curve))] = ValidationMode.Standard,
-            [(7, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(7, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MeshSpecific,
-            [(10, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(10, typeof(Surface))] = ValidationMode.Standard,
-            [(11, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(12, typeof(Curve))] = ValidationMode.Standard,
-            [(13, typeof(Curve))] = ValidationMode.Standard,
+    private static readonly FrozenDictionary<(byte, Type), ValidationConfig> _validationConfig =
+        new Dictionary<(byte, Type), ValidationConfig> {
+            [(1, typeof(GeometryBase))] = ValidationConfig.Standard,
+            [(1, typeof(Brep))] = ValidationConfig.Standard | ValidationConfig.MassProperties,
+            [(1, typeof(Curve))] = ValidationConfig.Standard | ValidationConfig.AreaCentroid,
+            [(1, typeof(Surface))] = ValidationConfig.Standard | ValidationConfig.AreaCentroid,
+            [(1, typeof(Mesh))] = ValidationConfig.Standard | ValidationConfig.MassProperties,
+            [(1, typeof(PointCloud))] = ValidationConfig.Standard,
+            [(2, typeof(GeometryBase))] = ValidationConfig.BoundingBox,
+            [(3, typeof(NurbsCurve))] = ValidationConfig.Standard,
+            [(3, typeof(NurbsSurface))] = ValidationConfig.Standard,
+            [(3, typeof(Curve))] = ValidationConfig.Standard,
+            [(3, typeof(Surface))] = ValidationConfig.Standard,
+            [(4, typeof(Curve))] = ValidationConfig.Standard | ValidationConfig.Degeneracy,
+            [(5, typeof(Curve))] = ValidationConfig.Tolerance,
+            [(6, typeof(Brep))] = ValidationConfig.Standard | ValidationConfig.Topology,
+            [(6, typeof(Mesh))] = ValidationConfig.Standard | ValidationConfig.MeshSpecific,
+            [(6, typeof(Curve))] = ValidationConfig.Standard,
+            [(7, typeof(Brep))] = ValidationConfig.Standard | ValidationConfig.Topology,
+            [(7, typeof(Mesh))] = ValidationConfig.Standard | ValidationConfig.MeshSpecific,
+            [(10, typeof(Curve))] = ValidationConfig.Standard | ValidationConfig.Degeneracy,
+            [(10, typeof(Surface))] = ValidationConfig.Standard,
+            [(11, typeof(Curve))] = ValidationConfig.Standard | ValidationConfig.Degeneracy,
+            [(12, typeof(Curve))] = ValidationConfig.Standard,
+            [(13, typeof(Curve))] = ValidationConfig.Standard,
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -54,7 +54,7 @@ internal static class ExtractionCore {
 #pragma warning restore IDE0004
 
         if (kind is 0) {
-            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);
+            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorRegistry.Geometry.ExtractionInvalidMethod);
         }
 
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
@@ -64,15 +64,15 @@ internal static class ExtractionCore {
         };
 
         try {
-            ValidationMode mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ValidationMode exact) ? exact :
+            ValidationConfig mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ValidationConfig exact) ? exact :
                 _validationConfig.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(normalized.GetType()))
                     .OrderByDescending(kv => kv.Key.Item2, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                     .Select(kv => kv.Value)
-                    .DefaultIfEmpty(ValidationMode.Standard)
+                    .DefaultIfEmpty(ValidationConfig.Standard)
                     .First();
 
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode is ValidationMode.None ? null : [context, mode])
+                .Validate(args: mode is ValidationConfig.None ? null : [context, mode])
                 .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
         } finally {
             if (shouldDispose) {

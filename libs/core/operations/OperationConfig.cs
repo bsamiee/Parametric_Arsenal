@@ -9,8 +9,8 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Polymorphic geometry context providing validation and tolerance contracts</summary>
     public required IGeometryContext Context { get; init; }
 
-    /// <summary>Validation mode applied before operation execution</summary>
-    public ValidationMode ValidationMode { get; init; } = ValidationMode.None;
+    /// <summary>Validation config applied before operation execution</summary>
+    public ValidationConfig ValidationConfig { get; init; } = ValidationConfig.None;
 
     /// <summary>Additional validation arguments passed to validation contracts</summary>
     public object[]? ValidationArgs { get; init; }
