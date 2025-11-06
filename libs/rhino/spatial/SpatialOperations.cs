@@ -2,74 +2,107 @@ using System.Buffers;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
+using Arsenal.Core.Results;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Core spatial algorithm implementations with RhinoCommon RTree SDK and tolerance-aware geometry processing.</summary>
+/// <summary>Core spatial algorithms with zero-null guarantees and Result monad integration.</summary>
 internal static class SpatialOperations {
     private static readonly ConditionalWeakTable<object, RTree> _treeCache = [];
 
-    /// <summary>Executes range queries using RTree search with sphere or bounding box dispatch.</summary>
+    /// <summary>Executes range query with RTree search and query shape transformation.</summary>
     [Pure]
-    internal static int[]? Range<TSource, TQuery>(
+    internal static Result<IReadOnlyList<int>> RangeQuery<TSource, TQuery>(
         TSource source,
         TQuery query,
         IGeometryContext context,
-        Func<object, RTree?>? treeFactory,
-        double? toleranceBuffer) where TSource : notnull where TQuery : notnull {
-        RTree? tree = treeFactory is not null ? _treeCache.GetValue(source, _ => treeFactory(source)!) :
-            source switch {
-                Curve[] curves => _treeCache.GetValue(source, _ => { RTree t = new(); _ = curves.Select((c, i) => (t.Insert(c.GetBoundingBox(accurate: true), i), 0).Item2).ToArray(); return t; }),
-                Surface[] surfaces => _treeCache.GetValue(source, _ => { RTree t = new(); _ = surfaces.Select((s, i) => (t.Insert(s.GetBoundingBox(accurate: true), i), 0).Item2).ToArray(); return t; }),
-                Brep[] breps => _treeCache.GetValue(source, _ => { RTree t = new(); _ = breps.Select((b, i) => (t.Insert(b.GetBoundingBox(accurate: true), i), 0).Item2).ToArray(); return t; }),
-                _ => null,
-            };
+        double? toleranceBuffer,
+        Func<TSource, RTree>? treeFactory) where TSource : notnull where TQuery : notnull =>
+        BuildTree(source, treeFactory)
+            .Map(tree => (tree, TransformQuery(query, context.AbsoluteTolerance, toleranceBuffer)))
+            .Bind(pair => pair.Item1 switch {
+                RTree t when pair.Item2 is Sphere sphere => ResultFactory.Create(value: ExecuteSearch(t, sphere)),
+                RTree t when pair.Item2 is BoundingBox box => ResultFactory.Create(value: ExecuteSearch(t, box)),
+                _ => ResultFactory.Create(value: (IReadOnlyList<int>)[]),
+            });
 
-        return (tree, TransformQuery(query, context.AbsoluteTolerance, toleranceBuffer)) switch {
-            (null, _) => [],
-            (RTree t, Sphere sphere) => ExecuteSearch(t, sphere),
-            (RTree t, BoundingBox box) => ExecuteSearch(t, box),
-            _ => [],
-        };
-    }
-
-    /// <summary>Executes k-nearest neighbor proximity queries using RhinoCommon algorithms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[]? ProximityK(Point3d[] points, Point3d needle, int k) =>
-        RTree.Point3dKNeighbors(points, [needle], k)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray();
-
-    /// <summary>Executes k-nearest neighbor proximity queries for PointCloud using RhinoCommon algorithms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[]? ProximityK(PointCloud cloud, Point3d needle, int k) =>
-        RTree.PointCloudKNeighbors(cloud, [needle], k)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray();
-
-    /// <summary>Executes distance-limited proximity queries using RhinoCommon algorithms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[]? ProximityDistance(Point3d[] points, Point3d needle, double distance) =>
-        RTree.Point3dClosestPoints(points, [needle], distance)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray();
-
-    /// <summary>Executes distance-limited proximity queries for PointCloud using RhinoCommon algorithms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[]? ProximityDistance(PointCloud cloud, Point3d needle, double distance) =>
-        RTree.PointCloudClosestPoints(cloud, [needle], distance)?.SelectMany<int[], int>(g => [.. g, -1]).ToArray();
-
-    /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware face tree construction.</summary>
+    /// <summary>Executes proximity query with parameter validation and RhinoCommon SDK integration.</summary>
     [Pure]
-    internal static int[]? Overlap(Mesh mesh1, Mesh mesh2, double tolerance) {
+    internal static Result<IReadOnlyList<int>> ProximityQuery<TSource>(
+        TSource source,
+        (Point3d Needle, int K) query,
+        IGeometryContext _) where TSource : notnull =>
+        query.K switch {
+            <= 0 => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidCount),
+            _ => source switch {
+                Point3d[] pts => ResultFactory.Create(value: (IReadOnlyList<int>)(RTree.Point3dKNeighbors(pts, [query.Needle], query.K)
+                    ?.SelectMany<int[], int>(g => [.. g, -1]).ToArray() ?? [])),
+                PointCloud cloud => ResultFactory.Create(value: (IReadOnlyList<int>)(RTree.PointCloudKNeighbors(cloud, [query.Needle], query.K)
+                    ?.SelectMany<int[], int>(g => [.. g, -1]).ToArray() ?? [])),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.UnsupportedOperation),
+            },
+        };
+
+    /// <summary>Executes proximity query with distance limit validation and RhinoCommon SDK integration.</summary>
+    [Pure]
+    internal static Result<IReadOnlyList<int>> ProximityQuery<TSource>(
+        TSource source,
+        (Point3d Needle, double Distance) query,
+        IGeometryContext _) where TSource : notnull =>
+        query.Distance switch {
+            <= 0 => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.InvalidDistance),
+            _ => source switch {
+                Point3d[] pts => ResultFactory.Create(value: (IReadOnlyList<int>)(RTree.Point3dClosestPoints(pts, [query.Needle], query.Distance)
+                    ?.SelectMany<int[], int>(g => [.. g, -1]).ToArray() ?? [])),
+                PointCloud cloud => ResultFactory.Create(value: (IReadOnlyList<int>)(RTree.PointCloudClosestPoints(cloud, [query.Needle], query.Distance)
+                    ?.SelectMany<int[], int>(g => [.. g, -1]).ToArray() ?? [])),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Parameters.UnsupportedOperation),
+            },
+        };
+
+    /// <summary>Executes mesh overlap detection with ArrayPool buffer management and tolerance handling.</summary>
+    [Pure]
+    internal static Result<IReadOnlyList<int>> OverlapQuery(
+        (Mesh Mesh1, Mesh Mesh2) meshes,
+        IGeometryContext context,
+        double? toleranceBuffer) {
         int[] buffer = ArrayPool<int>.Shared.Rent(4096);
         try {
             (RTree tree1, RTree tree2, int count) = (
-                _treeCache.GetValue(mesh1, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
-                _treeCache.GetValue(mesh2, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
+                _treeCache.GetValue(meshes.Mesh1, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
+                _treeCache.GetValue(meshes.Mesh2, static m => RTree.CreateMeshFaceTree((Mesh)m)!),
                 0);
-            _ = RTree.SearchOverlaps(tree1, tree2, tolerance,
+            _ = RTree.SearchOverlaps(tree1, tree2, context.AbsoluteTolerance + (toleranceBuffer ?? 0),
                 (_, args) => count = count + 1 < buffer.Length ? ((buffer[count], buffer[count + 1]) = (args.Id, args.IdB), count += 2).Item2 : count);
-            return count > 0 ? [.. buffer[..count]] : [];
+            return ResultFactory.Create(value: (IReadOnlyList<int>)(count > 0 ? [.. buffer[..count]] : []));
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
     }
+
+    /// <summary>Builds or retrieves cached RTree with inline construction for geometry arrays.</summary>
+    [Pure]
+    private static Result<RTree> BuildTree<TSource>(TSource source, Func<TSource, RTree>? factory) where TSource : notnull =>
+        factory is not null ? ResultFactory.Create(value: _treeCache.GetValue(source, _ => factory(source))) :
+        source switch {
+            Curve[] curves => ResultFactory.Create(value: _treeCache.GetValue(source, _ => {
+                RTree t = new();
+                _ = curves.Select((c, i) => (t.Insert(c.GetBoundingBox(accurate: true), i), 0).Item2).ToArray();
+                return t;
+            })),
+            Surface[] surfaces => ResultFactory.Create(value: _treeCache.GetValue(source, _ => {
+                RTree t = new();
+                _ = surfaces.Select((s, i) => (t.Insert(s.GetBoundingBox(accurate: true), i), 0).Item2).ToArray();
+                return t;
+            })),
+            Brep[] breps => ResultFactory.Create(value: _treeCache.GetValue(source, _ => {
+                RTree t = new();
+                _ = breps.Select((b, i) => (t.Insert(b.GetBoundingBox(accurate: true), i), 0).Item2).ToArray();
+                return t;
+            })),
+            _ => ResultFactory.Create<RTree>(error: SpatialErrors.Parameters.UnsupportedOperation),
+        };
 
     /// <summary>Transforms query shape with tolerance buffer expansion for spatial accuracy.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -92,9 +125,9 @@ internal static class SpatialOperations {
             },
         };
 
-    /// <summary>Executes RTree search with sphere query and ArrayPool buffer management.</summary>
+    /// <summary>Executes RTree search with ArrayPool buffer management and zero allocations.</summary>
     [Pure]
-    private static int[] ExecuteSearch(RTree tree, Sphere sphere) {
+    private static IReadOnlyList<int> ExecuteSearch(RTree tree, Sphere sphere) {
         int[] buffer = ArrayPool<int>.Shared.Rent(2048);
         try {
             int count = 0;
@@ -105,9 +138,9 @@ internal static class SpatialOperations {
         }
     }
 
-    /// <summary>Executes RTree search with bounding box query and ArrayPool buffer management.</summary>
+    /// <summary>Executes RTree search with ArrayPool buffer management and zero allocations.</summary>
     [Pure]
-    private static int[] ExecuteSearch(RTree tree, BoundingBox box) {
+    private static IReadOnlyList<int> ExecuteSearch(RTree tree, BoundingBox box) {
         int[] buffer = ArrayPool<int>.Shared.Rent(2048);
         try {
             int count = 0;
