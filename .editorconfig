@@ -661,6 +661,10 @@ dotnet_diagnostic.MA0051.severity = none                                       #
 [libs/rhino/extraction/ExtractionStrategies.cs]
 dotnet_diagnostic.MA0051.severity = none                                       # Dense extraction dispatch logic
 
+[libs/core/diagnostics/DiagnosticContext.cs]
+dotnet_diagnostic.MA0048.severity = none                                       # Multiple types in file
+dotnet_diagnostic.MA0049.severity = none                                       # Diagnostics class name matches namespace
+
 [test/**/*.cs]
 dotnet_diagnostic.CA1062.severity = none                                       # No validation tests
 dotnet_diagnostic.CA1707.severity = none                                       # Underscores in tests
