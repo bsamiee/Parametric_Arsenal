@@ -41,19 +41,19 @@ public sealed class ResultEdgeCaseTests {
     [Fact]
     public void OnErrorOverloadsApplyCorrectTransformations() => TestGen.RunAll(
         () => {
-            Result<int> mapped = ResultFactory.Create<int>(error: Errors.E1).OnError((Func<SystemError[], SystemError[]>)(_ => [Errors.E2]));
+            Result<int> mapped = ResultFactory.Create<int>(error: Errors.E1).OnError(_ => [Errors.E2]);
             Assert.Equal(Errors.E2, mapped.Error);
         },
         () => {
-            Result<int> recovered = ResultFactory.Create<int>(error: Errors.E1).OnError((Func<SystemError[], int>)(_ => 99));
+            Result<int> recovered = ResultFactory.Create<int>(error: Errors.E1).OnError(_ => 99);
             Assert.Equal((true, 99), (recovered.IsSuccess, recovered.Value));
         },
         () => {
-            Result<int> recoveredWith = ResultFactory.Create<int>(error: Errors.E1).OnError((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(value: 77)));
+            Result<int> recoveredWith = ResultFactory.Create<int>(error: Errors.E1).OnError(_ => ResultFactory.Create(value: 77));
             Assert.Equal((true, 77), (recoveredWith.IsSuccess, recoveredWith.Value));
         },
         () => {
-            Result<int> mapThenRecover = ResultFactory.Create<int>(error: Errors.E1).OnError((Func<SystemError[], SystemError[]>)(_ => [Errors.E2])).OnError((Func<SystemError[], int>)(_ => 50));
+            Result<int> mapThenRecover = ResultFactory.Create<int>(error: Errors.E1).OnError(_ => [Errors.E2]).OnError(_ => 50);
             Assert.Equal((true, 50), (mapThenRecover.IsSuccess, mapThenRecover.Value));
         });
 
@@ -256,17 +256,17 @@ public sealed class ResultEdgeCaseTests {
     public void OnErrorDoesNotExecuteHandlersOnSuccess() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             bool mapCalled = false;
-            Result<int> result = ResultFactory.Create(value: v).OnError((Func<SystemError[], SystemError[]>)(_ => { mapCalled = true; return [Errors.E1]; }));
+            Result<int> result = ResultFactory.Create(value: v).OnError(_ => { mapCalled = true; return [Errors.E1]; });
             Assert.Equal((v, false), (result.Value, mapCalled));
         })),
         () => Gen.Int.Run((Action<int>)(v => {
             bool recoverCalled = false;
-            Result<int> result = ResultFactory.Create(value: v).OnError((Func<SystemError[], int>)(_ => { recoverCalled = true; return 0; }));
+            Result<int> result = ResultFactory.Create(value: v).OnError(_ => { recoverCalled = true; return 0; });
             Assert.Equal((v, false), (result.Value, recoverCalled));
         })),
         () => Gen.Int.Run((Action<int>)(v => {
             bool recoverWithCalled = false;
-            Result<int> result = ResultFactory.Create(value: v).OnError((Func<SystemError[], Result<int>>)(_ => { recoverWithCalled = true; return ResultFactory.Create(value: 0); }));
+            Result<int> result = ResultFactory.Create(value: v).OnError(_ => { recoverWithCalled = true; return ResultFactory.Create(value: 0); });
             Assert.Equal((v, false), (result.Value, recoverWithCalled));
         })));
 
@@ -275,8 +275,8 @@ public sealed class ResultEdgeCaseTests {
     public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> result = ResultFactory.Create(value: v).Ensure(
-                ((Func<int, bool>)(x => x > 0), Errors.E1),
-                ((Func<int, bool>)(x => x < 100), Errors.E2));
+                (x => x > 0, Errors.E1),
+                (x => x < 100, Errors.E2));
             Assert.Equal(v is > 0 and < 100, result.IsSuccess);
         })),
         () => {

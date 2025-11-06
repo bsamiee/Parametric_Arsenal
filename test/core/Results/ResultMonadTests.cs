@@ -107,12 +107,12 @@ public sealed class ResultMonadTests {
             new(ErrorDomain.Results, 1002, "E2"),
             new(ErrorDomain.Results, 1003, "E3"));
         TestGen.RunAll(
-            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50),
-            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.False(ResultFactory.Create(value: v).Ensure((Func<int, bool>)(x => x < 0), e1).IsSuccess)), 50),
+            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure(x => x > 0, e1).IsSuccess)), 50),
+            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.False(ResultFactory.Create(value: v).Ensure(x => x < 0, e1).IsSuccess)), 50),
             () => Gen.Int.Run((Action<int>)(v =>
-                Assert.Equal((v is > 0 and < 100), ResultFactory.Create(value: v).Ensure(((Func<int, bool>)(x => x > 0), e1), ((Func<int, bool>)(x => x < 100), e2)).IsSuccess))),
+                Assert.Equal((v is > 0 and < 100), ResultFactory.Create(value: v).Ensure((x => x > 0, e1), (x => x < 100, e2)).IsSuccess))),
             () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v > 0,
-                ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50));
+                ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Ensure(x => x > 0, e1).IsSuccess)), 50));
     }
 
     /// <summary>Verifies Match using algebraic pattern exhaustion.</summary>
@@ -222,11 +222,11 @@ public sealed class ResultMonadTests {
         (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
         TestGen.RunAll(
             () => {
-                Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], SystemError[]>)(_ => [e2]));
+                Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError(_ => [e2]);
                 Assert.True(!mapped.IsSuccess && mapped.Errors.Contains(e2) && !mapped.Errors.Contains(e1));
             },
-            () => Assert.Equal(99, ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], int>)(_ => 99)).Value),
-            () => Assert.Equal(77, ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(value: 77))).Value),
-            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(value: v).OnError((Func<SystemError[], SystemError[]>)(_ => [e2])).Value)), 50));
+            () => Assert.Equal(99, ResultFactory.Create<int>(error: e1).OnError(_ => 99).Value),
+            () => Assert.Equal(77, ResultFactory.Create<int>(error: e1).OnError(_ => ResultFactory.Create(value: 77)).Value),
+            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(value: v).OnError(_ => [e2]).Value)), 50));
     }
 }
