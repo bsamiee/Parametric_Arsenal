@@ -91,6 +91,8 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 .Map(x => transform)                           // Functor transform
 .Bind(x => Result<Y>)                          // Monadic chain
 .Ensure(predicate, error: CoreErrors.Geometry.Invalid)  // ✅ Validation with named error parameter
+.Validate(args: [context, mode])               // ✅ Geometry validation with expression trees
+.Validate(predicate: p, error: err)            // ✅ Predicate validation
 .Match(onSuccess, onFailure)                   // Pattern match exhaustive
 .Tap(onSuccess, onFailure)                     // Side effects, preserves state
 .Apply(Result<Func>)                           // Applicative parallel validation
@@ -116,13 +118,15 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 
 ValidationRules compiles validators at runtime using expression trees - never handwrite validation logic.
 
-### Error Pattern (Centralized Registry)
+### Error Pattern (Centralized Registry with Duplicate Detection)
 
 ```csharp
+// libs/core/errors/ErrorRegistry.cs - Thread-safe registration with GetOrAdd
+public static SystemError Register(ErrorDomain domain, int code, string message) =>
+    _registry.GetOrAdd((domain, code), static (key, msg) => new(key.Item1, key.Item2, msg), message);
+
 // libs/core/errors/CoreErrors.cs - All core errors in one place
 public static class CoreErrors {
-    static CoreErrors() => ErrorRegistry.Freeze();
-
     public static class Geometry {
         public static readonly SystemError Invalid = ErrorRegistry.Register(domain: ErrorDomain.Validation, code: 3000, message: "Geometry must be valid");
     }

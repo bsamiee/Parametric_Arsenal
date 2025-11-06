@@ -2,7 +2,6 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Centralized core library errors with automatic registration and hierarchical organization.</summary>
 public static class CoreErrors {
-    static CoreErrors() => ErrorRegistry.Freeze();
 
     /// <summary>Result system errors (1000-1999).</summary>
     public static class Results {

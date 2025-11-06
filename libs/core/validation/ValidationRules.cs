@@ -68,14 +68,11 @@ public static class ValidationRules {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
-            (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
-                [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
-                    [CoreErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
-                    .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-                    [CoreErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
-                    .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
-                    [CoreErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),
-                ],
+            (Type t, double abs, [double rel, double ang]) when t == typeof(double) => [
+                .. !(RhinoMath.IsValidDouble(abs) && abs > RhinoMath.ZeroTolerance) ? [CoreErrors.Context.Tolerance.InvalidAbsolute] : [],
+                .. !(RhinoMath.IsValidDouble(rel) && rel is >= 0d and < 1d) ? [CoreErrors.Context.Tolerance.InvalidRelative] : [],
+                .. !(RhinoMath.IsValidDouble(ang) && ang is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ? [CoreErrors.Context.Tolerance.InvalidAngle] : [],
+            ],
             _ => throw new ArgumentException(CoreErrors.Results.InvalidValidateParameters.Message, nameof(args)),
         };
 
