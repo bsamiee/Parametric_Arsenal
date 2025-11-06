@@ -86,14 +86,23 @@ dotnet test --filter "FullyQualifiedName~Result" # Run specific test
 ```csharp
 Result<T>                                      // Lazy evaluation, monadic composition
 ResultFactory.Create(value: x)                 // ✅ Named parameter, never new Result
-ResultFactory.Create(error: err)               // ✅ Named parameter for errors
-ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
+ResultFactory.Create(error: err)               // ✅ Named parameter for single error
+ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma for multiple
+ResultFactory.Ok(x)                            // Explicit success creation
+ResultFactory.Err<T>(error: err)               // Explicit error creation
 .Map(x => transform)                           // Functor transform
-.Bind(x => Result<Y>)                          // Monadic chain
-.Apply(Result<Func>)                           // Applicative parallel
+.Bind(x => Result<Y>)                          // Monadic chain (alias: SelectMany for LINQ)
+.Apply(Result<Func>)                           // Applicative parallel validation
 .Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
-.OnError(recover: x => value)                  // ✅ Named recover parameter
+.Tap(onSuccess: x => log, onFailure: e => log) // Side effects without state change
+.MapError(errs => transformed)                 // Transform errors only
+.Recover(errs => fallbackValue)                // Recover from errors with value
+.RecoverWith(errs => Result<T>)                // Recover from errors with Result
+.Ensure(pred, error: ValidationErrors.X)       // Single validation
+.EnsureAll((pred1, err1), (pred2, err2))       // Multiple validations with accumulation
 .Traverse(transform)                           // Collection inside Result
+.Validate(context: ctx, mode: ValidationMode)  // Geometry validation
+[result1, result2,].Sequence()                 // Turn list of Results into Result of list
 ```
 
 ### Polymorphic Patterns

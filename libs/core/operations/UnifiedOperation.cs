@@ -46,27 +46,36 @@ public static class UnifiedOperation {
                     ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
                     : r;
 
-            Result<IReadOnlyList<TOut>> compute() => ResultFactory.Create(value: item)
-                .Filter(config.InputFilter ?? (_ => true),
-                    config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
-                .Validate(args: config.ValidationMode is ValidationMode.None ? null :
-                    [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
-                .OnError(recover: config.SkipInvalid ? _ => item : null)
-                .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
-                .Bind(resolveOp)
-                .Map(outputs => config.OutputFilter switch {
-                    null => outputs,
-                    Func<TOut, bool> filter => outputs.Where(filter).ToArray(),
-                })
-                .Bind(outputs => config.PostTransform switch {
-                    null => ResultFactory.Create(value: outputs),
-                    Func<TOut, Result<TOut>> transform => outputs.Aggregate(
-                        ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-                        (acc, output) => (config.SkipInvalid, transform(output)) switch {
-                            (true, { IsSuccess: false }) => acc,
-                            (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
-                        }),
-                });
+            Result<IReadOnlyList<TOut>> compute() {
+                Result<TIn> validated = ResultFactory.Create(value: item)
+                    .Filter(config.InputFilter ?? (_ => true),
+                        config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix));
+
+                Result<TIn> withValidation = config.ValidationMode is ValidationMode.None
+                    ? validated
+                    : validated.Validate(context: config.Context, mode: config.ValidationMode);
+
+                Result<TIn> recovered = config.SkipInvalid
+                    ? withValidation.Recover(_ => item)
+                    : withValidation;
+
+                return recovered
+                    .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
+                    .Bind(resolveOp)
+                    .Map(outputs => config.OutputFilter switch {
+                        null => outputs,
+                        Func<TOut, bool> filter => outputs.Where(filter).ToArray(),
+                    })
+                    .Bind(outputs => config.PostTransform switch {
+                        null => ResultFactory.Create(value: outputs),
+                        Func<TOut, Result<TOut>> transform => outputs.Aggregate(
+                            ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+                            (acc, output) => (config.SkipInvalid, transform(output)) switch {
+                                (true, { IsSuccess: false }) => acc,
+                                (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
+                            }),
+                    });
+            }
 
             return cacheHit
                 ? instrument((Result<IReadOnlyList<TOut>>)cached!, hit: true)

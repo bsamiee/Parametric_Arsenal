@@ -29,30 +29,19 @@ public static class ResultFactory {
             _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result using polymorphic parameter detection.</summary>
+    /// <summary>Validates geometry using ValidationRules with context and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
-        Func<T, bool>? predicate = null,
-        SystemError? error = null,
-        Func<T, Result<T>>? validation = null,
-        bool? unless = null,
-        Func<T, bool>? premise = null,
-        Func<T, bool>? conclusion = null,
-        (Func<T, bool>, SystemError)[]? validations = null,
-        object[]? args = null) =>
-        (predicate ?? premise, validation, validations, args) switch {
-            (Func<T, bool> p, null, null, _) when error.HasValue => result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
-            (Func<T, bool> p, Func<T, Result<T>> v, null, _) => result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
-            (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
-            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
-            }),
-            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
-            }),
-            (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
-            _ => result,
+        IGeometryContext context,
+        ValidationMode mode = ValidationMode.Standard) =>
+        IsGeometryType(typeof(T)) switch {
+            true => result.Bind(geometry =>
+                ValidationRules.GetOrCompileValidator(geometry!.GetType(), mode)(geometry, context) switch {
+                    { Length: 0 } => Create(value: geometry),
+                    var errors => Create<T>(errors: errors),
+                }),
+            false => result,
         };
 
     /// <summary>Lifts functions into Result context with partial application and Result unwrapping.</summary>
@@ -102,6 +91,32 @@ public static class ResultFactory {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
         accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
+
+    /// <summary>Sequences collection of Results into Result of collection with error accumulation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> Sequence<T>(this IEnumerable<Result<T>> results) {
+        ArgumentNullException.ThrowIfNull(results);
+        return results.Aggregate(
+            Create<IReadOnlyList<T>>(value: new List<T>().AsReadOnly()),
+            (acc, result) => acc.Accumulate(result));
+    }
+
+    /// <summary>Creates success Result with explicit naming for clarity.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Ok<T>(T value) => Create(value: value);
+
+    /// <summary>Creates error Result from single SystemError with explicit naming.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Err<T>(SystemError error) => Create<T>(error: error);
+
+    /// <summary>Creates error Result from multiple SystemErrors with explicit naming.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Errs<T>(params SystemError[] errors) => Create<T>(errors: errors);
+
+    /// <summary>Flattens nested Result into single-level Result.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Flatten<T>(this Result<Result<T>> nested) =>
+        nested.Bind(inner => inner);
 
     /// <summary>Checks if type is Geometry without loading Rhino assembly using string comparison.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

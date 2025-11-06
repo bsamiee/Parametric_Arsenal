@@ -114,9 +114,9 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Executes side effects without changing Result state.</summary>
+    /// <summary>Executes side effects without changing Result state (monadic tap).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Apply(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
+    public Result<T> Tap(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
         return self.Match(
             onSuccess: value => { onSuccess?.Invoke(value); return self; },
@@ -141,53 +141,79 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Reduces Result to accumulated value with optional error handling.</summary>
+    /// <summary>Transforms errors without changing success state.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TAcc Reduce<TAcc>(TAcc seed, Func<TAcc, T, TAcc> onSuccess, Func<TAcc, SystemError[], TAcc>? onFailure = null) {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        Result<T> eval = this.Eval;
-        return (eval, onFailure) switch {
-            ( { _isSuccess: true, _value: var value }, _) => onSuccess(seed, value),
-            ( { _errors: var errs }, var handler) when handler is not null => handler(seed, errs ?? []),
-            _ => seed,
-        };
-    }
-
-    /// <summary>Handles errors with transformation and recovery strategies.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> OnError(Func<SystemError[], SystemError[]>? mapError = null, Func<SystemError[], T>? recover = null, Func<SystemError[], Result<T>>? recoverWith = null) {
+    public Result<T> MapError(Func<SystemError[], SystemError[]> transform) {
+        ArgumentNullException.ThrowIfNull(transform);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.OnError(mapError, recover, recoverWith)),
-            false => self.Eval switch { { _isSuccess: true } => self,
-                var failure => (failure._errors ?? []) switch {
-                    var errs when mapError is not null => ResultFactory.Create<T>(errors: mapError(errs)),
-                    var errs when recover is not null => ResultFactory.Create(value: recover(errs)),
-                    var errs when recoverWith is not null => recoverWith(errs),
-                    _ => self,
-                },
+            true => ResultFactory.Create(deferred: () => self.Eval.MapError(transform)),
+            false => self.Eval switch {
+                { _isSuccess: true } => self,
+                { _errors: var errs } => ResultFactory.Create<T>(errors: transform(errs ?? [])),
             },
         };
     }
 
-    /// <summary>Ensures predicate holds or accumulates validation errors.</summary>
+    /// <summary>Recovers from errors by producing a value.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Ensure(params object[] validations) {
+    public Result<T> Recover(Func<SystemError[], T> recovery) {
+        ArgumentNullException.ThrowIfNull(recovery);
         Result<T> self = this;
-        return (self.IsDeferred, self.Eval) switch {
-            (true, _) => ResultFactory.Create(deferred: () => self.Eval.Ensure(validations)),
-            (_, { _isSuccess: false }) => self,
-            (_, { _value: var value }) => validations switch {
-                [Func<T, bool> predicate, SystemError error] => predicate(value) ? self : ResultFactory.Create<T>(errors: [error]),
-                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
-                    _ => self,
-                },
-                _ when validations.All(v => v is (Func<T, bool>, SystemError)) =>
-                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.Recover(recovery)),
+            false => self.Eval switch {
+                { _isSuccess: true } => self,
+                { _errors: var errs } => ResultFactory.Create(value: recovery(errs ?? [])),
+            },
+        };
+    }
+
+    /// <summary>Recovers from errors by producing a new Result.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> RecoverWith(Func<SystemError[], Result<T>> recovery) {
+        ArgumentNullException.ThrowIfNull(recovery);
+        Result<T> self = this;
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.RecoverWith(recovery)),
+            false => self.Eval switch {
+                { _isSuccess: true } => self,
+                { _errors: var errs } => recovery(errs ?? []),
+            },
+        };
+    }
+
+    /// <summary>Ensures single predicate holds or returns error.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> Ensure(Func<T, bool> predicate, SystemError error) {
+        ArgumentNullException.ThrowIfNull(predicate);
+        Result<T> self = this;
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.Ensure(predicate, error)),
+            false => self.Eval switch {
+                { _isSuccess: false } => self,
+                { _value: var value } when !predicate(value) => ResultFactory.Create<T>(errors: [error]),
+                _ => self,
+            },
+        };
+    }
+
+    /// <summary>Ensures all predicates hold or accumulates validation errors.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> EnsureAll(params (Func<T, bool> Predicate, SystemError Error)[] validations) {
+        ArgumentNullException.ThrowIfNull(validations);
+        Result<T> self = this;
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.EnsureAll(validations)),
+            false => self.Eval switch {
+                { _isSuccess: false } => self,
+                { _value: var value } => validations
+                    .Where(v => !v.Predicate(value))
+                    .Select(v => v.Error)
+                    .ToArray() switch {
+                        { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
                         _ => self,
                     },
-                [] => self,
-                _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(validations)),
             },
         };
     }
@@ -206,4 +232,15 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             },
         };
     }
+
+    /// <summary>SelectMany for LINQ query syntax support (alias for Bind).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<TOut> SelectMany<TOut>(Func<T, Result<TOut>> selector) => this.Bind(selector);
+
+    /// <summary>SelectMany with projection for LINQ query syntax support.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<TOut> SelectMany<TIntermediate, TOut>(
+        Func<T, Result<TIntermediate>> selector,
+        Func<T, TIntermediate, TOut> projection) =>
+        this.Bind(outer => selector(outer).Map(inner => projection(outer, inner)));
 }
