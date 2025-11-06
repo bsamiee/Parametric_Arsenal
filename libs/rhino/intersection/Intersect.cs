@@ -108,9 +108,13 @@ public static class Intersect {
             }.ToFrozenDictionary();
 
         [Pure]
+#pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction
         internal static Result<IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, IntersectionOptions opts) where T1 : notnull where T2 : notnull {
+#pragma warning restore MA0051
             static Result<IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
-                if (results is null) return ResultFactory.Create(value: IntersectionOutput.Empty);
+                if (results is null) {
+                    return ResultFactory.Create(value: IntersectionOutput.Empty);
+                }
 #pragma warning disable IDISP007 // Don't dispose injected - CurveIntersections created by caller and owned by this method
                 using (results) {
 #pragma warning restore IDISP007
@@ -202,8 +206,6 @@ public static class Intersect {
 #pragma warning restore IDISP004
                 (Curve ca, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
-                (Curve ca, BrepFace fb, _) =>
-                    fromBrepIntersection(RhinoIntersect.CurveBrepFace(ca, fb, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2),
                 (Brep ba, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.BrepBrep(ba, bb, tolerance, out Curve[] c3, out Point3d[] p3), c3, p3),
                 (Brep ba, Plane pb, _) =>
