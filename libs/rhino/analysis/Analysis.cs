@@ -143,7 +143,7 @@ public static class Analysis {
                 AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: enableDiagnostics)),
             new OperationConfig<object, IResult> {
                 Context = context,
-                ValidationMode = Core.Validation.ValidationMode.None,
+                ValidationMode = Core.Validation.V.None,
                 EnableCache = true,
                 AccumulateErrors = false,
                 OperationName = "Analysis.Multiple",

@@ -4,10 +4,9 @@ using System.Runtime.InteropServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>Zero-allocation error structure with domain classification and contextual information.</summary>
+/// <summary>Zero-allocation error structure with computed domain classification and contextual information.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct SystemError(ErrorDomain domain, int code, string message) : IEquatable<SystemError> {
-    public ErrorDomain Domain { get; } = domain;
+public readonly struct SystemError(int code, string message) : IEquatable<SystemError> {
     public int Code { get; } = code;
     public string Message { get; } = message;
 
@@ -21,14 +20,14 @@ public readonly struct SystemError(ErrorDomain domain, int code, string message)
     public override bool Equals(object? obj) => obj is SystemError other && this.Equals(other);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override int GetHashCode() => HashCode.Combine(this.Domain, this.Code, this.Message);
+    public override int GetHashCode() => HashCode.Combine(this.Code, this.Message);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(SystemError other) =>
-        this.Domain == other.Domain && this.Code == other.Code && string.Equals(this.Message, other.Message, StringComparison.Ordinal);
+        this.Code == other.Code && string.Equals(this.Message, other.Message, StringComparison.Ordinal);
 
     /// <summary>Creates new error with additional context information.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SystemError WithContext(string context) =>
-        new(this.Domain, this.Code, $"{this.Message} (Context: {context})");
+        new(this.Code, $"{this.Message} (Context: {context})");
 }
