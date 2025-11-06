@@ -26,7 +26,7 @@ public static class ResultFactory {
             (var v, null, null, null, var conds, null) when v is not null && conds is not null => new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue => n.Value.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, deferred: null)),
             (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [ErrorFactory.Create(code: 1001),], deferred: null),
-            _ => throw new ArgumentException(ErrorFactory.Create(code: 1002).Message, nameof(value)),
+            _ => throw new ArgumentException("Invalid Create parameters", nameof(value)),
         };
 
     /// <summary>Validates Result using polymorphic parameter detection with unified validation semantics.</summary>
@@ -92,7 +92,7 @@ public static class ResultFactory {
                         } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
                 .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
             (var ar, var rc, _, var a) => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture,
-                $"{ErrorFactory.Create(code: 1004).Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
+                $"Invalid Lift parameters: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
         };
     }
 

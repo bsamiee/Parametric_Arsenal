@@ -48,7 +48,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     }
 
     [DoesNotReturn, MethodImpl(MethodImplOptions.NoInlining)]
-    private static TReturn Throw<TReturn>() => throw new InvalidOperationException(ErrorFactory.Create(code: 1100).Message);
+    private static TReturn Throw<TReturn>() => throw new InvalidOperationException("Cannot access value in error state or error in success state");
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(Result<T> other) {

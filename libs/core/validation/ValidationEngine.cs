@@ -65,7 +65,7 @@ public static class ValidationEngine {
         (typeof(T), input, args) switch {
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians,]) when t == typeof(double) =>
                 [.. GetToleranceErrors(absoluteTolerance, relativeTolerance, angleToleranceRadians),],
-            _ => throw new ArgumentException(ErrorFactory.Create(code: 1003).Message, nameof(args)),
+            _ => throw new ArgumentException("Invalid validation parameters", nameof(args)),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -103,18 +103,18 @@ public static class ValidationEngine {
                     return (IEnumerable<(MemberInfo Member, int ErrorCode)>)[
                         .. properties.Select(prop => (
                             Member: _memberCache.GetOrAdd(new CacheKey(runtimeType, mode: 0UL, member: prop, kind: 1),
-                                static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
+                                static (key, type) => type.GetProperty(key.Member!)!, runtimeType)!,
                             errorCode)),
                         .. methods.Select(method => (
                             Member: _memberCache.GetOrAdd(new CacheKey(runtimeType, mode: 0UL, member: method, kind: 2),
-                                static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
+                                static (key, type) => type.GetMethod(key.Member!)!, runtimeType)!,
                             errorCode)),
                     ];
                 }),
             ];
 
         Expression[] validationExpressions = [.. memberValidations
-            .Where(validation => validation.Member is not null and not Type { Name: "Void" })
+            .Where(validation => validation.Member is not null)
             .Select<(MemberInfo Member, int ErrorCode), Expression>(validation => validation.Member switch {
                 PropertyInfo { PropertyType: Type pt } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
