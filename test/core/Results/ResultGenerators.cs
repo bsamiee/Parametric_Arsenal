@@ -7,6 +7,7 @@ using CsCheck;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic generators using zero-allocation static lambdas, inline type dispatch, and modern C# patterns.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Test generators used for property-based testing")]
 public static class ResultGenerators {
     /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
     public static Gen<SystemError> SystemErrorGen =>

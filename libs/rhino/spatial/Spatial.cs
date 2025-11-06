@@ -11,6 +11,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Polymorphic spatial indexing with RhinoCommon RTree algorithms and monadic composition.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
     /// <summary>RTree cache using weak references for automatic memory management and tree reuse across operations.</summary>
     private static readonly ConditionalWeakTable<object, RTree> _treeCache = [];
@@ -77,56 +78,52 @@ public static class Spatial {
         (input, query) switch {
             // Point array range queries
             (Point3d[] pts, Sphere sphere) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Point3d[] pts, BoundingBox box) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Point array proximity queries
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(tree =>
-                tuple1.Item2 <= 0 ?
-                    ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                    ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(tree =>
-                tuple2.Item2 <= 0 ?
-                    ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                    ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ => tuple1.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                : ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ => tuple2.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                : ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
             // PointCloud range queries
             (PointCloud cloud, Sphere sphere) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (PointCloud cloud, BoundingBox box) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // PointCloud proximity queries
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 =>
-                tuple3.Item2 <= 0 ?
-                    ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                    ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 =>
-                tuple4.Item2 <= 0 ?
-                    ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                    ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 => tuple3.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                : ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 => tuple4.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                : ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Mesh mesh, BoundingBox box) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Mesh overlap detection
             (ValueTuple<Mesh, Mesh> meshPair, double tolerance) => GetTree(meshPair.Item1).Bind(t1 =>
                 GetTree(meshPair.Item2).Bind(t2 =>
                     ExecuteOverlapSearch(t1, t2, context.AbsoluteTolerance + tolerance, bufferSize))),
             // Curve array range queries
             (Curve[] curves, Sphere sphere) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Curve[] curves, BoundingBox box) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Surface array range queries
             (Surface[] surfaces, Sphere sphere) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Surface[] surfaces, BoundingBox box) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Brep array range queries
             (Brep[] breps, Sphere sphere) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Brep[] breps, BoundingBox box) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(
                 error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
@@ -137,7 +134,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(
         RTree tree,
         object queryShape,
-        double tolerance,
         int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
@@ -165,7 +161,7 @@ public static class Spatial {
     [Pure]
     private static Result<IReadOnlyList<int>> ExecuteKNearestPoints(Point3d[] points, Point3d[] needles, int k) =>
         RTree.Point3dKNeighbors(points, needles, k) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
+            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
@@ -174,7 +170,7 @@ public static class Spatial {
     [Pure]
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedPoints(Point3d[] points, Point3d[] needles, double limit) =>
         RTree.Point3dClosestPoints(points, needles, limit) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
+            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
@@ -183,7 +179,7 @@ public static class Spatial {
     [Pure]
     private static Result<IReadOnlyList<int>> ExecuteKNearestCloud(PointCloud cloud, Point3d[] needles, int k) =>
         RTree.PointCloudKNeighbors(cloud, needles, k) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
+            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
@@ -192,7 +188,7 @@ public static class Spatial {
     [Pure]
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedCloud(PointCloud cloud, Point3d[] needles, double limit) =>
         RTree.PointCloudClosestPoints(cloud, needles, limit) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
+            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
@@ -232,7 +228,7 @@ public static class Spatial {
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
         for (int i = 0; i < geometries.Length; i++) {
-            tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
+            _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
         }
         return tree;
     }

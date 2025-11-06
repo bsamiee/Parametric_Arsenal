@@ -705,6 +705,7 @@ dotnet_diagnostic.MA0048.severity = error                                      #
 dotnet_diagnostic.MA0049.severity = error                                      # Type not match namespace
 dotnet_diagnostic.MA0050.severity = error                                      # Validate iterator arguments
 dotnet_diagnostic.MA0051.severity = error                                      # Method too long
+MA0051.maximum_lines_per_method = 120                                          # Maximum 120 lines per method
 dotnet_diagnostic.MA0052.severity = error                                      # Constant Enum.ToString
 dotnet_diagnostic.MA0053.severity = error                                      # Make class sealed
 dotnet_diagnostic.MA0054.severity = error                                      # Embed caught exception

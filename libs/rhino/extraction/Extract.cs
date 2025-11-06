@@ -8,20 +8,19 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Semantic extraction marker for parameterless methods.</summary>
-public readonly struct Semantic(byte kind) {
-    internal readonly byte Kind = kind;
-    public static readonly Semantic Analytical = new(1);
-    public static readonly Semantic Extremal = new(2);
-    public static readonly Semantic Greville = new(3);
-    public static readonly Semantic Inflection = new(4);
-    public static readonly Semantic Quadrant = new(5);
-    public static readonly Semantic EdgeMidpoints = new(6);
-    public static readonly Semantic FaceCentroids = new(7);
-}
-
 /// <summary>Polymorphic point extraction with singular API.</summary>
 public static class Extract {
+    /// <summary>Semantic extraction marker for parameterless methods.</summary>
+    public readonly struct Semantic(byte kind) {
+        internal readonly byte Kind = kind;
+        public static readonly Semantic Analytical = new(1);
+        public static readonly Semantic Extremal = new(2);
+        public static readonly Semantic Greville = new(3);
+        public static readonly Semantic Inflection = new(4);
+        public static readonly Semantic Quadrant = new(5);
+        public static readonly Semantic EdgeMidpoints = new(6);
+        public static readonly Semantic FaceCentroids = new(7);
+    }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : notnull =>
         spec switch {

@@ -5,6 +5,7 @@ using CsCheck;
 namespace Arsenal.Tests.Common;
 
 /// <summary>Category theory law verification using FrozenDictionary dispatch.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Shared test utilities used across test projects")]
 public static class TestLaw {
     private static readonly FrozenDictionary<string, Delegate> _laws = new Dictionary<string, Delegate>(StringComparer.Ordinal) {
         ["FunctorIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Map(static x => x).Equals(r), iter: iter)),
