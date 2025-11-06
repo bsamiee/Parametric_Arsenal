@@ -104,25 +104,25 @@ public sealed class ResultFactoryTests {
             () => Assert.Throws<ArgumentNullException>(() => success.Map((Func<int, int>)null!)),
             () => Assert.Throws<ArgumentNullException>(() => success.Bind((Func<int, Result<int>>)null!)),
             () => Assert.Throws<ArgumentNullException>(() => success.Match(null!, _ => 0)),
-            () => Assert.Throws<ArgumentNullException>(() => success.Filter(null!, Errors.E1)),
+            () => Assert.Throws<ArgumentNullException>(() => success.Ensure(null!, Errors.E1)),
             () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Lift<int>(null!, 1, 2)),
             () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Create<IEnumerable<int>>(value: [1, 2]).TraverseElements((Func<int, Result<int>>)null!)),
             () => Assert.Throws<InvalidOperationException>(() => failure.Value),
             () => Assert.NotEmpty(failure.Errors));
     }
 
-    /// <summary>Verifies error handling using algebraic transformation and recovery morphisms.</summary>
+    /// <summary>Verifies error handling using algebraic transformation and recovery morphisms with explicit overloads.</summary>
     [Fact]
     public void ErrorHandlingTransformationAndRecoveryBehavesCorrectly() => TestGen.RunAll(
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(origErr => {
-            Result<int> result = ResultFactory.Create<int>(error: origErr).OnError(mapError: _ => [Errors.E2]);
+            Result<int> result = ResultFactory.Create<int>(error: origErr).OnError((Func<SystemError[], SystemError[]>)(_ => [Errors.E2]));
             Assert.True(!result.IsSuccess && result.Errors.Contains(Errors.E2) && !result.Errors.Contains(origErr));
         }), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.Equal(42, ResultFactory.Create<int>(error: err).OnError(recover: _ => 42).Value)), 50),
+            Assert.Equal(42, ResultFactory.Create<int>(error: err).OnError((Func<SystemError[], int>)(_ => 42)).Value)), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError(recoverWith: _ => ResultFactory.Create(value: 99)).Value)), 50),
-        () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Filter(x => x > 0, Errors.E2).Errors));
+            Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(value: 99))).Value)), 50),
+        () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Ensure(x => x > 0, Errors.E2).Errors));
 
     /// <summary>Verifies Validate batch validations accumulate all errors.</summary>
     [Fact]
