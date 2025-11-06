@@ -83,7 +83,6 @@ internal static class AnalysisStrategies {
             .Map(_ => AnalyzeCore(source, method, context, parameters, derivativeOrder))
             .Bind(result => result switch {
                 AnalysisResult r => ResultFactory.Create(value: (IReadOnlyList<AnalysisResult>)[r]),
-                null => ResultFactory.Create<IReadOnlyList<AnalysisResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
                 _ => ResultFactory.Create<IReadOnlyList<AnalysisResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
             });
 
@@ -93,17 +92,12 @@ internal static class AnalysisStrategies {
             (var m, Curve cv, var tP, _, _, var order, var ctx) when cv.Domain.IncludesParameter(tP ?? cv.Domain.ParameterAt(0.5)) && (tP ?? cv.Domain.ParameterAt(0.5)) is var t =>
                 new AnalysisResult(
                     Point: cv.PointAt(t),
-                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && order >= 1 ?
-                        (cv.DerivativeAt(t), cv.TangentAt(t)) switch {
-                            (Vector3d d, _) when d.IsValid => [cv.TangentAt(t), d],
-                            (_, Vector3d tang) when tang.IsValid => [tang],
-                            _ => [],
-                        } : [],
+                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && order >= 1 && cv.TangentAt(t) is var tang && tang.IsValid ? [tang] : [],
                     Frames: m.HasFlag(AnalysisMethod.Frame) ?
                         (cv.FrameAt(t, out Plane frame) ? frame : new Plane(cv.PointAt(t), Vector3d.ZAxis),
-                         cv.GetPerpendicularFrames([0, 0.25, 0.5, 0.75, 1.0].Select(cv.Domain.ParameterAt).ToArray()),
-                         cv.InflectionPoints() is double[] ipts && ipts.Length > 0 ? ipts : null,
-                         cv.MaxCurvaturePoints() is double[] mpts && mpts.Length > 0 ? mpts : null,
+                         cv.GetPerpendicularFrames(new double[] { 0d, 0.25d, 0.5d, 0.75d, 1d }.Select(cv.Domain.ParameterAt).ToArray()),
+                         cv.InflectionPoints() is Point3d[] ipts && ipts.Length > 0 ? ipts.Select(pt => cv.ClosestPoint(pt, out double param) ? param : 0d).ToArray() : null,
+                         cv.MaxCurvaturePoints() is Point3d[] mpts && mpts.Length > 0 ? mpts.Select(pt => cv.ClosestPoint(pt, out double param) ? param : 0d).ToArray() : null,
                          cv.IsClosed ? cv.TorsionAt(t) : null) : null,
                     Curvature: m.HasFlag(AnalysisMethod.Curvature) && cv.CurvatureAt(t) is Vector3d curv && curv.IsValid ?
                         (null, null, curv.Length, null, null, null) : null,
@@ -125,12 +119,10 @@ internal static class AnalysisStrategies {
                     Domains: m.HasFlag(AnalysisMethod.Domains) ? [cv.Domain] : null,
                     Params: (t, p?.Item2, p?.Item3, order)),
 
-            (var m, Surface sf, _, var (u, v), _, var order, var ctx) when sf.Domain(0).IncludesParameter(u ?? sf.Domain(0).ParameterAt(0.5)) &&
-                sf.Domain(1).IncludesParameter(v ?? sf.Domain(1).ParameterAt(0.5)) &&
-                (u ?? sf.Domain(0).ParameterAt(0.5), v ?? sf.Domain(1).ParameterAt(0.5)) is (var uP, var vP) =>
+            (var m, Surface sf, _, (double, double) uv, _, var order, var ctx) when sf.Domain(0).IncludesParameter(uv.Item1) && sf.Domain(1).IncludesParameter(uv.Item2) && (uv.Item1, uv.Item2) is (var uP, var vP) =>
                 new AnalysisResult(
-                    Point: m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(uP, vP, order, out Point3d evalPt, out Vector3d[] derivs) ? evalPt : sf.PointAt(uP, vP),
-                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(uP, vP, order, out Point3d _, out Vector3d[] derivs) ? derivs : [],
+                    Point: sf.Evaluate(uP, vP, order, out Point3d evalPt, out Vector3d[] derivs) && m.HasFlag(AnalysisMethod.Derivatives) ? evalPt : sf.PointAt(uP, vP),
+                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && derivs.Length > 0 ? derivs : [],
                     Frames: m.HasFlag(AnalysisMethod.Frame) ?
                         (m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(uP, vP, order, out Point3d pt, out Vector3d[] ds) && ds.Length >= 2 ? new Plane(pt, ds[0], ds[1]) :
                          sf.FrameAt(uP, vP, out Plane fr) ? fr : Plane.WorldXY,
@@ -153,7 +145,7 @@ internal static class AnalysisStrategies {
                     Topology: null,
                     Proximity: null,
                     Singularities: m.HasFlag(AnalysisMethod.Singularity) ?
-                        (sf.IsAtSeam(uP, vP), sf.IsAtSingularity(uP, vP, true), null) : null,
+                        (sf.IsAtSeam(uP, vP), sf.IsAtSingularity(uP, vP, exact: true), (Point3d[]?)null) : null,
                     Metrics: m.HasFlag(AnalysisMethod.Metrics) ?
                         (null, AreaMassProperties.Compute(sf)?.Area, null, AreaMassProperties.Compute(sf)?.Centroid) : null,
                     Domains: m.HasFlag(AnalysisMethod.Domains) ? [sf.Domain(0), sf.Domain(1)] : null,
@@ -190,22 +182,13 @@ internal static class AnalysisStrategies {
                     Derivatives: [],
                     Frames: m.HasFlag(AnalysisMethod.Frame) ?
                         (new Plane(mesh.Vertices.Point3dAt(vIdx ?? 0), normal.IsValid ? normal : Vector3d.ZAxis), null, null, null, null) : null,
-                    Curvature: m.HasFlag(AnalysisMethod.Curvature) ?
-                        ((Func<(double?, double?, double?, double?, Vector3d?, Vector3d?)?>)(() => {
-                            double[] gaussValues = new double[mesh.Vertices.Count];
-                            double[] meanValues = new double[mesh.Vertices.Count];
-                            double[] k1Values = new double[mesh.Vertices.Count];
-                            double[] k2Values = new double[mesh.Vertices.Count];
-                            return (mesh.Vertices.ComputeCurvature(1, gaussValues) && mesh.Vertices.ComputeCurvature(2, meanValues) &&
-                                    mesh.Vertices.ComputeCurvature(3, k1Values) && mesh.Vertices.ComputeCurvature(4, k2Values)) ?
-                                (gaussValues[vIdx ?? 0], meanValues[vIdx ?? 0], k1Values[vIdx ?? 0], k2Values[vIdx ?? 0], null, null) : null;
-                        }))() : null,
+                    Curvature: null,
                     Discontinuities: null,
                     Topology: m.HasFlag(AnalysisMethod.Topology) ?
                         (Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, new Point3d(mesh.TopologyVertices[i].X, mesh.TopologyVertices[i].Y, mesh.TopologyVertices[i].Z))).ToArray(),
                          Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))).Where(e => e.Item2.IsValid).ToArray(),
-                         mesh.IsManifold,
-                         mesh.IsClosed) : null,
+                         (bool?)mesh.IsManifold,
+                         (bool?)mesh.IsClosed) : null,
                     Proximity: m.HasFlag(AnalysisMethod.Proximity) && mesh.ClosestMeshPoint(mesh.Vertices.Point3dAt(vIdx ?? 0), ctx.AbsoluteTolerance * 100) is MeshPoint mp ?
                         (mesh.PointAt(mp), null, 0, null) : null,
                     Singularities: null,
@@ -235,12 +218,12 @@ internal static class AnalysisStrategies {
                     Params: (p?.Item1, p?.Item2, p?.Item3, dO)),
 
             (var m, Point3d pt, _, _, _, var order, _) =>
-                new AnalysisResult(pt, [], null, null, null, null, null, null, null, null, (p?.Item1, p?.Item2, p?.Item3, order)),
+                new AnalysisResult(Point: pt, Derivatives: [], Frames: null, Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, Params: (p?.Item1, p?.Item2, p?.Item3, order)),
 
             (var m, Vector3d vec, _, _, _, var order, _) =>
-                new AnalysisResult(Point3d.Origin, [vec],
-                    m.HasFlag(AnalysisMethod.Frame) ? (new Plane(Point3d.Origin, vec), null, null, null, null) : null,
-                    null, null, null, null, null, null, null, (p?.Item1, p?.Item2, p?.Item3, order)),
+                new AnalysisResult(Point: Point3d.Origin, Derivatives: [vec],
+                    Frames: m.HasFlag(AnalysisMethod.Frame) ? (new Plane(Point3d.Origin, vec), null, null, null, null) : null,
+                    Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, Params: (p?.Item1, p?.Item2, p?.Item3, order)),
 
             _ => null,
         };
