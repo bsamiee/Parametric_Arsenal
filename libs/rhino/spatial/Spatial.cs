@@ -58,9 +58,9 @@ public static class Spatial {
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
         _algorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (ValidationMode mode, int bufferSize) config) switch {
             true => UnifiedOperation.Apply(
-                input,
-                (Func<TInput, Result<IReadOnlyList<int>>>)(item => ExecuteAlgorithm(item, query, context, config.bufferSize)),
-                new OperationConfig<TInput, int> {
+                input: input,
+                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => ExecuteAlgorithm(item, query, context, config.bufferSize)),
+                config: new OperationConfig<TInput, int> {
                     Context = context,
                     ValidationMode = config.mode,
                     OperationName = $"Spatial.{typeof(TInput).Name}.{typeof(TQuery).Name}",
@@ -142,12 +142,12 @@ public static class Spatial {
         int count = 0;
         try {
             (queryShape switch {
-                Sphere sphere => (Action)(() => tree.Search(sphere, (sender, args) => {
+                Sphere sphere => (Action)(() => tree.Search(sphere, (_, args) => {
                     if (count < buffer.Length) {
                         buffer[count++] = args.Id;
                     }
                 })),
-                BoundingBox box => () => tree.Search(box, (sender, args) => {
+                BoundingBox box => () => tree.Search(box, (_, args) => {
                     if (count < buffer.Length) {
                         buffer[count++] = args.Id;
                     }
@@ -207,13 +207,16 @@ public static class Spatial {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            _ = RTree.SearchOverlaps(tree1, tree2, tolerance, (sender, args) => {
+            bool success = RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
                 if (count + 1 < buffer.Length) {
                     buffer[count++] = args.Id;
                     buffer[count++] = args.IdB;
                 }
             });
-            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+            return success switch {
+                true => ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []),
+                false => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            };
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
@@ -223,7 +226,7 @@ public static class Spatial {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<RTree> GetTree<T>(T source) where T : notnull =>
         _treeFactories.TryGetValue(typeof(T), out Func<object, RTree>? factory) switch {
-            true => ResultFactory.Create(value: _treeCache.GetValue(source, _ => factory(source!))),
+            true => ResultFactory.Create(value: _treeCache.GetValue(key: source, createValueCallback: _ => factory(source!))),
             false => ResultFactory.Create<RTree>(error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext($"Type: {typeof(T).Name}")),
         };
 
