@@ -36,20 +36,20 @@ public static class ResultGenerators {
             Type t when t == typeof(double) => (Gen<T>)(object)Gen.Double,
             Type t when t == typeof(bool) => (Gen<T>)(object)Gen.Bool,
             _ => throw new NotSupportedException($"Type {typeof(T)} not supported"),
-        }).Select(static v => ResultFactory.Create(value: v))),
+        }).Select(static v => ResultFactory.Create(input: v))),
         (1, (IGen<Result<T>>)(typeof(T) switch {
             Type t when t == typeof(int) => (Gen<T>)(object)Gen.Int,
             Type t when t == typeof(string) => (Gen<T>)(object)Gen.String.Where(static s => s is not null),
             Type t when t == typeof(double) => (Gen<T>)(object)Gen.Double,
             Type t when t == typeof(bool) => (Gen<T>)(object)Gen.Bool,
             _ => throw new NotSupportedException($"Type {typeof(T)} not supported"),
-        }).Select(static v => ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)))),
+        }).Select(static v => ResultFactory.Create(input: () => ResultFactory.Create(input: v)))),
     ]);
 
     /// <summary>Generates failed Results with immediate/deferred distribution.</summary>
     public static Gen<Result<T>> FailureGen<T>() where T : notnull => Gen.Frequency([
-        (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create<T>(error: e))),
-        (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create(deferred: () => ResultFactory.Create<T>(error: e)))),
+        (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create<T>(input: e))),
+        (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create(input: () => ResultFactory.Create<T>(input: e)))),
     ]);
 
     /// <summary>Generates nested Result using recursive composition.</summary>
@@ -73,22 +73,22 @@ public static class ResultGenerators {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
-                        succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
-                                 : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
+                        succeeds ? ResultFactory.Create(input: (x + offset).ToString(CultureInfo.InvariantCulture))
+                                 : ResultFactory.Create<string>(input: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (multiplier, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
-                        succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
+                        succeeds ? ResultFactory.Create(input: x * multiplier) : ResultFactory.Create<double>(input: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
-                        succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: val + offset)
-                                                                                                       : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
+                        succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(input: val + offset)
+                                                                                                       : ResultFactory.Create<double>(input: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
-                        succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
-            _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
+                        succeeds ? ResultFactory.Create(input: s.Length + offset) : ResultFactory.Create<int>(input: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
+            _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(input: err))),
         };
 
     /// <summary>Generates pure functions with actual transformations using value-dependent operations.</summary>

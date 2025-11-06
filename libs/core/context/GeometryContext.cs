@@ -44,11 +44,11 @@ public sealed record GeometryContext(
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
         RhinoMath.IsValidDouble(value) switch {
-            false => ResultFactory.Create<double>(errors: [ValidationErrors.Context.InvalidUnitConversion]),
+            false => new Result<double>(isSuccess: false, default!, [ValidationErrors.Context.InvalidUnitConversion], input: null),
             true => this.GetLengthScale(targetUnits).Bind(scale =>
                 RhinoMath.IsValidDouble(value * scale) switch {
-                    true => ResultFactory.Create(value: value * scale),
-                    false => ResultFactory.Create<double>(errors: [ValidationErrors.Context.InvalidUnitConversion]),
+                    true => new Result<double>(isSuccess: true, value * scale, [], input: null),
+                    false => new Result<double>(isSuccess: false, default!, [ValidationErrors.Context.InvalidUnitConversion], input: null),
                 }),
         };
 
@@ -56,9 +56,9 @@ public sealed record GeometryContext(
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<double> GetLengthScale(UnitSystem targetUnits) =>
         (targetUnits == this.Units, RhinoMath.UnitScale(this.Units, targetUnits)) switch {
-            (true, _) => ResultFactory.Create(value: 1.0),
-            (_, double scale) when RhinoMath.IsValidDouble(scale) && scale > RhinoMath.ZeroTolerance => ResultFactory.Create(value: scale),
-            _ => ResultFactory.Create<double>(errors: [ValidationErrors.Context.InvalidUnitConversion]),
+            (true, _) => new Result<double>(isSuccess: true, 1.0, [], input: null),
+            (_, double scale) when RhinoMath.IsValidDouble(scale) && scale > RhinoMath.ZeroTolerance => new Result<double>(isSuccess: true, scale, [], input: null),
+            _ => new Result<double>(isSuccess: false, default!, [ValidationErrors.Context.InvalidUnitConversion], input: null),
         };
 
     /// <summary>Validates if value differences are within absolute tolerance.</summary>
@@ -79,10 +79,10 @@ public sealed record GeometryContext(
     public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) =>
         (absoluteTolerance <= 0d ? 0.01 : absoluteTolerance, angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians) switch {
             (double normAbs, double normAngle) when !RhinoMath.IsValidDouble(normAbs) || !RhinoMath.IsValidDouble(relativeTolerance) || !RhinoMath.IsValidDouble(normAngle) =>
-                ResultFactory.Create<GeometryContext>(errors: [ValidationErrors.Context.Tolerance.InvalidAbsolute]),
+                new Result<GeometryContext>(isSuccess: false, default!, [ValidationErrors.Context.Tolerance.InvalidAbsolute], input: null),
             (double normAbs, double normAngle) => ValidationRules.For(normAbs, relativeTolerance, normAngle) switch {
-                SystemError[] { Length: > 0 } errors => ResultFactory.Create<GeometryContext>(errors: errors),
-                _ => ResultFactory.Create(value: new GeometryContext(normAbs, relativeTolerance, normAngle, units)),
+                SystemError[] { Length: > 0 } errors => new Result<GeometryContext>(isSuccess: false, default!, errors, input: null),
+                _ => new Result<GeometryContext>(isSuccess: true, new GeometryContext(normAbs, relativeTolerance, normAngle, units), [], input: null),
             },
         };
 }

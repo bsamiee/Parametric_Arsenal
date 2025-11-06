@@ -54,7 +54,7 @@ internal static class ExtractionCore {
 #pragma warning restore IDE0004
 
         if (kind is 0) {
-            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);
+            return ResultFactory.Create<IReadOnlyList<Point3d>>(input: ExtractionErrors.Operation.InvalidMethod);
         }
 
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
@@ -71,9 +71,9 @@ internal static class ExtractionCore {
                     .DefaultIfEmpty(ValidationMode.Standard)
                     .First();
 
-            return ResultFactory.Create(value: normalized)
+            return ResultFactory.Create(input: normalized)
                 .Validate(args: mode is ValidationMode.None ? null : [context, mode])
-                .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
+                .Bind(g => ResultFactory.Create(input: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
                 (normalized as IDisposable)?.Dispose();

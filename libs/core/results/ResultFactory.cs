@@ -9,98 +9,78 @@ namespace Arsenal.Core.Results;
 
 /// <summary>Polymorphic factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
-    /// <summary>Creates Result using polymorphic parameter detection with explicit value semantics.</summary>
+    /// <summary>Creates Result using polymorphic input detection with unified semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Create<T>(
-        T? value = default,
-        SystemError[]? errors = null,
-        SystemError? error = null,
-        Func<Result<T>>? deferred = null,
-        (Func<T, bool> Condition, SystemError Error)[]? conditionals = null,
-        Result<Result<T>>? nested = null) =>
-        (value, errors, error, deferred, conditionals, nested) switch {
-            (var v, null, null, null, null, null) when v is not null => new Result<T>(isSuccess: true, v, [], deferred: null),
-            (_, var e, null, null, null, null) when e?.Length > 0 => new Result<T>(isSuccess: false, default!, e, deferred: null),
-            (_, null, var e, null, null, null) when e.HasValue => new Result<T>(isSuccess: false, default!, [e.Value,], deferred: null),
-            (_, null, null, var d, null, null) when d is not null => new Result<T>(isSuccess: false, default!, [], deferred: d),
-            (var v, null, null, null, var conds, null) when v is not null && conds is not null => new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
-            (_, null, null, null, null, var n) when n.HasValue => n.Value.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, deferred: null)),
-            (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided,], deferred: null),
-            _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
+    public static Result<T> Create<T>(object? input = null) =>
+        input switch {
+            T value => new Result<T>(isSuccess: true, value, [], input: null),
+            SystemError err => new Result<T>(isSuccess: false, default!, [err,], input: null),
+            SystemError[] errs when errs.Length > 0 => new Result<T>(isSuccess: false, default!, errs, input: null),
+            Func<Result<T>> deferred => new Result<T>(isSuccess: false, default!, [], input: deferred),
+            Result<Result<T>> nested => nested.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, input: null)),
+            Result<T> existing => existing,
+            null => new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided,], input: null),
+            _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(input)),
         };
 
-    /// <summary>Validates Result using polymorphic parameter detection.</summary>
+    /// <summary>Extension for geometry validation using compiled validators.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Validate<T>(
+    public static Result<T> ValidateGeometry<T>(
         this Result<T> result,
-        Func<T, bool>? predicate = null,
-        SystemError? error = null,
-        Func<T, Result<T>>? validation = null,
-        bool? unless = null,
-        Func<T, bool>? premise = null,
-        Func<T, bool>? conclusion = null,
-        (Func<T, bool>, SystemError)[]? validations = null,
-        object[]? args = null) =>
-        (predicate ?? premise, validation, validations, args) switch {
-            (Func<T, bool> p, null, null, _) when error.HasValue => result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
-            (Func<T, bool> p, Func<T, Result<T>> v, null, _) => result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
-            (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure([.. vs]),
-            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
+        IGeometryContext context,
+        ValidationMode mode = ValidationMode.Standard) where T : notnull =>
+        IsGeometryType(typeof(T)) switch {
+            true => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, context) switch { { Length: 0 } => new Result<T>(isSuccess: true, g, [], input: null),
+                var errs => new Result<T>(isSuccess: false, default!, errs, input: null),
             }),
-            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
-            }),
-            (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
-            _ => result,
+            false => result,
         };
 
-    /// <summary>Lifts functions into Result context with partial application and Result unwrapping.</summary>
+    /// <summary>Combines multiple Results into single Result using applicative composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static object Lift<TResult>(Delegate func, params object[] args) {
-        ArgumentNullException.ThrowIfNull(func);
-        ArgumentNullException.ThrowIfNull(args);
-        return (func.Method.GetParameters().Length, args.Count(x => x.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>)), args.Count(x => !(x.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>))), args) switch {
-            (var ar, 0, var nrc, var a) when ar > a.Length && nrc == a.Length =>
-                Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
-            (var ar, var rc, 0, var a) when ar == a.Length && rc == ar =>
-                a.Cast<Result<object>>().Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
-                    (acc, curr) => acc.Accumulate(curr))
-                .Map(values => (TResult)func.DynamicInvoke([.. values])!),
-            (var ar, var rc, 0, var a) when rc == a.Length && ar >= 3 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
-                    (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
-                        ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
-                            (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),
-                            (false, _, var errs) => Create<IReadOnlyList<object>>(errors: errs),
-                            _ => acc,
-                        } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
-                .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
-            (var ar, var rc, var nrc, var a) when rc > 0 && nrc > 0 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
-                    (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
-                        ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
-                            (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),
-                            (false, _, var errs) => Create<IReadOnlyList<object>>(errors: errs),
-                            _ => acc,
-                        } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
-                .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
-            (var ar, var rc, _, var a) => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture,
-                $"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
+    public static Result<(T1, T2)> Combine<T1, T2>(Result<T1> r1, Result<T2> r2) =>
+        (r1.IsSuccess, r2.IsSuccess) switch {
+            (true, true) => new Result<(T1, T2)>(isSuccess: true, (r1.Value, r2.Value), [], input: null),
+            _ => new Result<(T1, T2)>(isSuccess: false, default!, [.. r2.Errors, .. r1.Errors,], input: null),
         };
-    }
 
-    /// <summary>Traverses IEnumerable elements with monadic transformation.</summary>
+    /// <summary>Combines multiple Results into single Result using applicative composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
+    public static Result<(T1, T2, T3)> Combine<T1, T2, T3>(Result<T1> r1, Result<T2> r2, Result<T3> r3) =>
+        (r1.IsSuccess, r2.IsSuccess, r3.IsSuccess) switch {
+            (true, true, true) => new Result<(T1, T2, T3)>(isSuccess: true, (r1.Value, r2.Value, r3.Value), [], input: null),
+            _ => new Result<(T1, T2, T3)>(isSuccess: false, default!, [.. r3.Errors, .. r2.Errors, .. r1.Errors,], input: null),
+        };
+
+    /// <summary>Combines multiple Results into single Result using applicative composition.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(T1, T2, T3, T4)> Combine<T1, T2, T3, T4>(Result<T1> r1, Result<T2> r2, Result<T3> r3, Result<T4> r4) =>
+        (r1.IsSuccess, r2.IsSuccess, r3.IsSuccess, r4.IsSuccess) switch {
+            (true, true, true, true) => new Result<(T1, T2, T3, T4)>(isSuccess: true, (r1.Value, r2.Value, r3.Value, r4.Value), [], input: null),
+            _ => new Result<(T1, T2, T3, T4)>(isSuccess: false, default!, [.. r4.Errors, .. r3.Errors, .. r2.Errors, .. r1.Errors,], input: null),
+        };
+
+    /// <summary>Traverses collection with monadic or applicative composition based on accumulation mode.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<TOut>> Traverse<TIn, TOut>(
+        this IEnumerable<TIn> items,
+        Func<TIn, Result<TOut>> selector,
+        bool accumulateErrors = false) {
         ArgumentNullException.ThrowIfNull(selector);
-        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
+        IReadOnlyList<TOut> empty = Array.Empty<TOut>();
+        return accumulateErrors switch {
+            true => items.Select(selector).Aggregate(
+                new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
+                (acc, curr) => acc.Apply(curr.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(v => list => [.. list, v]))),
+            false => items.Aggregate(
+                new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
+                (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)[.. list, val]))),
+        };
     }
 
-    /// <summary>Accumulates item into Result list using applicative error composition and parallel validation.</summary>
+    /// <summary>Accumulates item into Result list using applicative composition with error accumulation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
+    internal static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
         accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
 
     /// <summary>Checks if type is Geometry without loading Rhino assembly using string comparison.</summary>

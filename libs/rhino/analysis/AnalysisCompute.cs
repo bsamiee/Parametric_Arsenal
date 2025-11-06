@@ -18,7 +18,7 @@ internal static class AnalysisCompute {
     private static readonly FrozenDictionary<Type, (ValidationMode Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         new Dictionary<Type, (ValidationMode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
             [typeof(Curve)] = (ValidationMode.Standard | ValidationMode.Degeneracy, (g, ctx, t, _, _, _, order) =>
-                ResultFactory.Create(value: (Curve)g)
+                ResultFactory.Create(input: (Curve)g)
                     .Validate(args: [ctx, ValidationMode.Standard | ValidationMode.Degeneracy])
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
@@ -32,7 +32,7 @@ internal static class AnalysisCompute {
                             }
                             AreaMassProperties amp = AreaMassProperties.Compute(cv);
                             return amp is not null && cv.FrameAt(param, out Plane frame)
-                                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
+                                ? ResultFactory.Create(input: (Analysis.IResult)new Analysis.CurveData(
                                     cv.PointAt(param),
                                     cv.DerivativeAt(param, order) ?? [],
                                     cv.CurvatureAt(param).Length,
@@ -43,14 +43,14 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
                                     amp.Centroid))
-                                : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
+                                : ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
                         }
                     })),
 
             [typeof(NurbsCurve)] = (ValidationMode.Standard | ValidationMode.Degeneracy, (g, ctx, t, _, _, _, order) =>
-                ResultFactory.Create(value: (NurbsCurve)g)
+                ResultFactory.Create(input: (NurbsCurve)g)
                     .Validate(args: [ctx, ValidationMode.Standard | ValidationMode.Degeneracy])
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
@@ -64,7 +64,7 @@ internal static class AnalysisCompute {
                             }
                             AreaMassProperties amp = AreaMassProperties.Compute(cv);
                             return amp is not null && cv.FrameAt(param, out Plane frame)
-                                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
+                                ? ResultFactory.Create(input: (Analysis.IResult)new Analysis.CurveData(
                                     cv.PointAt(param),
                                     cv.DerivativeAt(param, order) ?? [],
                                     cv.CurvatureAt(param).Length,
@@ -75,24 +75,24 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
                                     amp.Centroid))
-                                : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
+                                : ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
                         }
                     })),
 
             [typeof(Surface)] = (ValidationMode.Standard | ValidationMode.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
-                ResultFactory.Create(value: (Surface)g)
+                ResultFactory.Create(input: (Surface)g)
                     .Validate(args: [ctx, ValidationMode.Standard | ValidationMode.SurfaceContinuity])
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
                         if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                            return ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                         }
                         SurfaceCurvature sc = sf.CurvatureAt(u, v);
                         return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                            ? ResultFactory.Create(input: (Analysis.IResult)new Analysis.SurfaceData(
                                 sf.PointAt(u, v),
                                 derivs,
                                 sc.Gaussian,
@@ -107,21 +107,21 @@ internal static class AnalysisCompute {
                                 sf.IsAtSingularity(u, v, exact: true),
                                 amp.Area,
                                 amp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                            : ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
             [typeof(NurbsSurface)] = (ValidationMode.Standard | ValidationMode.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
-                ResultFactory.Create(value: (NurbsSurface)g)
+                ResultFactory.Create(input: (NurbsSurface)g)
                     .Validate(args: [ctx, ValidationMode.Standard | ValidationMode.SurfaceContinuity])
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
                         if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                            return ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                         }
                         SurfaceCurvature sc = sf.CurvatureAt(u, v);
                         return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                            ? ResultFactory.Create(input: (Analysis.IResult)new Analysis.SurfaceData(
                                 sf.PointAt(u, v),
                                 derivs,
                                 sc.Gaussian,
@@ -136,11 +136,11 @@ internal static class AnalysisCompute {
                                 sf.IsAtSingularity(u, v, exact: true),
                                 amp.Area,
                                 amp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                            : ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
             [typeof(Brep)] = (ValidationMode.Standard | ValidationMode.Topology | ValidationMode.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
-                ResultFactory.Create(value: (Brep)g)
+                ResultFactory.Create(input: (Brep)g)
                     .Validate(args: [ctx, ValidationMode.Standard | ValidationMode.Topology | ValidationMode.MassProperties])
                     .Bind(brep => {
                         int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
@@ -150,11 +150,11 @@ internal static class AnalysisCompute {
                         AreaMassProperties? amp = AreaMassProperties.Compute(brep);
                         VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
                         if (amp is null || vmp is null || !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame) || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.BrepAnalysisFailed);
+                            return ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.BrepAnalysisFailed);
                         }
                         SurfaceCurvature sc = sf.CurvatureAt(u, v);
                         return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
+                            ? ResultFactory.Create(input: (Analysis.IResult)new Analysis.BrepData(
                                 sf.PointAt(u, v),
                                 derivs,
                                 sc.Gaussian,
@@ -176,11 +176,11 @@ internal static class AnalysisCompute {
                                 amp.Area,
                                 vmp.Volume,
                                 vmp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.BrepAnalysisFailed);
+                            : ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.BrepAnalysisFailed);
                     })),
 
             [typeof(Mesh)] = (ValidationMode.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
-                ResultFactory.Create(value: (Mesh)g)
+                ResultFactory.Create(input: (Mesh)g)
                     .Validate(args: [ctx, ValidationMode.MeshSpecific])
                     .Bind(mesh => {
                         int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
@@ -188,8 +188,8 @@ internal static class AnalysisCompute {
                         AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
                         VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
                         return amp is null || vmp is null
-                            ? ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.MeshAnalysisFailed)
-                            : ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
+                            ? ResultFactory.Create<Analysis.IResult>(input: AnalysisErrors.Evaluation.MeshAnalysisFailed)
+                            : ResultFactory.Create(input: (Analysis.IResult)new Analysis.MeshData(
                                 mesh.Vertices[vIdx],
                                 new Plane(mesh.Vertices[vIdx], normal),
                                 normal,
@@ -219,5 +219,5 @@ internal static class AnalysisCompute {
                     .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
                 : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
                 .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
-            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry.WithContext(geometry.GetType().Name));
+            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(input: AnalysisErrors.Operation.UnsupportedGeometry.WithContext(geometry.GetType().Name));
 }

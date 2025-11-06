@@ -9,8 +9,8 @@ namespace Arsenal.Tests.Common;
 public static class TestLaw {
     private static readonly FrozenDictionary<string, Delegate> _laws = new Dictionary<string, Delegate>(StringComparer.Ordinal) {
         ["FunctorIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Map(static x => x).Equals(r), iter: iter)),
-        ["MonadRightIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Bind(static x => ResultFactory.Create(value: x)).Equals(r), iter: iter)),
-        ["ApplicativeIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Apply(ResultFactory.Create<Func<object, object>>(value: static x => x)).Equals(r), iter: iter)),
+        ["MonadRightIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Bind(static x => ResultFactory.Create(input: x)).Equals(r), iter: iter)),
+        ["ApplicativeIdentity"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Apply(ResultFactory.Create<Func<object, object>>(input: static x => x)).Equals(r), iter: iter)),
         ["EqualityReflexive"] = new Action<Gen<Result<object>>, int>(static (gen, iter) => gen.Sample(static (Result<object> r) => r.Equals(r), iter: iter)),
         ["EqualitySymmetric"] = new Action<Gen<Result<object>>, Gen<Result<object>>, int>(static (gen1, gen2, iter) =>
             gen1.Select(gen2).Sample(static (Result<object> r1, Result<object> r2) => r1.Equals(r2) == r2.Equals(r1), iter: iter)),
@@ -49,8 +49,8 @@ public static class TestLaw {
 
     /// <summary>Verifies monad left identity, right identity, and associativity laws.</summary>
     public static void VerifyMonad<T, T2, T3>(Gen<T> valueGen, Gen<Result<T>> rGen, Gen<Func<T, Result<T2>>> fGen, Gen<Func<T2, Result<T3>>> gGen, int iter = 100) where T : notnull where T2 : notnull where T3 : notnull {
-        valueGen.Select(fGen).Sample((T v, Func<T, Result<T2>> f) => ResultFactory.Create(value: v).Bind(f).Equals(f(v)), iter: iter);
-        rGen.Sample(static (Result<T> r) => r.Bind(static x => ResultFactory.Create(value: x)).Equals(r), iter: iter);
+        valueGen.Select(fGen).Sample((T v, Func<T, Result<T2>> f) => ResultFactory.Create(input: v).Bind(f).Equals(f(v)), iter: iter);
+        rGen.Sample(static (Result<T> r) => r.Bind(static x => ResultFactory.Create(input: x)).Equals(r), iter: iter);
         rGen.Select(fGen, gGen).Sample((Result<T> r, Func<T, Result<T2>> f, Func<T2, Result<T3>> g) =>
             r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))), iter: iter / 2);
     }

@@ -20,22 +20,24 @@ public static class UnifiedOperation {
         ConcurrentDictionary<(object, Type), object>? externalCache = null) where TIn : notnull {
         ConcurrentDictionary<(object, Type), object> cache = externalCache ?? (config.EnableCache ? _threadCache.Value! : new());
 
-        Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
-            Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
-            Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
-            Func<TIn, Result<Result<IReadOnlyList<TOut>>>> nested => nested(item).Bind(inner => inner),
-            Func<TIn, Result<TOut>> single => single(item).Map(v => (IReadOnlyList<TOut>)[v]),
-            IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
-                ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-                (acc, op) => (config.AccumulateErrors, op(item)) switch {
-                    (true, Result<TOut> res) => acc.Accumulate(res),
-                    (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
-                }),
-            (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
-                pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
-            _ => ResultFactory.Create<IReadOnlyList<TOut>>(
-                error: ValidationErrors.Operations.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
-        };
+        Result<IReadOnlyList<TOut>> resolveOp(TIn item) {
+            IReadOnlyList<TOut> empty = Array.Empty<TOut>();
+            return operation switch {
+                Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
+                Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
+                Func<TIn, Result<Result<IReadOnlyList<TOut>>>> nested => nested(item).Bind(inner => inner),
+                Func<TIn, Result<TOut>> single => single(item).Map(v => (IReadOnlyList<TOut>)[v]),
+                IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
+                    new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
+                    (acc, op) => (config.AccumulateErrors, op(item)) switch {
+                        (true, Result<TOut> res) => acc.Accumulate(res),
+                        (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
+                    }),
+                (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
+                    pred(item) ? op(item) : new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
+                _ => new Result<IReadOnlyList<TOut>>(isSuccess: false, default!, [ValidationErrors.Operations.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")], input: null),
+            };
+        }
 
         Result<IReadOnlyList<TOut>> execute(TIn item) {
             (object, Type) key = (item, operation.GetType());
@@ -46,22 +48,22 @@ public static class UnifiedOperation {
                     ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
                     : r;
 
-            Result<IReadOnlyList<TOut>> compute() => ResultFactory.Create(value: item)
+            Result<IReadOnlyList<TOut>> compute() => new Result<TIn>(isSuccess: true, item, [], input: null)
                 .Filter(config.InputFilter ?? (_ => true),
                     config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
-                .Validate(args: config.ValidationMode is ValidationMode.None ? null :
-                    [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
-                .OnError(recover: config.SkipInvalid ? _ => item : null)
-                .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
+                .Bind(v => config.ValidationMode is ValidationMode.None ? new Result<TIn>(isSuccess: true, v, [], input: null) :
+                    new Result<TIn>(isSuccess: true, v, [], input: null).ValidateGeometry(config.Context, config.ValidationMode))
+                .Recover(config.SkipInvalid ? item : default(TIn)!)
+                .Bind(config.PreTransform ?? (v => new Result<TIn>(isSuccess: true, v, [], input: null)))
                 .Bind(resolveOp)
                 .Map(outputs => config.OutputFilter switch {
                     null => outputs,
                     Func<TOut, bool> filter => outputs.Where(filter).ToArray(),
                 })
                 .Bind(outputs => config.PostTransform switch {
-                    null => ResultFactory.Create(value: outputs),
+                    null => new Result<IReadOnlyList<TOut>>(isSuccess: true, outputs, [], input: null),
                     Func<TOut, Result<TOut>> transform => outputs.Aggregate(
-                        ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+                        new Result<IReadOnlyList<TOut>>(isSuccess: true, Array.Empty<TOut>(), [], input: null),
                         (acc, output) => (config.SkipInvalid, transform(output)) switch {
                             (true, { IsSuccess: false }) => acc,
                             (_, Result<TOut> res) => acc.Bind(list => res.Map(v => (IReadOnlyList<TOut>)[.. list, v])),
@@ -77,23 +79,24 @@ public static class UnifiedOperation {
                     (config, computed: compute())), hit: false);
         }
 
+        IReadOnlyList<TOut> empty = Array.Empty<TOut>();
         return (input, config) switch {
-            (IReadOnlyList<TIn> { Count: 0 }, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+            (IReadOnlyList<TIn> { Count: 0 }, _) => new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
             (IReadOnlyList<TIn> { Count: 1 } list, _) => execute(list[0]),
             (IReadOnlyList<TIn> list, { EnableParallel: true, AccumulateErrors: bool acc, SkipInvalid: bool skip, MaxDegreeOfParallelism: int max }) =>
                 list.AsParallel().WithDegreeOfParallelism(max).Select(execute).Aggregate(
-                    ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+                    new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
                     (a, c) => (acc, skip && !c.IsSuccess) switch {
                         (true, _) => a.Apply(c.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(items => prev => [.. prev, .. items])),
                         (_, true) => a,
                         _ => a.Bind(prev => c.Map(items => (IReadOnlyList<TOut>)[.. prev, .. items])),
                     }),
             (IReadOnlyList<TIn> list, { ShortCircuit: true, AccumulateErrors: false }) =>
-                list.Aggregate(ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+                list.Aggregate(new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
                     (a, item) => a.IsSuccess ? a.Bind(prev => execute(item).Map(items => (IReadOnlyList<TOut>)[.. prev, .. items])) : a),
             (IReadOnlyList<TIn> list, { AccumulateErrors: bool acc, SkipInvalid: bool skip }) =>
                 list.Select(execute).Aggregate(
-                    ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
+                    new Result<IReadOnlyList<TOut>>(isSuccess: true, empty, [], input: null),
                     (a, c) => (acc, skip && !c.IsSuccess) switch {
                         (true, _) => a.Apply(c.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(items => prev => [.. prev, .. items])),
                         (_, true) => a,

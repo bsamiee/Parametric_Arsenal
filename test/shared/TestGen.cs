@@ -11,13 +11,13 @@ public static class TestGen {
     public static Gen<Result<T>> ToResult<T>(this Gen<T> valueGen, Gen<SystemError> errorGen, int successWeight = 1, int failureWeight = 1, int deferredWeight = 0) =>
         deferredWeight == 0
             ? Gen.Frequency([
-                (successWeight, (IGen<Result<T>>)valueGen.Select(static v => ResultFactory.Create(value: v))),
-                (failureWeight, (IGen<Result<T>>)errorGen.Select(static e => ResultFactory.Create<T>(error: e))),
+                (successWeight, (IGen<Result<T>>)valueGen.Select(static v => ResultFactory.Create(input: v))),
+                (failureWeight, (IGen<Result<T>>)errorGen.Select(static e => ResultFactory.Create<T>(input: e))),
             ])
             : Gen.Frequency([
-                (successWeight, (IGen<Result<T>>)valueGen.Select(static v => ResultFactory.Create(value: v))),
-                (failureWeight, (IGen<Result<T>>)errorGen.Select(static e => ResultFactory.Create<T>(error: e))),
-                (deferredWeight, (IGen<Result<T>>)valueGen.ToResult(errorGen, successWeight, failureWeight).Select(static r => ResultFactory.Create(deferred: () => r))),
+                (successWeight, (IGen<Result<T>>)valueGen.Select(static v => ResultFactory.Create(input: v))),
+                (failureWeight, (IGen<Result<T>>)errorGen.Select(static e => ResultFactory.Create<T>(input: e))),
+                (deferredWeight, (IGen<Result<T>>)valueGen.ToResult(errorGen, successWeight, failureWeight).Select(static r => ResultFactory.Create(input: () => r))),
             ]);
 
     /// <summary>Executes property-based test with polymorphic delegate dispatch for Func, Action, and tuple patterns.</summary>
