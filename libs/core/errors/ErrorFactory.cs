@@ -94,7 +94,7 @@ public static class ErrorFactory {
         public static SystemError InvalidDistance() => Create(ErrorDomain.Geometry, 4002);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static SystemError UnsupportedTypeCombo() => Create(ErrorDomain.Validation, 4003);
+        public static SystemError UnsupportedTypeCombo() => Create(ErrorDomain.Validation, 3932);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static SystemError ProximityFailed() => Create(ErrorDomain.Geometry, 4004);
