@@ -152,7 +152,7 @@ internal static class ExtractionStrategies {
                 ((Func<NurbsCurve, Point3d[]?>)(n => { using (n) { return n.InflectionPoints() is double[] ts && ts.Length > 0 ? ts.Select(n.PointAt).ToArray() : null; } }))(nc),
             (ExtractionMethod.Discontinuities, Curve c) => ((Func<List<Point3d>>)(() => { List<Point3d> pts = []; double t0 = c.Domain.Min; while (c.GetNextDiscontinuity(continuity, t0, c.Domain.Max, out double t)) { pts.Add(c.PointAt(t)); t0 = t; } return pts; }))() switch { { Count: > 0 } list => [.. list,], _ => null },
             (ExtractionMethod.FaceCentroids, Brep b) => [.. b.Faces.Select(f =>
-                ((Func<Brep, Point3d>)(dup => { try { return AreaMassProperties.Compute(dup)?.Centroid ?? Point3d.Unset; } finally { dup.Dispose(); } }))(f.DuplicateFace(duplicateMeshes: false))
+                ((Func<Brep, Point3d>)(dup => { using (dup) { return AreaMassProperties.Compute(dup)?.Centroid ?? Point3d.Unset; } }))(f.DuplicateFace(duplicateMeshes: false))
             ).Where(p => p != Point3d.Unset),],
             (ExtractionMethod.PositionalExtrema, Curve c) when direction is Vector3d dir && dir.Length > context.AbsoluteTolerance =>
                 c.ExtremeParameters(dir)?.Select(c.PointAt).ToArray(),
