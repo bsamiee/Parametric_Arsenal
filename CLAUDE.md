@@ -116,22 +116,29 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 
 ValidationRules compiles validators at runtime using expression trees - never handwrite validation logic.
 
-### Error Pattern (Each folder has own errors)
+### Error Pattern (Centralized with polymorphic dispatch)
 
 ```csharp
-// libs/core/validation/ValidationErrors.cs
-public static class ValidationErrors {
-    public static class Geometry {
-        public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3001, "...");
+// Single unified error system in libs/core/errors/
+// ErrorCatalog.cs - FrozenDictionary with O(1) lookup
+private static readonly FrozenDictionary<(ErrorDomain, int), SystemError> _errors = ...;
+
+// ErrorFactory.cs - Polymorphic dispatch with nested classes
+public static class ErrorFactory {
+    public static class Validation {
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static SystemError GeometryInvalid() => Create(ErrorDomain.Validation, 3000);
+    }
+    
+    public static class Spatial {
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static SystemError InvalidK() => Create(ErrorDomain.Geometry, 4001);
     }
 }
 
-// libs/rhino/spatial/SpatialErrors.cs - Folder-specific errors
-public static class SpatialErrors {
-    public static class Parameters {
-        public static readonly SystemError InvalidCount = new(ErrorDomain.Geometry, 2221, "...");
-    }
-}
+// Usage - Simple, consistent, no scattered files
+ErrorFactory.Validation.GeometryInvalid()
+ErrorFactory.Spatial.InvalidK().WithContext("Custom info")
 ```
 
 ### Analyzers Enforced
