@@ -468,6 +468,7 @@ dotnet_diagnostic.CA1812.severity = warning                                    #
 dotnet_diagnostic.CA1813.severity = warning                                    # Avoid unsealed attributes
 dotnet_diagnostic.CA1814.severity = warning                                    # Prefer jagged arrays
 dotnet_diagnostic.CA1816.severity = error                                      # Call SuppressFinalize correctly
+dotnet_diagnostic.CA1819.severity = none                                       # Array properties in init-only records
 dotnet_diagnostic.CA1820.severity = error                                      # Test string length
 dotnet_diagnostic.CA1821.severity = error                                      # Remove empty finalizers
 dotnet_diagnostic.CA1822.severity = error                                      # Mark static
