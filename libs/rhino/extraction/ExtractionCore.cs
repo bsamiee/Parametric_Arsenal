@@ -17,6 +17,8 @@ internal static class ExtractionCore {
             [(1, typeof(Brep))] = ValidationMode.Standard | ValidationMode.MassProperties,
             [(1, typeof(Curve))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
             [(1, typeof(Surface))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
+            [(1, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MassProperties,
+            [(1, typeof(PointCloud))] = ValidationMode.Standard,
             [(2, typeof(GeometryBase))] = ValidationMode.BoundingBox,
             [(3, typeof(NurbsCurve))] = ValidationMode.Standard,
             [(3, typeof(NurbsSurface))] = ValidationMode.Standard,
@@ -138,7 +140,7 @@ internal static class ExtractionCore {
             },
             (5, Curve c, _) => (c, context.AbsoluteTolerance) switch {
                 (Curve crv, double tol) when crv.TryGetCircle(out Circle circ, tol) =>
-                    [circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2),],
+                    [circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2)],
                 (Curve crv, double tol) when crv.TryGetEllipse(out Ellipse e, tol) =>
                     [e.Center + (e.Plane.XAxis * e.Radius1),
                         e.Center + (e.Plane.YAxis * e.Radius2),
@@ -156,9 +158,9 @@ internal static class ExtractionCore {
                 .Select(static ln => ln.PointAt(0.5)),
             ],
             (6, Curve c, _) => c.DuplicateSegments() is Curve[] { Length: > 0 } segs
-                ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5)),]
+                ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5))]
                 : c.TryGetPolyline(out Polyline pl)
-                    ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),]
+                    ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5))]
                     : [],
             (7, Brep b, _) => [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => {
