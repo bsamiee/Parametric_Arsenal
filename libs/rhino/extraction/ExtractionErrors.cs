@@ -26,10 +26,6 @@ public static class ExtractionErrors {
         public static readonly SystemError InvalidDirection =
             new(ErrorDomain.Geometry, 2004, "Direction parameter required for positional extrema");
 
-        /// <summary>No discontinuities found in curve geometry.</summary>
-        public static readonly SystemError NoDiscontinuities =
-            new(ErrorDomain.Geometry, 2005, "No discontinuities found in curve");
-
         /// <summary>Geometry cannot be converted to NURBS representation.</summary>
         public static readonly SystemError InvalidNurbsGeometry =
             new(ErrorDomain.Geometry, 2006, "Geometry cannot be converted to NURBS representation");
