@@ -32,12 +32,12 @@ public static class ValidationRules {
             [ValidationConfig.AreaCentroid] = (["IsClosed"], ["IsPlanar"], ErrorRegistry.Geometry.CurveNotClosedOrPlanar),
             [ValidationConfig.BoundingBox] = ([], ["GetBoundingBox"], ErrorRegistry.Geometry.BoundingBoxInvalid),
             [ValidationConfig.MassProperties] = (["IsSolid", "IsClosed"], [], ErrorRegistry.Geometry.PropertiesComputationFailed),
-            [ValidationConfig.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface"], ["IsManifold", "IsPointInside"], ErrorRegistry.Geometry.TopologyInvalidTopology),
-            [ValidationConfig.Degeneracy] = (["IsPeriodic", "IsPolyline"], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular"], ErrorRegistry.Geometry.DegeneracyDegenerateGeometry),
+            [ValidationConfig.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface"], ["IsManifold", "IsPointInside"], ErrorRegistry.Geometry.InvalidTopology),
+            [ValidationConfig.Degeneracy] = (["IsPeriodic", "IsPolyline"], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular"], ErrorRegistry.Geometry.DegenerateGeometry),
             [ValidationConfig.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse"], ErrorRegistry.Validation.ToleranceExceeded),
-            [ValidationConfig.SelfIntersection] = ([], ["SelfIntersections"], ErrorRegistry.Geometry.SelfIntersectionSelfIntersecting),
-            [ValidationConfig.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh"], ["IsValidWithLog"], ErrorRegistry.Geometry.MeshTopologyNonManifoldEdges),
-            [ValidationConfig.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], ErrorRegistry.Geometry.ContinuityPositionalDiscontinuity),
+            [ValidationConfig.SelfIntersection] = ([], ["SelfIntersections"], ErrorRegistry.Geometry.SelfIntersecting),
+            [ValidationConfig.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh"], ["IsValidWithLog"], ErrorRegistry.Geometry.MeshNonManifoldEdges),
+            [ValidationConfig.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], ErrorRegistry.Geometry.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator function for runtime type and validation config.</summary>

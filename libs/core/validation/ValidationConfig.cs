@@ -18,7 +18,10 @@ public readonly record struct ValidationConfig(int Flags) {
     public static readonly ValidationConfig SelfIntersection = new(128);
     public static readonly ValidationConfig MeshSpecific = new(256);
     public static readonly ValidationConfig SurfaceContinuity = new(512);
-    public static readonly ValidationConfig All = new(1023);
+    public static readonly ValidationConfig All = new(
+        Standard.Flags | AreaCentroid.Flags | BoundingBox.Flags | MassProperties.Flags |
+        Topology.Flags | Degeneracy.Flags | Tolerance.Flags | SelfIntersection.Flags |
+        MeshSpecific.Flags | SurfaceContinuity.Flags);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ValidationConfig operator |(ValidationConfig left, ValidationConfig right) =>
@@ -29,5 +32,6 @@ public readonly record struct ValidationConfig(int Flags) {
         new(left.Flags & right.Flags);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool HasFlag(ValidationConfig flag) => (this.Flags & flag.Flags) == flag.Flags;
+    public bool HasFlag(ValidationConfig flag) =>
+        flag.Flags == 0 ? this.Flags == 0 : (this.Flags & flag.Flags) == flag.Flags;
 }

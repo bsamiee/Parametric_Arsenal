@@ -11,28 +11,32 @@ namespace Arsenal.Core.Validation;
 public static class Validate {
     /// <summary>Validates tolerance values with inline collection-based error aggregation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<double> For(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians) =>
-        [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
-            [ErrorRegistry.Validation.ToleranceInvalidAbsolute,] : []),
+    public static Result<double> For(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians) {
+        SystemError[] errors = [
+            .. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
+                [ErrorRegistry.Validation.ToleranceInvalidAbsolute,] : []),
             .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-            [ErrorRegistry.Validation.ToleranceInvalidRelative,] : []),
+                [ErrorRegistry.Validation.ToleranceInvalidRelative,] : []),
             .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > 0d and <= RhinoMath.TwoPI) ?
-            [ErrorRegistry.Validation.ToleranceInvalidAngle,] : []),
-        ] switch {
-            SystemError[] { Length: 0 } => ResultFactory.Create(value: absoluteTolerance),
-            SystemError[] errors => ResultFactory.Create<double>(errors: errors),
-        };
+                [ErrorRegistry.Validation.ToleranceInvalidAngle,] : []),
+        ];
+        return errors.Length == 0
+            ? ResultFactory.Create(value: absoluteTolerance)
+            : ResultFactory.Create<double>(errors: errors);
+    }
 
     /// <summary>Polymorphic validation dispatcher with automatic parameter type detection and config composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> For<T>(T value, params object[] args) where T : notnull =>
         (value, args) switch {
             (var v, [IGeometryContext ctx, ValidationConfig config]) when IsGeometryType(typeof(T)) =>
-                ResultFactory.Create(value: v).Bind(g =>
-                    ValidationRules.GetOrCompileValidator(g!.GetType(), config)(g, ctx) switch {
-                        SystemError[] { Length: 0 } => ResultFactory.Create(value: g),
-                        SystemError[] errors => ResultFactory.Create<T>(errors: errors),
-                    }),
+                v is null
+                    ? ResultFactory.Create<T>(error: ErrorRegistry.Results.NoValueProvided)
+                    : ResultFactory.Create(value: v).Bind(g =>
+                        ValidationRules.GetOrCompileValidator(g.GetType(), config)(g, ctx) switch {
+                            SystemError[] { Length: 0 } => ResultFactory.Create(value: g),
+                            SystemError[] errors => ResultFactory.Create<T>(errors: errors),
+                        }),
             (var v, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) =>
                 For(v, ctx, ValidationConfig.Standard),
             (var v, [Func<T, bool> predicate, SystemError error]) =>
