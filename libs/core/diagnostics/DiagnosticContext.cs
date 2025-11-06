@@ -73,8 +73,8 @@ public static class Diagnostics {
         Activity? activity = _activitySource.StartActivity(operation);
         _ = result.IsSuccess;
         stopwatch.Stop();
-        (long allocated, DiagnosticContext ctx) = (GC.GetAllocatedBytesForCurrentThread() - startBytes,
-            new(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, result.IsSuccess ? null : result.Errors.Count));
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - startBytes;
+        DiagnosticContext ctx = new(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, result.IsSuccess ? null : result.Errors.Count);
         activity?.SetTag("operation", operation)
             .SetTag("elapsed_ms", stopwatch.Elapsed.TotalMilliseconds)
             .SetTag("allocations", allocated)
