@@ -92,7 +92,9 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 .Bind(x => Result<Y>)                          // Monadic chain
 .Apply(Result<Func>)                           // Applicative parallel
 .Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
-.OnError(recover: x => value)                  // ✅ Named recover parameter
+.Recover(x => value)                           // Recover from errors
+.Validate(predicate, error)                    // Validate with predicate
+.Tap(onSuccess, onFailure)                     // Side effects without changing state
 .Traverse(transform)                           // Collection inside Result
 ```
 

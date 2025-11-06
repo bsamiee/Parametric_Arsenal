@@ -26,35 +26,31 @@ public sealed class ResultEdgeCaseTests {
         () => Assert.True(ResultFactory.Create(input: default(double)).IsSuccess),
         () => Assert.True(ResultFactory.Create(input: default(bool)).IsSuccess));
 
-    /// <summary>Verifies Ensure with empty validation array returns identity.</summary>
+    /// <summary>Verifies Validate with empty validation array returns identity.</summary>
     [Fact]
-    public void EnsureEmptyValidationArrayReturnsIdentity() => TestGen.RunAll(
+    public void ValidateEmptyValidationArrayReturnsIdentity() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> original = ResultFactory.Create(input: v);
-            Result<int> ensured = original.Ensure();
-            Assert.Equal((original.IsSuccess, original.Value), (ensured.IsSuccess, ensured.Value));
+            Result<int> validated = original.Validate();
+            Assert.Equal((original.IsSuccess, original.Value), (validated.IsSuccess, validated.Value));
         })),
-        () => Assert.True(ResultFactory.Create(input: 42).Ensure().IsSuccess),
-        () => Assert.Equal(42, ResultFactory.Create(input: 42).Ensure().Value));
+        () => Assert.True(ResultFactory.Create(input: 42).Validate().IsSuccess),
+        () => Assert.Equal(42, ResultFactory.Create(input: 42).Validate().Value));
 
-    /// <summary>Verifies OnError parameter precedence using mutually exclusive handlers.</summary>
+    /// <summary>Verifies Recover parameter precedence using mutually exclusive handlers.</summary>
     [Fact]
-    public void OnErrorParameterPrecedenceAppliesCorrectly() => TestGen.RunAll(
+    public void RecoverParameterPrecedenceAppliesCorrectly() => TestGen.RunAll(
         () => {
-            Result<int> mapped = ResultFactory.Create<int>(input: Errors.E1).OnError(mapError: _ => [Errors.E2]);
+            Result<int> mapped = ResultFactory.Create<int>(input: Errors.E1).Recover((Func<SystemError[], SystemError[]>)(_ => [Errors.E2]));
             Assert.Equal(Errors.E2, mapped.Error);
         },
         () => {
-            Result<int> recovered = ResultFactory.Create<int>(input: Errors.E1).OnError(recover: _ => 99);
+            Result<int> recovered = ResultFactory.Create<int>(input: Errors.E1).Recover((Func<SystemError[], int>)(_ => 99));
             Assert.Equal((true, 99), (recovered.IsSuccess, recovered.Value));
         },
         () => {
-            Result<int> recoveredWith = ResultFactory.Create<int>(input: Errors.E1).OnError(recoverWith: _ => ResultFactory.Create(input: 77));
+            Result<int> recoveredWith = ResultFactory.Create<int>(input: Errors.E1).Recover((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(input: 77)));
             Assert.Equal((true, 77), (recoveredWith.IsSuccess, recoveredWith.Value));
-        },
-        () => {
-            Result<int> mapThenRecover = ResultFactory.Create<int>(input: Errors.E1).OnError(mapError: _ => [Errors.E2], recover: _ => 50);
-            Assert.Equal(Errors.E2, mapThenRecover.Error);
         });
 
     /// <summary>Verifies Traverse with single values versus collections using type-based dispatch.</summary>
@@ -152,18 +148,18 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal((errs.Length, false, true), (result, successCalled, failureCalled));
         }), 20));
 
-    /// <summary>Verifies Apply side-effect method preserves Result identity.</summary>
+    /// <summary>Verifies Tap side-effect method preserves Result identity.</summary>
     [Fact]
-    public void ApplyMethodPreservesResultIdentity() => TestGen.RunAll(
+    public void TapMethodPreservesResultIdentity() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> original = ResultFactory.Create(input: v);
-            Result<int> applied = original.Apply(onSuccess: _ => { });
-            Assert.True(original.Equals(applied));
+            Result<int> tapped = original.Tap(onSuccess: _ => { });
+            Assert.True(original.Equals(tapped));
         })),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err => {
             Result<int> original = ResultFactory.Create<int>(input: err);
-            Result<int> applied = original.Apply(onFailure: _ => { });
-            Assert.Equal(original.IsSuccess, applied.IsSuccess);
+            Result<int> tapped = original.Tap(onFailure: _ => { });
+            Assert.Equal(original.IsSuccess, tapped.IsSuccess);
         }), 20));
 
     /// <summary>Verifies Validate with premise and conclusion implements logical implication.</summary>
@@ -251,23 +247,21 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal(((v * 2) + 10, 1, 1, 1), (final, evalCount, mapCount, bindCount));
         }), 20));
 
-    /// <summary>Verifies OnError does not execute handlers on success.</summary>
+    /// <summary>Verifies Recover does not execute handlers on success.</summary>
     [Fact]
-    public void OnErrorDoesNotExecuteHandlersOnSuccess() => TestGen.RunAll(
+    public void RecoverDoesNotExecuteHandlersOnSuccess() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
-            bool mapCalled = false, recoverCalled = false, recoverWithCalled = false;
-            Result<int> result = ResultFactory.Create(input: v).OnError(
-                mapError: _ => { mapCalled = true; return [Errors.E1]; },
-                recover: _ => { recoverCalled = true; return 0; },
-                recoverWith: _ => { recoverWithCalled = true; return ResultFactory.Create(input: 0); });
-            Assert.Equal((v, false, false, false), (result.Value, mapCalled, recoverCalled, recoverWithCalled));
+            Result<int> resultMap = ResultFactory.Create(input: v).Recover((Func<SystemError[], SystemError[]>)(_ => [Errors.E1]));
+            Result<int> resultRecover = ResultFactory.Create(input: v).Recover((Func<SystemError[], int>)(_ => 0));
+            Result<int> resultRecoverWith = ResultFactory.Create(input: v).Recover((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(input: 0)));
+            Assert.Equal((v, v, v), (resultMap.Value, resultRecover.Value, resultRecoverWith.Value));
         })));
 
-    /// <summary>Verifies Ensure with mixed validation array formats handles correctly.</summary>
+    /// <summary>Verifies Validate with mixed validation array formats handles correctly.</summary>
     [Fact]
-    public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => TestGen.RunAll(
+    public void ValidateMixedValidationArrayFormatsHandlesCorrectly() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
-            Result<int> result = ResultFactory.Create(input: v).Ensure(
+            Result<int> result = ResultFactory.Create(input: v).Validate(
                 ((Func<int, bool>)(x => x > 0), Errors.E1),
                 ((Func<int, bool>)(x => x < 100), Errors.E2));
             Assert.Equal(v is > 0 and < 100, result.IsSuccess);
@@ -277,7 +271,7 @@ public sealed class ResultEdgeCaseTests {
                 (x => x > 0, Errors.E1),
                 (x => x < 100, Errors.E2),
             ];
-            Result<int> result = ResultFactory.Create(input: 50).Ensure(validations);
+            Result<int> result = ResultFactory.Create(input: 50).Validate(validations);
             Assert.True(result.IsSuccess);
         });
 }

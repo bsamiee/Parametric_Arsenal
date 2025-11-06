@@ -10,6 +10,7 @@ public static class ResultErrors {
         public static readonly SystemError InvalidCreateParameters = new(ErrorDomain.Results, 1002, "Invalid Create parameters");
         public static readonly SystemError InvalidValidateParameters = new(ErrorDomain.Results, 1003, "Invalid validation parameters");
         public static readonly SystemError InvalidLiftParameters = new(ErrorDomain.Results, 1004, "Invalid Lift parameters");
+        public static readonly SystemError InvalidRecoveryParameter = new(ErrorDomain.Results, 1005, "Invalid recovery parameter");
     }
 
     /// <summary>State access errors (1100-1199).</summary>

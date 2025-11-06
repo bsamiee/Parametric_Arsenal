@@ -74,8 +74,8 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         ArgumentNullException.ThrowIfNull(transform);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.Map(transform)),
-            false => self.Eval switch { { _isSuccess: true, _value: var value } => ResultFactory.Create(value: transform(value)), { _errors: var errs } => ResultFactory.Create<TOut>(errors: errs ?? []),
+            true => new Result<TOut>(isSuccess: false, default!, [], deferred: () => self.Eval.Map(transform)),
+            false => self.Eval switch { { _isSuccess: true, _value: var value } => new Result<TOut>(isSuccess: true, transform(value), [], deferred: null), { _errors: var errs } => new Result<TOut>(isSuccess: false, default!, errs ?? [], deferred: null),
             },
         };
     }
@@ -86,8 +86,8 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         ArgumentNullException.ThrowIfNull(operation);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.Bind(operation)),
-            false => self.Eval switch { { _isSuccess: true, _value: var value } => operation(value), { _errors: var errs } => ResultFactory.Create<TOut>(errors: errs ?? []),
+            true => new Result<TOut>(isSuccess: false, default!, [], deferred: () => self.Eval.Bind(operation)),
+            false => self.Eval switch { { _isSuccess: true, _value: var value } => operation(value), { _errors: var errs } => new Result<TOut>(isSuccess: false, default!, errs ?? [], deferred: null),
             },
         };
     }
@@ -98,8 +98,8 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         ArgumentNullException.ThrowIfNull(predicate);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.Filter(predicate, error)),
-            false => self.Eval switch { { _isSuccess: true, _value: var value } when !predicate(value) => ResultFactory.Create<T>(errors: [error]),
+            true => new Result<T>(isSuccess: false, default!, [], deferred: () => self.Eval.Filter(predicate, error)),
+            false => self.Eval switch { { _isSuccess: true, _value: var value } when !predicate(value) => new Result<T>(isSuccess: false, default!, [error], deferred: null),
                 _ => self,
             },
         };
@@ -116,7 +116,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
 
     /// <summary>Executes side effects without changing Result state.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Apply(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
+    public Result<T> Tap(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
         return self.Match(
             onSuccess: value => { onSuccess?.Invoke(value); return self; },
@@ -129,14 +129,14 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         Result<T> self = this;
         Result<Func<T, TOut>> f = func;
         return (self.IsDeferred, f.IsDeferred) switch {
-            (true, _) or (_, true) => ResultFactory.Create(deferred: () => self.Eval.Apply(f.Eval)),
+            (true, _) or (_, true) => new Result<TOut>(isSuccess: false, default!, [], deferred: () => self.Eval.Apply(f.Eval)),
             _ => (self.Eval, f.Eval) switch {
                 ( { _isSuccess: true, _value: var value }, { _isSuccess: true, _value: var invoker }) =>
-                    ResultFactory.Create(value: invoker(value)),
-                (var left, var right) => ResultFactory.Create<TOut>(errors: [
+                    new Result<TOut>(isSuccess: true, invoker(value), [], deferred: null),
+                (var left, var right) => new Result<TOut>(isSuccess: false, default!, [
                     .. right._errors ?? [],
                     .. left._errors ?? [],
-                ]),
+                ], deferred: null),
             },
         };
     }
@@ -155,35 +155,37 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
 
     /// <summary>Handles errors with transformation and recovery strategies.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> OnError(Func<SystemError[], SystemError[]>? mapError = null, Func<SystemError[], T>? recover = null, Func<SystemError[], Result<T>>? recoverWith = null) {
+    public Result<T> Recover(object recovery) {
         Result<T> self = this;
-        return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.OnError(mapError, recover, recoverWith)),
-            false => self.Eval switch { { _isSuccess: true } => self,
-                var failure => (failure._errors ?? []) switch {
-                    var errs when mapError is not null => ResultFactory.Create<T>(errors: mapError(errs)),
-                    var errs when recover is not null => ResultFactory.Create(value: recover(errs)),
-                    var errs when recoverWith is not null => recoverWith(errs),
-                    _ => self,
-                },
+        return (self.IsDeferred, recovery) switch {
+            (true, _) => new Result<T>(isSuccess: false, default!, [], deferred: () => self.Eval.Recover(recovery)),
+            (false, Func<SystemError[], SystemError[]> mapError) => self.Eval switch { { _isSuccess: true } => self,
+                var failure => ResultFactory.Create<T>(input: mapError(failure._errors ?? [])),
             },
+            (false, Func<SystemError[], T> recover) => self.Eval switch { { _isSuccess: true } => self,
+                var failure => new Result<T>(isSuccess: true, recover(failure._errors ?? []), [], deferred: null),
+            },
+            (false, Func<SystemError[], Result<T>> recoverWith) => self.Eval switch { { _isSuccess: true } => self,
+                var failure => recoverWith(failure._errors ?? []),
+            },
+            _ => throw new ArgumentException(ResultErrors.Factory.InvalidRecoveryParameter.Message, nameof(recovery)),
         };
     }
 
     /// <summary>Ensures predicate holds or accumulates validation errors.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Ensure(params object[] validations) {
+    public Result<T> Validate(params object[] validations) {
         Result<T> self = this;
         return (self.IsDeferred, self.Eval) switch {
-            (true, _) => ResultFactory.Create(deferred: () => self.Eval.Ensure(validations)),
+            (true, _) => new Result<T>(isSuccess: false, default!, [], deferred: () => self.Eval.Validate(validations)),
             (_, { _isSuccess: false }) => self,
             (_, { _value: var value }) => validations switch {
-                [Func<T, bool> predicate, SystemError error] => predicate(value) ? self : ResultFactory.Create<T>(errors: [error]),
-                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
+                [Func<T, bool> predicate, SystemError error] => predicate(value) ? self : new Result<T>(isSuccess: false, default!, [error], deferred: null),
+                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => new Result<T>(isSuccess: false, default!, errors, deferred: null),
                     _ => self,
                 },
                 _ when validations.All(v => v is (Func<T, bool>, SystemError)) =>
-                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
+                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => new Result<T>(isSuccess: false, default!, errors, deferred: null),
                         _ => self,
                     },
                 [] => self,
@@ -198,11 +200,11 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         ArgumentNullException.ThrowIfNull(selector);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.Traverse(selector)),
+            true => new Result<IReadOnlyList<TOut>>(isSuccess: false, default!, [], deferred: () => self.Eval.Traverse(selector)),
             false => self.Eval switch { { _isSuccess: true, _value: System.Collections.IEnumerable collection } when collection is not string =>
                                             collection.Cast<object>().Aggregate(
-                                                ResultFactory.Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-                                                (acc, item) => acc.Accumulate(selector((T)item))), { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]), { _errors: var errs } => ResultFactory.Create<IReadOnlyList<TOut>>(errors: errs ?? []),
+                                                new Result<IReadOnlyList<TOut>>(isSuccess: true, new List<TOut>().AsReadOnly(), [], deferred: null),
+                                                (acc, item) => acc.Accumulate(selector((T)item))), { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]), { _errors: var errs } => new Result<IReadOnlyList<TOut>>(isSuccess: false, default!, errs ?? [], deferred: null),
             },
         };
     }

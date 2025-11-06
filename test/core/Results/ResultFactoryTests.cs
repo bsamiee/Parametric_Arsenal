@@ -115,13 +115,13 @@ public sealed class ResultFactoryTests {
     [Fact]
     public void ErrorHandlingTransformationAndRecoveryBehavesCorrectly() => TestGen.RunAll(
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(origErr => {
-            Result<int> result = ResultFactory.Create<int>(input: origErr).OnError(mapError: _ => [Errors.E2]);
+            Result<int> result = ResultFactory.Create<int>(input: origErr).Recover((Func<SystemError[], SystemError[]>)(_ => [Errors.E2]));
             Assert.True(!result.IsSuccess && result.Errors.Contains(Errors.E2) && !result.Errors.Contains(origErr));
         }), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.Equal(42, ResultFactory.Create<int>(input: err).OnError(recover: _ => 42).Value)), 50),
+            Assert.Equal(42, ResultFactory.Create<int>(input: err).Recover((Func<SystemError[], int>)(_ => 42)).Value)), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.Equal(99, ResultFactory.Create<int>(input: err).OnError(recoverWith: _ => ResultFactory.Create(input: 99)).Value)), 50),
+            Assert.Equal(99, ResultFactory.Create<int>(input: err).Recover((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(input: 99))).Value)), 50),
         () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(input: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(input: x + 10)).Filter(x => x > 0, Errors.E2).Errors));
 
     /// <summary>Verifies Validate batch validations accumulate all errors.</summary>

@@ -99,20 +99,20 @@ public sealed class ResultMonadTests {
             Assert.Equal(value > 0,
                 ResultFactory.Create(input: () => ResultFactory.Create(input: value)).Filter(x => x > 0, TestError).IsSuccess))));
 
-    /// <summary>Verifies Ensure validation using algebraic error accumulation and partition logic.</summary>
+    /// <summary>Verifies Validate validation using algebraic error accumulation and partition logic.</summary>
     [Fact]
-    public void EnsureMultipleValidationsAccumulatesErrors() {
+    public void ValidateMultipleValidationsAccumulatesErrors() {
         (SystemError e1, SystemError e2, SystemError e3) = (
             TestError,
             new(ErrorDomain.Results, 1002, "E2"),
             new(ErrorDomain.Results, 1003, "E3"));
         TestGen.RunAll(
-            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(input: v).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50),
-            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.False(ResultFactory.Create(input: v).Ensure((Func<int, bool>)(x => x < 0), e1).IsSuccess)), 50),
+            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(input: v).Validate((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50),
+            () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.False(ResultFactory.Create(input: v).Validate((Func<int, bool>)(x => x < 0), e1).IsSuccess)), 50),
             () => Gen.Int.Run((Action<int>)(v =>
-                Assert.Equal((v is > 0 and < 100), ResultFactory.Create(input: v).Ensure(((Func<int, bool>)(x => x > 0), e1), ((Func<int, bool>)(x => x < 100), e2)).IsSuccess))),
+                Assert.Equal((v is > 0 and < 100), ResultFactory.Create(input: v).Validate(((Func<int, bool>)(x => x > 0), e1), ((Func<int, bool>)(x => x < 100), e2)).IsSuccess))),
             () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v > 0,
-                ResultFactory.Create(input: () => ResultFactory.Create(input: v)).Ensure((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50));
+                ResultFactory.Create(input: () => ResultFactory.Create(input: v)).Validate((Func<int, bool>)(x => x > 0), e1).IsSuccess)), 50));
     }
 
     /// <summary>Verifies Match using algebraic pattern exhaustion.</summary>
@@ -196,37 +196,37 @@ public sealed class ResultMonadTests {
             Assert.Throws<ObjectDisposedException>(() => result.Value);
         });
 
-    /// <summary>Verifies Apply side effects preserve Result state using algebraic identity preservation.</summary>
+    /// <summary>Verifies Tap side effects preserve Result state using algebraic identity preservation.</summary>
     [Fact]
-    public void ApplyMethodSideEffectsPreservesState() => TestGen.RunAll(
+    public void TapMethodSideEffectsPreservesState() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             int captured = 0;
-            Result<int> result = ResultFactory.Create(input: v).Apply(onSuccess: x => captured = x);
+            Result<int> result = ResultFactory.Create(input: v).Tap(onSuccess: x => captured = x);
             Assert.Equal((v, v, true), (captured, result.Value, result.IsSuccess));
         })),
         () => ResultGenerators.SystemErrorArrayGen.Run((Action<SystemError[]>)(errs => {
             SystemError[]? captured = null;
-            Result<int> result = ResultFactory.Create<int>(input: errs).Apply(onFailure: e => captured = [.. e]);
+            Result<int> result = ResultFactory.Create<int>(input: errs).Tap(onFailure: e => captured = [.. e]);
             Assert.Equal((errs.Length, false), (captured!.Length, result.IsSuccess));
         }), 50),
         () => Gen.Bool.Run((Action<bool>)(isSuccess => {
             (bool successCalled, bool failureCalled) = (false, false);
             (isSuccess ? ResultFactory.Create(input: 42) : ResultFactory.Create<int>(input: TestError))
-                .Apply(_ => successCalled = true, _ => failureCalled = true);
+                .Tap(_ => successCalled = true, _ => failureCalled = true);
             Assert.Equal((isSuccess, !isSuccess), (successCalled, failureCalled));
         })));
 
-    /// <summary>Verifies OnError transformation and recovery using algebraic error morphisms.</summary>
+    /// <summary>Verifies Recover transformation and recovery using algebraic error morphisms.</summary>
     [Fact]
-    public void OnErrorErrorHandlingTransformsAndRecovers() {
+    public void RecoverErrorHandlingTransformsAndRecovers() {
         (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
         TestGen.RunAll(
             () => {
-                Result<int> mapped = ResultFactory.Create<int>(input: e1).OnError(mapError: _ => [e2]);
+                Result<int> mapped = ResultFactory.Create<int>(input: e1).Recover((Func<SystemError[], SystemError[]>)(_ => [e2]));
                 Assert.True(!mapped.IsSuccess && mapped.Errors.Contains(e2) && !mapped.Errors.Contains(e1));
             },
-            () => Assert.Equal(99, ResultFactory.Create<int>(input: e1).OnError(recover: _ => 99).Value),
-            () => Assert.Equal(77, ResultFactory.Create<int>(input: e1).OnError(recoverWith: _ => ResultFactory.Create(input: 77)).Value),
-            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(input: v).OnError(mapError: _ => [e2]).Value)), 50));
+            () => Assert.Equal(99, ResultFactory.Create<int>(input: e1).Recover((Func<SystemError[], int>)(_ => 99)).Value),
+            () => Assert.Equal(77, ResultFactory.Create<int>(input: e1).Recover((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(input: 77))).Value),
+            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(input: v).Recover((Func<SystemError[], SystemError[]>)(_ => [e2])).Value)), 50));
     }
 }
