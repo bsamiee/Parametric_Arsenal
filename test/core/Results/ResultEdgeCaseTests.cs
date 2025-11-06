@@ -105,7 +105,7 @@ public sealed class ResultEdgeCaseTests {
             int result = partial.Value([20, 30]);
             Assert.Equal(60, result);
         },
-        Gen.Int.Select(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
+        () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
             Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
                 (Func<int, int, int>)((x, y) => x * y),
                 [ResultFactory.Create(value: a)]);
@@ -128,7 +128,7 @@ public sealed class ResultEdgeCaseTests {
     /// <summary>Verifies Reduce with only success handler defaults to seed on failure.</summary>
     [Fact]
     public void ReduceWithoutFailureHandlerDefaultsToSeed() => TestGen.RunAll(
-        Gen.Int.Select(Gen.Int).ToAssertion((Action<int, int>)((seed, val) =>
+        () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((seed, val) =>
             Assert.Equal(seed + val, ResultFactory.Create(value: val).Reduce(seed, (s, v) => s + v)))),
         () => Gen.Int.Run((Action<int>)(seed =>
             Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Reduce(seed, (s, v) => s + v)))),

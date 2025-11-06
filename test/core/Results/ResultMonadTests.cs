@@ -42,20 +42,20 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies monad category laws: left identity, right identity, and associativity.</summary>
     [Fact]
     public void MonadLaws() => TestGen.RunAll(
-        () => TestLaw.VerifyMonad(Gen.Int, ResultGenerators.MonadicFunctionGen<int, string>()),
-        () => TestLaw.Verify<int>("MonadRightIdentity", ResultGenerators.ResultGen<int>()),
-        () => TestLaw.VerifyMonad(
-            ResultGenerators.ResultGen<int>(),
-            ResultGenerators.MonadicFunctionGen<int, string>(),
-            ResultGenerators.MonadicFunctionGen<string, double>()));
+        () => Gen.Int.Select(ResultGenerators.MonadicFunctionGen<int, string>()).Run((int v, Func<int, Result<string>> f) =>
+            ResultFactory.Create(value: v).Bind(f).Equals(f(v)), 100),
+        () => TestLaw.Verify<int>("MonadRightIdentity", ResultGenerators.ResultGen<int>(), 100),
+        () => ResultGenerators.ResultGen<int>().Select(ResultGenerators.MonadicFunctionGen<int, string>(), ResultGenerators.MonadicFunctionGen<string, double>()).Run(
+            (Result<int> r, Func<int, Result<string>> f, Func<string, Result<double>> g) =>
+                r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))), 50));
 
     /// <summary>Verifies applicative functor and equality laws.</summary>
     [Fact]
     public void ApplicativeAndEqualityLaws() => TestGen.RunAll(
         () => TestLaw.Verify<int>("ApplicativeIdentity", ResultGenerators.ResultGen<int>()),
-        () => TestLaw.Verify<int>("EqualityReflexive", ResultGenerators.ResultGen<int>()),
-        () => TestLaw.Verify<int>("EqualitySymmetric", ResultGenerators.ResultGen<int>(), ResultGenerators.ResultGen<int>()),
-        () => TestLaw.Verify<int>("HashConsistent", Gen.Int, v => ResultFactory.Create(value: v)));
+        () => TestLaw.Verify<int>("EqualityReflexive", ResultGenerators.ResultGen<int>(), 100),
+        () => TestLaw.Verify<int>("EqualitySymmetric", ResultGenerators.ResultGen<int>(), ResultGenerators.ResultGen<int>(), 100),
+        () => TestLaw.Verify<int>("HashConsistent", Gen.Int, (Func<int, Result<int>>)(v => ResultFactory.Create(value: v)), 100));
 
     /// <summary>Verifies TryGet extraction using algebraic success/failure partition.</summary>
     [Theory]
@@ -78,9 +78,9 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies Reduce accumulation using algebraic handler selection.</summary>
     [Fact]
     public void ReduceAccumulationBehaviorAppliesCorrectHandler() => TestGen.RunAll(
-        Gen.Int.Select(Gen.Int).ToAssertion((Action<int, int>)((value, seed) =>
+        () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((value, seed) =>
             Assert.Equal(seed + value, ResultFactory.Create(value: value).Reduce(seed, (s, v) => s + v)))),
-        ResultGenerators.SystemErrorArrayGen.Select(Gen.Int).ToAssertion((Action<SystemError[], int>)((errors, seed) =>
+        () => ResultGenerators.SystemErrorArrayGen.Select(Gen.Int).Run((Action<SystemError[], int>)((errors, seed) =>
             Assert.Equal(seed + errors.Length,
                 ResultFactory.Create<int>(errors: errors).Reduce(seed, (s, v) => s + v, (s, errs) => s + errs.Length)))),
         () => Gen.Int.Run((Action<int>)(seed =>
@@ -93,7 +93,7 @@ public sealed class ResultMonadTests {
             Assert.True(ResultFactory.Create(value: value).Filter(x => x > 0, TestError).IsSuccess))),
         () => Gen.Int[1, 100].Run((Action<int>)(value =>
             Assert.False(ResultFactory.Create(value: value).Filter(x => x < 0, TestError).IsSuccess))),
-        ResultGenerators.FailureGen<int>().ToAssertion((Action<Result<int>>)(result =>
+        () => ResultGenerators.FailureGen<int>().Run((Action<Result<int>>)(result =>
             Assert.False(result.Filter(x => x > 0, TestError).IsSuccess))),
         () => Gen.Int.Run((Action<int>)(value =>
             Assert.Equal(value > 0,
@@ -131,7 +131,7 @@ public sealed class ResultMonadTests {
             new(ErrorDomain.Results, 5001, "Function error"),
             new(ErrorDomain.Results, 5002, "Value error"));
         TestGen.RunAll(
-            Gen.Int.Select(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
+            () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
                 Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
                 Assert.Equal((true, a + b), (applied.IsSuccess, applied.Value));
             })),

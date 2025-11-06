@@ -32,7 +32,7 @@ public sealed class ResultFactoryTests {
         }), 50),
         () => Gen.Int.Run((Action<int>)(v =>
             Assert.Equal(v > 0, ResultFactory.Create(value: v, conditionals: [(x => x > 0, Errors.E1)]).IsSuccess)), 50),
-        ResultGenerators.NestedResultGen<int>().ToAssertion((Action<Result<Result<int>>>)(nested =>
+        () => ResultGenerators.NestedResultGen<int>().Run((Action<Result<Result<int>>>)(nested =>
             Assert.Equal(nested.IsSuccess && nested.Value.IsSuccess, ResultFactory.Create<int>(nested: nested).IsSuccess)), 50));
 
     /// <summary>Verifies Validate polymorphism using algebraic validation pattern matching.</summary>
@@ -65,15 +65,15 @@ public sealed class ResultFactoryTests {
     public void LiftFunctionLiftingAccumulatesErrorsApplicatively() {
         Func<int, int, int> add = static (x, y) => x + y;
         TestGen.RunAll(
-            Gen.Int.Select(Gen.Int).ToAssertion((Action<int, int>)((a, b) => {
+            () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: a), ResultFactory.Create(value: b));
                 Assert.Equal((true, a + b), (result.IsSuccess, result.Value));
             }), 50),
-            Gen.Int.Select(ResultGenerators.SystemErrorGen).ToAssertion((Action<int, SystemError>)((v, err) => {
+            () => Gen.Int.Select(ResultGenerators.SystemErrorGen).Run((Action<int, SystemError>)((v, err) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: v), ResultFactory.Create<int>(error: err));
                 Assert.True(!result.IsSuccess && result.Errors.Contains(err));
             }), 50),
-            ResultGenerators.SystemErrorGen.Select(ResultGenerators.SystemErrorGen).ToAssertion((Action<SystemError, SystemError>)((e1, e2) => {
+            () => ResultGenerators.SystemErrorGen.Select(ResultGenerators.SystemErrorGen).Run((Action<SystemError, SystemError>)((e1, e2) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create<int>(error: e1), ResultFactory.Create<int>(error: e2));
                 Assert.Equal((false, 2), (result.IsSuccess, result.Errors.Count));
             }), 50),
