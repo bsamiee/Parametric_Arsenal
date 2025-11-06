@@ -14,6 +14,6 @@ public static class ErrorRegistry {
         _registry.GetOrAdd((domain, code), static (key, msg) => new(key.Item1, key.Item2, msg), message);
 
     /// <summary>Gets all registered errors for introspection or diagnostic purposes.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static IReadOnlyDictionary<(ErrorDomain Domain, int Code), SystemError> GetAll() => _registry;
+    [Pure]
+    public static ConcurrentDictionary<(ErrorDomain, int), SystemError> All => _registry;
 }

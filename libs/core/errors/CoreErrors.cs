@@ -2,7 +2,6 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Centralized core library errors with automatic registration and hierarchical organization.</summary>
 public static class CoreErrors {
-
     /// <summary>Result system errors (1000-1999).</summary>
     public static class Results {
         public static readonly SystemError NoValueProvided = ErrorRegistry.Register(domain: ErrorDomain.Results, code: 1001, message: "No value provided");
@@ -12,7 +11,7 @@ public static class CoreErrors {
         public static readonly SystemError InvalidAccess = ErrorRegistry.Register(domain: ErrorDomain.Results, code: 1100, message: "Cannot access value in error state or error in success state");
     }
 
-    /// <summary>Geometry validation errors (3000-3999).</summary>
+    /// <summary>Geometry validation errors (3000-3899).</summary>
     public static class Geometry {
         public static readonly SystemError Invalid = ErrorRegistry.Register(domain: ErrorDomain.Validation, code: 3000, message: "Geometry must be valid");
 
