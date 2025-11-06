@@ -18,11 +18,13 @@ public static class PointExtractionEngine {
         IGeometryContext context,
         int? count = null,
         double? length = null,
-        bool includeEnds = true) where T : notnull =>
+        bool includeEnds = true,
+        Vector3d? direction = null,
+        Continuity continuity = Continuity.C1_continuous) where T : notnull =>
         UnifiedOperation.Apply(
             input,
             (Func<object, Result<IReadOnlyList<Point3d>>>)(item => item switch {
-                GeometryBase g => ExtractionStrategies.Extract(g, method, context, count, length, includeEnds),
+                GeometryBase g => ExtractionStrategies.Extract(g, method, context, count, length, includeEnds, direction, continuity),
                 _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ValidationErrors.Geometry.Invalid),
             }),
             new OperationConfig<object, Point3d> {

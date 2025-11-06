@@ -21,5 +21,10 @@ public static class ExtractionErrors {
         /// <summary>Length parameter must exceed tolerance for uniform extraction.</summary>
         public static readonly SystemError InvalidLength =
             new(ErrorDomain.Geometry, 2003, "Length parameter must be greater than zero tolerance");
+
+        /// <summary>Direction parameter required for positional extrema extraction.</summary>
+        public static readonly SystemError InvalidDirection =
+            new(ErrorDomain.Geometry, 2004, "Direction parameter required for positional extrema");
+
     }
 }
