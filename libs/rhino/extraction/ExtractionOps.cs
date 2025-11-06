@@ -11,76 +11,91 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Core extraction algorithms with polymorphic dispatch via pattern matching.</summary>
 internal static class ExtractionOps {
+    private static readonly FrozenDictionary<Type, (ValidationMode Standard, Func<GeometryBase, ValidationMode>? Dynamic)> _validationModes =
+        new Dictionary<Type, (ValidationMode, Func<GeometryBase, ValidationMode>?)> {
+            [typeof(ExtractionConfig.UniformByCount)] = (ValidationMode.Standard | ValidationMode.Degeneracy, null),
+            [typeof(ExtractionConfig.UniformByLength)] = (ValidationMode.Standard | ValidationMode.Degeneracy, null),
+            [typeof(ExtractionConfig.Extremal)] = (ValidationMode.BoundingBox, null),
+            [typeof(ExtractionConfig.Quadrant)] = (ValidationMode.Tolerance, null),
+            [typeof(ExtractionConfig.EdgeMidpoints)] = (ValidationMode.Standard | ValidationMode.Topology, null),
+            [typeof(ExtractionConfig.Greville)] = (ValidationMode.Standard, null),
+            [typeof(ExtractionConfig.Inflection)] = (ValidationMode.Standard | ValidationMode.Degeneracy, null),
+            [typeof(ExtractionConfig.Discontinuities)] = (ValidationMode.Standard, null),
+            [typeof(ExtractionConfig.FaceCentroids)] = (ValidationMode.Standard | ValidationMode.Topology, null),
+            [typeof(ExtractionConfig.Analytical)] = (ValidationMode.Standard, g => g switch {
+                Brep => ValidationMode.Standard | ValidationMode.MassProperties,
+                Curve => ValidationMode.Standard | ValidationMode.AreaCentroid,
+                Surface => ValidationMode.Standard | ValidationMode.AreaCentroid,
+                _ => ValidationMode.Standard,
+            }),
+            [typeof(ExtractionConfig.PositionalExtrema)] = (ValidationMode.Standard, g => g switch {
+                Surface or Brep => ValidationMode.Standard | ValidationMode.BoundingBox,
+                Mesh => ValidationMode.Standard | ValidationMode.MeshSpecific,
+                _ => ValidationMode.Standard,
+            }),
+        }.ToFrozenDictionary();
+
     /// <summary>Executes extraction operation with geometry and config dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, ExtractionConfig config, IGeometryContext context) =>
-        ResultFactory.Create(value: geometry).Validate(args: [context, config switch {
-            ExtractionConfig.Analytical => ExtractionConfig.Analytical.GetValidationMode(geometry),
-            ExtractionConfig.PositionalExtrema => ExtractionConfig.PositionalExtrema.GetValidationMode(geometry),
-            ExtractionConfig.UniformByCount => ExtractionConfig.UniformByCount.ValidationMode,
-            ExtractionConfig.UniformByLength => ExtractionConfig.UniformByLength.ValidationMode,
-            ExtractionConfig.Extremal => ExtractionConfig.Extremal.ValidationMode,
-            ExtractionConfig.Quadrant => ExtractionConfig.Quadrant.ValidationMode,
-            ExtractionConfig.EdgeMidpoints => ExtractionConfig.EdgeMidpoints.ValidationMode,
-            ExtractionConfig.Greville => ExtractionConfig.Greville.ValidationMode,
-            ExtractionConfig.Inflection => ExtractionConfig.Inflection.ValidationMode,
-            ExtractionConfig.Discontinuities => ExtractionConfig.Discontinuities.ValidationMode,
-            ExtractionConfig.FaceCentroids => ExtractionConfig.FaceCentroids.ValidationMode,
-            _ => ValidationMode.Standard,
-        },]).Bind(g => config switch {
-            ExtractionConfig.UniformByCount c => ExtractUniform(g, c),
-            ExtractionConfig.UniformByLength l => ExtractUniform(g, l),
-            ExtractionConfig.Analytical => ExtractAnalytical(g),
-            ExtractionConfig.Extremal => ExtractExtremal(g),
-            ExtractionConfig.Quadrant => ExtractQuadrant(g, context),
-            ExtractionConfig.EdgeMidpoints => ExtractEdgeMidpoints(g),
-            ExtractionConfig.Greville => ExtractGreville(g),
-            ExtractionConfig.Inflection => ExtractInflection(g),
-            ExtractionConfig.Discontinuities d => ExtractDiscontinuities((Curve)g, d.Continuity),
-            ExtractionConfig.FaceCentroids => ExtractFaceCentroids((Brep)g),
-            ExtractionConfig.PositionalExtrema p => ExtractPositionalExtrema(g, p.Direction, context),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
-        });
+        ResultFactory.Create(value: geometry)
+            .Validate(args: [context, _validationModes.TryGetValue(config.GetType(), out (ValidationMode Standard, Func<GeometryBase, ValidationMode>? Dynamic) modes)
+                ? modes.Dynamic?.Invoke(geometry) ?? modes.Standard
+                : ValidationMode.Standard,])
+            .Bind(g => (config, g) switch {
+                (ExtractionConfig.UniformByCount { Count: <= 0 }, _) => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
+                (ExtractionConfig.UniformByLength { Length: <= 0 }, _) => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength),
+                (ExtractionConfig.PositionalExtrema { Direction.Length: <= 0 }, _) => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidDirection),
+                (ExtractionConfig.UniformByCount c, Curve curve) => ExtractUniformByCount(curve, c.Count, c.IncludeEnds),
+                (ExtractionConfig.UniformByCount c, Surface surface) => ExtractUniformGrid(surface, c.Count, c.IncludeEnds),
+                (ExtractionConfig.UniformByLength l, Curve curve) => ExtractUniformByLength(curve, l.Length, l.IncludeEnds),
+                (ExtractionConfig.Analytical, GeometryBase gb) => ExtractAnalytical(gb),
+                (ExtractionConfig.Extremal, Curve c) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[c.PointAtStart, c.PointAtEnd,]),
+                (ExtractionConfig.Extremal, Surface s) when (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max),]),
+                (ExtractionConfig.Extremal, GeometryBase gb) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)gb.GetBoundingBox(accurate: true).GetCorners()),
+                (ExtractionConfig.Quadrant, Curve c) => ExtractQuadrant(c, context),
+                (ExtractionConfig.EdgeMidpoints, Extrusion or SubD or Brep or Mesh or Curve) => ExtractEdgeMidpoints(g),
+                (ExtractionConfig.Greville, NurbsCurve or Curve or NurbsSurface or Surface) => ExtractGreville(g),
+                (ExtractionConfig.Inflection, NurbsCurve or Curve) => ExtractInflection(g),
+                (ExtractionConfig.Discontinuities d, Curve c) => ExtractDiscontinuities(c, d.Continuity),
+                (ExtractionConfig.FaceCentroids, Brep b) => ExtractFaceCentroids(b),
+                (ExtractionConfig.PositionalExtrema p, Curve or Surface) => ExtractPositionalExtrema(g, p.Direction, context),
+                _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
+            });
 
     [Pure]
-    private static Result<IReadOnlyList<Point3d>> ExtractUniform(GeometryBase geometry, ExtractionConfig.UniformByCount config) =>
-        config.Count <= 0 ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount) : geometry switch {
-            Curve c => c.DivideByCount(config.Count, config.IncludeEnds) switch {
-                double[] { Length: > 0 } pars => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pars.Select(c.PointAt)]),
-                _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
-            },
-            Surface s when (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from ui in Enumerable.Range(0, config.Count) from vi in Enumerable.Range(0, config.Count) let up = config.Count == 1 ? 0.5 : config.IncludeEnds ? ui / (double)(config.Count - 1) : (ui + 0.5) / config.Count let vp = config.Count == 1 ? 0.5 : config.IncludeEnds ? vi / (double)(config.Count - 1) : (vi + 0.5) / config.Count select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp))]),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
-        };
-    [Pure]
-    private static Result<IReadOnlyList<Point3d>> ExtractUniform(GeometryBase geometry, ExtractionConfig.UniformByLength config) =>
-        config.Length <= 0 ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength) : geometry switch {
-            Curve c => c.DivideByLength(config.Length, config.IncludeEnds) switch {
-                double[] { Length: > 0 } pars => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pars.Select(c.PointAt)]),
-                _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
-            },
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
+    private static Result<IReadOnlyList<Point3d>> ExtractUniformByCount(Curve curve, int count, bool includeEnds) =>
+        curve.DivideByCount(count, includeEnds) switch {
+            double[] { Length: > 0 } pars => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pars.Select(curve.PointAt)]),
+            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
         };
 
     [Pure]
-    private static Result<IReadOnlyList<Point3d>> ExtractExtremal(GeometryBase geometry) => geometry switch {
-        Curve c => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[c.PointAtStart, c.PointAtEnd,]),
-        Surface s when (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max),]),
-        _ => ResultFactory.Create(value: (IReadOnlyList<Point3d>)geometry.GetBoundingBox(accurate: true).GetCorners()),
-    };
+    private static Result<IReadOnlyList<Point3d>> ExtractUniformGrid(Surface surface, int count, bool includeEnds) =>
+        (surface.Domain(0), surface.Domain(1)) switch {
+            (Interval u, Interval v) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from ui in Enumerable.Range(0, count) from vi in Enumerable.Range(0, count) let up = count == 1 ? 0.5 : includeEnds ? ui / (double)(count - 1) : (ui + 0.5) / count let vp = count == 1 ? 0.5 : includeEnds ? vi / (double)(count - 1) : (vi + 0.5) / count select surface.PointAt(u.ParameterAt(up), v.ParameterAt(vp))]),
+        };
 
     [Pure]
-    private static Result<IReadOnlyList<Point3d>> ExtractQuadrant(GeometryBase geometry, IGeometryContext context) => geometry switch {
-        Curve c when c.TryGetCircle(out Circle circ, context.AbsoluteTolerance) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2),]),
-        Curve c when c.TryGetEllipse(out Ellipse e, context.AbsoluteTolerance) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[e.Center + (e.Plane.XAxis * e.Radius1), e.Center + (e.Plane.YAxis * e.Radius2), e.Center - (e.Plane.XAxis * e.Radius1), e.Center - (e.Plane.YAxis * e.Radius2),]),
-        Curve c => c.TryGetPolyline(out Polyline pl) ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pl]) : c.IsLinear(context.AbsoluteTolerance) ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[c.PointAtStart, c.PointAtEnd,]) : ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
+    private static Result<IReadOnlyList<Point3d>> ExtractUniformByLength(Curve curve, double length, bool includeEnds) =>
+        curve.DivideByLength(length, includeEnds) switch {
+            double[] { Length: > 0 } pars => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pars.Select(curve.PointAt)]),
+            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters),
+        };
+
+    [Pure]
+    private static Result<IReadOnlyList<Point3d>> ExtractQuadrant(Curve curve, IGeometryContext context) => curve switch {
+        _ when curve.TryGetCircle(out Circle circ, context.AbsoluteTolerance) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2),]),
+        _ when curve.TryGetEllipse(out Ellipse e, context.AbsoluteTolerance) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[e.Center + (e.Plane.XAxis * e.Radius1), e.Center + (e.Plane.YAxis * e.Radius2), e.Center - (e.Plane.XAxis * e.Radius1), e.Center - (e.Plane.YAxis * e.Radius2),]),
+        _ when curve.TryGetPolyline(out Polyline pl) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pl]),
+        _ when curve.IsLinear(context.AbsoluteTolerance) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[curve.PointAtStart, curve.PointAtEnd,]),
         _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
     };
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractEdgeMidpoints(GeometryBase geometry) => geometry switch {
-        Extrusion ext => ext.ToBrep(splitKinkyFaces: true) switch { Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))]).Map(pts => { b.Dispose(); return pts; }), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
-        SubD sd => sd.ToBrep() switch { Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))]).Map(pts => { b.Dispose(); return pts; }), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
+        Extrusion ext => ext.ToBrep(splitKinkyFaces: true) switch { Brep b => ((Func<Result<IReadOnlyList<Point3d>>>)(() => { try { return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))]); } finally { b.Dispose(); } }))(), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
+        SubD sd => sd.ToBrep() switch { Brep b => ((Func<Result<IReadOnlyList<Point3d>>>)(() => { try { return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))]); } finally { b.Dispose(); } }))(), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
         Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))]),
         Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.TopologyEdges.Count).Select(i => m.TopologyEdges.EdgeLine(i)).Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5))]),
         Curve c => c.DuplicateSegments() switch { Curve[] { Length: > 0 } segs => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. segs.Select(seg => seg.PointAtNormalizedLength(0.5))]), _ => c.TryGetPolyline(out Polyline pl) ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pl.GetSegments().Where(ln => ln.IsValid).Select(ln => ln.PointAt(0.5))]) : ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
@@ -90,26 +105,32 @@ internal static class ExtractionOps {
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractGreville(GeometryBase geometry) => geometry switch {
         NurbsCurve nc => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. nc.GrevillePoints()]),
-        Curve c => c.ToNurbsCurve() switch { NurbsCurve nc => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. nc.GrevillePoints()]).Map(pts => { nc.Dispose(); return pts; }), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
+        Curve c => c.ToNurbsCurve() switch { NurbsCurve nc => ((Func<Result<IReadOnlyList<Point3d>>>)(() => { try { return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. nc.GrevillePoints()]); } finally { nc.Dispose(); } }))(), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
         NurbsSurface ns when ns.Points is NurbsSurfacePointList pts => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select ns.PointAt(gp.X, gp.Y)]),
-        Surface s => s.ToNurbsSurface() switch { NurbsSurface ns when ns.Points is NurbsSurfacePointList pts => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select ns.PointAt(gp.X, gp.Y)]).Map(p => { ns.Dispose(); return p; }), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
+        Surface s => s.ToNurbsSurface() switch { NurbsSurface ns when ns.Points is NurbsSurfacePointList pts => ((Func<Result<IReadOnlyList<Point3d>>>)(() => { try { return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select ns.PointAt(gp.X, gp.Y)]); } finally { ns.Dispose(); } }))(), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
         _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
     };
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractInflection(GeometryBase geometry) => geometry switch {
         NurbsCurve nc => nc.InflectionPoints() switch { Point3d[] { Length: > 0 } inflections => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. inflections]), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters), },
-        Curve c => c.ToNurbsCurve() switch { NurbsCurve nc => (nc.InflectionPoints() switch { Point3d[] { Length: > 0 } inflections => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. inflections]), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters), }).Map(pts => { nc.Dispose(); return pts; }), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
+        Curve c => c.ToNurbsCurve() switch { NurbsCurve nc => ((Func<Result<IReadOnlyList<Point3d>>>)(() => { try { return nc.InflectionPoints() switch { Point3d[] { Length: > 0 } inflections => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. inflections]), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InsufficientParameters), }; } finally { nc.Dispose(); } }))(), _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod), },
         _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
     };
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(Brep brep) =>
         ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. brep.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
-            Brep dup => AreaMassProperties.Compute(dup) switch {
-                { Centroid.IsValid: true } mp => ((Func<Point3d>)(() => { Point3d pt = mp.Centroid; mp.Dispose(); dup.Dispose(); return pt; }))(),
-                _ => ((Func<Point3d>)(() => { dup.Dispose(); return Point3d.Unset; }))(),
-            },
+            Brep dup => ((Func<Point3d>)(() => {
+                try {
+                    return AreaMassProperties.Compute(dup) switch {
+                        { Centroid.IsValid: true } mp => ((Func<Point3d>)(() => { try { return mp.Centroid; } finally { mp.Dispose(); } }))(),
+                        _ => Point3d.Unset,
+                    };
+                } finally {
+                    dup.Dispose();
+                }
+            }))(),
             _ => Point3d.Unset,
         }).Where(p => p.IsValid),]);
 
@@ -123,10 +144,10 @@ internal static class ExtractionOps {
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractAnalytical(GeometryBase geometry) {
         IEnumerable<Point3d> centroids = geometry switch {
-            Brep b when VolumeMassProperties.Compute(b) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { Point3d pt = mp.Centroid; mp.Dispose(); return pt; }))(),],
-            Curve c when AreaMassProperties.Compute(c) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { Point3d pt = mp.Centroid; mp.Dispose(); return pt; }))(),],
-            Surface s when AreaMassProperties.Compute(s) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { Point3d pt = mp.Centroid; mp.Dispose(); return pt; }))(),],
-            Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { Point3d pt = mp.Centroid; mp.Dispose(); return pt; }))(),],
+            Brep b when VolumeMassProperties.Compute(b) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { try { return mp.Centroid; } finally { mp.Dispose(); } }))(),],
+            Curve c when AreaMassProperties.Compute(c) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { try { return mp.Centroid; } finally { mp.Dispose(); } }))(),],
+            Surface s when AreaMassProperties.Compute(s) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { try { return mp.Centroid; } finally { mp.Dispose(); } }))(),],
+            Mesh m when m.Vertices.Count > 0 && VolumeMassProperties.Compute(m) is { Centroid.IsValid: true } mp => [((Func<Point3d>)(() => { try { return mp.Centroid; } finally { mp.Dispose(); } }))(),],
             PointCloud pc when pc.Count > 0 && pc.GetPoints() is Point3d[] pts => [pts.Aggregate(Point3d.Origin, (sum, pt) => sum + pt) / pc.Count,],
             _ => [],
         };
