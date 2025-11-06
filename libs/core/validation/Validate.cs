@@ -3,11 +3,26 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Rhino;
 
 namespace Arsenal.Core.Validation;
 
 /// <summary>Unified validation entry point using polymorphic parameter detection for single clean API.</summary>
 public static class Validate {
+    /// <summary>Validates tolerance values with inline collection-based error aggregation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<double> For(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians) =>
+        [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
+            [ErrorRegistry.Validation.ToleranceInvalidAbsolute,] : []),
+            .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
+            [ErrorRegistry.Validation.ToleranceInvalidRelative,] : []),
+            .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > 0d and <= RhinoMath.TwoPI) ?
+            [ErrorRegistry.Validation.ToleranceInvalidAngle,] : []),
+        ] switch {
+            SystemError[] { Length: 0 } => ResultFactory.Create(value: absoluteTolerance),
+            SystemError[] errors => ResultFactory.Create<double>(errors: errors),
+        };
+
     /// <summary>Polymorphic validation dispatcher with automatic parameter type detection and config composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> For<T>(T value, params object[] args) where T : notnull =>
@@ -20,18 +35,6 @@ public static class Validate {
                     }),
             (var v, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) =>
                 For(v, ctx, ValidationConfig.Standard),
-            (double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) =>
-                (Result<T>)(object)(
-                    [.. (!(Rhino.RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > Rhino.RhinoMath.ZeroTolerance) ?
-                        [ErrorRegistry.Validation.ToleranceInvalidAbsolute,] : []),
-                        .. (!(Rhino.RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-                        [ErrorRegistry.Validation.ToleranceInvalidRelative,] : []),
-                        .. (!(Rhino.RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > 0d and <= (2d * System.Math.PI)) ?
-                        [ErrorRegistry.Validation.ToleranceInvalidAngle,] : []),
-                    ] switch {
-                        SystemError[] { Length: 0 } => ResultFactory.Create(value: (double)(object)absoluteTolerance),
-                        SystemError[] errors => ResultFactory.Create<double>(errors: errors),
-                    }),
             (var v, [Func<T, bool> predicate, SystemError error]) =>
                 predicate(v) switch {
                     true => ResultFactory.Create(value: v),

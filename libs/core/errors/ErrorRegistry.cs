@@ -72,9 +72,17 @@ public static class ErrorRegistry {
         public static readonly SystemError InvalidAccess = Get(Domain.Results, 1100);
     }
 
-    /// <summary>Geometry domain errors (2000-2999).</summary>
+    /// <summary>Geometry domain errors (2000-2999) - flattened structure for type count compliance.</summary>
     public static class Geometry {
         public static readonly SystemError Invalid = Get(Domain.Validation, 3000);
+        public static readonly SystemError CurveNotClosedOrPlanar = Get(Domain.Validation, 3100);
+        public static readonly SystemError BoundingBoxInvalid = Get(Domain.Validation, 3200);
+        public static readonly SystemError PropertiesComputationFailed = Get(Domain.Validation, 3300);
+        public static readonly SystemError TopologyInvalidTopology = Get(Domain.Validation, 3400);
+        public static readonly SystemError DegeneracyDegenerateGeometry = Get(Domain.Validation, 3500);
+        public static readonly SystemError SelfIntersectionSelfIntersecting = Get(Domain.Validation, 3600);
+        public static readonly SystemError MeshTopologyNonManifoldEdges = Get(Domain.Validation, 3700);
+        public static readonly SystemError ContinuityPositionalDiscontinuity = Get(Domain.Validation, 3800);
         public static readonly SystemError ExtractionInvalidMethod = Get(Domain.Geometry, 2000);
         public static readonly SystemError ExtractionInsufficientParameters = Get(Domain.Geometry, 2001);
         public static readonly SystemError ExtractionInvalidCount = Get(Domain.Geometry, 2002);
@@ -93,38 +101,6 @@ public static class ErrorRegistry {
         public static readonly SystemError SpatialInvalidK = Get(Domain.Geometry, 4001);
         public static readonly SystemError SpatialInvalidDistance = Get(Domain.Geometry, 4002);
         public static readonly SystemError SpatialProximityFailed = Get(Domain.Geometry, 4004);
-
-        public static class Curve {
-            public static readonly SystemError NotClosedOrPlanar = Get(Domain.Validation, 3100);
-        }
-
-        public static class BoundingBox {
-            public static readonly SystemError Invalid = Get(Domain.Validation, 3200);
-        }
-
-        public static class Properties {
-            public static readonly SystemError ComputationFailed = Get(Domain.Validation, 3300);
-        }
-
-        public static class Topology {
-            public static readonly SystemError InvalidTopology = Get(Domain.Validation, 3400);
-        }
-
-        public static class Degeneracy {
-            public static readonly SystemError DegenerateGeometry = Get(Domain.Validation, 3500);
-        }
-
-        public static class SelfIntersection {
-            public static readonly SystemError SelfIntersecting = Get(Domain.Validation, 3600);
-        }
-
-        public static class MeshTopology {
-            public static readonly SystemError NonManifoldEdges = Get(Domain.Validation, 3700);
-        }
-
-        public static class Continuity {
-            public static readonly SystemError PositionalDiscontinuity = Get(Domain.Validation, 3800);
-        }
     }
 
     /// <summary>Validation domain errors (3000-3999).</summary>
