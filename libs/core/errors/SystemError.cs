@@ -31,4 +31,12 @@ public readonly struct SystemError(ErrorDomain domain, int code, string message)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SystemError WithContext(string context) =>
         new(this.Domain, this.Code, $"{this.Message} (Context: {context})");
+
+    /// <summary>Creates error from registry using code-based lookup with automatic domain inference.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError From(int code, string? context = null) => ErrorRegistry.Get(code, context);
+
+    /// <summary>Creates error array from codes for batch error creation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError[] From(params int[] codes) => ErrorRegistry.Get(codes);
 }
