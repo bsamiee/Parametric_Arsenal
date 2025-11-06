@@ -117,27 +117,29 @@ internal static class ExtractionCore {
                     let gp = pts.GetGrevillePoint(u, v)
                     select ns.PointAt(gp.X, gp.Y),
                 ] : [],
+#pragma warning disable IDISP007 // Don't dispose injected - False positive: these objects are created by ToNurbsCurve/ToNurbsSurface and ownership is transferred
             (3, Curve c, _) => c.ToNurbsCurve() switch {
-                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { try { return [.. n.GrevillePoints(),]; } finally { n.Dispose(); } }))(nc),
+                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { using (n) { return [.. n.GrevillePoints(),]; } }))(nc),
                 _ => [],
             },
             (3, Surface s, _) => s.ToNurbsSurface() switch {
                 NurbsSurface ns when ns.Points is NurbsSurfacePointList pts => ((Func<NurbsSurface, Point3d[]>)(n => {
-                    try {
+                    using (n) {
                         return [.. from u in Enumerable.Range(0, pts.CountU)
                                    from v in Enumerable.Range(0, pts.CountV)
                                    let gp = pts.GetGrevillePoint(u, v)
                                    select n.PointAt(gp.X, gp.Y),
                         ];
-                    } finally { n.Dispose(); }
+                    }
                 }))(ns),
                 _ => [],
             },
             (4, NurbsCurve nc, _) => nc.InflectionPoints() switch { Point3d[] { Length: > 0 } pts => pts, _ => [] },
             (4, Curve c, _) => c.ToNurbsCurve() switch {
-                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { try { return n.InflectionPoints() ?? []; } finally { n.Dispose(); } }))(nc),
+                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { using (n) { return n.InflectionPoints() ?? []; } }))(nc),
                 _ => [],
             },
+#pragma warning restore IDISP007
             (5, Curve c, _) => (c, context.AbsoluteTolerance) switch {
                 (Curve crv, double tol) when crv.TryGetCircle(out Circle circ, tol) =>
                     [circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2),],
@@ -162,15 +164,15 @@ internal static class ExtractionCore {
                 : c.TryGetPolyline(out Polyline pl)
                     ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),]
                     : [],
+#pragma warning disable IDISP007 // Don't dispose injected - False positive: DuplicateFace creates a new Brep that we own
             (7, Brep b, _) => [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => {
-                    try {
-                        return AreaMassProperties.Compute(d)?.Centroid ?? Point3d.Unset;
-                    } finally { d.Dispose(); }
+                    using (d) { return AreaMassProperties.Compute(d)?.Centroid ?? Point3d.Unset; }
                 }))(dup),
                 _ => Point3d.Unset,
             }).Where(static p => p != Point3d.Unset),
             ],
+#pragma warning restore IDISP007
             (7, Mesh m, _) => [.. Enumerable.Range(0, m.Faces.Count)
                 .Select(i => m.Faces.GetFaceCenter(i))
                 .Where(static pt => pt.IsValid),
