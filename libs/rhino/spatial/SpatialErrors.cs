@@ -4,18 +4,22 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Spatial indexing error definitions with hierarchical codes for RhinoCommon RTree operations.</summary>
 public static class SpatialErrors {
-    /// <summary>Parameter validation errors for spatial operations.</summary>
-    public static class Parameters {
+    /// <summary>Query parameter and type combination validation errors.</summary>
+    public static class Query {
         /// <summary>K-nearest neighbor count parameter must be positive for proximity queries.</summary>
-        public static readonly SystemError InvalidCount =
-            new(ErrorDomain.Geometry, 2100, "Invalid count parameter for proximity query");
+        public static readonly SystemError InvalidK =
+            new(ErrorDomain.Geometry, 4001, "K-nearest neighbor count must be positive");
 
-        /// <summary>Distance limit parameter must be positive for spatial range queries.</summary>
+        /// <summary>Distance limit parameter must be positive for proximity queries.</summary>
         public static readonly SystemError InvalidDistance =
-            new(ErrorDomain.Geometry, 2101, "Invalid distance parameter for spatial query");
+            new(ErrorDomain.Geometry, 4002, "Distance limit must be positive");
 
-        /// <summary>Needle points collection required for proximity search operations.</summary>
-        public static readonly SystemError InvalidNeedles =
-            new(ErrorDomain.Geometry, 2102, "Invalid needle points for proximity query");
+        /// <summary>Input/query type combination not supported by spatial indexing engine.</summary>
+        public static readonly SystemError UnsupportedTypeCombo =
+            new(ErrorDomain.Validation, 4003, "Input and query type combination not supported");
+
+        /// <summary>RTree proximity search returned null indicating algorithm failure.</summary>
+        public static readonly SystemError ProximityFailed =
+            new(ErrorDomain.Geometry, 4004, "Proximity search operation failed");
     }
 }
