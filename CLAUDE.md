@@ -18,7 +18,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **NO old patterns** - Target-typed new, collection expressions, tuple deconstruction
 - **K&R brace style** - Opening braces on same line
 - **Always leverage libs/** - Never handroll what Result monad provides
-- **ALWAYS trailing commas** - Every multi-line list, array, dictionary must have trailing comma on last item
 - **ALWAYS named parameters** - Use `parameter: value` for all non-obvious arguments (errors, values, configs)
 - **ALWAYS target-typed new** - Use `new(...)` not `new Type(...)` when type is known from context
 

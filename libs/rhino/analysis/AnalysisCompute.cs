@@ -42,7 +42,7 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount]],
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
-                                    amp.Centroid,))
+                                    amp.Centroid))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
@@ -74,7 +74,7 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount]],
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
-                                    amp.Centroid,))
+                                    amp.Centroid))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
@@ -87,24 +87,26 @@ internal static class AnalysisCompute {
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
-                        return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && sf.FrameAt(u, v, out Plane frame)
-                            ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
-                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed)
-                                .Map(sc => (Analysis.IResult)new Analysis.SurfaceData(
-                                    sf.PointAt(u, v),
-                                    derivs,
-                                    sc.Gaussian,
-                                    sc.Mean,
-                                    sc.Kappa(0),
-                                    sc.Kappa(1),
-                                    sc.Direction(0),
-                                    sc.Direction(1),
-                                    frame,
-                                    frame.Normal,
-                                    sf.IsAtSeam(u, v) != 0,
-                                    sf.IsAtSingularity(u, v, exact: true),
-                                    amp.Area,
-                                    amp.Centroid,))
+                        if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
+                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                        }
+                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+                        return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                                sf.PointAt(u, v),
+                                derivs,
+                                sc.Gaussian,
+                                sc.Mean,
+                                sc.Kappa(0),
+                                sc.Kappa(1),
+                                sc.Direction(0),
+                                sc.Direction(1),
+                                frame,
+                                frame.Normal,
+                                sf.IsAtSeam(u, v) != 0,
+                                sf.IsAtSingularity(u, v, exact: true),
+                                amp.Area,
+                                amp.Centroid))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
@@ -114,24 +116,26 @@ internal static class AnalysisCompute {
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
-                        return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && sf.FrameAt(u, v, out Plane frame)
-                            ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
-                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed)
-                                .Map(sc => (Analysis.IResult)new Analysis.SurfaceData(
-                                    sf.PointAt(u, v),
-                                    derivs,
-                                    sc.Gaussian,
-                                    sc.Mean,
-                                    sc.Kappa(0),
-                                    sc.Kappa(1),
-                                    sc.Direction(0),
-                                    sc.Direction(1),
-                                    frame,
-                                    frame.Normal,
-                                    sf.IsAtSeam(u, v) != 0,
-                                    sf.IsAtSingularity(u, v, exact: true),
-                                    amp.Area,
-                                    amp.Centroid,))
+                        if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
+                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
+                        }
+                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+                        return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                                sf.PointAt(u, v),
+                                derivs,
+                                sc.Gaussian,
+                                sc.Mean,
+                                sc.Kappa(0),
+                                sc.Kappa(1),
+                                sc.Direction(0),
+                                sc.Direction(1),
+                                frame,
+                                frame.Normal,
+                                sf.IsAtSeam(u, v) != 0,
+                                sf.IsAtSingularity(u, v, exact: true),
+                                amp.Area,
+                                amp.Centroid))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
@@ -143,32 +147,35 @@ internal static class AnalysisCompute {
                         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
-                        (AreaMassProperties? amp, VolumeMassProperties? vmp) = (AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep));
-                        return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && vmp is not null && sf.FrameAt(u, v, out Plane frame) && brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
-                            ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
-                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.BrepAnalysisFailed)
-                                .Map(sc => (Analysis.IResult)new Analysis.BrepData(
-                                    sf.PointAt(u, v),
-                                    derivs,
-                                    sc.Gaussian,
-                                    sc.Mean,
-                                    sc.Kappa(0),
-                                    sc.Kappa(1),
-                                    sc.Direction(0),
-                                    sc.Direction(1),
-                                    frame,
-                                    frame.Normal,
-                                    [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
-                                    [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
-                                    brep.IsManifold,
-                                    brep.IsSolid,
-                                    cp,
-                                    testPoint.DistanceTo(cp),
-                                    ci,
-                                    (uOut, vOut),
-                                    amp.Area,
-                                    vmp.Volume,
-                                    vmp.Centroid,))
+                        AreaMassProperties? amp = AreaMassProperties.Compute(brep);
+                        VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
+                        if (amp is null || vmp is null || !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame) || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)) {
+                            return ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.BrepAnalysisFailed);
+                        }
+                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+                        return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
+                                sf.PointAt(u, v),
+                                derivs,
+                                sc.Gaussian,
+                                sc.Mean,
+                                sc.Kappa(0),
+                                sc.Kappa(1),
+                                sc.Direction(0),
+                                sc.Direction(1),
+                                frame,
+                                frame.Normal,
+                                [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
+                                [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
+                                brep.IsManifold,
+                                brep.IsSolid,
+                                cp,
+                                testPoint.DistanceTo(cp),
+                                ci,
+                                (uOut, vOut),
+                                amp.Area,
+                                vmp.Volume,
+                                vmp.Centroid))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.BrepAnalysisFailed);
                     })),
 
@@ -178,9 +185,11 @@ internal static class AnalysisCompute {
                     .Bind(mesh => {
                         int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
                         Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
-                        (AreaMassProperties? amp, VolumeMassProperties? vmp) = (AreaMassProperties.Compute(mesh), VolumeMassProperties.Compute(mesh));
-                        return amp is not null && vmp is not null
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
+                        AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
+                        VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
+                        return amp is null || vmp is null
+                            ? ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.MeshAnalysisFailed)
+                            : ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
                                 mesh.Vertices[vIdx],
                                 new Plane(mesh.Vertices[vIdx], normal),
                                 normal,
@@ -189,8 +198,7 @@ internal static class AnalysisCompute {
                                 mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
                                 mesh.IsClosed,
                                 amp.Area,
-                                vmp.Volume,))
-                            : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.MeshAnalysisFailed);
+                                vmp.Volume));
                     })),
         }.ToFrozenDictionary();
 
