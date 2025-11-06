@@ -37,7 +37,7 @@ internal static class AnalysisCompute {
                                     cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
                                     cv.IsClosed ? cv.TorsionAt(param) : 0,
                                     [.. buffer[..discCount]],
-                                    [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                                    buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous).ToArray(),
                                     cv.GetLength(),
                                     amp.Centroid))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
@@ -69,7 +69,7 @@ internal static class AnalysisCompute {
                                     cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
                                     cv.IsClosed ? cv.TorsionAt(param) : 0,
                                     [.. buffer[..discCount]],
-                                    [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                                    buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous).ToArray(),
                                     cv.GetLength(),
                                     amp.Centroid))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);

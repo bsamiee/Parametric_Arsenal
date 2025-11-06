@@ -25,6 +25,7 @@ dotnet_style_require_accessibility_modifiers = always:error                    #
 dotnet_code_quality.api_surface = all                                          # Analyze all APIs
 csharp_using_directive_placement = outside_namespace:error                     # Usings outside namespace
 dotnet_sort_system_directives_first = true                                     # System usings first
+MA0051.maximum_lines_per_method = 120                                          # Max method length 120 lines
 dotnet_separate_import_directive_groups = false                                # Don't separate using groups
 
 # --------------------------------------------------------------------

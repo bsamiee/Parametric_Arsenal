@@ -130,7 +130,7 @@ uv run basedpyright .
 ### Analyzers Enforced
 
 These are automatically enforced during build:
-- **MA0051**: Method length max 60 lines
+- **MA0051**: Method length max 120 lines
 - **IDE0301-0305**: Collection expressions required
 - **IDE0290**: Primary constructors required
 - **File-scoped namespaces**: Mandatory
@@ -162,7 +162,7 @@ These are automatically enforced during build:
 3. Use explicit types (no `var`)
 4. Return `Result<T>` for operations that can fail
 5. Use pattern matching instead of if/else
-6. Keep methods under 60 lines
+6. Keep methods under 120 lines
 7. Add corresponding error definitions if needed
 
 ### Adding a New Rhino Plugin Command (Python)

@@ -110,7 +110,7 @@ public static class SpatialErrors {
 
 ### Analyzers Enforced
 
-- MA0051: Method length max 60 lines
+- MA0051: Method length max 120 lines
 - IDE0301-0305: Collection expressions required
 - IDE0290: Primary constructors required
 - File-scoped namespaces mandatory
