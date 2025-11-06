@@ -137,7 +137,7 @@ internal static class ExtractionStrategies {
             (ExtractionMethod.EdgeMidpoints, _) => null,
             (ExtractionMethod.Greville, NurbsCurve nc) => nc.GrevillePoints(),
             (ExtractionMethod.Greville, Curve c) when c.ToNurbsCurve() is NurbsCurve nc =>
-                ((Func<NurbsCurve, Point3d[]?>)(n => { try { return n.GrevillePoints(); } finally { n.Dispose(); } }))(nc),
+                ((Func<NurbsCurve, Point3d[]?>)(n => { using (n) { return n.GrevillePoints(); } }))(nc),
             (ExtractionMethod.Greville, NurbsSurface ns) when ns.Points is NurbsSurfacePointList pts =>
                 [.. from u in Enumerable.Range(0, pts.CountU)
                     from v in Enumerable.Range(0, pts.CountV)
