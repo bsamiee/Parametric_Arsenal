@@ -202,8 +202,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             false => self.Eval switch { { _isSuccess: true, _value: System.Collections.IEnumerable collection } when collection is not string =>
                                             collection.Cast<object>().Aggregate(
                                                 ResultFactory.Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-                                                (acc, item) => acc.Apply(selector((T)item).Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(
-                                                    val => list => [.. list, val]))), { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]), { _errors: var errs } => ResultFactory.Create<IReadOnlyList<TOut>>(errors: errs ?? []),
+                                                (acc, item) => acc.Accumulate(selector((T)item))), { _isSuccess: true, _value: var value } => selector(value).Map(val => (IReadOnlyList<TOut>)[val]), { _errors: var errs } => ResultFactory.Create<IReadOnlyList<TOut>>(errors: errs ?? []),
             },
         };
     }

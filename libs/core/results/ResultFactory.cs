@@ -65,7 +65,7 @@ public static class ResultFactory {
                 Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
             (var ar, var rc, 0, var a) when ar == a.Length && rc == ar =>
                 a.Cast<Result<object>>().Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
-                    (acc, curr) => acc.Apply(curr.Map<Func<IReadOnlyList<object>, IReadOnlyList<object>>>(value => list => [.. list, value,])))
+                    (acc, curr) => acc.Accumulate(curr))
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
             (var ar, var rc, 0, var a) when rc == a.Length && ar >= 3 && ar > a.Length =>
                 a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
@@ -97,6 +97,11 @@ public static class ResultFactory {
         return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
             (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
     }
+
+    /// <summary>Accumulates item into Result list using applicative error composition and parallel validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
+        accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
 
     /// <summary>Checks if type is Geometry without loading Rhino assembly using string comparison.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
