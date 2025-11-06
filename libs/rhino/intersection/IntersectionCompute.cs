@@ -15,8 +15,8 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Dense intersection computation strategies using polymorphic type-based dispatch.</summary>
 internal static class IntersectionCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<IntersectionResult>> Execute<T1, T2>(T1 a, T2 b, IGeometryContext ctx, IntersectionConfig cfg) where T1 : notnull where T2 : notnull =>
-        (cfg.ValidateInputs, a, b) switch {
+    internal static Result<IReadOnlyList<IntersectionResult>> Execute<T1, T2>(T1 a, T2 b, IGeometryContext ctx, (double? Tolerance, Vector3d? Direction, int? MaxHits, bool Validate) cfg) where T1 : notnull where T2 : notnull =>
+        (cfg.Validate, a, b) switch {
             (true, GeometryBase ga, GeometryBase gb) => ResultFactory.Create(value: (ga, gb))
                 .Validate(args: [ctx, ValidationMode.Standard])
                 .Bind(_ => Compute(a, b, ctx, cfg)),
@@ -27,7 +27,7 @@ internal static class IntersectionCompute {
         };
 
     [Pure]
-    private static Result<IReadOnlyList<IntersectionResult>> Compute<T1, T2>(T1 a, T2 b, IGeometryContext ctx, IntersectionConfig cfg) where T1 : notnull where T2 : notnull {
+    private static Result<IReadOnlyList<IntersectionResult>> Compute<T1, T2>(T1 a, T2 b, IGeometryContext ctx, (double? Tolerance, Vector3d? Direction, int? MaxHits, bool Validate) cfg) where T1 : notnull where T2 : notnull {
         double tol = cfg.Tolerance ?? ctx.AbsoluteTolerance;
         return (a, b, cfg) switch {
             (Curve ca, Curve cb, _) => CurveCurve(ca, cb, tol),
@@ -59,17 +59,17 @@ internal static class IntersectionCompute {
             (Sphere sa, Sphere sb, _) => SphereSphere(sa, sb),
             (Circle ca, Circle cb, _) => CircleCircle(ca, cb, ctx),
             (Arc aa, Arc ab, _) => ArcArc(aa, ab, ctx),
-            (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
+            (Point3d[] pts, Brep[] breps, { Direction: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
                 ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, tol)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
-            (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
+            (Point3d[] pts, Mesh[] meshes, { Direction: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
                 ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, tol)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
-            (Ray3d ray, GeometryBase[] geoms, { MaxHitCount: int hits }) when ray.Direction.Length > RhinoMath.ZeroTolerance && hits > 0 =>
+            (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when ray.Direction.Length > RhinoMath.ZeroTolerance && hits > 0 =>
                 ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.RayShoot(ray, geoms, hits)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
-            (_, _, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
+            (_, _, { Direction: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
                 ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
             (Ray3d { Direction.Length: <= RhinoMath.ZeroTolerance }, _, _) =>
                 ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Parameters.InvalidRayDirection),
-            (_, _, { MaxHitCount: null or <= 0 }) when a is Ray3d =>
+            (_, _, { MaxHits: null or <= 0 }) when a is Ray3d =>
                 ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Parameters.InvalidMaxHitCount),
             _ => ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Operation.UnsupportedMethod),
         };
