@@ -39,6 +39,7 @@ public static class Analysis {
         Vector3d PrincipalDir1,
         Vector3d PrincipalDir2,
         Plane Frame,
+        Vector3d Normal,
         bool AtSeam,
         bool AtSingularity,
         double Area,
@@ -55,6 +56,7 @@ public static class Analysis {
         Vector3d PrincipalDir1,
         Vector3d PrincipalDir2,
         Plane Frame,
+        Vector3d Normal,
         (int Index, Point3d Point)[] Vertices,
         (int Index, Line Geometry)[] Edges,
         bool IsManifold,
@@ -71,6 +73,7 @@ public static class Analysis {
     public sealed record MeshData(
         Point3d Location,
         Plane Frame,
+        Vector3d Normal,
         (int Index, Point3d Point)[] TopologyVertices,
         (int Index, Line Geometry)[] TopologyEdges,
         bool IsManifold,
