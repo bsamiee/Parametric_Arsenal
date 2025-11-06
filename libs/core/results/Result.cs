@@ -60,14 +60,6 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Attempts to extract value with safe null handling.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGet([MaybeNullWhen(false)] out T value) =>
-        this.IsSuccess switch {
-            true => (value = this.Value, true).Item2,
-            false => (value = default, false).Item2,
-        };
-
     /// <summary>Transforms success values using monadic functor semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Map<TOut>(Func<T, TOut> transform) {
@@ -92,14 +84,27 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Filters values using validation predicate with error specification.</summary>
+    /// <summary>Validates values using predicate with error specification and accumulation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Filter(Func<T, bool> predicate, SystemError error) {
+    public Result<T> Ensure(Func<T, bool> predicate, SystemError error) {
         ArgumentNullException.ThrowIfNull(predicate);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.Filter(predicate, error)),
+            true => ResultFactory.Create(deferred: () => self.Eval.Ensure(predicate, error)),
             false => self.Eval switch { { _isSuccess: true, _value: var value } when !predicate(value) => ResultFactory.Create<T>(errors: [error]),
+                _ => self,
+            },
+        };
+    }
+
+    /// <summary>Validates values using multiple predicates with error accumulation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> Ensure(params (Func<T, bool>, SystemError)[] validations) {
+        Result<T> self = this;
+        return (self.IsDeferred, self.Eval) switch {
+            (true, _) => ResultFactory.Create(deferred: () => self.Eval.Ensure(validations)),
+            (_, { _isSuccess: false }) => self,
+            (_, { _value: var value }) => validations.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
                 _ => self,
             },
         };
@@ -114,9 +119,9 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Executes side effects without changing Result state.</summary>
+    /// <summary>Executes side effects without changing Result state for observability and debugging.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Apply(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
+    public Result<T> Tap(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
         return self.Match(
             onSuccess: value => { onSuccess?.Invoke(value); return self; },
@@ -141,58 +146,46 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Reduces Result to accumulated value with optional error handling.</summary>
+    /// <summary>Transforms errors using error mapping function.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TAcc Reduce<TAcc>(TAcc seed, Func<TAcc, T, TAcc> onSuccess, Func<TAcc, SystemError[], TAcc>? onFailure = null) {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        Result<T> eval = this.Eval;
-        return (eval, onFailure) switch {
-            ( { _isSuccess: true, _value: var value }, _) => onSuccess(seed, value),
-            ( { _errors: var errs }, var handler) when handler is not null => handler(seed, errs ?? []),
-            _ => seed,
-        };
-    }
-
-    /// <summary>Handles errors with transformation and recovery strategies.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> OnError(Func<SystemError[], SystemError[]>? mapError = null, Func<SystemError[], T>? recover = null, Func<SystemError[], Result<T>>? recoverWith = null) {
+    public Result<T> OnError(Func<SystemError[], SystemError[]> mapError) {
+        ArgumentNullException.ThrowIfNull(mapError);
         Result<T> self = this;
         return self.IsDeferred switch {
-            true => ResultFactory.Create(deferred: () => self.Eval.OnError(mapError, recover, recoverWith)),
+            true => ResultFactory.Create(deferred: () => self.Eval.OnError(mapError)),
             false => self.Eval switch { { _isSuccess: true } => self,
-                var failure => (failure._errors ?? []) switch {
-                    var errs when mapError is not null => ResultFactory.Create<T>(errors: mapError(errs)),
-                    var errs when recover is not null => ResultFactory.Create(value: recover(errs)),
-                    var errs when recoverWith is not null => recoverWith(errs),
-                    _ => self,
-                },
+                var failure => ResultFactory.Create<T>(errors: mapError(failure._errors ?? [])),
             },
         };
     }
 
-    /// <summary>Ensures predicate holds or accumulates validation errors.</summary>
+    /// <summary>Recovers from errors by providing fallback value.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<T> Ensure(params object[] validations) {
+    public Result<T> OnError(Func<SystemError[], T> recover) {
+        ArgumentNullException.ThrowIfNull(recover);
         Result<T> self = this;
-        return (self.IsDeferred, self.Eval) switch {
-            (true, _) => ResultFactory.Create(deferred: () => self.Eval.Ensure(validations)),
-            (_, { _isSuccess: false }) => self,
-            (_, { _value: var value }) => validations switch {
-                [Func<T, bool> predicate, SystemError error] => predicate(value) ? self : ResultFactory.Create<T>(errors: [error]),
-                [(Func<T, bool>, SystemError)[] grouped] => grouped.Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
-                    _ => self,
-                },
-                _ when validations.All(v => v is (Func<T, bool>, SystemError)) =>
-                    validations.Cast<(Func<T, bool>, SystemError)>().Where(v => !v.Item1(value)).Select(v => v.Item2).ToArray() switch { { Length: > 0 } errors => ResultFactory.Create<T>(errors: errors),
-                        _ => self,
-                    },
-                [] => self,
-                _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(validations)),
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.OnError(recover)),
+            false => self.Eval switch { { _isSuccess: true } => self,
+                var failure => ResultFactory.Create(value: recover(failure._errors ?? [])),
             },
         };
     }
 
-    /// <summary>Transforms collection elements to Results with error accumulation.</summary>
+    /// <summary>Recovers from errors by chaining to alternative Result operation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<T> OnError(Func<SystemError[], Result<T>> recoverWith) {
+        ArgumentNullException.ThrowIfNull(recoverWith);
+        Result<T> self = this;
+        return self.IsDeferred switch {
+            true => ResultFactory.Create(deferred: () => self.Eval.OnError(recoverWith)),
+            false => self.Eval switch { { _isSuccess: true } => self,
+                var failure => recoverWith(failure._errors ?? []),
+            },
+        };
+    }
+
+    /// <summary>Transforms collection elements to Results with error accumulation using monadic traversal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<IReadOnlyList<TOut>> Traverse<TOut>(Func<T, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);

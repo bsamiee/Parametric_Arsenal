@@ -57,13 +57,13 @@ public sealed class ResultMonadTests {
         () => TestLaw.Verify<int>("EqualitySymmetric", ResultGenerators.ResultGen<int>(), ResultGenerators.ResultGen<int>(), 100),
         () => TestLaw.Verify<int>("HashConsistent", Gen.Int, (Func<int, Result<int>>)(v => ResultFactory.Create(value: v)), 100));
 
-    /// <summary>Verifies TryGet extraction using algebraic success/failure partition.</summary>
+    /// <summary>Verifies Match extraction using algebraic success/failure partition for value access.</summary>
     [Theory]
-    [MemberData(nameof(TryGetTestCases))]
-    public void TryGetExtractionBehaviorMatchesResultState(Result<int> result, bool expectedSuccess) =>
-        Assert.Equal(expectedSuccess, result.TryGet(out int extracted));
+    [MemberData(nameof(MatchExtractionTestCases))]
+    public void MatchExtractionBehaviorMatchesResultState(Result<int> result, bool expectedSuccess) =>
+        Assert.Equal(expectedSuccess, result.Match(_ => true, _ => false));
 
-    public static IEnumerable<object[]> TryGetTestCases {
+    public static IEnumerable<object[]> MatchExtractionTestCases {
         get {
             (int value, SystemError error) = Gen.Int.Select(ResultGenerators.SystemErrorGen).Single();
             return [
@@ -75,29 +75,29 @@ public sealed class ResultMonadTests {
         }
     }
 
-    /// <summary>Verifies Reduce accumulation using algebraic handler selection.</summary>
+    /// <summary>Verifies Match accumulation using algebraic handler selection for reduction semantics.</summary>
     [Fact]
-    public void ReduceAccumulationBehaviorAppliesCorrectHandler() => TestGen.RunAll(
+    public void MatchAccumulationBehaviorAppliesCorrectHandler() => TestGen.RunAll(
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((value, seed) =>
-            Assert.Equal(seed + value, ResultFactory.Create(value: value).Reduce(seed, (s, v) => s + v)))),
+            Assert.Equal(seed + value, ResultFactory.Create(value: value).Match(v => seed + v, _ => seed)))),
         () => ResultGenerators.SystemErrorArrayGen.Select(Gen.Int).Run((Action<SystemError[], int>)((errors, seed) =>
             Assert.Equal(seed + errors.Length,
-                ResultFactory.Create<int>(errors: errors).Reduce(seed, (s, v) => s + v, (s, errs) => s + errs.Length)))),
+                ResultFactory.Create<int>(errors: errors).Match(_ => seed, errs => seed + errs.Length)))),
         () => Gen.Int.Run((Action<int>)(seed =>
-            Assert.Equal(seed, ResultFactory.Create<int>(error: TestError).Reduce(seed, (s, v) => s + v)))));
+            Assert.Equal(seed, ResultFactory.Create<int>(error: TestError).Match(v => seed + v, _ => seed)))));
 
-    /// <summary>Verifies Filter using predicate pattern matching and error propagation.</summary>
+    /// <summary>Verifies Ensure using predicate pattern matching and error propagation.</summary>
     [Fact]
-    public void FilterPredicateValidationFiltersCorrectly() => TestGen.RunAll(
+    public void EnsurePredicateValidationFiltersCorrectly() => TestGen.RunAll(
         () => Gen.Int[1, 100].Run((Action<int>)(value =>
-            Assert.True(ResultFactory.Create(value: value).Filter(x => x > 0, TestError).IsSuccess))),
+            Assert.True(ResultFactory.Create(value: value).Ensure(x => x > 0, TestError).IsSuccess))),
         () => Gen.Int[1, 100].Run((Action<int>)(value =>
-            Assert.False(ResultFactory.Create(value: value).Filter(x => x < 0, TestError).IsSuccess))),
+            Assert.False(ResultFactory.Create(value: value).Ensure(x => x < 0, TestError).IsSuccess))),
         () => ResultGenerators.FailureGen<int>().Run((Action<Result<int>>)(result =>
-            Assert.False(result.Filter(x => x > 0, TestError).IsSuccess))),
+            Assert.False(result.Ensure(x => x > 0, TestError).IsSuccess))),
         () => Gen.Int.Run((Action<int>)(value =>
             Assert.Equal(value > 0,
-                ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)).Filter(x => x > 0, TestError).IsSuccess))));
+                ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)).Ensure(x => x > 0, TestError).IsSuccess))));
 
     /// <summary>Verifies Ensure validation using algebraic error accumulation and partition logic.</summary>
     [Fact]
@@ -196,37 +196,37 @@ public sealed class ResultMonadTests {
             Assert.Throws<ObjectDisposedException>(() => result.Value);
         });
 
-    /// <summary>Verifies Apply side effects preserve Result state using algebraic identity preservation.</summary>
+    /// <summary>Verifies Tap side effects preserve Result state using algebraic identity preservation.</summary>
     [Fact]
-    public void ApplyMethodSideEffectsPreservesState() => TestGen.RunAll(
+    public void TapMethodSideEffectsPreservesState() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             int captured = 0;
-            Result<int> result = ResultFactory.Create(value: v).Apply(onSuccess: x => captured = x);
+            Result<int> result = ResultFactory.Create(value: v).Tap(onSuccess: x => captured = x);
             Assert.Equal((v, v, true), (captured, result.Value, result.IsSuccess));
         })),
         () => ResultGenerators.SystemErrorArrayGen.Run((Action<SystemError[]>)(errs => {
             SystemError[]? captured = null;
-            Result<int> result = ResultFactory.Create<int>(errors: errs).Apply(onFailure: e => captured = [.. e]);
+            Result<int> result = ResultFactory.Create<int>(errors: errs).Tap(onFailure: e => captured = [.. e]);
             Assert.Equal((errs.Length, false), (captured!.Length, result.IsSuccess));
         }), 50),
         () => Gen.Bool.Run((Action<bool>)(isSuccess => {
             (bool successCalled, bool failureCalled) = (false, false);
             (isSuccess ? ResultFactory.Create(value: 42) : ResultFactory.Create<int>(error: TestError))
-                .Apply(_ => successCalled = true, _ => failureCalled = true);
+                .Tap(_ => successCalled = true, _ => failureCalled = true);
             Assert.Equal((isSuccess, !isSuccess), (successCalled, failureCalled));
         })));
 
-    /// <summary>Verifies OnError transformation and recovery using algebraic error morphisms.</summary>
+    /// <summary>Verifies OnError transformation and recovery using algebraic error morphisms with explicit overloads.</summary>
     [Fact]
     public void OnErrorErrorHandlingTransformsAndRecovers() {
         (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
         TestGen.RunAll(
             () => {
-                Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError(mapError: _ => [e2]);
+                Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], SystemError[]>)(_ => [e2]));
                 Assert.True(!mapped.IsSuccess && mapped.Errors.Contains(e2) && !mapped.Errors.Contains(e1));
             },
-            () => Assert.Equal(99, ResultFactory.Create<int>(error: e1).OnError(recover: _ => 99).Value),
-            () => Assert.Equal(77, ResultFactory.Create<int>(error: e1).OnError(recoverWith: _ => ResultFactory.Create(value: 77)).Value),
-            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(value: v).OnError(mapError: _ => [e2]).Value)), 50));
+            () => Assert.Equal(99, ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], int>)(_ => 99)).Value),
+            () => Assert.Equal(77, ResultFactory.Create<int>(error: e1).OnError((Func<SystemError[], Result<int>>)(_ => ResultFactory.Create(value: 77))).Value),
+            () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v, ResultFactory.Create(value: v).OnError((Func<SystemError[], SystemError[]>)(_ => [e2])).Value)), 50));
     }
 }

@@ -90,10 +90,14 @@ ResultFactory.Create(error: err)               // ✅ Named parameter for errors
 ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 .Map(x => transform)                           // Functor transform
 .Bind(x => Result<Y>)                          // Monadic chain
-.Apply(Result<Func>)                           // Applicative parallel
-.Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
-.OnError(recover: x => value)                  // ✅ Named recover parameter
-.Traverse(transform)                           // Collection inside Result
+.Ensure(predicate, error: ValidationErrors.X)  // ✅ Validation with named error parameter
+.Match(onSuccess, onFailure)                   // Pattern match exhaustive
+.Tap(onSuccess, onFailure)                     // Side effects, preserves state
+.Apply(Result<Func>)                           // Applicative parallel validation
+.OnError((Func<SystemError[], T>)recover)      // ✅ Explicit overload for recovery
+.OnError((Func<SystemError[], SystemError[]>)map) // ✅ Explicit overload for error mapping
+.OnError((Func<SystemError[], Result<T>>)recovWith) // ✅ Explicit overload for monadic recovery
+.Traverse(transform)                           // Collection traversal with Result
 ```
 
 ### Polymorphic Patterns

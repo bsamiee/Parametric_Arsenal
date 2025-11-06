@@ -46,12 +46,13 @@ public static class UnifiedOperation {
                     ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
                     : r;
 
-            Result<IReadOnlyList<TOut>> compute() => ResultFactory.Create(value: item)
-                .Filter(config.InputFilter ?? (_ => true),
+            Result<TIn> validated = ResultFactory.Create(value: item)
+                .Ensure(config.InputFilter ?? (_ => true),
                     config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
                 .Validate(args: config.ValidationMode is ValidationMode.None ? null :
-                    [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []])
-                .OnError(recover: config.SkipInvalid ? _ => item : null)
+                    [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []]);
+
+            Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError((Func<SystemError[], TIn>)(_ => item)) : validated)
                 .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
                 .Bind(resolveOp)
                 .Map(outputs => config.OutputFilter switch {
