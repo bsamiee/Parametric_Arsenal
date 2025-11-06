@@ -18,7 +18,7 @@ public readonly struct AnalysisMethod : IEquatable<AnalysisMethod> {
     public static readonly AnalysisMethod Proximity = new(6);
     public static readonly AnalysisMethod Metrics = new(7);
     public static readonly AnalysisMethod Domains = new(8);
-    public static readonly AnalysisMethod Comprehensive = new(255);
+    public static readonly AnalysisMethod Comprehensive = new(255);  // 255 = sentinel value for all methods in collection
 
     [Pure] public bool Equals(AnalysisMethod other) => this._value == other._value;
     [Pure] public override bool Equals(object? obj) => obj is AnalysisMethod other && this.Equals(other);

@@ -47,7 +47,7 @@ internal static class AnalysisStrategies {
                             c.PointAt(t),
                             methods.Contains(AnalysisMethod.Derivatives) ? ResultFactory.Create(value: c.DerivativeAt(t, o) ?? []) : ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.DerivativeComputationFailed),
                             methods.Contains(AnalysisMethod.Frame) && c.FrameAt(t, out Plane f) ? ResultFactory.Create(value: f) : ResultFactory.Create<Plane>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-                            methods.Contains(AnalysisMethod.Curvature) && c.CurvatureAt(t) is Vector3d k && k.IsValid ? ResultFactory.Create(value: (0d, 0d, k.Length, 0d, Vector3d.Zero, Vector3d.Zero)) : ResultFactory.Create<(double, double, double, double, Vector3d, Vector3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                            methods.Contains(AnalysisMethod.Curvature) && c.CurvatureAt(t) is Vector3d k && k.IsValid ? ResultFactory.Create(value: (Gaussian: double.NaN, Mean: double.NaN, k.Length, K2: double.NaN, Vector3d.Unset, Vector3d.Unset)) : ResultFactory.Create<(double, double, double, double, Vector3d, Vector3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
                             methods.Contains(AnalysisMethod.Discontinuity) && dc > 0 ? ResultFactory.Create(value: (buffer[..dc].ToArray(), buffer[..dc].Select(dp => c.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous).ToArray())) : ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
                             ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
                             ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
@@ -68,6 +68,7 @@ internal static class AnalysisStrategies {
                             double st = s.Domain(dir).Min;
                             while (dc < MaxDiscontinuities && s.GetNextDiscontinuity(dir, Continuity.C1_continuous, st, s.Domain(dir).Max, out double td)) { buffer[dc++] = td; st = td + context.AbsoluteTolerance; }
                         }
+                        AreaMassProperties? amp = methods.Contains(AnalysisMethod.Metrics) ? AreaMassProperties.Compute(s) : null;
                         return new AnalysisData(
                             s.PointAt(u, v),
                             methods.Contains(AnalysisMethod.Derivatives) && s.Evaluate(u, v, o, out Point3d _, out Vector3d[] d) ? ResultFactory.Create(value: d) : ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.SurfaceEvaluationFailed),
@@ -76,7 +77,7 @@ internal static class AnalysisStrategies {
                             methods.Contains(AnalysisMethod.Discontinuity) && dc > 0 ? ResultFactory.Create(value: (buffer[..dc].ToArray(), buffer[..dc].Select(_ => Continuity.C1_continuous).ToArray())) : ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
                             ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
                             ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
-                            methods.Contains(AnalysisMethod.Metrics) ? ResultFactory.Create(value: (0d, AreaMassProperties.Compute(s)?.Area ?? 0d, 0d, AreaMassProperties.Compute(s)?.Centroid ?? Point3d.Origin)) : ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                            amp is not null ? ResultFactory.Create(value: (0d, amp.Area, 0d, amp.Centroid)) : ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
                             methods.Contains(AnalysisMethod.Domains) ? ResultFactory.Create<Interval[]>(value: [s.Domain(0), s.Domain(1)]) : ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
                             (null, (u, v), null));
                     } finally { pool.Return(buffer, clearArray: true); }
@@ -88,6 +89,7 @@ internal static class AnalysisStrategies {
                     int fIdx = Math.Max(0, Math.Min(p?.Mesh ?? 0, b.Faces.Count - 1));
                     using Surface sf = b.Faces[fIdx].UnderlyingSurface();
                     (double u, double v) = p?.Surface ?? (sf.Domain(0).ParameterAt(0.5), sf.Domain(1).ParameterAt(0.5)); Point3d pt = sf.PointAt(u, v);
+                    (AreaMassProperties? amp, VolumeMassProperties? vmp) = methods.Contains(AnalysisMethod.Metrics) ? (AreaMassProperties.Compute(b), VolumeMassProperties.Compute(b)) : (null, null);
                     return new AnalysisData(
                         pt,
                         methods.Contains(AnalysisMethod.Derivatives) && sf.Evaluate(u, v, o, out Point3d _, out Vector3d[] d) ? ResultFactory.Create(value: d) : ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.SurfaceEvaluationFailed),
@@ -96,7 +98,7 @@ internal static class AnalysisStrategies {
                         ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
                         methods.Contains(AnalysisMethod.Topology) ? ResultFactory.Create(value: (b.Vertices.Select((v, i) => (i, v.Location)).ToArray(), b.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))).ToArray(), b.IsManifold, b.IsSolid)) : ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
                         methods.Contains(AnalysisMethod.Proximity) && b.ClosestPoint(pt, out Point3d cp, out ComponentIndex _, out double _, out double _, context.AbsoluteTolerance * 100, out Vector3d _) ? ResultFactory.Create(value: (cp, pt.DistanceTo(cp))) : ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
-                        methods.Contains(AnalysisMethod.Metrics) ? ResultFactory.Create(value: (0d, AreaMassProperties.Compute(b)?.Area ?? 0d, VolumeMassProperties.Compute(b)?.Volume ?? 0d, VolumeMassProperties.Compute(b)?.Centroid ?? Point3d.Origin)) : ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                        (amp, vmp) switch { (AreaMassProperties a, VolumeMassProperties vol) => ResultFactory.Create(value: (0d, a.Area, vol.Volume, vol.Centroid)), _ => ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry) },
                         ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
                         (null, (u, v), fIdx));
                 }),
@@ -105,6 +107,7 @@ internal static class AnalysisStrategies {
                 .Validate(args: [context, _validationConfig.GetValueOrDefault(typeof(Mesh), ValidationMode.MeshSpecific)])
                 .Map(m => {
                     int vIdx = Math.Max(0, Math.Min(p?.Mesh ?? 0, m.Vertices.Count - 1));
+                    (AreaMassProperties? amp, VolumeMassProperties? vmp) = methods.Contains(AnalysisMethod.Metrics) ? (AreaMassProperties.Compute(m), VolumeMassProperties.Compute(m)) : (null, null);
                     return new AnalysisData(
                         m.Vertices[vIdx],
                         ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.DerivativeComputationFailed),
@@ -113,7 +116,7 @@ internal static class AnalysisStrategies {
                         ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
                         methods.Contains(AnalysisMethod.Topology) ? ResultFactory.Create(value: (Enumerable.Range(0, m.TopologyVertices.Count).Select(i => (i, (Point3d)m.TopologyVertices[i])).ToArray(), Enumerable.Range(0, m.TopologyEdges.Count).Select(i => (i, m.TopologyEdges.EdgeLine(i))).ToArray(), m.IsManifold(topologicalTest: true, out bool _, out bool _), m.IsClosed)) : ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
                         methods.Contains(AnalysisMethod.Proximity) && m.ClosestMeshPoint(m.Vertices[vIdx], context.AbsoluteTolerance * 100) is MeshPoint mp ? ResultFactory.Create(value: (m.PointAt(mp), 0d)) : ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
-                        methods.Contains(AnalysisMethod.Metrics) ? ResultFactory.Create(value: (0d, AreaMassProperties.Compute(m)?.Area ?? 0d, VolumeMassProperties.Compute(m)?.Volume ?? 0d, Point3d.Origin)) : ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                        (amp, vmp) switch { (AreaMassProperties a, VolumeMassProperties vol) => ResultFactory.Create(value: (0d, a.Area, vol.Volume, Point3d.Origin)), _ => ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry) },
                         methods.Contains(AnalysisMethod.Domains) ? ResultFactory.Create<Interval[]>(value: [new Interval(0, m.Vertices.Count)]) : ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
                         (null, null, vIdx));
                 }),
