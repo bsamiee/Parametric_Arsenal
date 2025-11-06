@@ -12,6 +12,8 @@ namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
 internal static class AnalysisCompute {
+    private const int MaxDiscontinuities = 20;
+
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (ValidationMode Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         new Dictionary<Type, (ValidationMode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
@@ -21,10 +23,10 @@ internal static class AnalysisCompute {
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
                         ArrayPool<double> pool = ArrayPool<double>.Shared;
-                        double[] buffer = pool.Rent(20);
+                        double[] buffer = pool.Rent(MaxDiscontinuities);
                         try {
                             (int discCount, double s) = (0, cv.Domain.Min);
-                            while (discCount < 20 && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                            while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
                                 buffer[discCount++] = td;
                                 s = td + ctx.AbsoluteTolerance;
                             }
@@ -40,7 +42,7 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount]],
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
-                                    amp.Centroid))
+                                    amp.Centroid,))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
@@ -53,10 +55,10 @@ internal static class AnalysisCompute {
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
                         ArrayPool<double> pool = ArrayPool<double>.Shared;
-                        double[] buffer = pool.Rent(20);
+                        double[] buffer = pool.Rent(MaxDiscontinuities);
                         try {
                             (int discCount, double s) = (0, cv.Domain.Min);
-                            while (discCount < 20 && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                            while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
                                 buffer[discCount++] = td;
                                 s = td + ctx.AbsoluteTolerance;
                             }
@@ -72,7 +74,7 @@ internal static class AnalysisCompute {
                                     [.. buffer[..discCount]],
                                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                                     cv.GetLength(),
-                                    amp.Centroid))
+                                    amp.Centroid,))
                                 : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.CurveAnalysisFailed);
                         } finally {
                             pool.Return(buffer, clearArray: true);
@@ -87,6 +89,7 @@ internal static class AnalysisCompute {
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
                         return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && sf.FrameAt(u, v, out Plane frame)
                             ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
+                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed)
                                 .Map(sc => (Analysis.IResult)new Analysis.SurfaceData(
                                     sf.PointAt(u, v),
                                     derivs,
@@ -97,10 +100,11 @@ internal static class AnalysisCompute {
                                     sc.Direction(0),
                                     sc.Direction(1),
                                     frame,
+                                    frame.Normal,
                                     sf.IsAtSeam(u, v) != 0,
                                     sf.IsAtSingularity(u, v, exact: true),
                                     amp.Area,
-                                    amp.Centroid))
+                                    amp.Centroid,))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
@@ -112,6 +116,7 @@ internal static class AnalysisCompute {
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
                         return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && sf.FrameAt(u, v, out Plane frame)
                             ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
+                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed)
                                 .Map(sc => (Analysis.IResult)new Analysis.SurfaceData(
                                     sf.PointAt(u, v),
                                     derivs,
@@ -122,10 +127,11 @@ internal static class AnalysisCompute {
                                     sc.Direction(0),
                                     sc.Direction(1),
                                     frame,
+                                    frame.Normal,
                                     sf.IsAtSeam(u, v) != 0,
                                     sf.IsAtSingularity(u, v, exact: true),
                                     amp.Area,
-                                    amp.Centroid))
+                                    amp.Centroid,))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.SurfaceAnalysisFailed);
                     })),
 
@@ -140,6 +146,7 @@ internal static class AnalysisCompute {
                         (AreaMassProperties? amp, VolumeMassProperties? vmp) = (AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep));
                         return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && amp is not null && vmp is not null && sf.FrameAt(u, v, out Plane frame) && brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
                             ? ResultFactory.Create(value: sf.CurvatureAt(u, v))
+                                .Filter(sc => sc.IsDefined, error: AnalysisErrors.Evaluation.BrepAnalysisFailed)
                                 .Map(sc => (Analysis.IResult)new Analysis.BrepData(
                                     sf.PointAt(u, v),
                                     derivs,
@@ -150,6 +157,7 @@ internal static class AnalysisCompute {
                                     sc.Direction(0),
                                     sc.Direction(1),
                                     frame,
+                                    frame.Normal,
                                     [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
                                     [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
                                     brep.IsManifold,
@@ -160,7 +168,7 @@ internal static class AnalysisCompute {
                                     (uOut, vOut),
                                     amp.Area,
                                     vmp.Volume,
-                                    vmp.Centroid))
+                                    vmp.Centroid,))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.BrepAnalysisFailed);
                     })),
 
@@ -169,17 +177,19 @@ internal static class AnalysisCompute {
                     .Validate(args: [ctx, ValidationMode.MeshSpecific])
                     .Bind(mesh => {
                         int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
+                        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
                         (AreaMassProperties? amp, VolumeMassProperties? vmp) = (AreaMassProperties.Compute(mesh), VolumeMassProperties.Compute(mesh));
                         return amp is not null && vmp is not null
                             ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
                                 mesh.Vertices[vIdx],
-                                new Plane(mesh.Vertices[vIdx], mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis),
+                                new Plane(mesh.Vertices[vIdx], normal),
+                                normal,
                                 [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
                                 [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
                                 mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
                                 mesh.IsClosed,
                                 amp.Area,
-                                vmp.Volume))
+                                vmp.Volume,))
                             : ResultFactory.Create<Analysis.IResult>(error: AnalysisErrors.Evaluation.MeshAnalysisFailed);
                     })),
         }.ToFrozenDictionary();
