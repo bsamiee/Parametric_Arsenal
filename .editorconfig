@@ -877,3 +877,6 @@ indent_size = 2                                                                #
 
 [*.md]
 trim_trailing_whitespace = false                                               # Keep markdown trailing spaces
+
+[test/shared/**/*.cs]
+dotnet_diagnostic.CA1515.severity = none                                       # Shared test utilities
