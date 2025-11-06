@@ -13,16 +13,30 @@ public static class Extract {
     /// <summary>Semantic extraction marker for parameterless methods.</summary>
     public readonly struct Semantic(byte kind) {
         internal readonly byte Kind = kind;
+
+        /// <summary>Extracts mass property centroids and characteristic points (vertices, corners, midpoints).</summary>
         public static readonly Semantic Analytical = new(1);
+
+        /// <summary>Extracts geometric extrema (curve endpoints, surface domain corners, bounding box corners).</summary>
         public static readonly Semantic Extremal = new(2);
+
+        /// <summary>Extracts Greville points from NURBS curves and surfaces.</summary>
         public static readonly Semantic Greville = new(3);
+
+        /// <summary>Extracts inflection points from curves where curvature changes sign.</summary>
         public static readonly Semantic Inflection = new(4);
+
+        /// <summary>Extracts quadrant points from circular and elliptical curves.</summary>
         public static readonly Semantic Quadrant = new(5);
+
+        /// <summary>Extracts edge midpoints from Brep, Mesh, and polycurve topology.</summary>
         public static readonly Semantic EdgeMidpoints = new(6);
+
+        /// <summary>Extracts face centroids from Brep and Mesh topology.</summary>
         public static readonly Semantic FaceCentroids = new(7);
     }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : notnull =>
+    public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
         spec switch {
             int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidCount),
             double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidLength),
@@ -32,11 +46,8 @@ public static class Extract {
             int or double or (int, bool) or (double, bool) or Vector3d or Continuity or Semantic =>
                 UnifiedOperation.Apply(
                     input,
-                    (Func<object, Result<IReadOnlyList<Point3d>>>)(item => item switch {
-                        GeometryBase g => ExtractionCore.Execute(g, spec, context),
-                        _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ValidationErrors.Geometry.Invalid),
-                    }),
-                    new OperationConfig<object, Point3d> { Context = context, ValidationMode = ValidationMode.None }),
+                    (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
+                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = ValidationMode.None }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod),
         };
 }
