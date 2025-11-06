@@ -2,50 +2,51 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Hierarchical validation error factory with consistent error codes.</summary>
+/// <summary>Hierarchical validation error factory with consistent error codes - aliases for backward compatibility.</summary>
+[Obsolete("Use ErrorFactory.Validation instead", error: false)]
 public static class ValidationErrors {
     /// <summary>Geometry validation errors (3000-3999).</summary>
     public static class Geometry {
-        public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3000, "Geometry must be valid");
+        public static readonly SystemError Invalid = ErrorFactory.Validation.GeometryInvalid();
 
         /// <summary>Curve validation errors (3100-3199).</summary>
         public static class Curve {
-            public static readonly SystemError NotClosedOrPlanar = new(ErrorDomain.Validation, 3100, "Curve must be closed and planar for area centroid");
+            public static readonly SystemError NotClosedOrPlanar = ErrorFactory.Validation.CurveNotClosedOrPlanar();
         }
 
         /// <summary>Bounding box validation errors (3200-3299).</summary>
         public static class BoundingBox {
-            public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3200, "Bounding box is invalid");
+            public static readonly SystemError Invalid = ErrorFactory.Validation.BoundingBoxInvalid();
         }
 
         /// <summary>Mass properties validation errors (3300-3399).</summary>
         public static class Properties {
-            public static readonly SystemError ComputationFailed = new(ErrorDomain.Validation, 3300, "Mass properties computation failed");
+            public static readonly SystemError ComputationFailed = ErrorFactory.Validation.MassPropertiesComputationFailed();
         }
 
         /// <summary>Topology validation errors (3400-3499).</summary>
         public static class Topology {
-            public static readonly SystemError InvalidTopology = new(ErrorDomain.Validation, 3400, "Geometry has invalid topology");
+            public static readonly SystemError InvalidTopology = ErrorFactory.Validation.InvalidTopology();
         }
 
         /// <summary>Degeneracy validation errors (3500-3599).</summary>
         public static class Degeneracy {
-            public static readonly SystemError DegenerateGeometry = new(ErrorDomain.Validation, 3500, "Geometry is degenerate");
+            public static readonly SystemError DegenerateGeometry = ErrorFactory.Validation.DegenerateGeometry();
         }
 
         /// <summary>Self-intersection validation errors (3600-3699).</summary>
         public static class SelfIntersection {
-            public static readonly SystemError SelfIntersecting = new(ErrorDomain.Validation, 3600, "Geometry is self-intersecting");
+            public static readonly SystemError SelfIntersecting = ErrorFactory.Validation.SelfIntersecting();
         }
 
         /// <summary>Mesh-specific validation errors (3700-3799).</summary>
         public static class MeshTopology {
-            public static readonly SystemError NonManifoldEdges = new(ErrorDomain.Validation, 3700, "Mesh has non-manifold edges");
+            public static readonly SystemError NonManifoldEdges = ErrorFactory.Validation.NonManifoldEdges();
         }
 
         /// <summary>Surface continuity validation errors (3800-3899).</summary>
         public static class Continuity {
-            public static readonly SystemError PositionalDiscontinuity = new(ErrorDomain.Validation, 3800, "Surface has positional discontinuity (G0)");
+            public static readonly SystemError PositionalDiscontinuity = ErrorFactory.Validation.PositionalDiscontinuity();
         }
     }
 
@@ -53,17 +54,17 @@ public static class ValidationErrors {
     public static class Context {
         /// <summary>Tolerance validation errors (3900-3919).</summary>
         public static class Tolerance {
-            public static readonly SystemError InvalidAbsolute = new(ErrorDomain.Validation, 3900, "Absolute tolerance must be greater than zero");
-            public static readonly SystemError InvalidRelative = new(ErrorDomain.Validation, 3901, "Relative tolerance must be in range [0,1)");
-            public static readonly SystemError InvalidAngle = new(ErrorDomain.Validation, 3902, "Angle tolerance must be in range (0, 2π]");
-            public static readonly SystemError ToleranceExceeded = new(ErrorDomain.Validation, 3903, "Geometry exceeds tolerance threshold");
+            public static readonly SystemError InvalidAbsolute = ErrorFactory.Validation.InvalidAbsoluteTolerance();
+            public static readonly SystemError InvalidRelative = ErrorFactory.Validation.InvalidRelativeTolerance();
+            public static readonly SystemError InvalidAngle = ErrorFactory.Validation.InvalidAngleTolerance();
+            public static readonly SystemError ToleranceExceeded = ErrorFactory.Validation.ToleranceExceeded();
         }
-        public static readonly SystemError InvalidUnitConversion = new(ErrorDomain.Validation, 3920, "Invalid unit conversion scale");
+        public static readonly SystemError InvalidUnitConversion = ErrorFactory.Validation.InvalidUnitConversion();
     }
 
     /// <summary>Operation validation errors (4000-4099).</summary>
     public static class Operations {
-        public static readonly SystemError UnsupportedOperationType = new(ErrorDomain.Validation, 4000, "Unsupported operation type");
-        public static readonly SystemError InputFiltered = new(ErrorDomain.Validation, 4001, "Input filtered");
+        public static readonly SystemError UnsupportedOperationType = ErrorFactory.Validation.UnsupportedOperationType();
+        public static readonly SystemError InputFiltered = ErrorFactory.Validation.InputFiltered();
     }
 }

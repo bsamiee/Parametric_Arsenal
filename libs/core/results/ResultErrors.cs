@@ -2,18 +2,19 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Result system errors (1000-1999).</summary>
+/// <summary>Result system errors (1000-1999) - aliases for backward compatibility.</summary>
+[Obsolete("Use ErrorFactory.Results instead", error: false)]
 public static class ResultErrors {
     /// <summary>Result creation and manipulation errors (1000-1099).</summary>
     internal static class Factory {
-        public static readonly SystemError NoValueProvided = new(ErrorDomain.Results, 1001, "No value provided");
-        public static readonly SystemError InvalidCreateParameters = new(ErrorDomain.Results, 1002, "Invalid Create parameters");
-        public static readonly SystemError InvalidValidateParameters = new(ErrorDomain.Results, 1003, "Invalid validation parameters");
-        public static readonly SystemError InvalidLiftParameters = new(ErrorDomain.Results, 1004, "Invalid Lift parameters");
+        public static readonly SystemError NoValueProvided = ErrorFactory.Results.NoValueProvided();
+        public static readonly SystemError InvalidCreateParameters = ErrorFactory.Results.InvalidCreateParameters();
+        public static readonly SystemError InvalidValidateParameters = ErrorFactory.Results.InvalidValidateParameters();
+        public static readonly SystemError InvalidLiftParameters = ErrorFactory.Results.InvalidLiftParameters();
     }
 
     /// <summary>State access errors (1100-1199).</summary>
     internal static class State {
-        public static readonly SystemError InvalidAccess = new(ErrorDomain.Results, 1100, "Cannot access value in error state or error in success state");
+        public static readonly SystemError InvalidAccess = ErrorFactory.Results.InvalidAccess();
     }
 }

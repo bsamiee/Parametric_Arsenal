@@ -1,3 +1,4 @@
+using Arsenal.Core.Errors;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -155,7 +156,7 @@ public static class Intersect {
                                       [.. from pl in sections from pt in pl select pt],
                                       [], [], [], [],
                                       [.. sections])),
-                    null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                    null => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                     _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                 };
 
@@ -163,7 +164,7 @@ public static class Intersect {
 
             return (a, b, opts) switch {
                 (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.InvalidProjectionDirection()),
                 (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, ctx.AbsoluteTolerance, out int[] ids1)],
@@ -173,7 +174,7 @@ public static class Intersect {
                         [.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, ctx.AbsoluteTolerance)],
                         [], [], [], [], [])),
                 (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.InvalidProjectionDirection()),
                 (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, ctx.AbsoluteTolerance, out int[] ids2)],
@@ -183,9 +184,9 @@ public static class Intersect {
                         [.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, ctx.AbsoluteTolerance)],
                         [], [], [], [], [])),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when ray.Direction.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidRayDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.InvalidRayDirection()),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when hits <= 0 =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidMaxHitCount),
+                    ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.InvalidMaxHitCount()),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
@@ -223,7 +224,7 @@ public static class Intersect {
                         Line[] { Length: > 0 } lines => ResultFactory.Create(value: new IntersectionOutput(
                             [.. from l in lines select l.From, .. from l in lines select l.To],
                             [], [], [], [], [])),
-                        null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        null => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Mesh ma, Mesh mb, { Sorted: true }) =>
@@ -240,26 +241,26 @@ public static class Intersect {
                     RhinoIntersect.MeshLine(ma, lb) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], [], [])),
-                        null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        null => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Mesh ma, Line lb, { Sorted: true }) =>
                     RhinoIntersect.MeshLineSorted(ma, lb, out int[] ids3) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids3.Length > 0 ? [.. ids3] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                     },
                 (Mesh ma, PolylineCurve pc, { Sorted: false }) =>
                     RhinoIntersect.MeshPolyline(ma, pc, out int[] ids4) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids4.Length > 0 ? [.. ids4] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                     },
                 (Mesh ma, PolylineCurve pc, { Sorted: true }) =>
                     RhinoIntersect.MeshPolylineSorted(ma, pc, out int[] ids5) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids5.Length > 0 ? [.. ids5] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.ComputationFailed()),
                     },
                 (Line la, Line lb, _) =>
                     RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false) switch {
@@ -337,7 +338,7 @@ public static class Intersect {
                     fromCountedPoints((int)RhinoIntersect.CircleCircle(ca, cb, out Point3d ccp1, out Point3d ccp2), ccp1, ccp2, tolerance),
                 (Arc aa, Arc ab, _) =>
                     fromCountedPoints((int)RhinoIntersect.ArcArc(aa, ab, out Point3d aap1, out Point3d aap2), aap1, aap2, tolerance),
-                _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.UnsupportedMethod),
+                _ => ResultFactory.Create<IntersectionOutput>(error: ErrorFactory.Intersection.UnsupportedMethod()),
             };
         }
     }

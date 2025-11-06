@@ -1,3 +1,4 @@
+using Arsenal.Core.Errors;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -54,7 +55,7 @@ internal static class ExtractionCore {
 #pragma warning restore IDE0004
 
         if (kind is 0) {
-            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);
+            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorFactory.Extraction.InvalidMethod());
         }
 
         (GeometryBase normalized, bool shouldDispose) = geometry switch {

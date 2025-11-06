@@ -2,28 +2,24 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Error codes for point extraction operations with Rhino geometry integration.</summary>
+/// <summary>Error codes for point extraction operations with Rhino geometry integration - aliases for backward compatibility.</summary>
+[Obsolete("Use ErrorFactory.Extraction instead", error: false)]
 public static class ExtractionErrors {
     /// <summary>Operation-level extraction errors for geometry processing failures.</summary>
     public static class Operation {
         /// <summary>Extraction method not supported for target geometry type.</summary>
-        public static readonly SystemError InvalidMethod =
-            new(ErrorDomain.Geometry, 2000, "Invalid extraction method specified");
+        public static readonly SystemError InvalidMethod = ErrorFactory.Extraction.InvalidMethod();
 
         /// <summary>Required parameters missing for selected extraction method.</summary>
-        public static readonly SystemError InsufficientParameters =
-            new(ErrorDomain.Geometry, 2001, "Insufficient parameters for extraction operation");
+        public static readonly SystemError InsufficientParameters = ErrorFactory.Extraction.InsufficientParameters();
 
         /// <summary>Count parameter must be positive for uniform extraction.</summary>
-        public static readonly SystemError InvalidCount =
-            new(ErrorDomain.Geometry, 2002, "Count parameter must be positive");
+        public static readonly SystemError InvalidCount = ErrorFactory.Extraction.InvalidCount();
 
         /// <summary>Length parameter must exceed tolerance for uniform extraction.</summary>
-        public static readonly SystemError InvalidLength =
-            new(ErrorDomain.Geometry, 2003, "Length parameter must be greater than zero tolerance");
+        public static readonly SystemError InvalidLength = ErrorFactory.Extraction.InvalidLength();
 
         /// <summary>Direction parameter required for positional extrema extraction.</summary>
-        public static readonly SystemError InvalidDirection =
-            new(ErrorDomain.Geometry, 2004, "Direction parameter required for positional extrema");
+        public static readonly SystemError InvalidDirection = ErrorFactory.Extraction.InvalidDirection();
     }
 }
