@@ -10,6 +10,7 @@ namespace Arsenal.Rhino.Tests.Spatial;
 /// Demonstrates algebraic patterns: pattern matching, monadic composition, polymorphic dispatch.
 /// </summary>
 [TestFixture]
+#pragma warning disable CA1515 // Test fixture must be public for NUnit to discover it
 public sealed class SpatialEngineTests : RhinoTestFixture {
 
     private static readonly IGeometryContext Context = GeometryContext.CreateWithDefaults(UnitSystem.Millimeters).Value;
@@ -52,11 +53,10 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
     [Test, TestCaseSource(nameof(SpatialRangeTestCases))]
     public void SpatialRangeQueryReturnsExpectedIndices(Point3d[] points, Sphere queryShape, int expectedCount) {
         // Act - monadic composition with pattern matching
-        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
-            input: points,
-            method: SpatialMethod.PointsRange,
-            context: Context,
-            queryShape: queryShape
+        Result<IReadOnlyList<int>> result = SpatialAnalyzer.Analyze(
+            source: points,
+            query: queryShape,
+            context: Context
         );
 
         // Assert - pattern match on Result monad
@@ -95,12 +95,10 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
     [Test, TestCaseSource(nameof(ProximityTestCases))]
     public void SpatialProximityFindsNearestNeighbors(Point3d[] points, Point3d needle, int k, int expectedCount) {
         // Act
-        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
-            input: points,
-            method: SpatialMethod.PointsProximity,
-            context: Context,
-            needles: [needle],
-            k: k
+        Result<IReadOnlyList<int>> result = SpatialAnalyzer.Analyze(
+            source: points,
+            query: (needle, k),
+            context: Context
         );
 
         // Assert - algebraic pattern matching
@@ -124,10 +122,10 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
 
         // Pattern match over different error scenarios
         (string Name, Func<Result<IReadOnlyList<int>>> Operation)[] errorScenarios = [
-            ("Invalid K value (<=0)", () => SpatialEngine.Index(
-                points, SpatialMethod.PointsProximity, Context, needles: [Point3d.Origin], k: 0)),
-            ("Invalid distance value (<=0)", () => SpatialEngine.Index(
-                points, SpatialMethod.PointsProximity, Context, needles: [Point3d.Origin], k: 1, limitDistance: -5)),
+            ("Invalid K value (<=0)", () => SpatialAnalyzer.Analyze(
+                points, (Point3d.Origin, 0), Context)),
+            ("Invalid distance value (<=0)", () => SpatialAnalyzer.Analyze(
+                points, (Point3d.Origin, -5.0), Context)),
         ];
 
         foreach ((string Name, Func<Result<IReadOnlyList<int>>> Operation) in errorScenarios) {
@@ -148,16 +146,14 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
     /// <summary>Test geometry-based spatial queries (polymorphic dispatch).</summary>
     [Test]
     public void SpatialEngineGeometryInputHandlesPolymorphically() {
-        // Arrange - create test geometry
-        using LineCurve curve = new(new Point3d(0, 0, 0), new Point3d(100, 0, 0));
-        Point3d[] points = [.. Enumerable.Range(0, 20).Select(i => new Point3d(i * 5, i * 5, 0))];
+        // Arrange - create test curves array
+        Curve[] curves = [.. Enumerable.Range(0, 20).Select(i => (Curve)new LineCurve(new Point3d(i * 5, i * 5, 0), new Point3d((i * 5) + 10, i * 5, 0)))];
 
-        // Act - polymorphic dispatch on GeometryBase
-        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
-            input: curve,
-            method: SpatialMethod.CurveRange,
-            context: Context,
-            queryShape: new Sphere(new Point3d(50, 0, 0), 10)
+        // Act - polymorphic dispatch on Curve[]
+        Result<IReadOnlyList<int>> result = SpatialAnalyzer.Analyze(
+            source: curves,
+            query: new Sphere(new Point3d(50, 50, 0), 15),
+            context: Context
         );
 
         // Assert - pattern match on result
@@ -186,11 +182,10 @@ public sealed class SpatialEngineTests : RhinoTestFixture {
         Sphere queryShape = new(new Point3d(0.5, 0.5, 0.5), 2);
 
         // Act - polymorphic collection handling with monadic traversal
-        Result<IReadOnlyList<int>> result = SpatialEngine.Index(
-            input: collections,
-            method: SpatialMethod.PointsRange,
-            context: Context,
-            queryShape: queryShape
+        Result<IReadOnlyList<int>> result = SpatialAnalyzer.Analyze(
+            source: collections,
+            query: queryShape,
+            context: Context
         );
 
         // Assert

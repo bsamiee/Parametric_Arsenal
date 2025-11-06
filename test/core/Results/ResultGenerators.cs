@@ -7,6 +7,7 @@ using CsCheck;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic generators using zero-allocation static lambdas, inline type dispatch, and modern C# patterns.</summary>
+#pragma warning disable CA1515 // Test helpers used by other test files in this project
 public static class ResultGenerators {
     /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
     public static Gen<SystemError> SystemErrorGen =>
