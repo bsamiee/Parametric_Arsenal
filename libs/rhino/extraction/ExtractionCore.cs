@@ -11,8 +11,8 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Internal extraction algorithms with Rhino SDK geometry processing.</summary>
 internal static class ExtractionCore {
-    private static readonly FrozenDictionary<(byte, Type), ValidationMode> _validationConfig =
-        new Dictionary<(byte, Type), ValidationMode> {
+    private static readonly FrozenDictionary<(byte, Type), V> _validationConfig =
+        new Dictionary<(byte, Type), V> {
             [(1, typeof(GeometryBase))] = V.Standard,
             [(1, typeof(Brep))] = V.Standard | V.MassProperties,
             [(1, typeof(Curve))] = V.Standard | V.AreaCentroid,
@@ -64,7 +64,7 @@ internal static class ExtractionCore {
         };
 
         try {
-            ValidationMode mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ValidationMode exact) ? exact :
+            V mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out V exact) ? exact :
                 _validationConfig.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(normalized.GetType()))
                     .OrderByDescending(kv => kv.Key.Item2, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                     .Select(kv => kv.Value)

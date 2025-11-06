@@ -15,8 +15,8 @@ internal static class AnalysisCompute {
     private const int MaxDiscontinuities = 20;
 
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
-    private static readonly FrozenDictionary<Type, (ValidationMode Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
-        new Dictionary<Type, (ValidationMode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
+    private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
+        new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
             [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                 ResultFactory.Create(value: (Curve)g)
                     .Validate(args: [ctx, V.Standard | V.Degeneracy])

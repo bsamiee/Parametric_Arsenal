@@ -64,17 +64,17 @@ public static class E {
 
     /// <summary>Geometry operation errors (2000-2999).</summary>
     public static class Geometry {
-        public static SystemError InvalidExtraction => At(2000);
+        public static SystemError InvalidMethod => At(2000);
         public static SystemError InsufficientParameters => At(2001);
         public static SystemError InvalidCount => At(2002);
         public static SystemError InvalidLength => At(2003);
         public static SystemError InvalidDirection => At(2004);
-        public static SystemError UnsupportedIntersection => At(2200);
-        public static SystemError IntersectionFailed => At(2201);
-        public static SystemError InvalidProjection => At(2202);
-        public static SystemError InvalidRay => At(2204);
-        public static SystemError InvalidMaxHits => At(2205);
-        public static SystemError UnsupportedAnalysis => At(2300);
+        public static SystemError UnsupportedMethod => At(2200);
+        public static SystemError ComputationFailed => At(2201);
+        public static SystemError InvalidProjectionDirection => At(2202);
+        public static SystemError InvalidRayDirection => At(2204);
+        public static SystemError InvalidMaxHitCount => At(2205);
+        public static SystemError UnsupportedGeometry => At(2300);
         public static SystemError CurveAnalysisFailed => At(2310);
         public static SystemError SurfaceAnalysisFailed => At(2311);
         public static SystemError BrepAnalysisFailed => At(2312);

@@ -48,8 +48,8 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        ValidationMode mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out ValidationMode m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out ValidationMode m2) ? m2
+        V mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V m1) ? m1
+            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V m2) ? m2
             : V.None;
 
         return UnifiedOperation.Apply(
@@ -74,8 +74,8 @@ public static class Intersect {
     }
 
     private static class IntersectionCore {
-        internal static readonly FrozenDictionary<(Type, Type), ValidationMode> _validationConfig =
-            new Dictionary<(Type, Type), ValidationMode> {
+        internal static readonly FrozenDictionary<(Type, Type), V> _validationConfig =
+            new Dictionary<(Type, Type), V> {
                 [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,
                 [(typeof(Curve), typeof(Surface))] = V.Standard,
                 [(typeof(Curve), typeof(Brep))] = V.Standard | V.Topology,
