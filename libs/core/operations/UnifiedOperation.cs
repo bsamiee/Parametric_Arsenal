@@ -50,7 +50,7 @@ public static class UnifiedOperation {
             Result<TIn> validated = ResultFactory.Create(value: item)
                 .Ensure(config.InputFilter ?? (_ => true),
                     config.ErrorPrefix is null ? ErrorFactory.Create(code: 4001) : ErrorFactory.Create(code: 4001, context: config.ErrorPrefix))
-                .Validate(args: config.ValidationMode is Modes.None ? null :
+                .Validate(args: config.ValidationMode == Modes.None ? null :
                     [config.Context, config.ValidationMode, .. config.ValidationArgs ?? [],]);
 
             Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError(_ => item) : validated)

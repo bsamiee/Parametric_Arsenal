@@ -220,5 +220,5 @@ internal static class AnalysisCompute {
                     .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
                 : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
                 .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
-            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: ErrorFactory.Create(code: 2300).WithContext(geometry.GetType().Name));
+            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: ErrorFactory.Create(code: 2300, context: geometry.GetType().Name));
 }

@@ -46,7 +46,7 @@ public static class ErrorFactory {
             [4001] = (ErrorDomain.Validation, "Input filtered"),
             [4002] = (ErrorDomain.Geometry, "K-nearest neighbor count must be positive"),
             [4003] = (ErrorDomain.Geometry, "Distance limit must be positive"),
-            [4004] = (ErrorDomain.Validation, "Input and query type combination not supported"),
+            [4004] = (ErrorDomain.Geometry, "Input and query type combination not supported"),
             [4005] = (ErrorDomain.Geometry, "Proximity search operation failed"),
             [5000] = (ErrorDomain.Diagnostics, "Diagnostic capture failed"),
         }.ToFrozenDictionary();
