@@ -68,7 +68,9 @@ public static class Diagnostics {
         [CallerFilePath] string callerFile = "",
         [CallerLineNumber] int callerLine = 0) {
 #if DEBUG
-        (Activity? activity, long startBytes, Stopwatch stopwatch) = (_activitySource.StartActivity(operation), GC.GetAllocatedBytesForCurrentThread(), Stopwatch.StartNew());
+        long startBytes = GC.GetAllocatedBytesForCurrentThread();
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        Activity? activity = _activitySource.StartActivity(operation);
         _ = result.IsSuccess;
         stopwatch.Stop();
         (long allocated, DiagnosticContext ctx) = (GC.GetAllocatedBytesForCurrentThread() - startBytes,
