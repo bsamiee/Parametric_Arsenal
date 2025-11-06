@@ -147,11 +147,11 @@ internal static class ExtractionCore {
                         e.Center - (e.Plane.XAxis * e.Radius1),
                         e.Center - (e.Plane.YAxis * e.Radius2),
                     ],
-                (Curve crv, double tol) when crv.TryGetPolyline(out Polyline pl) => [.. pl,],
-                (Curve crv, double tol) when crv.IsLinear(tol) => [crv.PointAtStart, crv.PointAtEnd,],
+                (Curve crv, double tol) when crv.TryGetPolyline(out Polyline pl) => [.. pl],
+                (Curve crv, double tol) when crv.IsLinear(tol) => [crv.PointAtStart, crv.PointAtEnd],
                 _ => [],
             },
-            (6, Brep b, _) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5)),],
+            (6, Brep b, _) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))],
             (6, Mesh m, _) => [.. Enumerable.Range(0, m.TopologyEdges.Count)
                 .Select(i => m.TopologyEdges.EdgeLine(i))
                 .Where(static ln => ln.IsValid)
@@ -176,7 +176,7 @@ internal static class ExtractionCore {
                 .Where(static pt => pt.IsValid),
             ],
             (10, Curve c, int count) => c.DivideByCount(count, includeEnds) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (10, Surface s, int d) => (s.Domain(0), s.Domain(1), s) switch {
@@ -190,11 +190,11 @@ internal static class ExtractionCore {
                 _ => [],
             },
             (11, Curve c, double length) => c.DivideByLength(length, includeEnds) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (12, Curve c, Vector3d dir) => c.ExtremeParameters(dir) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (13, Curve c, Continuity cont) => ((Func<List<Point3d>>)(() => {
@@ -205,7 +205,7 @@ internal static class ExtractionCore {
                     t0 = t;
                 }
                 return pts;
-            }))() switch { { Count: > 0 } list => [.. list,], _ => [], },
+            }))() switch { { Count: > 0 } list => [.. list], _ => [], },
             _ => [],
         };
 }
