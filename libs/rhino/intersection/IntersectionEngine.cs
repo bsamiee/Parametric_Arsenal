@@ -32,11 +32,11 @@ public static class IntersectionEngine {
                     new OperationConfig<object, IntersectionResult> { Context = context, ValidationMode = ValidationMode.None, AccumulateErrors = true, })
                 .Map(results => (
                     (IReadOnlyList<Point3d>)[.. results.SelectMany(r => r.Points)],
-                    [.. results.SelectMany(r => r.Curves ?? [])] is { Count: > 0 } curves ? (IReadOnlyList<Curve>?)curves : null,
-                    [.. results.SelectMany(r => r.ParametersA ?? [])] is { Count: > 0 } paramsA ? (IReadOnlyList<double>?)paramsA : null,
-                    [.. results.SelectMany(r => r.ParametersB ?? [])] is { Count: > 0 } paramsB ? (IReadOnlyList<double>?)paramsB : null,
-                    [.. results.SelectMany(r => r.FaceIndices ?? [])] is { Count: > 0 } indices ? (IReadOnlyList<int>?)indices : null,
-                    [.. results.SelectMany(r => r.Sections ?? [])] is { Count: > 0 } sections ? (IReadOnlyList<Polyline>?)sections : null)),
+                    (IReadOnlyList<Curve>?)(results.SelectMany(r => r.Curves ?? []).ToArray() is { Length: > 0 } curves ? curves : null),
+                    (IReadOnlyList<double>?)(results.SelectMany(r => r.ParametersA ?? []).ToArray() is { Length: > 0 } paramsA ? paramsA : null),
+                    (IReadOnlyList<double>?)(results.SelectMany(r => r.ParametersB ?? []).ToArray() is { Length: > 0 } paramsB ? paramsB : null),
+                    (IReadOnlyList<int>?)(results.SelectMany(r => r.FaceIndices ?? []).ToArray() is { Length: > 0 } indices ? indices : null),
+                    (IReadOnlyList<Polyline>?)(results.SelectMany(r => r.Sections ?? []).ToArray() is { Length: > 0 } sections ? sections : null))),
             (Point3d[] points, GeometryBase[] targets) when (method & (IntersectionMethod.ProjectPointsToBreps | IntersectionMethod.ProjectPointsToMeshes | IntersectionMethod.ProjectPointsToBrepsEx | IntersectionMethod.ProjectPointsToMeshesEx)) != IntersectionMethod.None =>
                 IntersectionStrategies.Intersect(points, targets, method, context, tolerance, projectionDirection, maxHitCount)
                     .Map(r => (r.Points, r.Curves, r.ParametersA, r.ParametersB, r.FaceIndices, r.Sections)),
