@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
-using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
 
@@ -48,16 +47,16 @@ public static class ValidationRules {
 
     private static readonly FrozenDictionary<ValidationMode, (string[] Properties, string[] Methods, SystemError Error)> _validationRules =
         new Dictionary<ValidationMode, (string[], string[], SystemError)> {
-            [ValidationMode.Standard] = (["IsValid"], [], ValidationErrors.Geometry.Invalid),
-            [ValidationMode.AreaCentroid] = (["IsClosed"], ["IsPlanar"], ValidationErrors.Geometry.Curve.NotClosedOrPlanar),
-            [ValidationMode.BoundingBox] = ([], ["GetBoundingBox"], ValidationErrors.Geometry.BoundingBox.Invalid),
-            [ValidationMode.MassProperties] = (["IsSolid", "IsClosed"], [], ValidationErrors.Geometry.Properties.ComputationFailed),
-            [ValidationMode.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface"], ["IsManifold", "IsPointInside"], ValidationErrors.Geometry.Topology.InvalidTopology),
-            [ValidationMode.Degeneracy] = (["IsPeriodic", "IsPolyline"], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular"], ValidationErrors.Geometry.Degeneracy.DegenerateGeometry),
-            [ValidationMode.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse"], ValidationErrors.Context.Tolerance.ToleranceExceeded),
-            [ValidationMode.SelfIntersection] = ([], ["SelfIntersections"], ValidationErrors.Geometry.SelfIntersection.SelfIntersecting),
-            [ValidationMode.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh"], ["IsValidWithLog"], ValidationErrors.Geometry.MeshTopology.NonManifoldEdges),
-            [ValidationMode.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], ValidationErrors.Geometry.Continuity.PositionalDiscontinuity),
+            [ValidationMode.Standard] = (["IsValid"], [], CoreErrors.Geometry.Invalid),
+            [ValidationMode.AreaCentroid] = (["IsClosed"], ["IsPlanar"], CoreErrors.Geometry.Curve.NotClosedOrPlanar),
+            [ValidationMode.BoundingBox] = ([], ["GetBoundingBox"], CoreErrors.Geometry.BoundingBox.Invalid),
+            [ValidationMode.MassProperties] = (["IsSolid", "IsClosed"], [], CoreErrors.Geometry.Properties.ComputationFailed),
+            [ValidationMode.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface"], ["IsManifold", "IsPointInside"], CoreErrors.Geometry.Topology.InvalidTopology),
+            [ValidationMode.Degeneracy] = (["IsPeriodic", "IsPolyline"], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular"], CoreErrors.Geometry.Degeneracy.DegenerateGeometry),
+            [ValidationMode.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse"], CoreErrors.Context.Tolerance.ToleranceExceeded),
+            [ValidationMode.SelfIntersection] = ([], ["SelfIntersections"], CoreErrors.Geometry.SelfIntersection.SelfIntersecting),
+            [ValidationMode.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh"], ["IsValidWithLog"], CoreErrors.Geometry.MeshTopology.NonManifoldEdges),
+            [ValidationMode.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], CoreErrors.Geometry.Continuity.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
@@ -71,13 +70,13 @@ public static class ValidationRules {
         (typeof(T), input, args) switch {
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
                 [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
-                    [ValidationErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
+                    [CoreErrors.Context.Tolerance.InvalidAbsolute] : Array.Empty<SystemError>()),
                     .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-                    [ValidationErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
+                    [CoreErrors.Context.Tolerance.InvalidRelative] : Array.Empty<SystemError>()),
                     .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
-                    [ValidationErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),
+                    [CoreErrors.Context.Tolerance.InvalidAngle] : Array.Empty<SystemError>()),
                 ],
-            _ => throw new ArgumentException(ResultErrors.Factory.InvalidValidateParameters.Message, nameof(args)),
+            _ => throw new ArgumentException(CoreErrors.Results.InvalidValidateParameters.Message, nameof(args)),
         };
 
     /// <summary>Compiles expression tree validator for runtime type and validation mode using reflection-based rule application.</summary>

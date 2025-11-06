@@ -25,8 +25,8 @@ public static class ResultFactory {
             (_, null, null, var d, null, null) when d is not null => new Result<T>(isSuccess: false, default!, [], deferred: d),
             (var v, null, null, null, var conds, null) when v is not null && conds is not null => new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue => n.Value.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, deferred: null)),
-            (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided,], deferred: null),
-            _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
+            (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [CoreErrors.Results.NoValueProvided,], deferred: null),
+            _ => throw new ArgumentException(CoreErrors.Results.InvalidCreateParameters.Message, nameof(value)),
         };
 
     /// <summary>Validates Result using polymorphic parameter detection with unified validation semantics.</summary>
@@ -86,7 +86,7 @@ public static class ResultFactory {
                         } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
                 .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
             (var ar, var rc, _, var a) => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture,
-                $"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
+                $"{CoreErrors.Results.InvalidLiftParameters.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
         };
     }
 

@@ -28,9 +28,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ["key"] = 1]  // Wrong
 ["key"] = 1,] // Correct
 
-// ❌ Unnamed parameters  
+// ❌ Unnamed parameters
 ResultFactory.Create(error)                          // Wrong
-ResultFactory.Create(error: ValidationErrors.X)      // Correct
+ResultFactory.Create(error: CoreErrors.Geometry.Invalid)  // Correct
 
 // ❌ Redundant type in new
 new Dictionary<K, V>()                               // Wrong
@@ -46,7 +46,7 @@ UnifiedOperation.Apply(
     input,
     (Func<object, Result<IReadOnlyList<T>>>)(item => item switch {
         GeometryBase g => Strategies.Process(g, method, context),
-        _ => ResultFactory.Create<IReadOnlyList<T>>(error: ValidationErrors.Geometry.Invalid),
+        _ => ResultFactory.Create<IReadOnlyList<T>>(error: CoreErrors.Geometry.Invalid),
     }),
     new OperationConfig<object, T> { Context = context, ValidationMode = ValidationMode.None })
 ```
@@ -90,7 +90,7 @@ ResultFactory.Create(error: err)               // ✅ Named parameter for errors
 ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 .Map(x => transform)                           // Functor transform
 .Bind(x => Result<Y>)                          // Monadic chain
-.Ensure(predicate, error: ValidationErrors.X)  // ✅ Validation with named error parameter
+.Ensure(predicate, error: CoreErrors.Geometry.Invalid)  // ✅ Validation with named error parameter
 .Match(onSuccess, onFailure)                   // Pattern match exhaustive
 .Tap(onSuccess, onFailure)                     // Side effects, preserves state
 .Apply(Result<Func>)                           // Applicative parallel validation
@@ -116,20 +116,22 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 
 ValidationRules compiles validators at runtime using expression trees - never handwrite validation logic.
 
-### Error Pattern (Each folder has own errors)
+### Error Pattern (Centralized Registry)
 
 ```csharp
-// libs/core/validation/ValidationErrors.cs
-public static class ValidationErrors {
+// libs/core/errors/CoreErrors.cs - All core errors in one place
+public static class CoreErrors {
+    static CoreErrors() => ErrorRegistry.Freeze();
+
     public static class Geometry {
-        public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3001, "...");
+        public static readonly SystemError Invalid = ErrorRegistry.Register(domain: ErrorDomain.Validation, code: 3000, message: "Geometry must be valid");
     }
 }
 
-// libs/rhino/spatial/SpatialErrors.cs - Folder-specific errors
+// libs/rhino/spatial/SpatialErrors.cs - Domain-specific errors
 public static class SpatialErrors {
     public static class Parameters {
-        public static readonly SystemError InvalidCount = new(ErrorDomain.Geometry, 2221, "...");
+        public static readonly SystemError InvalidCount = ErrorRegistry.Register(domain: ErrorDomain.Geometry, code: 2221, message: "...");
     }
 }
 ```
