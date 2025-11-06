@@ -5,8 +5,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
-using Arsenal.Core.Results;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Core.Validation;
@@ -49,21 +47,6 @@ public static class ValidationRules {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, ValidationMode mode) =>
         _validatorCache.GetOrAdd(new CacheKey(runtimeType, mode), static k => CompileValidator(k.Type, k.Mode));
-
-    /// <summary>Generates validation errors for tolerance values using polymorphic parameter detection.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
-        (typeof(T), input, args) switch {
-            (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians,]) when t == typeof(double) =>
-                [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
-                    [ErrorRegistry.Get(3900),] : Array.Empty<SystemError>()),
-                    .. (!(RhinoMath.IsValidDouble(relativeTolerance) && relativeTolerance is >= 0d and < 1d) ?
-                    [ErrorRegistry.Get(3901),] : Array.Empty<SystemError>()),
-                    .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
-                    [ErrorRegistry.Get(3902),] : Array.Empty<SystemError>()),
-                ],
-            _ => throw new ArgumentException(ErrorRegistry.Get(1003).Message, nameof(args)),
-        };
 
     /// <summary>Compiles expression tree validator for runtime type and validation mode using reflection-based rule application.</summary>
     [Pure]

@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>Central error registry with FrozenDictionary dispatch enabling hundreds of errors in minimal footprint.</summary>
+/// <summary>Central error registry with FrozenDictionary dispatch and polymorphic creation.</summary>
 public static class ErrorRegistry {
     private static readonly FrozenDictionary<int, string> _messages = new Dictionary<int, string> {
         [1001] = "No value provided",
@@ -53,54 +53,57 @@ public static class ErrorRegistry {
         [4204] = "Invalid extraction method",
     }.ToFrozenDictionary();
 
-    private static readonly FrozenDictionary<int, int> _domainRanges = new Dictionary<int, int> {
-        [1000] = 1999,
-        [2000] = 2999,
-        [3000] = 3999,
-        [4000] = 4999,
-        [5000] = 5999,
-    }.ToFrozenDictionary();
-
-    /// <summary>Creates SystemError from code with automatic domain inference and optional context.</summary>
+    /// <summary>Creates SystemError with automatic domain inference and polymorphic context.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) =>
-        (InferDomain(code), _messages.TryGetValue(code, out string? msg)) switch {
-            (ErrorDomain domain, true) when domain != ErrorDomain.None =>
-                context is null
-                    ? new(domain, code, msg)
-                    : new(domain, code, $"{msg} (Context: {context})"),
-            (ErrorDomain domain, false) when domain != ErrorDomain.None =>
-                new(domain, code, $"Unregistered error in {domain}"),
+    public static SystemError Get(int code, string? context = null, ErrorDomain? domain = null, string? message = null) =>
+        (domain ?? InferDomain(code), message ?? (_messages.TryGetValue(code, out string? msg) ? msg : null), context) switch {
+            ({ } d, { } m, null) when d != ErrorDomain.None => new(d, code, m),
+            ({ } d, { } m, { } c) when d != ErrorDomain.None => new(d, code, $"{m} (Context: {c})"),
+            ({ } d, null, _) when d != ErrorDomain.None => new(d, code, $"Unregistered error in {d}"),
             _ => new(ErrorDomain.None, code, "Unknown error code"),
         };
 
-    /// <summary>Creates SystemError array from codes for error accumulation patterns.</summary>
+    /// <summary>Creates SystemError array from codes with optional context tuples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError[] Get(params int[] codes) =>
-        codes.Length switch {
-            0 => [],
-            1 => [Get(codes[0]),],
-            _ => [.. codes.Select(c => Get(c)),],
-        };
+    public static SystemError[] Get(params int[] codes) => [.. codes.Select(Get),];
 
-    /// <summary>Registers custom error message for code with validation.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryRegister(int code, string message) =>
-        !_messages.ContainsKey(code) && InferDomain(code) != ErrorDomain.None;
+    /// <summary>Creates SystemError array from code/context tuples for batch operations.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError[] Get(params (int Code, string? Context)[] errors) =>
+        [.. errors.Select(e => Get(e.Code, e.Context)),];
 
-    /// <summary>Infers error domain from code using range-based classification.</summary>
+    /// <summary>Creates conditional error for validation chains.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError[] When(bool condition, int code, string? context = null) =>
+        condition ? [Get(code, context),] : [];
+
+    /// <summary>Creates conditional error with predicate dispatch.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError[] When<T>(T value, Func<T, bool> predicate, int code, string? context = null) =>
+        predicate(value) ? [Get(code, context),] : [];
+
+    /// <summary>Wraps exception as SystemError for error chaining.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError FromException(Exception exception, int fallbackCode = 1100) =>
+        Get(fallbackCode, $"{exception.GetType().Name}: {exception.Message}");
+
+    /// <summary>Infers error domain from code using dense pattern matching.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ErrorDomain InferDomain(int code) =>
-        _domainRanges
-            .Where(kvp => code >= kvp.Key && code <= kvp.Value)
-            .Select(kvp => new ErrorDomain(kvp.Key))
-            .FirstOrDefault(ErrorDomain.None);
+        code switch {
+            >= 1000 and < 2000 => ErrorDomain.Results,
+            >= 2000 and < 3000 => ErrorDomain.Geometry,
+            >= 3000 and < 4000 => ErrorDomain.Validation,
+            >= 4000 and < 5000 => ErrorDomain.Operations,
+            >= 5000 and < 6000 => ErrorDomain.Diagnostics,
+            _ => ErrorDomain.None,
+        };
 
-    /// <summary>Validates if code is in registered range without creating error.</summary>
+    /// <summary>Validates if code is registered without creating error.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsRegistered(int code) => _messages.ContainsKey(code);
 
-    /// <summary>Gets all registered codes for domain for introspection and testing.</summary>
+    /// <summary>Gets all registered codes for domain for introspection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static IReadOnlyList<int> GetCodesForDomain(ErrorDomain domain) =>
         [.. _messages.Keys.Where(code => InferDomain(code) == domain),];

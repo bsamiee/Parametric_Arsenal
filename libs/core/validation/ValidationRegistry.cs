@@ -6,12 +6,8 @@ namespace Arsenal.Core.Validation;
 
 /// <summary>Central validation mode registry with FrozenDictionary dispatch for rule-based validation.</summary>
 public static class ValidationRegistry {
-    /// <summary>Validation rule configuration tuple with properties, methods, and error code.</summary>
-    public readonly struct RuleConfig(string[] properties, string[] methods, int errorCode) {
-        public readonly string[] Properties = properties;
-        public readonly string[] Methods = methods;
-        public readonly int ErrorCode = errorCode;
-    }
+    /// <summary>Validation rule configuration with properties, methods, and error code.</summary>
+    public readonly record struct RuleConfig(string[] Properties, string[] Methods, int ErrorCode);
 
     private static readonly FrozenDictionary<int, RuleConfig> _rules = new Dictionary<int, RuleConfig> {
         [1] = new(["IsValid",], [], 3000),
@@ -34,27 +30,4 @@ public static class ValidationRegistry {
             1023 => [.. _rules.Values,],
             _ => [.. _rules.Where(kvp => (mode.Value & kvp.Key) == kvp.Key).Select(kvp => kvp.Value),],
         };
-
-    /// <summary>Gets error code for specific validation mode flag.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetErrorCode(ValidationMode mode) =>
-        _rules.TryGetValue(mode.Value, out RuleConfig config) ? config.ErrorCode : 3000;
-
-    /// <summary>Checks if validation mode has registered rules.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool HasRules(ValidationMode mode) =>
-        mode.Value switch {
-            0 => false,
-            _ => _rules.Keys.Any(key => (mode.Value & key) == key),
-        };
-
-    /// <summary>Gets all properties for validation mode with flag decomposition.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string[] GetProperties(ValidationMode mode) =>
-        [.. GetRules(mode).SelectMany(r => r.Properties).Distinct(),];
-
-    /// <summary>Gets all methods for validation mode with flag decomposition.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string[] GetMethods(ValidationMode mode) =>
-        [.. GetRules(mode).SelectMany(r => r.Methods).Distinct(),];
 }
