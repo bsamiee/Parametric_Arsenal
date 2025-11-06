@@ -4,8 +4,8 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Analysis method discriminator using readonly struct types for compile-time safety and zero allocation.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Colocated with AnalysisData for tight coupling")]
+/// <summary>Analysis method discriminator using readonly struct for compile-time safety and zero allocation.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Colocated with AnalysisData within 4-file limit constraint")]
 public readonly struct AnalysisMethod : IEquatable<AnalysisMethod> {
     private readonly byte _value;
     private AnalysisMethod(byte value) => this._value = value;
@@ -18,7 +18,6 @@ public readonly struct AnalysisMethod : IEquatable<AnalysisMethod> {
     public static readonly AnalysisMethod Proximity = new(6);
     public static readonly AnalysisMethod Metrics = new(7);
     public static readonly AnalysisMethod Domains = new(8);
-    public static readonly AnalysisMethod Comprehensive = new(255);  // 255 = sentinel value for all methods in collection
 
     [Pure] public bool Equals(AnalysisMethod other) => this._value == other._value;
     [Pure] public override bool Equals(object? obj) => obj is AnalysisMethod other && this.Equals(other);
@@ -39,17 +38,4 @@ public sealed record AnalysisData(
     Result<(double Length, double Area, double Volume, Point3d Centroid)> Metrics,
     Result<Interval[]> Domains,
     (double? Curve, (double, double)? Surface, int? Mesh) Parameters) {
-    /// <summary>Creates empty analysis with point only.</summary>
-    [Pure]
-    public static AnalysisData Empty(Point3d point) => new(
-        point,
-        ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.DerivativeComputationFailed),
-        ResultFactory.Create<Plane>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-        ResultFactory.Create<(double, double, double, double, Vector3d, Vector3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-        ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
-        ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
-        ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
-        ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-        ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
-        (null, null, null));
 }

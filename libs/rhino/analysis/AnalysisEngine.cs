@@ -2,9 +2,7 @@ using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -20,26 +18,16 @@ public static class AnalysisEngine {
 
     /// <summary>Analyzes geometry producing evaluation data with Result monad eliminating null reference issues.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<AnalysisData>> Analyze<T>(
+    public static Result<AnalysisData> Analyze<T>(
         T input,
         IGeometryContext context,
         IEnumerable<AnalysisMethod>? methods = null,
         (double? Curve, (double, double)? Surface, int? Mesh)? parameters = null,
         int derivativeOrder = 2) where T : notnull =>
-        UnifiedOperation.Apply(
+        AnalysisStrategies.Analyze(
             input,
-            (Func<object, Result<IReadOnlyList<AnalysisData>>>)(item =>
-                AnalysisStrategies.Analyze(
-                    item,
-                    methods?.ToFrozenSet() ?? _comprehensiveMethods,
-                    context,
-                    parameters,
-                    derivativeOrder)
-                .Map(result => (IReadOnlyList<AnalysisData>)[result])),
-            new OperationConfig<object, AnalysisData> {
-                Context = context,
-                ValidationMode = ValidationMode.None,
-                AccumulateErrors = false,
-                EnableCache = true,
-            });
+            methods?.ToFrozenSet() ?? _comprehensiveMethods,
+            context,
+            parameters,
+            derivativeOrder);
 }

@@ -140,7 +140,17 @@ internal static class AnalysisStrategies {
                     methods.Contains(AnalysisMethod.Domains) ? ResultFactory.Create<Interval[]>(value: [new Interval(0, cloud.Count)]) : ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
                     (null, null, null))),
 
-            (Point3d pt, _, int o) => ResultFactory.Create(value: AnalysisData.Empty(pt)),
+            (Point3d pt, _, int o) => ResultFactory.Create(value: new AnalysisData(
+                pt,
+                ResultFactory.Create<Vector3d[]>(error: AnalysisErrors.Evaluation.DerivativeComputationFailed),
+                ResultFactory.Create<Plane>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                ResultFactory.Create<(double, double, double, double, Vector3d, Vector3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                ResultFactory.Create<(double[], Continuity[])>(error: AnalysisErrors.Discontinuity.NoneFound),
+                ResultFactory.Create<((int, Point3d)[], (int, Line)[], bool, bool)>(error: AnalysisErrors.Topology.NoTopologyData),
+                ResultFactory.Create<(Point3d, double)>(error: AnalysisErrors.Proximity.ClosestPointFailed),
+                ResultFactory.Create<(double, double, double, Point3d)>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+                ResultFactory.Create<Interval[]>(error: AnalysisErrors.Parameters.ParameterOutOfDomain),
+                (null, null, null))),
 
             (Vector3d vec, var p, int o) => ResultFactory.Create(value: new AnalysisData(
                 Point3d.Origin,
