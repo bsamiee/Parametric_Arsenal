@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using Arsenal.Core.Diagnostics;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 
@@ -37,11 +38,15 @@ public static class UnifiedOperation {
         };
 
         Result<IReadOnlyList<TOut>> execute(TIn item) {
-            if (cache.TryGetValue((item, operation.GetType()), out object? cached) && config.EnableCache) {
-                return (Result<IReadOnlyList<TOut>>)cached;
-            }
+            (object, Type) key = (item, operation.GetType());
+            bool cacheHit = cache.TryGetValue(key, out object? cached) && config.EnableCache;
 
-            Result<IReadOnlyList<TOut>> computed = ResultFactory.Create(value: item)
+            Result<IReadOnlyList<TOut>> instrument(Result<IReadOnlyList<TOut>> r, bool hit) =>
+                config.EnableDiagnostics && config.OperationName is not null
+                    ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
+                    : r;
+
+            Result<IReadOnlyList<TOut>> compute() => ResultFactory.Create(value: item)
                 .Filter(config.InputFilter ?? (_ => true),
                     config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
                 .Validate(args: config.ValidationMode is ValidationMode.None ? null :
@@ -63,11 +68,13 @@ public static class UnifiedOperation {
                         }),
                 });
 
-            return (Result<IReadOnlyList<TOut>>)cache.AddOrUpdate(
-                (item, operation.GetType()),
-                static (_, state) => state,
-                static (_, existing, state) => state.config.EnableCache ? existing : state.computed,
-                (config, computed));
+            return cacheHit
+                ? instrument((Result<IReadOnlyList<TOut>>)cached!, hit: true)
+                : instrument((Result<IReadOnlyList<TOut>>)cache.AddOrUpdate(
+                    key,
+                    static (_, state) => state,
+                    static (_, existing, state) => state.config.EnableCache ? existing : state.computed,
+                    (config, computed: compute())), hit: false);
         }
 
         return (input, config) switch {

@@ -84,8 +84,9 @@ public static class Analysis {
         Curve curve,
         IGeometryContext context,
         double? parameter = null,
-        int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder)
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCompute.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
@@ -94,8 +95,9 @@ public static class Analysis {
         Surface surface,
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
-        int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder)
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCompute.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
@@ -106,8 +108,9 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int faceIndex = 0,
         Point3d? testPoint = null,
-        int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCompute.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (BrepData)results[0]);
 
     /// <summary>Analyzes mesh geometry producing comprehensive topology navigation and manifold inspection data.</summary>
@@ -115,8 +118,9 @@ public static class Analysis {
     public static Result<MeshData> Analyze(
         Mesh mesh,
         IGeometryContext context,
-        int vertexIndex = 0) =>
-        AnalysisCompute.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0)
+        int vertexIndex = 0,
+        bool enableDiagnostics = false) =>
+        AnalysisCompute.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0, enableDiagnostics: enableDiagnostics)
             .Map(results => (MeshData)results[0]);
 
     /// <summary>Analyzes collections of geometry producing heterogeneous results via UnifiedOperation batch processing.</summary>
@@ -128,15 +132,18 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int? index = null,
         Point3d? testPoint = null,
-        int derivativeOrder = 2) where T : notnull =>
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) where T : notnull =>
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>
-                AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder)),
+                AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: false)),
             new OperationConfig<object, IResult> {
                 Context = context,
                 ValidationMode = Core.Validation.ValidationMode.None,
                 EnableCache = true,
                 AccumulateErrors = false,
+                OperationName = "Analysis.Multiple",
+                EnableDiagnostics = enableDiagnostics,
             });
 }

@@ -54,7 +54,8 @@ public static class Spatial {
     public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
         TInput input,
         TQuery query,
-        IGeometryContext context) where TInput : notnull where TQuery : notnull =>
+        IGeometryContext context,
+        bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
         _algorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (ValidationMode mode, int bufferSize) config) switch {
             true => UnifiedOperation.Apply(
                 input,
@@ -62,6 +63,8 @@ public static class Spatial {
                 new OperationConfig<TInput, int> {
                     Context = context,
                     ValidationMode = config.mode,
+                    OperationName = $"Spatial.{typeof(TInput).Name}.{typeof(TQuery).Name}",
+                    EnableDiagnostics = enableDiagnostics,
                 }),
             false => ResultFactory.Create<IReadOnlyList<int>>(
                 error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext(
