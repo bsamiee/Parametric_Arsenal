@@ -79,13 +79,13 @@
   <ItemGroup>
     <!-- IDisposable pattern enforcement and memory leak detection -->
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
-    
+
     <!-- Comprehensive C# code quality and refactoring suggestions -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    
+
     <!-- Performance, code quality, and best practices enforcement -->
     <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
-    
+
     <!-- Microsoft .NET code quality analyzers (CA rules) -->
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
   </ItemGroup>

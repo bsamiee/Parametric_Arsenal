@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -23,208 +24,103 @@ internal sealed record AnalysisResult(
     Interval[]? Domains,
     (double? Curve, (double, double)? Surface, int? Mesh, int DerivOrder) Params);
 
-/// <summary>Dense analysis strategy dispatcher with method-type configuration and SDK integration.</summary>
+/// <summary>Ultra-dense analysis dispatcher with polymorphic SDK integration and zero-allocation patterns.</summary>
 internal static class AnalysisStrategies {
-    private static readonly FrozenDictionary<(AnalysisMethod, Type), ValidationMode> _validation =
+    /// <summary>Validation configuration mapping analysis methods and geometry types to required validation modes.</summary>
+    private static readonly FrozenDictionary<(AnalysisMethod Method, Type GeometryType), ValidationMode> _validationConfig =
         new Dictionary<(AnalysisMethod, Type), ValidationMode> {
-            [(AnalysisMethod.Point, typeof(Curve))] = ValidationMode.Standard,
             [(AnalysisMethod.Derivatives, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(AnalysisMethod.Curvature, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(AnalysisMethod.Frame, typeof(Curve))] = ValidationMode.Standard,
-            [(AnalysisMethod.Discontinuity, typeof(Curve))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
-            [(AnalysisMethod.Metrics, typeof(Curve))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(AnalysisMethod.Point, typeof(Surface))] = ValidationMode.Standard,
             [(AnalysisMethod.Derivatives, typeof(Surface))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
+            [(AnalysisMethod.Frame, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
+            [(AnalysisMethod.Frame, typeof(Surface))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
+            [(AnalysisMethod.Curvature, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
             [(AnalysisMethod.Curvature, typeof(Surface))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
-            [(AnalysisMethod.Frame, typeof(Surface))] = ValidationMode.Standard,
+            [(AnalysisMethod.Discontinuity, typeof(Curve))] = ValidationMode.Standard,
             [(AnalysisMethod.Discontinuity, typeof(Surface))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
-            [(AnalysisMethod.Singularity, typeof(Surface))] = ValidationMode.Standard,
-            [(AnalysisMethod.Metrics, typeof(Surface))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(AnalysisMethod.Metrics, typeof(BrepFace))] = ValidationMode.Standard | ValidationMode.MassProperties,
             [(AnalysisMethod.Topology, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(AnalysisMethod.Proximity, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(AnalysisMethod.Metrics, typeof(Brep))] = ValidationMode.Standard | ValidationMode.MassProperties,
-            [(AnalysisMethod.Point, typeof(Mesh))] = ValidationMode.MeshSpecific,
-            [(AnalysisMethod.Curvature, typeof(Mesh))] = ValidationMode.MeshSpecific,
             [(AnalysisMethod.Topology, typeof(Mesh))] = ValidationMode.MeshSpecific,
+            [(AnalysisMethod.Proximity, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
             [(AnalysisMethod.Proximity, typeof(Mesh))] = ValidationMode.MeshSpecific,
+            [(AnalysisMethod.Singularity, typeof(Surface))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
+            [(AnalysisMethod.Metrics, typeof(Curve))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
+            [(AnalysisMethod.Metrics, typeof(Surface))] = ValidationMode.Standard | ValidationMode.MassProperties,
+            [(AnalysisMethod.Metrics, typeof(Brep))] = ValidationMode.Standard | ValidationMode.MassProperties,
             [(AnalysisMethod.Metrics, typeof(Mesh))] = ValidationMode.MeshSpecific,
-            [(AnalysisMethod.Point, typeof(SubD))] = ValidationMode.Standard | ValidationMode.SurfaceContinuity,
-            [(AnalysisMethod.Topology, typeof(SubD))] = ValidationMode.Standard,
-            [(AnalysisMethod.Point, typeof(PointCloud))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(AnalysisMethod.Frame, typeof(PointCloud))] = ValidationMode.Standard,
+            [(AnalysisMethod.Metrics, typeof(PointCloud))] = ValidationMode.Standard,
         }.ToFrozenDictionary();
-
+    /// <summary>Polymorphic analysis with direct SDK dispatch, validation, and comprehensive evaluation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<AnalysisResult>> Analyze(
-        object source, AnalysisMethod method, IGeometryContext context,
-        (double?, (double, double)?, int?)? parameters, int derivativeOrder) =>
-        ResultFactory.Create(value: source)
-            .Validate(args: [context,
-                ((Func<ValidationMode>)(() => {
-                    Type type = source switch {
-                        BrepFace => typeof(BrepFace),
-                        GeometryBase g => g.GetType(),
-                        _ => source.GetType(),
-                    };
-                    return Enum.GetValues<AnalysisMethod>()
-                        .Where(flag => flag is not (AnalysisMethod.None or AnalysisMethod.Standard or AnalysisMethod.Comprehensive) && method.HasFlag(flag))
-                        .Select(flag => {
-                            for (Type? t = type; t is not null && t != typeof(object); t = t.BaseType) {
-                                if (_validation.TryGetValue((flag, t), out ValidationMode m)) {
-                                    return m;
-                                }
-                            }
-                            return ValidationMode.None;
-                        })
-                        .Aggregate(ValidationMode.None, (acc, m) => acc | m);
-                }))(),
-            ])
-            .Map(_ => AnalyzeCore(source, method, context, parameters, derivativeOrder))
-            .Bind(result => result switch {
-                AnalysisResult r => ResultFactory.Create(value: (IReadOnlyList<AnalysisResult>)[r]),
-                _ => ResultFactory.Create<IReadOnlyList<AnalysisResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry),
-            });
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "MA0051:Method is too long", Justification = "Dense polymorphic dispatch requires comprehensive pattern matching")]
+    internal static Result<IReadOnlyList<AnalysisResult>> Analyze(object source, AnalysisMethod method, IGeometryContext context, (double? Curve, (double, double)? Surface, int? Mesh)? parameters = null, int derivativeOrder = 2) =>
+        ((source, method, parameters, derivativeOrder) switch {
+            (Curve cv, AnalysisMethod m, var p, int o) => ResultFactory.Create(value: cv).Validate(args: [context, _validationConfig.GetValueOrDefault((m, typeof(Curve)), ValidationMode.Standard | ValidationMode.Degeneracy)])
+                .Map(_ => {
+                    double t = p?.Curve ?? cv.Domain.ParameterAt(0.5);
+                    ArrayPool<double> pool = ArrayPool<double>.Shared;
+                    double[] buffer = pool.Rent(20);
+                    try {
+                        int dc = 0; double s = cv.Domain.Min;
+                        while (dc < 20 && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) { buffer[dc++] = td; s = td + context.AbsoluteTolerance; }
+                        Point3d[] inflPts = cv.InflectionPoints() ?? []; Point3d[] maxCurvPts = cv.MaxCurvaturePoints() ?? [];
+                        return new AnalysisResult(cv.PointAt(t), m.HasFlag(AnalysisMethod.Derivatives) ? cv.DerivativeAt(t, o) ?? [] : [], m.HasFlag(AnalysisMethod.Frame) && cv.FrameAt(t, out Plane f) ? (f, cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25))]), inflPts.Length > 0 ? [.. inflPts.Select(p => cv.ClosestPoint(p, out double tp) ? tp : 0)] : null, maxCurvPts.Length > 0 ? [.. maxCurvPts.Select(p => cv.ClosestPoint(p, out double tp) ? tp : 0)] : null, cv.IsClosed ? cv.TorsionAt(t) : null) : null, m.HasFlag(AnalysisMethod.Curvature) && cv.CurvatureAt(t) is Vector3d k && k.IsValid ? (Gaussian: null, Mean: null, k.Length, K2: null, Dir1: null, Dir2: null) : null, m.HasFlag(AnalysisMethod.Discontinuity) && dc > 0 ? ([.. buffer[..dc]], buffer[..dc].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous).ToArray()) : null, Topology: null, Proximity: null, Singularities: null, m.HasFlag(AnalysisMethod.Metrics) ? (cv.GetLength(), Area: null, Volume: null, AreaMassProperties.Compute(cv)?.Centroid) : null, m.HasFlag(AnalysisMethod.Domains) ? [cv.Domain] : null, (t, Surface: null, Mesh: null, o));
+                    } finally { pool.Return(buffer, clearArray: true); }
+                }),
 
-    [Pure]
-    private static AnalysisResult? AnalyzeCore(object source, AnalysisMethod method, IGeometryContext context, (double?, (double, double)?, int?)? p, int dO) =>
-        (method, source, p?.Item1, p?.Item2, p?.Item3, dO, context) switch {
-            (var m, Curve cv, var tP, _, _, var order, var ctx) when cv.Domain.IncludesParameter(tP ?? cv.Domain.ParameterAt(0.5)) && (tP ?? cv.Domain.ParameterAt(0.5)) is var t =>
-                new AnalysisResult(
-                    Point: cv.PointAt(t),
-                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && order >= 1 && cv.TangentAt(t) is var tang && tang.IsValid ? [tang] : [],
-                    Frames: m.HasFlag(AnalysisMethod.Frame) ?
-                        (cv.FrameAt(t, out Plane frame) ? frame : new Plane(cv.PointAt(t), Vector3d.ZAxis),
-                         cv.GetPerpendicularFrames(new double[] { 0d, 0.25d, 0.5d, 0.75d, 1d }.Select(cv.Domain.ParameterAt).ToArray()),
-                         cv.InflectionPoints() is Point3d[] ipts && ipts.Length > 0 ? ipts.Select(pt => cv.ClosestPoint(pt, out double param) ? param : 0d).ToArray() : null,
-                         cv.MaxCurvaturePoints() is Point3d[] mpts && mpts.Length > 0 ? mpts.Select(pt => cv.ClosestPoint(pt, out double param) ? param : 0d).ToArray() : null,
-                         cv.IsClosed ? cv.TorsionAt(t) : null) : null,
-                    Curvature: m.HasFlag(AnalysisMethod.Curvature) && cv.CurvatureAt(t) is Vector3d curv && curv.IsValid ?
-                        (null, null, curv.Length, null, null, null) : null,
-                    Discontinuities: m.HasFlag(AnalysisMethod.Discontinuity) ?
-                        (((Func<double[]>)(() => {
-                            List<double> dParams = new();
-                            double current = cv.Domain.Min;
-                            for (int i = 0; i < 20 && cv.GetNextDiscontinuity(Continuity.C1_continuous, current, cv.Domain.Max, out double td); i++, current = td + ctx.AbsoluteTolerance) {
-                                dParams.Add(td);
-                            }
-                            return [.. dParams];
-                        }))() is double[] dPs && dPs.Length > 0 ? dPs : null,
-                        null) : null,
-                    Topology: null,
-                    Proximity: null,
-                    Singularities: null,
-                    Metrics: m.HasFlag(AnalysisMethod.Metrics) ?
-                        (cv.GetLength(), null, null, AreaMassProperties.Compute(cv)?.Centroid) : null,
-                    Domains: m.HasFlag(AnalysisMethod.Domains) ? [cv.Domain] : null,
-                    Params: (t, p?.Item2, p?.Item3, order)),
+            (Surface sf, AnalysisMethod m, var p, int o) => ResultFactory.Create(value: sf).Validate(args: [context, _validationConfig.GetValueOrDefault((m, typeof(Surface)), ValidationMode.Standard | ValidationMode.SurfaceContinuity)])
+                .Map(_ => {
+                    (double u, double v) = p?.Surface ?? (sf.Domain(0).ParameterAt(0.5), sf.Domain(1).ParameterAt(0.5));
+                    ArrayPool<double> pool = ArrayPool<double>.Shared; double[] buffer = pool.Rent(20);
+                    try {
+                        int dc = 0;
+                        foreach (int dir in Enumerable.Range(0, 2)) {
+                            double s = sf.Domain(dir).Min;
+                            while (dc < 20 && sf.GetNextDiscontinuity(dir, Continuity.C1_continuous, s, sf.Domain(dir).Max, out double td)) { buffer[dc++] = td; s = td + context.AbsoluteTolerance; }
+                        }
+                        return new AnalysisResult(sf.PointAt(u, v), m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(u, v, o, out Point3d _, out Vector3d[] d) ? d : [], m.HasFlag(AnalysisMethod.Frame) && sf.FrameAt(u, v, out Plane f) ? (f, Perpendicular: null, InflectionParams: null, MaxCurvatureParams: null, Torsion: null) : null, m.HasFlag(AnalysisMethod.Curvature) && sf.CurvatureAt(u, v) is SurfaceCurvature sc ? (sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1), sc.Direction(0), sc.Direction(1)) : null, m.HasFlag(AnalysisMethod.Discontinuity) && dc > 0 ? ([.. buffer[..dc]], buffer[..dc].Select(_ => Continuity.C1_continuous).ToArray()) : null, Topology: null, Proximity: null, m.HasFlag(AnalysisMethod.Singularity) ? (sf.IsAtSeam(u, v) != 0, sf.IsAtSingularity(u, v, exact: true), null) : null, m.HasFlag(AnalysisMethod.Metrics) ? (Length: null, AreaMassProperties.Compute(sf)?.Area, Volume: null, AreaMassProperties.Compute(sf)?.Centroid) : null, m.HasFlag(AnalysisMethod.Domains) ? [sf.Domain(0), sf.Domain(1)] : null, (Curve: null, (u, v), Mesh: null, o));
+                    } finally { pool.Return(buffer, clearArray: true); }
+                }),
 
-            (var m, Surface sf, _, (double, double) uv, _, var order, var ctx) when sf.Domain(0).IncludesParameter(uv.Item1) && sf.Domain(1).IncludesParameter(uv.Item2) && (uv.Item1, uv.Item2) is (var uP, var vP) =>
-                new AnalysisResult(
-                    Point: sf.Evaluate(uP, vP, order, out Point3d evalPt, out Vector3d[] derivs) && m.HasFlag(AnalysisMethod.Derivatives) ? evalPt : sf.PointAt(uP, vP),
-                    Derivatives: m.HasFlag(AnalysisMethod.Derivatives) && derivs.Length > 0 ? derivs : [],
-                    Frames: m.HasFlag(AnalysisMethod.Frame) ?
-                        (m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(uP, vP, order, out Point3d pt, out Vector3d[] ds) && ds.Length >= 2 ? new Plane(pt, ds[0], ds[1]) :
-                         sf.FrameAt(uP, vP, out Plane fr) ? fr : Plane.WorldXY,
-                        null, null, null, null) : null,
-                    Curvature: m.HasFlag(AnalysisMethod.Curvature) && sf.CurvatureAt(uP, vP) is SurfaceCurvature sc ?
-                        (sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1), sc.Direction(0), sc.Direction(1)) : null,
-                    Discontinuities: m.HasFlag(AnalysisMethod.Discontinuity) ?
-                        (((Func<double[]>)(() => {
-                            List<double> dParams = new();
-                            for (int dir = 0; dir <= 1; dir++) {
-                                double current = dir == 0 ? sf.Domain(0).Min : sf.Domain(1).Min;
-                                double max = dir == 0 ? sf.Domain(0).Max : sf.Domain(1).Max;
-                                for (int i = 0; i < 10 && sf.GetNextDiscontinuity(dir, Continuity.C1_continuous, current, max, out double td); i++, current = td + ctx.AbsoluteTolerance) {
-                                    dParams.Add(td);
-                                }
-                            }
-                            return [.. dParams];
-                        }))() is double[] dPs && dPs.Length > 0 ? dPs : null,
-                        null) : null,
-                    Topology: null,
-                    Proximity: null,
-                    Singularities: m.HasFlag(AnalysisMethod.Singularity) ?
-                        (sf.IsAtSeam(uP, vP), sf.IsAtSingularity(uP, vP, exact: true), (Point3d[]?)null) : null,
-                    Metrics: m.HasFlag(AnalysisMethod.Metrics) ?
-                        (null, AreaMassProperties.Compute(sf)?.Area, null, AreaMassProperties.Compute(sf)?.Centroid) : null,
-                    Domains: m.HasFlag(AnalysisMethod.Domains) ? [sf.Domain(0), sf.Domain(1)] : null,
-                    Params: (p?.Item1, (uP, vP), p?.Item3, order)),
+            (Brep brep, AnalysisMethod m, var p, int o) => ResultFactory.Create(value: brep).Validate(args: [context, _validationConfig.GetValueOrDefault((m, typeof(Brep)), ValidationMode.Standard | ValidationMode.Topology)])
+                .Map(_ => {
+                    int fIdx = Math.Max(0, Math.Min(p?.Mesh ?? 0, brep.Faces.Count - 1));
+                    using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
+                    (double u, double v) = p?.Surface ?? (sf.Domain(0).ParameterAt(0.5), sf.Domain(1).ParameterAt(0.5)); Point3d pt = sf.PointAt(u, v);
+                    return new AnalysisResult(pt, m.HasFlag(AnalysisMethod.Derivatives) && sf.Evaluate(u, v, o, out Point3d _, out Vector3d[] d) ? d : [], m.HasFlag(AnalysisMethod.Frame) && sf.FrameAt(u, v, out Plane f) ? (f, Perpendicular: null, InflectionParams: null, MaxCurvatureParams: null, Torsion: null) : null, m.HasFlag(AnalysisMethod.Curvature) && sf.CurvatureAt(u, v) is SurfaceCurvature sc ? (sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1), sc.Direction(0), sc.Direction(1)) : null, Discontinuities: null, m.HasFlag(AnalysisMethod.Topology) ? (brep.Vertices.Select((v, i) => (i, v.Location)).ToArray(), brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))).ToArray(), brep.IsManifold, brep.IsSolid) : null, m.HasFlag(AnalysisMethod.Proximity) && brep.ClosestPoint(pt, out Point3d cp, out ComponentIndex ci, out double s, out double t, context.AbsoluteTolerance * 100, out Vector3d _) ? (cp, ci, pt.DistanceTo(cp), (s, t)) : null, Singularities: null, m.HasFlag(AnalysisMethod.Metrics) ? (Length: null, AreaMassProperties.Compute(brep)?.Area, VolumeMassProperties.Compute(brep)?.Volume, VolumeMassProperties.Compute(brep)?.Centroid) : null, Domains: null, (Curve: null, (u, v), fIdx, o));
+                }),
 
-            (var m, BrepFace face, _, var sP, _, var order, var ctx) when
-                AnalyzeCore(face.UnderlyingSurface(), m & ~AnalysisMethod.Metrics, ctx, (null, sP, null), order) is AnalysisResult faceResult =>
-                faceResult with {
-                    Metrics = m.HasFlag(AnalysisMethod.Metrics) ?
-                        (null, AreaMassProperties.Compute(face)?.Area,
-                         face.Brep is Brep fb ? VolumeMassProperties.Compute(fb)?.Volume : null,
-                         AreaMassProperties.Compute(face)?.Centroid) : null,
-                },
+            (Mesh mesh, AnalysisMethod m, var p, int o) => ResultFactory.Create(value: mesh).Validate(args: [context, _validationConfig.GetValueOrDefault((m, typeof(Mesh)), ValidationMode.MeshSpecific)])
+                .Map(_ => {
+                    int vIdx = Math.Max(0, Math.Min(p?.Mesh ?? 0, mesh.Vertices.Count - 1));
+                    ((int, Point3d)[]?, (int, Line)[]?, bool?, bool?)? topo = m.HasFlag(AnalysisMethod.Topology) ? (Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])).ToArray(),
+                        Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))).ToArray(), mesh.IsManifold(topologicalTest: true, out bool _, out bool _), mesh.IsClosed) : null;
+                    return new AnalysisResult(mesh.Vertices[vIdx], [],
+                        m.HasFlag(AnalysisMethod.Frame) ? (new Plane(mesh.Vertices[vIdx], mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis), null, null, null, null) : ((Plane, Plane[]?, double[]?, double[]?, double?)?)(null),
+                        Curvature: null, Discontinuities: null, topo,
+                        m.HasFlag(AnalysisMethod.Proximity) && mesh.ClosestMeshPoint(mesh.Vertices[vIdx], context.AbsoluteTolerance * 100) is MeshPoint mp ? (Closest: mesh.PointAt(mp), Component: null, Distance: 0d, SurfaceUV: null) : null,
+                        Singularities: null,
+                        m.HasFlag(AnalysisMethod.Metrics) ? (Length: null, AreaMassProperties.Compute(mesh)?.Area, VolumeMassProperties.Compute(mesh)?.Volume, Centroid: null) : null,
+                        m.HasFlag(AnalysisMethod.Domains) ? [new Interval(0, mesh.Vertices.Count)] : null, (Curve: null, Surface: null, vIdx, o));
+                }),
 
-            (var m, Brep brep, _, _, var fIdx, var order, var ctx) when (fIdx ?? 0) >= 0 && (fIdx ?? 0) < brep.Faces.Count &&
-                AnalyzeCore(brep.Faces[fIdx ?? 0], m & ~(AnalysisMethod.Topology | AnalysisMethod.Proximity | AnalysisMethod.Metrics), ctx, (null, null, fIdx ?? 0), order) is AnalysisResult brepBase =>
-                brepBase with {
-                    Topology = m.HasFlag(AnalysisMethod.Topology) ?
-                        (brep.Vertices.Select((v, i) => (i, v.Location)).ToArray(),
-                         brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))).ToArray(),
-                         brep.IsManifold,
-                         brep.IsSolid) : null,
-                    Proximity = m.HasFlag(AnalysisMethod.Proximity) && brep.ClosestPoint(brepBase.Point, out Point3d closestBr, out ComponentIndex ci, out double s, out double tBr, ctx.AbsoluteTolerance * 100, out Vector3d _) ?
-                        (closestBr, ci, brepBase.Point.DistanceTo(closestBr), (s, tBr)) : null,
-                    Metrics = m.HasFlag(AnalysisMethod.Metrics) ?
-                        (null, AreaMassProperties.Compute(brep)?.Area, VolumeMassProperties.Compute(brep)?.Volume, VolumeMassProperties.Compute(brep)?.Centroid) : null,
-                },
+            (SubD subd, AnalysisMethod m, var p, int o) => ResultFactory.Create(deferred: () => {
+                using Brep br = subd.ToBrep();
+                return br is not null ? Analyze(br, m, context, p, o).Map(r => r[0]) :
+                    ResultFactory.Create<AnalysisResult>(error: AnalysisErrors.Operation.UnsupportedGeometry);
+            }),
 
-            (var m, Mesh mesh, _, _, var vIdx, _, var ctx) when (vIdx ?? 0) >= 0 && (vIdx ?? 0) < mesh.Vertices.Count &&
-                (mesh.Normals.Count > (vIdx ?? 0) ? mesh.Normals[vIdx ?? 0] :
-                 mesh.Normals.ComputeNormals() && mesh.Normals.Count > (vIdx ?? 0) ? mesh.Normals[vIdx ?? 0] : Vector3d.ZAxis) is var normal =>
-                new AnalysisResult(
-                    Point: mesh.Vertices.Point3dAt(vIdx ?? 0),
-                    Derivatives: [],
-                    Frames: m.HasFlag(AnalysisMethod.Frame) ?
-                        (new Plane(mesh.Vertices.Point3dAt(vIdx ?? 0), normal.IsValid ? normal : Vector3d.ZAxis), null, null, null, null) : null,
-                    Curvature: null,
-                    Discontinuities: null,
-                    Topology: m.HasFlag(AnalysisMethod.Topology) ?
-                        (Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, new Point3d(mesh.TopologyVertices[i].X, mesh.TopologyVertices[i].Y, mesh.TopologyVertices[i].Z))).ToArray(),
-                         Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))).Where(e => e.Item2.IsValid).ToArray(),
-                         (bool?)mesh.IsManifold,
-                         (bool?)mesh.IsClosed) : null,
-                    Proximity: m.HasFlag(AnalysisMethod.Proximity) && mesh.ClosestMeshPoint(mesh.Vertices.Point3dAt(vIdx ?? 0), ctx.AbsoluteTolerance * 100) is MeshPoint mp ?
-                        (mesh.PointAt(mp), null, 0, null) : null,
-                    Singularities: null,
-                    Metrics: m.HasFlag(AnalysisMethod.Metrics) ?
-                        (null, AreaMassProperties.Compute(mesh)?.Area, VolumeMassProperties.Compute(mesh)?.Volume,
-                         mesh.Vertices.Count > 0 ? new Point3d(mesh.Vertices.Average(v => v.X), mesh.Vertices.Average(v => v.Y), mesh.Vertices.Average(v => v.Z)) : Point3d.Origin) : null,
-                    Domains: m.HasFlag(AnalysisMethod.Domains) ? [new Interval(0, mesh.Vertices.Count)] : null,
-                    Params: (p?.Item1, p?.Item2, vIdx ?? 0, dO)),
+            (PointCloud cloud, AnalysisMethod m, _, int o) when cloud.Count > 0 => ResultFactory.Create(value: cloud.GetBoundingBox(accurate: true).Center)
+                .Map(center => new AnalysisResult(center, [],
+                    m.HasFlag(AnalysisMethod.Frame) && Plane.FitPlaneToPoints(cloud.GetPoints(), out Plane f) == PlaneFitResult.Success ? (f, Perpendicular: null, InflectionParams: null, MaxCurvatureParams: null, Torsion: null) : null,
+                    Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null,
+                    m.HasFlag(AnalysisMethod.Metrics) ? (Length: null, Area: null, Volume: null, center) : null,
+                    m.HasFlag(AnalysisMethod.Domains) ? [new Interval(0, cloud.Count)] : null, (Curve: null, Surface: null, Mesh: null, o))),
 
-            (var m, SubD subd, _, var sP, var idx, var order, var ctx) when subd.ToBrep() is Brep sbr =>
-                ((Func<AnalysisResult?>)(() => { try { return AnalyzeCore(sbr, m, ctx, (null, sP, idx), order); } finally { sbr.Dispose(); } }))(),
+            (Point3d pt, _, _, int o) => ResultFactory.Create(value: new AnalysisResult(pt, [], Frames: null, Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, (Curve: null, Surface: null, Mesh: null, o))),
 
-            (var m, PointCloud cloud, _, _, _, _, var ctx) when cloud.Count > 0 &&
-                (cloud.GetPoints(), cloud.GetBoundingBox(accurate: true).Center,
-                 Plane.FitPlaneToPoints(cloud.GetPoints(), out Plane fitted) == PlaneFitResult.Success ? fitted : Plane.WorldXY) is (var pts, var center, var plane) =>
-                new AnalysisResult(
-                    Point: center,
-                    Derivatives: [],
-                    Frames: m.HasFlag(AnalysisMethod.Frame) ? (plane, null, null, null, null) : null,
-                    Curvature: null,
-                    Discontinuities: null,
-                    Topology: null,
-                    Proximity: null,
-                    Singularities: null,
-                    Metrics: m.HasFlag(AnalysisMethod.Metrics) ? (null, null, null, center) : null,
-                    Domains: m.HasFlag(AnalysisMethod.Domains) ? [new Interval(0, cloud.Count)] : null,
-                    Params: (p?.Item1, p?.Item2, p?.Item3, dO)),
+            (Vector3d vec, AnalysisMethod m, _, int o) => ResultFactory.Create(value: new AnalysisResult(Point3d.Origin, [vec],
+                m.HasFlag(AnalysisMethod.Frame) ? (Primary: new Plane(Point3d.Origin, vec), Perpendicular: null, InflectionParams: null, MaxCurvatureParams: null, Torsion: null) : null,
+                Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, (Curve: null, Surface: null, Mesh: null, o))),
 
-            (var m, Point3d pt, _, _, _, var order, _) =>
-                new AnalysisResult(Point: pt, Derivatives: [], Frames: null, Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, Params: (p?.Item1, p?.Item2, p?.Item3, order)),
-
-            (var m, Vector3d vec, _, _, _, var order, _) =>
-                new AnalysisResult(Point: Point3d.Origin, Derivatives: [vec],
-                    Frames: m.HasFlag(AnalysisMethod.Frame) ? (new Plane(Point3d.Origin, vec), null, null, null, null) : null,
-                    Curvature: null, Discontinuities: null, Topology: null, Proximity: null, Singularities: null, Metrics: null, Domains: null, Params: (p?.Item1, p?.Item2, p?.Item3, order)),
-
-            _ => null,
-        };
+            _ => ResultFactory.Create<AnalysisResult>(error: AnalysisErrors.Operation.UnsupportedGeometry),
+        }).Map(result => (IReadOnlyList<AnalysisResult>)[result]);
 }

@@ -67,5 +67,6 @@ public static class AnalysisEngine {
                 Context = context,
                 ValidationMode = ValidationMode.None,
                 AccumulateErrors = false,
+                EnableCache = true,
             });
 }
