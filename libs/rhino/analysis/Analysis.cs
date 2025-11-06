@@ -85,7 +85,7 @@ public static class Analysis {
         IGeometryContext context,
         double? parameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(curve, context, parameter, null, null, null, derivativeOrder)
+        AnalysisCompute.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
@@ -95,7 +95,7 @@ public static class Analysis {
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(surface, context, null, uvParameter, null, null, derivativeOrder)
+        AnalysisCompute.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
@@ -107,7 +107,7 @@ public static class Analysis {
         int faceIndex = 0,
         Point3d? testPoint = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(brep, context, null, uvParameter, faceIndex, testPoint, derivativeOrder)
+        AnalysisCompute.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
             .Map(results => (BrepData)results[0]);
 
     /// <summary>Analyzes mesh geometry producing comprehensive topology navigation and manifold inspection data.</summary>

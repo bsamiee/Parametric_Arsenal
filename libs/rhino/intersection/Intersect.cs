@@ -111,7 +111,9 @@ public static class Intersect {
         internal static Result<IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, IntersectionOptions opts) where T1 : notnull where T2 : notnull {
             static Result<IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
                 if (results is null) return ResultFactory.Create(value: IntersectionOutput.Empty);
+#pragma warning disable IDISP007 // Don't dispose injected - CurveIntersections created by caller and owned by this method
                 using (results) {
+#pragma warning restore IDISP007
                     return results.Count > 0
                         ? ResultFactory.Create(value: new IntersectionOutput(
                             [.. from e in results select e.PointA],
@@ -183,13 +185,21 @@ public static class Intersect {
                         [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
                         [], [], [], [], [])),
                 (Curve ca, Curve cb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
+#pragma warning restore IDISP004
                 (Curve ca, Surface sb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Plane pb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurvePlane(ca, pb, tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Line lb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
                 (Curve ca, BrepFace fb, _) =>

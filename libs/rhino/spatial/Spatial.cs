@@ -78,52 +78,52 @@ public static class Spatial {
         (input, query) switch {
             // Point array range queries
             (Point3d[] pts, Sphere sphere) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Point3d[] pts, BoundingBox box) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Point array proximity queries
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ => tuple1.Item2 <= 0 ?
-                ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ => tuple2.Item2 <= 0 ?
-                ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ => tuple1.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                : ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ => tuple2.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                : ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
             // PointCloud range queries
             (PointCloud cloud, Sphere sphere) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (PointCloud cloud, BoundingBox box) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // PointCloud proximity queries
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 => tuple3.Item2 <= 0 ?
-                ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 => tuple4.Item2 <= 0 ?
-                ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 => tuple3.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                : ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 => tuple4.Item2 <= 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                : ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Mesh mesh, BoundingBox box) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Mesh overlap detection
             (ValueTuple<Mesh, Mesh> meshPair, double tolerance) => GetTree(meshPair.Item1).Bind(t1 =>
                 GetTree(meshPair.Item2).Bind(t2 =>
                     ExecuteOverlapSearch(t1, t2, context.AbsoluteTolerance + tolerance, bufferSize))),
             // Curve array range queries
             (Curve[] curves, Sphere sphere) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Curve[] curves, BoundingBox box) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Surface array range queries
             (Surface[] surfaces, Sphere sphere) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Surface[] surfaces, BoundingBox box) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             // Brep array range queries
             (Brep[] breps, Sphere sphere) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, sphere, bufferSize)),
             (Brep[] breps, BoundingBox box) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
+                ExecuteRangeSearch(tree, box, bufferSize)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(
                 error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
@@ -134,7 +134,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(
         RTree tree,
         object queryShape,
-        double tolerance,
         int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;

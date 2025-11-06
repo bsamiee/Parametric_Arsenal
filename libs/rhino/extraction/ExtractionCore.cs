@@ -39,14 +39,14 @@ internal static class ExtractionCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, object spec, IGeometryContext context) {
         (byte kind, object? param, bool includeEnds) = spec switch {
-            int count => ((byte)10, (object?)count, true),
-            double length => ((byte)11, (object?)length, true),
-            (int count, bool ends) => ((byte)10, (object?)count, ends),
-            (double length, bool ends) => ((byte)11, (object?)length, ends),
-            Vector3d dir => ((byte)12, (object?)dir, true),
-            Continuity cont => ((byte)13, (object?)cont, true),
-            Semantic { Kind: byte k } => (k, (object?)null, true),
-            _ => ((byte)0, (object?)null, false),
+            int count => ((byte)10, count, true),
+            double length => ((byte)11, length, true),
+            (int count, bool ends) => ((byte)10, count, ends),
+            (double length, bool ends) => ((byte)11, length, ends),
+            Vector3d dir => ((byte)12, dir, true),
+            Continuity cont => ((byte)13, cont, true),
+            Semantic { Kind: byte k } => (k, null, true),
+            _ => ((byte)0, null, false),
         };
 
         if (kind is 0) return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);
@@ -54,7 +54,7 @@ internal static class ExtractionCore {
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
             Extrusion ext when kind is 1 or 6 => (ext.ToBrep(splitKinkyFaces: true), true),
             SubD sd when kind is 1 or 6 => (sd.ToBrep(), true),
-            _ => (geometry, false)
+            _ => (geometry, false),
         };
 
         try {
@@ -141,10 +141,11 @@ internal static class ExtractionCore {
                 .Select(i => m.TopologyEdges.EdgeLine(i))
                 .Where(static ln => ln.IsValid)
                 .Select(static ln => ln.PointAt(0.5)),],
-            (6, Curve c, _) => c.DuplicateSegments() is Curve[] { Length: > 0 } segs ?
-                [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5)),] :
-                c.TryGetPolyline(out Polyline pl) ?
-                    [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),] : [],
+            (6, Curve c, _) => c.DuplicateSegments() is Curve[] { Length: > 0 } segs
+                ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5)),]
+                : c.TryGetPolyline(out Polyline pl)
+                    ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),]
+                    : [],
             (7, Brep b, _) => [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => { try {
                     return AreaMassProperties.Compute(d)?.Centroid ?? Point3d.Unset;
@@ -182,7 +183,7 @@ internal static class ExtractionCore {
                     t0 = t;
                 }
                 return pts;
-            }))() switch { { Count: > 0 } list => [.. list], _ => [] },
+            }))() switch { { Count: > 0 } list => [.. list], _ => [], },
             _ => [],
         };
 }
