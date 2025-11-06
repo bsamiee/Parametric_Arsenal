@@ -8,10 +8,11 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Polymorphic analysis engine with geometry-specific overloads and unified internal dispatch.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Analysis is the primary API entry point for the Analysis namespace")]
 public static class Analysis {
     /// <summary>Analysis result marker interface for polymorphic return discrimination.</summary>
     public interface IResult {
-        Point3d Location { get; }
+        public Point3d Location { get; }
     }
 
     /// <summary>Curve analysis result containing derivatives, curvature, frame data, discontinuities, and metrics.</summary>
@@ -82,9 +83,9 @@ public static class Analysis {
     public static Result<CurveData> Analyze(
         Curve curve,
         IGeometryContext context,
-        double? t = null,
+        double? parameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(curve, context, t, null, null, null, derivativeOrder)
+        AnalysisCompute.Execute(curve, context, parameter, null, null, null, derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
@@ -92,9 +93,9 @@ public static class Analysis {
     public static Result<SurfaceData> Analyze(
         Surface surface,
         IGeometryContext context,
-        (double U, double V)? uv = null,
+        (double u, double v)? uvParameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(surface, context, null, uv, null, null, derivativeOrder)
+        AnalysisCompute.Execute(surface, context, null, uvParameter, null, null, derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
@@ -102,11 +103,11 @@ public static class Analysis {
     public static Result<BrepData> Analyze(
         Brep brep,
         IGeometryContext context,
-        (double U, double V)? uv = null,
+        (double u, double v)? uvParameter = null,
         int faceIndex = 0,
         Point3d? testPoint = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(brep, context, null, uv, faceIndex, testPoint, derivativeOrder)
+        AnalysisCompute.Execute(brep, context, null, uvParameter, faceIndex, testPoint, derivativeOrder)
             .Map(results => (BrepData)results[0]);
 
     /// <summary>Analyzes mesh geometry producing comprehensive topology navigation and manifold inspection data.</summary>
@@ -115,7 +116,7 @@ public static class Analysis {
         Mesh mesh,
         IGeometryContext context,
         int vertexIndex = 0) =>
-        AnalysisCompute.Execute(mesh, context, null, null, vertexIndex, null, 0)
+        AnalysisCompute.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0)
             .Map(results => (MeshData)results[0]);
 
     /// <summary>Analyzes collections of geometry producing heterogeneous results via UnifiedOperation batch processing.</summary>
@@ -123,15 +124,15 @@ public static class Analysis {
     public static Result<IReadOnlyList<IResult>> AnalyzeMultiple<T>(
         IReadOnlyList<T> geometries,
         IGeometryContext context,
-        double? t = null,
-        (double U, double V)? uv = null,
+        double? parameter = null,
+        (double u, double v)? uvParameter = null,
         int? index = null,
         Point3d? testPoint = null,
         int derivativeOrder = 2) where T : notnull =>
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>
-                AnalysisCompute.Execute(item, context, t, uv, index, testPoint, derivativeOrder)),
+                AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder)),
             new OperationConfig<object, IResult> {
                 Context = context,
                 ValidationMode = Core.Validation.ValidationMode.None,

@@ -5,6 +5,7 @@ using CsCheck;
 namespace Arsenal.Tests.Common;
 
 /// <summary>Algebraic test generation and execution using polymorphic dispatch.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Shared test utilities used across test projects")]
 public static class TestGen {
     /// <summary>Generates Result with algebraic state distribution (success/failure × immediate/deferred).</summary>
     public static Gen<Result<T>> ToResult<T>(this Gen<T> valueGen, Gen<SystemError> errorGen, int successWeight = 1, int failureWeight = 1, int deferredWeight = 0) =>
