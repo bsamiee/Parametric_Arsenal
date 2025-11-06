@@ -12,7 +12,7 @@ namespace Arsenal.Core.Validation;
 /// <summary>Polymorphic validation system using compiled expression trees and cached validators with registry-based dispatch.</summary>
 public static class ValidationRules {
     /// <summary>Cache key structure for validator lookups with type, mode, and member discrimination.</summary>
-    private readonly struct CacheKey(Type type, ValidationMode mode, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
+    private readonly struct CacheKey(Type type, ValidationMode mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
         public readonly ValidationMode Mode = mode;
         public readonly string? Member = member;

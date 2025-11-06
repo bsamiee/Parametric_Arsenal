@@ -166,7 +166,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteKNearestPoints(Point3d[] points, Point3d[] needles, int k) =>
         RTree.Point3dKNeighbors(points, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
         };
 
@@ -175,7 +174,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedPoints(Point3d[] points, Point3d[] needles, double limit) =>
         RTree.Point3dClosestPoints(points, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
         };
 
@@ -184,7 +182,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteKNearestCloud(PointCloud cloud, Point3d[] needles, int k) =>
         RTree.PointCloudKNeighbors(cloud, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
         };
 
@@ -193,7 +190,6 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedCloud(PointCloud cloud, Point3d[] needles, double limit) =>
         RTree.PointCloudClosestPoints(cloud, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: ErrorRegistry.Get(4005)),
         };
 

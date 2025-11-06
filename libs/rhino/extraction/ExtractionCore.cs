@@ -72,7 +72,7 @@ internal static class ExtractionCore {
                     .First();
 
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode is ValidationMode.None ? null : [context, mode])
+                .Validate(args: mode == ValidationMode.None ? null : [context, mode])
                 .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
