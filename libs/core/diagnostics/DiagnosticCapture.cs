@@ -20,7 +20,7 @@ public static class DiagnosticCapture {
     public static Result<T> Capture<T>(
         this Result<T> result,
         string operation,
-        ValidationMode? validationApplied = null,
+        ulong? validationApplied = null,
         bool? cacheHit = null,
         [CallerMemberName] string callerMember = "",
         [CallerFilePath] string callerFile = "",

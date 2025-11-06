@@ -1,8 +1,10 @@
+using Arsenal.Core.Errors;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -143,7 +145,7 @@ public static class Analysis {
                 AnalysisCompute.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: enableDiagnostics)),
             new OperationConfig<object, IResult> {
                 Context = context,
-                ValidationMode = Core.Validation.ValidationMode.None,
+                ValidationMode = Modes.None,
                 EnableCache = true,
                 AccumulateErrors = false,
                 OperationName = "Analysis.Multiple",

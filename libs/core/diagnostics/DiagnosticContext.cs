@@ -14,13 +14,13 @@ public readonly struct DiagnosticContext(
     string operation,
     TimeSpan elapsed,
     long allocations,
-    ValidationMode? validationApplied = null,
+    ulong? validationApplied = null,
     bool? cacheHit = null,
     int? errorCount = null) : IEquatable<DiagnosticContext> {
     public string Operation { get; } = operation;
     public TimeSpan Elapsed { get; } = elapsed;
     public long Allocations { get; } = allocations;
-    public ValidationMode? ValidationApplied { get; } = validationApplied;
+    public ulong? ValidationApplied { get; } = validationApplied;
     public bool? CacheHit { get; } = cacheHit;
     public int? ErrorCount { get; } = errorCount;
 

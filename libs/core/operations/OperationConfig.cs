@@ -10,7 +10,7 @@ public sealed record OperationConfig<TIn, TOut> {
     public required IGeometryContext Context { get; init; }
 
     /// <summary>Validation mode applied before operation execution</summary>
-    public ValidationMode ValidationMode { get; init; } = ValidationMode.None;
+    public ulong ValidationMode { get; init; } = Modes.None;
 
     /// <summary>Additional validation arguments passed to validation contracts</summary>
     public object[]? ValidationArgs { get; init; }

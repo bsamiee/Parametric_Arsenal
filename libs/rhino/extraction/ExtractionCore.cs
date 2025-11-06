@@ -1,3 +1,4 @@
+using Arsenal.Core.Errors;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -11,31 +12,31 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Internal extraction algorithms with Rhino SDK geometry processing.</summary>
 internal static class ExtractionCore {
-    private static readonly FrozenDictionary<(byte, Type), ValidationMode> _validationConfig =
-        new Dictionary<(byte, Type), ValidationMode> {
-            [(1, typeof(GeometryBase))] = ValidationMode.Standard,
-            [(1, typeof(Brep))] = ValidationMode.Standard | ValidationMode.MassProperties,
-            [(1, typeof(Curve))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(1, typeof(Surface))] = ValidationMode.Standard | ValidationMode.AreaCentroid,
-            [(1, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MassProperties,
-            [(1, typeof(PointCloud))] = ValidationMode.Standard,
-            [(2, typeof(GeometryBase))] = ValidationMode.BoundingBox,
-            [(3, typeof(NurbsCurve))] = ValidationMode.Standard,
-            [(3, typeof(NurbsSurface))] = ValidationMode.Standard,
-            [(3, typeof(Curve))] = ValidationMode.Standard,
-            [(3, typeof(Surface))] = ValidationMode.Standard,
-            [(4, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(5, typeof(Curve))] = ValidationMode.Tolerance,
-            [(6, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(6, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MeshSpecific,
-            [(6, typeof(Curve))] = ValidationMode.Standard,
-            [(7, typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-            [(7, typeof(Mesh))] = ValidationMode.Standard | ValidationMode.MeshSpecific,
-            [(10, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(10, typeof(Surface))] = ValidationMode.Standard,
-            [(11, typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-            [(12, typeof(Curve))] = ValidationMode.Standard,
-            [(13, typeof(Curve))] = ValidationMode.Standard,
+    private static readonly FrozenDictionary<(byte, Type), ulong> _validationConfig =
+        new Dictionary<(byte, Type), ulong> {
+            [(1, typeof(GeometryBase))] = Modes.Standard,
+            [(1, typeof(Brep))] = Modes.Standard | Modes.MassProperties,
+            [(1, typeof(Curve))] = Modes.Standard | Modes.AreaCentroid,
+            [(1, typeof(Surface))] = Modes.Standard | Modes.AreaCentroid,
+            [(1, typeof(Mesh))] = Modes.Standard | Modes.MassProperties,
+            [(1, typeof(PointCloud))] = Modes.Standard,
+            [(2, typeof(GeometryBase))] = Modes.BoundingBox,
+            [(3, typeof(NurbsCurve))] = Modes.Standard,
+            [(3, typeof(NurbsSurface))] = Modes.Standard,
+            [(3, typeof(Curve))] = Modes.Standard,
+            [(3, typeof(Surface))] = Modes.Standard,
+            [(4, typeof(Curve))] = Modes.Standard | Modes.Degeneracy,
+            [(5, typeof(Curve))] = Modes.Tolerance,
+            [(6, typeof(Brep))] = Modes.Standard | Modes.Topology,
+            [(6, typeof(Mesh))] = Modes.Standard | Modes.MeshSpecific,
+            [(6, typeof(Curve))] = Modes.Standard,
+            [(7, typeof(Brep))] = Modes.Standard | Modes.Topology,
+            [(7, typeof(Mesh))] = Modes.Standard | Modes.MeshSpecific,
+            [(10, typeof(Curve))] = Modes.Standard | Modes.Degeneracy,
+            [(10, typeof(Surface))] = Modes.Standard,
+            [(11, typeof(Curve))] = Modes.Standard | Modes.Degeneracy,
+            [(12, typeof(Curve))] = Modes.Standard,
+            [(13, typeof(Curve))] = Modes.Standard,
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -54,7 +55,7 @@ internal static class ExtractionCore {
 #pragma warning restore IDE0004
 
         if (kind is 0) {
-            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);
+            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ErrorFactory.Create(code: 2000));
         }
 
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
@@ -64,15 +65,15 @@ internal static class ExtractionCore {
         };
 
         try {
-            ValidationMode mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ValidationMode exact) ? exact :
+            ulong mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ulong exact) ? exact :
                 _validationConfig.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(normalized.GetType()))
                     .OrderByDescending(kv => kv.Key.Item2, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                     .Select(kv => kv.Value)
-                    .DefaultIfEmpty(ValidationMode.Standard)
+                    .DefaultIfEmpty(Modes.Standard)
                     .First();
 
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode is ValidationMode.None ? null : [context, mode])
+                .Validate(args: mode is Modes.None ? null : [context, mode])
                 .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
