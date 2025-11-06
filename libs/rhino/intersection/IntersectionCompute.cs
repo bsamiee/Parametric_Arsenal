@@ -8,6 +8,8 @@ using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
+#pragma warning disable MA0007 // Record primary constructor parameters cannot have trailing commas in C#
+
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Dense intersection computation strategies using polymorphic type-based dispatch.</summary>
@@ -58,9 +60,9 @@ internal static class IntersectionCompute {
             (Circle ca, Circle cb, _) => CircleCircle(ca, cb, ctx),
             (Arc aa, Arc ab, _) => ArcArc(aa, ab, ctx),
             (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
-                ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, RhinoMath.ZeroTolerance)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
+                ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, tol)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
             (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance =>
-                ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, RhinoMath.ZeroTolerance)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
+                ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, tol)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
             (Ray3d ray, GeometryBase[] geoms, { MaxHitCount: int hits }) when ray.Direction.Length > RhinoMath.ZeroTolerance && hits > 0 =>
                 ResultFactory.Create(value: new IntersectionResult([.. RhinoIntersect.RayShoot(ray, geoms, hits)])).Map(r => (IReadOnlyList<IntersectionResult>)[r]),
             (_, _, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
@@ -78,20 +80,17 @@ internal static class IntersectionCompute {
         RhinoIntersect.CurveCurve(ca, cb, tol, tol) switch {
             null => ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Operation.ComputationFailed),
             { Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<IntersectionResult>)[new([])]),
-#pragma warning disable MA0007 // Record primary constructor parameters cannot have trailing commas
             CurveIntersections r when r.Any(e => e.IsOverlap) => ResultFactory.Create(value: (IReadOnlyList<IntersectionResult>)[new(
                 Points: [.. from e in r select e.PointA],
                 Curves: [.. from e in r where e.IsOverlap from c in new[] { ca.Trim(e.OverlapA) } where c is not null select c],
                 ParametersA: [.. from e in r select e.ParameterA],
                 ParametersB: [.. from e in r select e.ParameterB])]),
-#pragma warning restore MA0007
 #pragma warning disable MA0007 // Record primary constructor parameters cannot have trailing commas
             CurveIntersections r => ResultFactory.Create(value: (IReadOnlyList<IntersectionResult>)[new(
                 Points: [.. from e in r select e.PointA],
                 Curves: null,
                 ParametersA: [.. from e in r select e.ParameterA],
                 ParametersB: [.. from e in r select e.ParameterB])]),
-#pragma warning restore MA0007
         };
 
     [Pure]
@@ -99,13 +98,11 @@ internal static class IntersectionCompute {
         RhinoIntersect.CurveSurface(ca, sb, tol, tol) switch {
             null => ResultFactory.Create<IReadOnlyList<IntersectionResult>>(error: IntersectionErrors.Operation.ComputationFailed),
             { Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<IntersectionResult>)[new([])]),
-#pragma warning disable MA0007 // Record primary constructor parameters cannot have trailing commas
             CurveIntersections r => ResultFactory.Create(value: (IReadOnlyList<IntersectionResult>)[new(
                 Points: [.. from e in r select e.PointA],
                 Curves: null,
                 ParametersA: [.. from e in r select e.ParameterA],
                 ParametersB: [.. from e in r select e.ParameterB])]),
-#pragma warning restore MA0007
         };
 
     [Pure]
