@@ -40,7 +40,8 @@ public static class Intersect {
         T1 geometryA,
         T2 geometryB,
         IGeometryContext context,
-        IntersectionOptions? options = null) where T1 : notnull where T2 : notnull {
+        IntersectionOptions? options = null,
+        bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new();
         Type t1Type = typeof(T1);
         Type t2Type = typeof(T2);
@@ -60,6 +61,8 @@ public static class Intersect {
                 Context = context,
                 ValidationMode = mode,
                 AccumulateErrors = true,
+                OperationName = $"Intersect.{t1Type.Name}.{t2Type.Name}",
+                EnableDiagnostics = enableDiagnostics,
             })
         .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(
             [.. acc.Points, .. curr.Points],

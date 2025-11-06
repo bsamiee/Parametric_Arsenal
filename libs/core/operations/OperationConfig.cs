@@ -50,4 +50,10 @@ public sealed record OperationConfig<TIn, TOut> {
 
     /// <summary>Custom error message prefix for error accumulation</summary>
     public string? ErrorPrefix { get; init; }
+
+    /// <summary>Operation name for diagnostic instrumentation when diagnostics enabled</summary>
+    public string? OperationName { get; init; }
+
+    /// <summary>Enable diagnostic capture for allocation and timing instrumentation in DEBUG builds</summary>
+    public bool EnableDiagnostics { get; init; }
 }

@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
+using Arsenal.Core.Diagnostics;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
@@ -192,8 +193,13 @@ internal static class AnalysisCompute {
         (double, double)? uv,
         int? index,
         Point3d? testPoint,
-        int derivativeOrder) =>
-        _strategies.TryGetValue(geometry.GetType(), out (ValidationMode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>) strategy)
-            ? strategy.Item2(geometry, context, t, uv, index, testPoint, derivativeOrder).Map(r => (IReadOnlyList<Analysis.IResult>)[r])
+        int derivativeOrder,
+        bool enableDiagnostics = false) =>
+        _strategies.TryGetValue(geometry.GetType(), out (ValidationMode mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)
+            ? (enableDiagnostics
+                ? strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder)
+                    .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
+                : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
+                .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
             : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: AnalysisErrors.Operation.UnsupportedGeometry.WithContext(geometry.GetType().Name));
 }
