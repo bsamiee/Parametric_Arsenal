@@ -39,14 +39,14 @@ internal static class ExtractionCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, object spec, IGeometryContext context) {
         (byte kind, object? param, bool includeEnds) = spec switch {
-            int count => (10, count, true),
-            double length => (11, length, true),
-            (int count, bool ends) => (10, count, ends),
-            (double length, bool ends) => (11, length, ends),
-            Vector3d dir => (12, dir, true),
-            Continuity cont => (13, cont, true),
-            Semantic { Kind: byte k } => (k, null, true),
-            _ => (0, null, false),
+            int count => ((byte)10, (object?)count, true),
+            double length => ((byte)11, (object?)length, true),
+            (int count, bool ends) => ((byte)10, (object?)count, ends),
+            (double length, bool ends) => ((byte)11, (object?)length, ends),
+            Vector3d dir => ((byte)12, (object?)dir, true),
+            Continuity cont => ((byte)13, (object?)cont, true),
+            Semantic { Kind: byte k } => (k, (object?)null, true),
+            _ => ((byte)0, (object?)null, false),
         };
 
         if (kind is 0) return ResultFactory.Create<IReadOnlyList<Point3d>>(error: ExtractionErrors.Operation.InvalidMethod);

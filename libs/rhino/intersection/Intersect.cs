@@ -150,34 +150,34 @@ public static class Intersect {
             double tolerance = opts.Tolerance ?? ctx.AbsoluteTolerance;
 
             return (a, b, opts) switch {
+                (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
+                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
+                    ResultFactory.Create(value: new IntersectionOutput(
+                        [.. RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, ctx.AbsoluteTolerance, out int[] ids1)],
+                        [], [], [], ids1.Length > 0 ? [.. ids1] : [], [])),
                 (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) =>
-                    dir.IsValid && dir.Length > RhinoMath.ZeroTolerance switch {
-                        false => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
-                        true when opts.WithIndices => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, ctx.AbsoluteTolerance, out int[] ids1)],
-                            [], [], [], ids1.Length > 0 ? [.. ids1] : [], [])),
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, ctx.AbsoluteTolerance)],
-                            [], [], [], [], [])),
-                    },
+                    ResultFactory.Create(value: new IntersectionOutput(
+                        [.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, ctx.AbsoluteTolerance)],
+                        [], [], [], [], [])),
+                (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
+                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
+                    ResultFactory.Create(value: new IntersectionOutput(
+                        [.. RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, ctx.AbsoluteTolerance, out int[] ids2)],
+                        [], [], [], ids2.Length > 0 ? [.. ids2] : [], [])),
                 (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) =>
-                    dir.IsValid && dir.Length > RhinoMath.ZeroTolerance switch {
-                        false => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
-                        true when opts.WithIndices => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, ctx.AbsoluteTolerance, out int[] ids2)],
-                            [], [], [], ids2.Length > 0 ? [.. ids2] : [], [])),
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, ctx.AbsoluteTolerance)],
-                            [], [], [], [], [])),
-                    },
+                    ResultFactory.Create(value: new IntersectionOutput(
+                        [.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, ctx.AbsoluteTolerance)],
+                        [], [], [], [], [])),
+                (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when ray.Direction.Length <= RhinoMath.ZeroTolerance =>
+                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidRayDirection),
+                (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when hits <= 0 =>
+                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidMaxHitCount),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) =>
-                    (ray.Direction.Length > RhinoMath.ZeroTolerance, hits > 0) switch {
-                        (false, _) => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidRayDirection),
-                        (_, false) => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidMaxHitCount),
-                        (true, true) => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
-                            [], [], [], [], [])),
-                    },
+                    ResultFactory.Create(value: new IntersectionOutput(
+                        [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
+                        [], [], [], [], [])),
                 (Curve ca, Curve cb, _) =>
                     fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
                 (Curve ca, Surface sb, _) =>

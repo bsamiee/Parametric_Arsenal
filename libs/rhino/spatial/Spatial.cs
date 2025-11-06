@@ -67,28 +67,28 @@ public static class Spatial {
             (Point3d[] pts, BoundingBox box) => SpatialCache.GetTree(pts).Bind(tree =>
                 ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
             // Point array proximity queries
-            (Point3d[] pts, (Point3d[] needles, int k)) => SpatialCache.GetTree(pts).Bind(tree =>
-                k <= 0 ?
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => SpatialCache.GetTree(pts).Bind(tree =>
+                tuple1.Item2 <= 0 ?
                     ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                    ExecuteKNearestPoints(pts, needles, k)),
-            (Point3d[] pts, (Point3d[] needles, double limit)) => SpatialCache.GetTree(pts).Bind(tree =>
-                limit <= 0 ?
+                    ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => SpatialCache.GetTree(pts).Bind(tree =>
+                tuple2.Item2 <= 0 ?
                     ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                    ExecuteDistanceLimitedPoints(pts, needles, limit)),
+                    ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
             // PointCloud range queries
             (PointCloud cloud, Sphere sphere) => SpatialCache.GetTree(cloud).Bind(tree =>
                 ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
             (PointCloud cloud, BoundingBox box) => SpatialCache.GetTree(cloud).Bind(tree =>
                 ExecuteRangeSearch(tree, box, context.AbsoluteTolerance, bufferSize)),
             // PointCloud proximity queries
-            (PointCloud cloud, (Point3d[] needles, int k)) =>
-                k <= 0 ?
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 =>
+                tuple3.Item2 <= 0 ?
                     ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK) :
-                    ExecuteKNearestCloud(cloud, needles, k),
-            (PointCloud cloud, (Point3d[] needles, double limit)) =>
-                limit <= 0 ?
+                    ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 =>
+                tuple4.Item2 <= 0 ?
                     ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance) :
-                    ExecuteDistanceLimitedCloud(cloud, needles, limit),
+                    ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => SpatialCache.GetTree(mesh).Bind(tree =>
                 ExecuteRangeSearch(tree, sphere, context.AbsoluteTolerance, bufferSize)),
@@ -153,6 +153,7 @@ public static class Spatial {
         RTree.Point3dKNeighbors(points, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
 
     /// <summary>Executes distance-limited proximity search for point arrays using RTree.Point3dClosestPoints.</summary>
@@ -161,6 +162,7 @@ public static class Spatial {
         RTree.Point3dClosestPoints(points, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
 
     /// <summary>Executes k-nearest neighbor search for point clouds using RTree.PointCloudKNeighbors.</summary>
@@ -169,6 +171,7 @@ public static class Spatial {
         RTree.PointCloudKNeighbors(cloud, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
 
     /// <summary>Executes distance-limited proximity search for point clouds using RTree.PointCloudClosestPoints.</summary>
@@ -177,6 +180,7 @@ public static class Spatial {
         RTree.PointCloudClosestPoints(cloud, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: (IReadOnlyList<int>)results.SelectMany(indices => indices).ToArray()),
             null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
         };
 
     /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
