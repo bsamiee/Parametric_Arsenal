@@ -86,7 +86,7 @@ public static class Analysis {
         IGeometryContext context,
         double? parameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(curve, context, t, uv: index: null, testPoint: null, null, derivativeOrder)
+        AnalysisCompute.Execute(curve, context, t, uv: null, index: null, testPoint: null, derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
@@ -96,7 +96,7 @@ public static class Analysis {
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(surface, context, t: index: null, uv, null, null, derivativeOrder)
+        AnalysisCompute.Execute(surface, context, t: null, uv, index: null, testPoint: null, derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
@@ -117,7 +117,7 @@ public static class Analysis {
         Mesh mesh,
         IGeometryContext context,
         int vertexIndex = 0) =>
-        AnalysisCompute.Execute(mesh, context, t: uv: null, null, vertexIndex, testPoint: null, 0)
+        AnalysisCompute.Execute(mesh, context, t: null, uv: null, vertexIndex, testPoint: null, 0)
             .Map(results => (MeshData)results[0]);
 
     /// <summary>Analyzes collections of geometry producing heterogeneous results via UnifiedOperation batch processing.</summary>
