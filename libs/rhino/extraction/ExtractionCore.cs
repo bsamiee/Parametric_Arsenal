@@ -84,8 +84,8 @@ internal static class ExtractionCore {
     [Pure]
     private static Point3d[] ExtractCore(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) =>
         (kind, geometry, param) switch {
-            (1, Brep b, _) => VolumeMassProperties.Compute(b) switch { { Centroid: { IsValid: true } ct } => [ct, .. b.Vertices.Select(v => v.Location),],
-                _ => [.. b.Vertices.Select(v => v.Location),],
+            (1, Brep b, _) => VolumeMassProperties.Compute(b) switch { { Centroid: { IsValid: true } ct } => [ct, .. b.Vertices.Select(v => v.Location)],
+                _ => [.. b.Vertices.Select(v => v.Location)],
             },
             (1, Curve c, _) => (AreaMassProperties.Compute(c), c) switch {
                 ( { Centroid: { IsValid: true } ct }, Curve crv) =>
@@ -99,18 +99,18 @@ internal static class ExtractionCore {
                     [sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max),],
             },
             (1, Mesh m, _) => (VolumeMassProperties.Compute(m), m) switch {
-                ( { Centroid: { IsValid: true } ct }, Mesh mesh) => [ct, .. mesh.Vertices.ToPoint3dArray(),],
+                ( { Centroid: { IsValid: true } ct }, Mesh mesh) => [ct, .. mesh.Vertices.ToPoint3dArray()],
                 (_, Mesh mesh) => mesh.Vertices.ToPoint3dArray(),
             },
             (1, PointCloud pc, _) => pc.GetPoints() is Point3d[] pts && pts.Length > 0 ?
-                [pts.Aggregate(Point3d.Origin, static (s, p) => s + p) / pts.Length, .. pts,] : [],
+                [pts.Aggregate(Point3d.Origin, static (s, p) => s + p) / pts.Length, .. pts] : [],
             (2, Curve c, _) => [c.PointAtStart, c.PointAtEnd,],
             (2, Surface s, _) => (s.Domain(0), s.Domain(1), s) switch {
                 (Interval u, Interval v, Surface sf) =>
                     [sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max),],
             },
             (2, GeometryBase g, _) => g.GetBoundingBox(accurate: true).GetCorners(),
-            (3, NurbsCurve nc, _) => [.. nc.GrevillePoints(),],
+            (3, NurbsCurve nc, _) => [.. nc.GrevillePoints()],
             (3, NurbsSurface ns, _) => ns.Points is NurbsSurfacePointList pts ?
                 [.. from u in Enumerable.Range(0, pts.CountU)
                     from v in Enumerable.Range(0, pts.CountV)
@@ -118,7 +118,7 @@ internal static class ExtractionCore {
                     select ns.PointAt(gp.X, gp.Y),
                 ] : [],
             (3, Curve c, _) => c.ToNurbsCurve() switch {
-                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { try { return [.. n.GrevillePoints(),]; } finally { n.Dispose(); } }))(nc),
+                NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { try { return [.. n.GrevillePoints()]; } finally { n.Dispose(); } }))(nc),
                 _ => [],
             },
             (3, Surface s, _) => s.ToNurbsSurface() switch {
@@ -147,20 +147,20 @@ internal static class ExtractionCore {
                         e.Center - (e.Plane.XAxis * e.Radius1),
                         e.Center - (e.Plane.YAxis * e.Radius2),
                     ],
-                (Curve crv, double tol) when crv.TryGetPolyline(out Polyline pl) => [.. pl,],
+                (Curve crv, double tol) when crv.TryGetPolyline(out Polyline pl) => [.. pl],
                 (Curve crv, double tol) when crv.IsLinear(tol) => [crv.PointAtStart, crv.PointAtEnd,],
                 _ => [],
             },
-            (6, Brep b, _) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5)),],
+            (6, Brep b, _) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))],
             (6, Mesh m, _) => [.. Enumerable.Range(0, m.TopologyEdges.Count)
                 .Select(i => m.TopologyEdges.EdgeLine(i))
                 .Where(static ln => ln.IsValid)
                 .Select(static ln => ln.PointAt(0.5)),
             ],
             (6, Curve c, _) => c.DuplicateSegments() is Curve[] { Length: > 0 } segs
-                ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5)),]
+                ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5))]
                 : c.TryGetPolyline(out Polyline pl)
-                    ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),]
+                    ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5))]
                     : [],
             (7, Brep b, _) => [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => {
@@ -176,7 +176,7 @@ internal static class ExtractionCore {
                 .Where(static pt => pt.IsValid),
             ],
             (10, Curve c, int count) => c.DivideByCount(count, includeEnds) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (10, Surface s, int d) => (s.Domain(0), s.Domain(1), s) switch {
@@ -190,11 +190,11 @@ internal static class ExtractionCore {
                 _ => [],
             },
             (11, Curve c, double length) => c.DivideByLength(length, includeEnds) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (12, Curve c, Vector3d dir) => c.ExtremeParameters(dir) switch {
-                double[] ts => [.. ts.Select(c.PointAt),],
+                double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
             (13, Curve c, Continuity cont) => ((Func<List<Point3d>>)(() => {
@@ -205,7 +205,7 @@ internal static class ExtractionCore {
                     t0 = t;
                 }
                 return pts;
-            }))() switch { { Count: > 0 } list => [.. list,], _ => [], },
+            }))() switch { { Count: > 0 } list => [.. list], _ => [], },
             _ => [],
         };
 }
