@@ -69,7 +69,7 @@
     <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Report all analyzer diagnostics, not just errors -->
     <ReportAnalyzer>true</ReportAnalyzer>
   </PropertyGroup>
@@ -80,7 +80,8 @@
   <ItemGroup>
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.231" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- ============================================ -->
