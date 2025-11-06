@@ -145,9 +145,9 @@ public static class ErrorFactory {
         public static SystemError InvalidUnitConversion() => Create(ErrorDomain.Validation, 3920);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static SystemError UnsupportedOperationType() => Create(ErrorDomain.Validation, 4000);
+        public static SystemError UnsupportedOperationType() => Create(ErrorDomain.Validation, 3930);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static SystemError InputFiltered() => Create(ErrorDomain.Validation, 4001);
+        public static SystemError InputFiltered() => Create(ErrorDomain.Validation, 3931);
     }
 }

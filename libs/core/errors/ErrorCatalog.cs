@@ -45,8 +45,8 @@ public static class ErrorCatalog {
             [(ErrorDomain.Validation, 3902)] = new(ErrorDomain.Validation, 3902, "Angle tolerance must be in range (0, 2π]"),
             [(ErrorDomain.Validation, 3903)] = new(ErrorDomain.Validation, 3903, "Geometry exceeds tolerance threshold"),
             [(ErrorDomain.Validation, 3920)] = new(ErrorDomain.Validation, 3920, "Invalid unit conversion scale"),
-            [(ErrorDomain.Validation, 4000)] = new(ErrorDomain.Validation, 4000, "Unsupported operation type"),
-            [(ErrorDomain.Validation, 4001)] = new(ErrorDomain.Validation, 4001, "Input filtered"),
+            [(ErrorDomain.Validation, 3930)] = new(ErrorDomain.Validation, 3930, "Unsupported operation type"),
+            [(ErrorDomain.Validation, 3931)] = new(ErrorDomain.Validation, 3931, "Input filtered"),
             [(ErrorDomain.Validation, 4003)] = new(ErrorDomain.Validation, 4003, "Input and query type combination not supported"),
             [(ErrorDomain.Geometry, 4004)] = new(ErrorDomain.Geometry, 4004, "Proximity search operation failed"),
         }.ToFrozenDictionary();
