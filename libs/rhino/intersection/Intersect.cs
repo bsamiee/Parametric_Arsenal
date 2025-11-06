@@ -194,6 +194,8 @@ public static class Intersect {
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
 #pragma warning restore IDISP004
+                (Curve ca, BrepFace bf, _) =>
+                    fromBrepIntersection(RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2),
                 (Curve ca, Surface sb, _) =>
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance), overlapSource: null),
@@ -208,8 +210,6 @@ public static class Intersect {
 #pragma warning restore IDISP004
                 (Curve ca, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
-                (Curve ca, BrepFace bf, _) =>
-                    fromBrepIntersection(RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2),
                 (Brep ba, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.BrepBrep(ba, bb, tolerance, out Curve[] c3, out Point3d[] p3), c3, p3),
                 (Brep ba, Plane pb, _) =>
@@ -249,7 +249,7 @@ public static class Intersect {
                             [.. points], [], [], [], ids3.Length > 0 ? [.. ids3] : [], [])),
                         _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
                     },
-                (Mesh ma, PolylineCurve pc, _) when !opts.Sorted =>
+                (Mesh ma, PolylineCurve pc, { Sorted: false }) =>
                     RhinoIntersect.MeshPolyline(ma, pc, out int[] ids4) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids4.Length > 0 ? [.. ids4] : [], [])),
