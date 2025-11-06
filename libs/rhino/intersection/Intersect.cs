@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
@@ -13,14 +12,16 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Type-safe optional parameters for intersection operations.</summary>
-[StructLayout(LayoutKind.Auto)]
-public readonly record struct IntersectionOptions(
-    double? Tolerance = null,
-    Vector3d? ProjectionDirection = null,
-    int? MaxHits = null,
-    bool WithIndices = false,
-    bool Sorted = false);
+/// <summary>Polymorphic intersection engine with automatic type-based method detection.</summary>
+public static class Intersect {
+    /// <summary>Type-safe optional parameters for intersection operations.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct IntersectionOptions(
+        double? Tolerance = null,
+        Vector3d? ProjectionDirection = null,
+        int? MaxHits = null,
+        bool WithIndices = false,
+        bool Sorted = false);
 
     /// <summary>Unified intersection output with zero nullable fields.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -109,15 +110,24 @@ public readonly record struct IntersectionOptions(
         [Pure]
 #pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction
         internal static Result<IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, IntersectionOptions opts) where T1 : notnull where T2 : notnull {
-            static Result<IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) =>
-                results switch { { Count: > 0 } => ResultFactory.Create(value: new IntersectionOutput(
-                                     [.. from e in results select e.PointA],
-                                     overlapSource is not null ? [.. from e in results where e.IsOverlap let c = overlapSource.Trim(e.OverlapA) where c is not null select c] : [],
-                                     [.. from e in results select e.ParameterA],
-                                     [.. from e in results select e.ParameterB],
-                                     [], [])),
-                    _ => ResultFactory.Create(value: IntersectionOutput.Empty),
-                };
+#pragma warning restore MA0051
+            static Result<IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
+                if (results is null) {
+                    return ResultFactory.Create(value: IntersectionOutput.Empty);
+                }
+#pragma warning disable IDISP007 // Don't dispose injected - CurveIntersections created by caller and owned by this method
+                using (results) {
+#pragma warning restore IDISP007
+                    return results.Count > 0
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [.. from e in results select e.PointA],
+                            overlapSource is not null ? [.. from e in results where e.IsOverlap let c = overlapSource.Trim(e.OverlapA) where c is not null select c] : [],
+                            [.. from e in results select e.ParameterA],
+                            [.. from e in results select e.ParameterB],
+                            [], []))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty);
+                }
+            }
 
             static Result<IntersectionOutput> fromBrepIntersection(bool success, Curve[] curves, Point3d[] points) =>
                 success switch {
@@ -182,11 +192,17 @@ public readonly record struct IntersectionOptions(
                     fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
 #pragma warning restore IDISP004
                 (Curve ca, Surface sb, _) =>
-                    fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, tolerance), overlapSource: null),
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+                    fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Plane pb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                     fromCurveIntersections(RhinoIntersect.CurvePlane(ca, pb, tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Line lb, _) =>
-                    fromCurveIntersections(RhinoIntersect.CurveLine(ca, lb, tolerance, tolerance), overlapSource: null),
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+                    fromCurveIntersections(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance), overlapSource: null),
+#pragma warning restore IDISP004
                 (Curve ca, Brep bb, _) =>
                     fromBrepIntersection(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
                 (Brep ba, Brep bb, _) =>

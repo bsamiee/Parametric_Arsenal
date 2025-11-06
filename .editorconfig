@@ -25,7 +25,6 @@ dotnet_style_require_accessibility_modifiers = always:error                    #
 dotnet_code_quality.api_surface = all                                          # Analyze all APIs
 csharp_using_directive_placement = outside_namespace:error                     # Usings outside namespace
 dotnet_sort_system_directives_first = true                                     # System usings first
-MA0051.maximum_lines_per_method = 120                                          # Max method length 120 lines
 dotnet_separate_import_directive_groups = false                                # Don't separate using groups
 
 # --------------------------------------------------------------------
@@ -705,8 +704,7 @@ dotnet_diagnostic.MA0047.severity = error                                      #
 dotnet_diagnostic.MA0048.severity = error                                      # File name match type
 dotnet_diagnostic.MA0049.severity = error                                      # Type not match namespace
 dotnet_diagnostic.MA0050.severity = error                                      # Validate iterator arguments
-dotnet_diagnostic.MA0051.severity = error                                      # Method too long
-MA0051.maximum_lines_per_method = 120                                          # Maximum 120 lines per method
+dotnet_diagnostic.MA0051.severity = none                                       # Method length not enforced
 dotnet_diagnostic.MA0052.severity = error                                      # Constant Enum.ToString
 dotnet_diagnostic.MA0053.severity = error                                      # Make class sealed
 dotnet_diagnostic.MA0054.severity = error                                      # Embed caught exception

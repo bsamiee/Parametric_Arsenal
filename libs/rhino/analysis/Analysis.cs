@@ -13,7 +13,6 @@ public static class Analysis {
     /// <summary>Analysis result marker interface for polymorphic return discrimination.</summary>
     public interface IResult {
         public Point3d Location { get; }
-        public Point3d Location { get; }
     }
 
     /// <summary>Curve analysis result containing derivatives, curvature, frame data, discontinuities, and metrics.</summary>
@@ -86,7 +85,7 @@ public static class Analysis {
         IGeometryContext context,
         double? parameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(curve, context, t, uv: null, index: null, testPoint: null, derivativeOrder)
+        AnalysisCompute.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
@@ -96,7 +95,7 @@ public static class Analysis {
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(surface, context, t: null, uv, index: null, testPoint: null, derivativeOrder)
+        AnalysisCompute.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
@@ -108,7 +107,7 @@ public static class Analysis {
         int faceIndex = 0,
         Point3d? testPoint = null,
         int derivativeOrder = 2) =>
-        AnalysisCompute.Execute(brep, context, t: null, uv, faceIndex, testPoint, derivativeOrder)
+        AnalysisCompute.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
             .Map(results => (BrepData)results[0]);
 
     /// <summary>Analyzes mesh geometry producing comprehensive topology navigation and manifold inspection data.</summary>
@@ -117,7 +116,7 @@ public static class Analysis {
         Mesh mesh,
         IGeometryContext context,
         int vertexIndex = 0) =>
-        AnalysisCompute.Execute(mesh, context, t: null, uv: null, vertexIndex, testPoint: null, 0)
+        AnalysisCompute.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0)
             .Map(results => (MeshData)results[0]);
 
     /// <summary>Analyzes collections of geometry producing heterogeneous results via UnifiedOperation batch processing.</summary>

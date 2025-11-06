@@ -18,6 +18,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **NO old patterns** - Target-typed new, collection expressions, tuple deconstruction
 - **K&R brace style** - Opening braces on same line
 - **Always leverage libs/** - Never handroll what Result monad provides
+- **ALWAYS trailing commas** - Every multi-line list, array, dictionary must have trailing comma on last item
+- **ALWAYS named parameters** - Use `parameter: value` for all non-obvious arguments (errors, values, configs)
+- **ALWAYS target-typed new** - Use `new(...)` not `new Type(...)` when type is known from context
+
+### Common Mistakes (ELIMINATE)
+
+```csharp
+// ❌ Missing trailing commas
+["key"] = 1]  // Wrong
+["key"] = 1,] // Correct
+
+// ❌ Unnamed parameters  
+ResultFactory.Create(error)                          // Wrong
+ResultFactory.Create(error: ValidationErrors.X)      // Correct
+
+// ❌ Redundant type in new
+new Dictionary<K, V>()                               // Wrong
+new()                                                // Correct
+```
 
 ### Dense Code Patterns
 
@@ -33,13 +52,13 @@ UnifiedOperation.Apply(
     new OperationConfig<object, T> { Context = context, ValidationMode = ValidationMode.None })
 ```
 
-**FrozenDictionary Configuration** - Compile-time lookups:
+**FrozenDictionary Configuration** - Compile-time lookups with trailing commas:
 
 ```csharp
 private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode Mode, Func<object, RTree?>? TreeFactory)> _config =
     new Dictionary<(SpatialMethod, Type), (ValidationMode, Func<object, RTree?>?)> {
         [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (ValidationMode.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),
-        [(SpatialMethod.MeshOverlap, typeof(ValueTuple<Mesh, Mesh>))] = (ValidationMode.MeshSpecific, null),
+        [(SpatialMethod.MeshOverlap, typeof(ValueTuple<Mesh, Mesh>))] = (ValidationMode.MeshSpecific, null),  // ✅ Trailing comma
     }.ToFrozenDictionary();
 ```
 
@@ -63,15 +82,19 @@ dotnet test --filter "FullyQualifiedName~Result" # Run specific test
 
 ### Result Monad (ALWAYS USE)
 
+**CRITICAL**: Always use named parameters for ResultFactory methods:
+
 ```csharp
-Result<T> // Lazy evaluation, monadic composition
-ResultFactory.Create(value: x) // Never new Result
-.Map(x => transform)           // Functor transform
-.Bind(x => Result<Y>)          // Monadic chain
-.Apply(Result<Func>)           // Applicative parallel
-.Filter(predicate, error)      // Validation
-.OnError(recover: x => value)  // Recovery
-.Traverse(transform)           // Collection inside Result
+Result<T>                                      // Lazy evaluation, monadic composition
+ResultFactory.Create(value: x)                 // ✅ Named parameter, never new Result
+ResultFactory.Create(error: err)               // ✅ Named parameter for errors
+ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
+.Map(x => transform)                           // Functor transform
+.Bind(x => Result<Y>)                          // Monadic chain
+.Apply(Result<Func>)                           // Applicative parallel
+.Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
+.OnError(recover: x => value)                  // ✅ Named recover parameter
+.Traverse(transform)                           // Collection inside Result
 ```
 
 ### Polymorphic Patterns
@@ -110,7 +133,6 @@ public static class SpatialErrors {
 
 ### Analyzers Enforced
 
-- MA0051: Method length max 120 lines
 - IDE0301-0305: Collection expressions required
 - IDE0290: Primary constructors required
 - File-scoped namespaces mandatory

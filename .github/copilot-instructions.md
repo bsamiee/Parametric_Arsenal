@@ -79,16 +79,21 @@ uv run basedpyright .
    - **NO old patterns** - Use target-typed new, collection expressions, tuple deconstruction
    - **K&R brace style** - Opening braces on same line
    - **Always leverage libs/** - Never handroll what Result monad provides
+   - **ALWAYS trailing commas** - Every multi-line collection/dictionary/array must end with comma
+   - **ALWAYS named parameters** - Use `parameter: value` syntax for all non-obvious arguments
+   - **ALWAYS target-typed new** - Use `new(...)` not `new Type(...)` when type is known
 
-3. **Result Monad (ALWAYS USE)**:
+3. **Result Monad (ALWAYS USE)** - Always use named parameters:
    ```csharp
-   Result<T>                          // Lazy evaluation, monadic composition
-   ResultFactory.Create(value: x)     // Never new Result
-   .Map(x => transform)               // Functor transform
-   .Bind(x => Result<Y>)              // Monadic chain
-   .Apply(Result<Func>)               // Applicative parallel
-   .Filter(predicate, error)          // Validation
-   .OnError(recover: x => value)      // Recovery
+   Result<T>                                      // Lazy evaluation, monadic composition
+   ResultFactory.Create(value: x)                 // ✅ Named parameter, never new Result
+   ResultFactory.Create(error: err)               // ✅ Named parameter for errors
+   ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
+   .Map(x => transform)                           // Functor transform
+   .Bind(x => Result<Y>)                          // Monadic chain
+   .Apply(Result<Func>)                           // Applicative parallel
+   .Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
+   .OnError(recover: x => value)                  // ✅ Named recover parameter
    ```
 
 4. **Pattern Matching for Polymorphism**:
@@ -102,11 +107,11 @@ uv run basedpyright .
        new OperationConfig<object, T> { Context = context, ValidationMode = ValidationMode.None })
    ```
 
-5. **FrozenDictionary for Configuration**:
+5. **FrozenDictionary for Configuration** - Always include trailing comma:
    ```csharp
    private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode Mode, Func<object, RTree?>? TreeFactory)> _config =
        new Dictionary<(SpatialMethod, Type), (ValidationMode, Func<object, RTree?>?)> {
-           [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (ValidationMode.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),
+           [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (ValidationMode.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),  // ✅ Trailing comma
        }.ToFrozenDictionary();
    ```
 
@@ -130,7 +135,6 @@ uv run basedpyright .
 ### Analyzers Enforced
 
 These are automatically enforced during build:
-- **MA0051**: Method length max 120 lines
 - **IDE0301-0305**: Collection expressions required
 - **IDE0290**: Primary constructors required
 - **File-scoped namespaces**: Mandatory
@@ -154,6 +158,28 @@ These are automatically enforced during build:
 - Tests should follow Rhino plugin testing patterns
 - Use type stubs from `rhino-stubs` package
 
+## Common Mistakes to Avoid
+
+**CRITICAL**: Frequent errors to eliminate:
+
+```csharp
+// ❌ Missing trailing commas
+[error1, error2]    // Wrong
+[error1, error2,]   // Correct
+
+// ❌ Unnamed parameters
+ResultFactory.Create(error)                          // Wrong
+ResultFactory.Create(error: ValidationErrors.X)      // Correct
+.Filter(pred, err)                                   // Wrong
+.Filter(pred, error: err)                            // Correct
+
+// ❌ Redundant type in new
+new Dictionary<K, V>()                               // Wrong
+new()                                                // Correct
+new List<int> { 1, 2 }                              // Wrong
+[1, 2,]                                              // Correct
+```
+
 ## Common Tasks
 
 ### Adding a New C# Class
@@ -162,8 +188,10 @@ These are automatically enforced during build:
 3. Use explicit types (no `var`)
 4. Return `Result<T>` for operations that can fail
 5. Use pattern matching instead of if/else
-6. Keep methods under 120 lines
-7. Add corresponding error definitions if needed
+6. Add corresponding error definitions if needed
+7. **Add trailing commas to all multi-line collections**
+8. **Use named parameters for all non-obvious arguments**
+9. **Use target-typed `new(...)` expressions**
 
 ### Adding a New Rhino Plugin Command (Python)
 1. Place in `rhino/plugins/[PluginName]/commands/`
