@@ -16,9 +16,6 @@ public static class IntersectionErrors {
         public static readonly SystemError InvalidProjectionDirection =
             new(ErrorDomain.Geometry, 2202, "Projection direction vector is invalid or zero-length");
 
-        public static readonly SystemError EmptyGeometryCollection =
-            new(ErrorDomain.Geometry, 2203, "Empty geometry collection provided for batch operation");
-
         public static readonly SystemError InvalidRayDirection =
             new(ErrorDomain.Geometry, 2204, "Ray direction vector is invalid or zero-length");
 
