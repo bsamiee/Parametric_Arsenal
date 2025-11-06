@@ -16,9 +16,15 @@
       },
       "Meziantou.Analyzer": {
         "type": "Direct",
-        "requested": "[2.0.231, )",
-        "resolved": "2.0.231",
-        "contentHash": "h5FQkDk22R291JofPXFDxrgNyk1RGCqeIQKcrCRXYz+p5v2Ade2C9PpRiatasVqSDPyFk2q/B5AflWM2a9TVwQ=="
+        "requested": "[2.0.250, )",
+        "resolved": "2.0.250",
+        "contentHash": "+Y/z+dDTlDbI0iYsG5sad2kskprPH86jscQcS8VfnEaZxbb4WsP0bD0iEG4ZdY0XwZycdUWfRCtJrTKQX/8bJA=="
+      },
+      "Microsoft.CodeAnalysis.NetAnalyzers": {
+        "type": "Direct",
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "JajbvkrBgtdRghavIjcJuNHMOja4lqBmEezbhZyqWPYh2cpLhT5mPpfC7NQVDO4IehWQum9t/nwF4v+qQGtYWg=="
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",

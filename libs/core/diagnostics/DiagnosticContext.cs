@@ -28,7 +28,7 @@ public readonly struct DiagnosticContext(
 
     [Pure]
     private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
-        $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value}" : string.Empty)}");
+        $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(CultureInfo.InvariantCulture)}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(CultureInfo.InvariantCulture)}" : string.Empty)}");
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(DiagnosticContext left, DiagnosticContext right) => left.Equals(right);
@@ -54,7 +54,7 @@ public readonly struct DiagnosticContext(
 
 /// <summary>Polymorphic diagnostic capture engine with ConditionalWeakTable storage and compile-time tracing control.</summary>
 public static class Diagnostics {
-    private static readonly ConditionalWeakTable<object, DiagnosticContext> _metadata = [];
+    private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
     private static readonly ActivitySource _activitySource = new("Arsenal.Core", "1.0.0");
 
     /// <summary>Captures operation diagnostics with allocation tracking and optional Activity tracing when enabled at compile-time.</summary>
@@ -83,7 +83,7 @@ public static class Diagnostics {
             .SetTag("validation", validationApplied?.ToString() ?? "None")
             .SetTag("cache_hit", cacheHit?.ToString() ?? "N/A")
             .Dispose();
-        _ = _metadata.AddOrUpdate(result, ctx);
+        _metadata.AddOrUpdate(result, new StrongBox<DiagnosticContext>(ctx));
         return result;
 #else
         return result;
@@ -92,20 +92,25 @@ public static class Diagnostics {
 
     /// <summary>Retrieves diagnostic metadata for Result instance using ConditionalWeakTable lookup with safe null handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) =>
+    public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
 #if DEBUG
-        _metadata.TryGetValue(result, out context);
+        bool found = _metadata.TryGetValue(result, out StrongBox<DiagnosticContext>? box);
+        context = found && box is not null ? box.Value! : default;
+        return found;
 #else
-        (context = default, false).Item2;
+        context = default;
+        return false;
 #endif
+    }
 
     /// <summary>Clears all diagnostic metadata enabling memory reclamation for long-running processes.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Clear() {
+    public static void Clear() =>
 #if DEBUG
-        _ = _metadata.Clear();
+        _metadata.Clear();
+#else
+        default;
 #endif
-    }
 
     /// <summary>Compile-time feature detection for diagnostic capability presence in binary.</summary>
     [Pure]

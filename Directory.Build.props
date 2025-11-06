@@ -17,70 +17,77 @@
   <!-- Language & Platform Configuration            -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <LangVersion>preview</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Features>strict</Features>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <Prefer32Bit>false</Prefer32Bit>
+    <TargetFramework>net8.0</TargetFramework>                                  <!-- Target .NET 8.0 framework -->
+    <LangVersion>preview</LangVersion>                                         <!-- Use latest C# preview features -->
+    <Nullable>enable</Nullable>                                                <!-- Enable nullable reference types -->
+    <ImplicitUsings>enable</ImplicitUsings>                                    <!-- Enable implicit global usings -->
+    <Features>strict</Features>                                                <!-- Enable strict language features -->
+    <PlatformTarget>AnyCPU</PlatformTarget>                                    <!-- Build for any CPU architecture -->
+    <Prefer32Bit>false</Prefer32Bit>                                           <!-- Prefer 64-bit execution -->
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Build Configuration                          -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
-    <IsPublishable>false</IsPublishable>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
-    <Deterministic>true</Deterministic>
-    <DebugType>portable</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-    <DisableRAR1001Warning>true</DisableRAR1001Warning>
+    <IsPackable>false</IsPackable>                                             <!-- Not a NuGet package -->
+    <IsPublishable>false</IsPublishable>                                       <!-- Not for standalone publishing -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>            <!-- Use package lock for deterministic restore -->
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder> <!-- No fallback package folder -->
+    <Deterministic>true</Deterministic>                                        <!-- Enable deterministic builds -->
+    <DebugType>portable</DebugType>                                            <!-- Use portable PDB format -->
+    <DebugSymbols>true</DebugSymbols>                                          <!-- Generate debug symbols -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>          <!-- Auto-generate binding redirects -->
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType> <!-- Generate for output type -->
+    <DisableRAR1001Warning>true</DisableRAR1001Warning>                        <!-- Disable assembly reference warnings -->
   </PropertyGroup>
 
   <!-- Debug Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <Optimize>false</Optimize>
-    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <Optimize>false</Optimize>                                                 <!-- Disable optimizations for debugging -->
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>                <!-- Check arithmetic overflow in Debug -->
   </PropertyGroup>
 
   <!-- Release Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <Optimize>true</Optimize>
-    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
-    <ConcurrentBuild>true</ConcurrentBuild>
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-    <TieredCompilation>true</TieredCompilation>
+    <Optimize>true</Optimize>                                                  <!-- Enable compiler optimizations -->
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>               <!-- No overflow checks for performance -->
+    <ConcurrentBuild>true</ConcurrentBuild>                                    <!-- Build projects in parallel -->
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>              <!-- Optimize for CI environment -->
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>                  <!-- Generate reference assemblies -->
+    <TieredCompilation>true</TieredCompilation>                                <!-- Enable tiered JIT compilation -->
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Code Analysis Configuration                  -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-    <RunAnalyzers>true</RunAnalyzers>
-    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
-    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <!-- Report all analyzer diagnostics, not just errors -->
-    <ReportAnalyzer>true</ReportAnalyzer>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>                              <!-- Enable .NET code analyzers -->
+    <AnalysisLevel>latest-all</AnalysisLevel>                                  <!-- Use latest analyzer version with all rules -->
+    <AnalysisMode>All</AnalysisMode>                                           <!-- Enable all analysis categories -->
+    <RunAnalyzers>true</RunAnalyzers>                                          <!-- Run analyzers during compilation -->
+    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>      <!-- Run analyzers in IDE during editing -->
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>                    <!-- Run analyzers during build -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>                    <!-- Enforce code style rules at build time -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>                        <!-- Treat all warnings as errors -->
+    <ReportAnalyzer>true</ReportAnalyzer>                                      <!-- Report all analyzer diagnostics -->
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Code Analyzers                               -->
   <!-- ============================================ -->
   <ItemGroup>
+    <!-- IDisposable pattern enforcement and memory leak detection -->
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
+    
+    <!-- Comprehensive C# code quality and refactoring suggestions -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.231" PrivateAssets="all" />
+    
+    <!-- Performance, code quality, and best practices enforcement -->
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
+    
+    <!-- Microsoft .NET code quality analyzers (CA rules) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- ============================================ -->
