@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Diagnostics;
+using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 
@@ -52,7 +53,7 @@ public static class UnifiedOperation {
                 .Validate(args: config.ValidationMode is ValidationMode.None ? null :
                     [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []]);
 
-            Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError((Func<SystemError[], TIn>)(_ => item)) : validated)
+            Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError(_ => item) : validated)
                 .Bind(config.PreTransform ?? (v => ResultFactory.Create(value: v)))
                 .Bind(resolveOp)
                 .Map(outputs => config.OutputFilter switch {
