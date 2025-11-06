@@ -70,21 +70,21 @@ public static class ResultGenerators {
     public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
         (typeof(T), typeof(TResult)) switch {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
-                Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
                         succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
                                  : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
-                Gen.Double.Tuple(Gen.Bool).Select(static (multiplier, succeeds) =>
+                Gen.Double.Select(Gen.Bool).Select(static (multiplier, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
                         succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
-                Gen.Double.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                Gen.Double.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
                         succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: val + offset)
                                                                                                        : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
-                Gen.Int.Tuple(Gen.Bool).Select(static (offset, succeeds) =>
+                Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
                         succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
             _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
