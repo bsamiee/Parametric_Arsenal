@@ -26,8 +26,5 @@ public static class ExtractionErrors {
         public static readonly SystemError InvalidDirection =
             new(ErrorDomain.Geometry, 2004, "Direction parameter required for positional extrema");
 
-        /// <summary>Geometry cannot be converted to NURBS representation.</summary>
-        public static readonly SystemError InvalidNurbsGeometry =
-            new(ErrorDomain.Geometry, 2006, "Geometry cannot be converted to NURBS representation");
     }
 }
