@@ -37,7 +37,7 @@ internal static class ExtractionConfig {
     /// <summary>Retrieves validation mode for extraction kind and geometry type with inheritance fallback.</summary>
     internal static V GetValidationMode(byte kind, Type geometryType) =>
         ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact :
-            ValidationModes.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsInstanceOfType(geometryType))
+            ValidationModes.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(geometryType))
                 .OrderByDescending(kv => kv.Key.Item2, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                 .Select(kv => kv.Value)
                 .DefaultIfEmpty(V.Standard)

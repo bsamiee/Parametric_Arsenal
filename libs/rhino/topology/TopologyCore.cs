@@ -14,7 +14,7 @@ namespace Arsenal.Rhino.Topology;
 
 /// <summary>Edge continuity classification enumeration for geometric analysis.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "byte enum for performance and memory efficiency")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in TopologyCore.cs")]
 public enum EdgeContinuityType : byte {
     /// <summary>G0 discontinuous or below minimum continuity threshold.</summary>
     Sharp = 0,
@@ -32,7 +32,7 @@ public enum EdgeContinuityType : byte {
 
 /// <summary>Naked edge analysis result containing edge curves and indices with topology metadata.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record NakedEdgeData(
     IReadOnlyList<Curve> EdgeCurves,
     IReadOnlyList<int> EdgeIndices,
@@ -49,7 +49,7 @@ public sealed record NakedEdgeData(
 
 /// <summary>Boundary loop analysis result with closed loop curves and join diagnostics.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record BoundaryLoopData(
     IReadOnlyList<Curve> Loops,
     IReadOnlyList<IReadOnlyList<int>> EdgeIndicesPerLoop,
@@ -66,7 +66,7 @@ public sealed record BoundaryLoopData(
 
 /// <summary>Non-manifold topology analysis result with diagnostic data for irregular vertices and edges.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record NonManifoldData(
     IReadOnlyList<int> EdgeIndices,
     IReadOnlyList<int> VertexIndices,
@@ -86,7 +86,7 @@ public sealed record NonManifoldData(
 
 /// <summary>Connected component analysis result with adjacency graph and spatial bounds.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record ConnectivityData(
     IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
     IReadOnlyList<int> ComponentSizes,
@@ -105,7 +105,7 @@ public sealed record ConnectivityData(
 
 /// <summary>Edge classification result by continuity type with geometric measures.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record EdgeClassificationData(
     IReadOnlyList<int> EdgeIndices,
     IReadOnlyList<EdgeContinuityType> Classifications,
@@ -121,7 +121,7 @@ public sealed record EdgeClassificationData(
 
 /// <summary>Face adjacency query result with neighbor data and dihedral angle computation.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCompute.cs")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result records grouped semantically in TopologyCore.cs")]
 public sealed record AdjacencyData(
     int EdgeIndex,
     IReadOnlyList<int> AdjacentFaceIndices,
@@ -193,11 +193,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, NakedEdgeData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.GetNakedEdges.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -219,11 +215,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, BoundaryLoopData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.GetBoundaryLoops.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -244,11 +236,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, NonManifoldData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.GetNonManifold.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -269,11 +257,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, ConnectivityData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.GetConnectivity.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -301,11 +285,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, EdgeClassificationData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.ClassifyEdges.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -333,11 +313,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, AdjacencyData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.GetValidationMode(input),
                 OperationName = $"Topology.GetAdjacency.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
