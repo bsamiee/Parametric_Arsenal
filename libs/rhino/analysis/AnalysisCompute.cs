@@ -13,17 +13,15 @@ namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
 internal static class AnalysisCompute {
-    private const int MaxDiscontinuities = 20;
-
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         ((Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>>)((cv, ctx, t, order) => {
             double param = t ?? cv.Domain.Mid;
             ArrayPool<double> pool = ArrayPool<double>.Shared;
-            double[] buffer = pool.Rent(MaxDiscontinuities);
+            double[] buffer = pool.Rent(AnalysisConfig.MaxDiscontinuities);
             try {
                 (int discCount, double s) = (0, cv.Domain.Min);
-                while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                while (discCount < AnalysisConfig.MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
                     buffer[discCount++] = td;
                     s = td + ctx.AbsoluteTolerance;
                 }

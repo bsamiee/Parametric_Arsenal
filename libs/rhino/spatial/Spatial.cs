@@ -22,17 +22,18 @@ public static class Spatial {
         TQuery query,
         IGeometryContext context,
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.AlgorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize) config) switch {
-            true => UnifiedOperation.Apply(
+        (SpatialConfig.ValidationModes.TryGetValue((typeof(TInput), typeof(TQuery)), out V mode),
+            SpatialConfig.BufferSizes.TryGetValue((typeof(TInput), typeof(TQuery)), out int bufferSize)) switch {
+            (true, true) => UnifiedOperation.Apply(
                 input: input,
-                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => SpatialCore.ExecuteAlgorithm(item, query, context, config.bufferSize)),
+                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => SpatialCore.ExecuteAlgorithm(item, query, context, bufferSize)),
                 config: new OperationConfig<TInput, int> {
                     Context = context,
-                    ValidationMode = config.mode,
+                    ValidationMode = mode,
                     OperationName = $"Spatial.{typeof(TInput).Name}.{typeof(TQuery).Name}",
                     EnableDiagnostics = enableDiagnostics,
                 }),
-            false => ResultFactory.Create<IReadOnlyList<int>>(
+            _ => ResultFactory.Create<IReadOnlyList<int>>(
                 error: E.Spatial.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
