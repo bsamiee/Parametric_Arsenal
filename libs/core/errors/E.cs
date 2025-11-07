@@ -50,7 +50,13 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [2400] = "Naked edge extraction failed",
+            [2401] = "Boundary loop construction failed",
+            [2402] = "Non-manifold edge detected",
+            [2404] = "Connected component analysis failed",
+            [2405] = "Edge classification failed",
             [2406] = "Invalid edge index",
+            [2407] = "Adjacency query failed",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -101,7 +107,13 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError NakedEdgeFailed = Get(2400);
+        public static readonly SystemError BoundaryLoopFailed = Get(2401);
+        public static readonly SystemError NonManifoldEdge = Get(2402);
+        public static readonly SystemError ConnectivityFailed = Get(2404);
+        public static readonly SystemError EdgeClassificationFailed = Get(2405);
         public static readonly SystemError InvalidEdgeIndex = Get(2406);
+        public static readonly SystemError AdjacencyFailed = Get(2407);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>
