@@ -1,259 +1,270 @@
 # GitHub Copilot Instructions for Parametric Arsenal
 
-This file provides instructions for GitHub Copilot coding agent when working on this repository.
+**Context**: .NET 8.0 monorepo with C# libraries for Rhino 8/Grasshopper parametric design + Python scripting. Extremely strict code quality standards enforced by analyzers.
 
-## Repository Overview
+**Primary Reference**: For detailed patterns and examples, see `/CLAUDE.md`
 
-**Parametric Arsenal** is a .NET 8.0 project combining C# libraries with Python scripting for Rhino 8 and Grasshopper parametric design tools. The repository follows a monorepo structure with strict code quality standards enforced through analyzers and custom coding patterns.
+---
 
-## Project Structure
+## 🚫 IMMEDIATE BLOCKERS (Fix Before Proceeding)
 
-```
-Parametric_Arsenal/
-├── libs/                           # Core C# libraries
-│   ├── core/                       # Core library with Result monad, validation, operations
-│   ├── rhino/                      # Rhino-specific geometry and spatial operations
-│   └── grasshopper/                # Grasshopper component library
-├── rhino/                          # Rhino plugins (Python/C#)
-│   └── plugins/                    # Rhino plugin implementations
-├── test/                           # Test projects
-│   ├── core/                       # xUnit + CsCheck tests for core (Arsenal.Core.Tests)
-│   ├── rhino/                      # NUnit + Rhino.Testing tests (Arsenal.Rhino.Tests)
-│   └── shared/                     # Shared test utilities (Arsenal.Tests.Shared)
-├── grasshopper/                    # Grasshopper components
-├── CLAUDE.md                       # Detailed C# coding standards (MANDATORY READ)
-├── Directory.Build.props           # MSBuild configuration
-└── pyproject.toml                  # Python tooling configuration
-```
+These violations fail the build. Check for and fix immediately:
 
-## Build and Test Commands
+1. ❌ **Multiple types in one file** → Split into separate files (CA1050)
+2. ❌ **Missing trailing commas** in multi-line collections → Add `,` at end
+3. ❌ **Unnamed parameters** in non-obvious calls → Add `parameter: value`
+4. ❌ **Using `var`** → Replace with explicit type
+5. ❌ **Using `if`/`else`** → Replace with pattern matching/switch expressions
+6. ❌ **Redundant `new Type()`** → Use target-typed `new()`
+7. ❌ **Old collection syntax** → Use collection expressions `[]`
 
-### C# / .NET
-```bash
-# Build entire solution
-dotnet build
+---
 
-# Build specific project
-dotnet build libs/core/
+## 📋 Quick Reference: Mandatory Patterns
 
-# Run all tests
-dotnet test
-
-# Run specific test
-dotnet test --filter "FullyQualifiedName~Result"
-
-# Clean build artifacts
-dotnet clean
-```
-
-### Python
-```bash
-# Format Python code
-uv run ruff format .
-
-# Lint Python code
-uv run ruff check .
-
-# Type check with mypy
-uv run mypy .
-
-# Type check with basedpyright
-uv run basedpyright .
-```
-
-## Critical Coding Standards
-
-### C# Code Requirements (MANDATORY)
-
-**Read `CLAUDE.md` thoroughly** - it contains mandatory patterns and rules. Key requirements:
-
-1. **Code Density**: Super dense algebraic code only. Study exemplars in:
-   - `libs/core/validation/ValidationRules.cs`
-   - `libs/core/results/ResultFactory.cs`
-   - `libs/core/operations/UnifiedOperation.cs`
-
-2. **Strict Rules**:
-   - **NO if/else** - Use pattern matching and switch expressions only
-   - **NO var** - Explicit types always
-   - **NO helpers/extracting** - Improve logic instead (300 LOC hard limit)
-   - **NO old patterns** - Use target-typed new, collection expressions, tuple deconstruction
-   - **K&R brace style** - Opening braces on same line
-   - **Always leverage libs/** - Never handroll what Result monad provides
-   - **ALWAYS trailing commas** - Every multi-line collection/dictionary/array must end with comma
-   - **ALWAYS named parameters** - Use `parameter: value` syntax for all non-obvious arguments
-   - **ALWAYS target-typed new** - Use `new(...)` not `new Type(...)` when type is known
-
-3. **Result Monad (ALWAYS USE)** - Always use named parameters:
-   ```csharp
-   Result<T>                                      // Lazy evaluation, monadic composition
-   ResultFactory.Create(value: x)                 // ✅ Named parameter, never new Result
-   ResultFactory.Create(error: err)               // ✅ Named parameter for errors
-   ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
-   .Map(x => transform)                           // Functor transform
-   .Bind(x => Result<Y>)                          // Monadic chain
-   .Apply(Result<Func>)                           // Applicative parallel
-   .Filter(predicate, error: ValidationErrors.X)  // ✅ Named error parameter
-   .OnError(recover: x => value)                  // ✅ Named recover parameter
-   ```
-
-4. **Pattern Matching for Polymorphism**:
-   ```csharp
-   UnifiedOperation.Apply(
-       input,
-       (Func<object, Result<IReadOnlyList<T>>>)(item => item switch {
-           GeometryBase g => Strategies.Process(g, method, context),
-           _ => ResultFactory.Create<IReadOnlyList<T>>(error: ValidationErrors.Geometry.Invalid),
-       }),
-       new OperationConfig<object, T> { Context = context, ValidationMode = ValidationMode.None })
-   ```
-
-5. **FrozenDictionary for Configuration** - Always include trailing comma:
-   ```csharp
-   private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode Mode, Func<object, RTree?>? TreeFactory)> _config =
-       new Dictionary<(SpatialMethod, Type), (ValidationMode, Func<object, RTree?>?)> {
-           [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (ValidationMode.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),  // ✅ Trailing comma
-       }.ToFrozenDictionary();
-   ```
-
-6. **Error Pattern**: Each folder has its own errors class:
-   ```csharp
-   // libs/core/validation/ValidationErrors.cs
-   public static class ValidationErrors {
-       public static class Geometry {
-           public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3001, "...");
-       }
-   }
-   ```
-
-### Python Code Requirements
-
-1. **Type Annotations**: All functions must have complete type annotations
-2. **Rhino Interop**: Use `Rhino.*` types correctly, understanding they're .NET assemblies
-3. **Style**: Follow Ruff formatting and linting rules in `pyproject.toml`
-4. **Imports**: Keep Rhino-specific imports separate from standard library
-
-### Analyzers Enforced
-
-These are automatically enforced during build:
-- **IDE0301-0305**: Collection expressions required
-- **IDE0290**: Primary constructors required
-- **File-scoped namespaces**: Mandatory
-
-## Key Techniques and Patterns
-
-1. **ConditionalWeakTable** - For auto-memory managed caching
-2. **ArrayPool<T>** - For zero-allocation buffers
-3. **Expression.Compile()** - For runtime validator generation
-4. **FrozenDictionary** - For compile-time lookups
-5. **ValueTuple patterns** - For multi-value dispatch
-
-## Testing Guidelines
-
-### C# Tests
-- **Core library**: Use xUnit + CsCheck for property-based testing
-- **Rhino library**: Use NUnit + Rhino.Testing framework
-- **Shared utilities**: Available in Arsenal.Tests.Shared
-
-### Python Tests
-- Tests should follow Rhino plugin testing patterns
-- Use type stubs from `rhino-stubs` package
-
-## Common Mistakes to Avoid
-
-**CRITICAL**: Frequent errors to eliminate:
+### Result Monad (All Error Handling)
 
 ```csharp
-// ❌ Missing trailing commas
-[error1, error2]    // Wrong
-[error1, error2,]   // Correct
+// Creating Results - use named parameters
+ResultFactory.Create(value: x)                 // Success
+ResultFactory.Create(error: E.Validation.X)    // Single error
+ResultFactory.Create(errors: [e1, e2,])        // Multiple errors + trailing comma
 
-// ❌ Unnamed parameters
-ResultFactory.Create(error)                          // Wrong
-ResultFactory.Create(error: ValidationErrors.X)      // Correct
-.Filter(pred, err)                                   // Wrong
-.Filter(pred, error: err)                            // Correct
-
-// ❌ Redundant type in new
-new Dictionary<K, V>()                               // Wrong
-new()                                                // Correct
-new List<int> { 1, 2 }                              // Wrong
-[1, 2,]                                              // Correct
+// Chaining operations
+result
+    .Map(x => Transform(x))                    // Transform value
+    .Bind(x => ComputeResult(x))               // Chain operations
+    .Ensure(pred, error: E.Validation.Y)       // Validate (named error)
+    .Match(onSuccess: v => Use(v), onFailure: e => Handle(e))
 ```
 
-## Common Tasks
+### UnifiedOperation (Polymorphic Dispatch)
 
-### Adding a New C# Class
-1. Use file-scoped namespaces
-2. Apply primary constructors where applicable
-3. Use explicit types (no `var`)
-4. Return `Result<T>` for operations that can fail
-5. Use pattern matching instead of if/else
-6. Add corresponding error definitions if needed
-7. **Add trailing commas to all multi-line collections**
-8. **Use named parameters for all non-obvious arguments**
-9. **Use target-typed `new(...)` expressions**
+```csharp
+UnifiedOperation.Apply(
+    input: data,
+    operation: (Func<TIn, Result<IReadOnlyList<TOut>>>)(item => item switch {
+        Point3d p => Process(p),
+        Curve c => Process(c),
+        _ => ResultFactory.Create<IReadOnlyList<TOut>>(
+            error: E.Geometry.UnsupportedAnalysis),
+    }),
+    config: new OperationConfig<TIn, TOut> {
+        Context = context,
+        ValidationMode = V.Standard,
+        AccumulateErrors = false,
+    });
+```
 
-### Adding a New Rhino Plugin Command (Python)
-1. Place in `rhino/plugins/[PluginName]/commands/`
-2. Add complete type annotations
-3. Use `Rhino.*` imports for geometry
-4. Follow Ruff formatting standards
-5. Add docstrings in Google style
+### FrozenDictionary Configuration
 
-### Modifying Validation Logic
-- **Never handwrite validators** - Use ValidationRules expression tree compilation
-- Add new rules through the ValidationRules DSL
+```csharp
+private static readonly FrozenDictionary<Key, Value> _config =
+    new Dictionary<Key, Value> {
+        [key1] = value1,
+        [key2] = value2,  // ✅ Trailing comma required
+    }.ToFrozenDictionary();
+```
 
-## Artifact Locations
+### Validation Modes (Bitwise Flags)
 
-Build artifacts are output to:
-- C# libraries: `/artifacts/[ProjectName]/debug/`
-- Example: `/artifacts/Core/debug/Arsenal.Core.dll`
-- Note: Configuration is lowercase `debug` (not `Debug`)
+```csharp
+V.None | V.Standard | V.Degeneracy           // Combine with |
+V.All                                         // All validations
+mode.Has(V.Standard)                          // Check flag
+```
 
-## Dependencies and Package Management
+---
 
-### C# (.NET)
-- Managed via `.csproj` files
-- NuGet packages restored automatically with `dotnet restore`
+## 🎯 Core Principles
 
-### Python
-- Managed via `pyproject.toml` with UV
-- Install with: `uv sync`
-- Lock file: `uv.lock`
+### 1. Code Density
+- **Study exemplars** before writing code:
+  - `libs/core/validation/ValidationRules.cs` - Expression trees
+  - `libs/core/results/ResultFactory.cs` - Polymorphic patterns
+  - `libs/core/operations/UnifiedOperation.cs` - Dispatch engine
+- **300 LOC hard limit** per member - improve logic, don't extract helpers
+- **Inline complex expressions** - no convenience methods
 
-## Branch Strategy
+### 2. Pattern Matching Over Control Flow
+```csharp
+// ✅ CORRECT
+return value switch {
+    null => ResultFactory.Create(error: E.X),
+    var v when v.IsValid => ResultFactory.Create(value: v),
+    _ => ResultFactory.Create(error: E.Y),
+};
 
-- Main branch: `main`
-- Feature branches: Use descriptive names
-- Commits: Follow Conventional Commits (enforced)
+// ❌ WRONG - Never use if/else
+if (value == null) return ResultFactory.Create(error: E.X);
+else if (value.IsValid) return ResultFactory.Create(value: value);
+else return ResultFactory.Create(error: E.Y);
+```
 
-## Important Notes
+### 3. Explicit Types Always
+```csharp
+// ✅ CORRECT
+int count = GetCount();
+Result<Point3d> result = ResultFactory.Create(value: point);
+Dictionary<string, int> dict = new();
 
-1. **Never modify working code unnecessarily** - Make surgical, minimal changes
-2. **Consult CLAUDE.md** for all C# code - it contains the authoritative coding standards
-3. **Run tests before committing** - Always validate changes don't break existing functionality
-4. **Build artifacts go to /artifacts/** - Never commit build outputs
-5. **Platform**: .NET 8.0, C# preview features, Rhino 8 SDK, Python 3.9+
+// ❌ WRONG
+var count = GetCount();
+var result = ResultFactory.Create(value: point);
+var dict = new Dictionary<string, int>();
+```
 
-## Security and Quality
+### 4. Target-Typed New
+```csharp
+// ✅ CORRECT - Type on left, target-typed new on right
+Dictionary<string, int> dict = new();
+List<Point3d> points = [];
+SystemError error = new(domain, code, message);
 
-- All changes must pass build and tests
-- Security vulnerabilities in dependencies are tracked
-- Code must compile without warnings
-- Analyzer rules are non-negotiable
+// ❌ WRONG - Redundant type
+Dictionary<string, int> dict = new Dictionary<string, int>();
+List<Point3d> points = new List<Point3d>();
+```
 
-## Getting Help
+### 5. Named Parameters for Clarity
+```csharp
+// ✅ CORRECT - Non-obvious parameters are named
+ResultFactory.Create(error: E.Validation.Invalid)
+.Ensure(predicate, error: E.Validation.Range)
+.Validate(args: [context, V.Standard,])
 
-1. Read `CLAUDE.md` for detailed C# patterns
-2. Read `README.md` for project overview
-3. Check `pyproject.toml` for Python configuration
-4. Review `Directory.Build.props` for MSBuild settings
-5. Examine existing code in the relevant library for patterns
+// ❌ WRONG - Ambiguous unnamed parameters
+ResultFactory.Create(E.Validation.Invalid)
+.Ensure(predicate, E.Validation.Range)
+.Validate([context, V.Standard])
+```
 
-## When in Doubt
+### 6. Trailing Commas Required
+```csharp
+// ✅ CORRECT - All multi-line collections end with comma
+[
+    item1,
+    item2,
+    item3,
+]
 
-- **For C# code**: Default to the patterns in `CLAUDE.md` and existing core library code
-- **For Python code**: Follow Ruff rules and existing plugin patterns
-- **For architecture**: Use Result monad, avoid exceptions for control flow
-- **For testing**: Match the testing style of the target library (xUnit vs NUnit)
+new Dictionary<K, V> {
+    [key1] = value1,
+    [key2] = value2,
+}
+
+// ❌ WRONG - Missing trailing comma
+[item1, item2, item3]
+new Dictionary<K, V> { [key1] = value1, [key2] = value2 }
+```
+
+---
+
+## 📁 Project Structure
+
+```
+libs/
+├── core/              # Result monad, validation, operations, errors
+│   ├── results/       # Result<T>, ResultFactory
+│   ├── validation/    # V (flags), ValidationRules (expression trees)
+│   ├── operations/    # UnifiedOperation, OperationConfig
+│   ├── errors/        # E (registry), SystemError, ErrorDomain
+│   └── context/       # IGeometryContext, GeometryContext
+├── rhino/             # RhinoCommon geometry operations
+│   ├── spatial/       # Spatial indexing with RTree
+│   ├── extraction/    # Point extraction
+│   ├── intersection/  # Intersection algorithms
+│   └── analysis/      # Geometric analysis
+└── grasshopper/       # Grasshopper components
+
+test/
+├── core/              # xUnit + CsCheck property tests
+├── rhino/             # NUnit + Rhino.Testing
+└── shared/            # Shared test utilities
+```
+
+---
+
+## 🔨 Build Commands
+
+```bash
+dotnet restore                              # Restore packages
+dotnet build                                # Build solution
+dotnet test                                 # Run all tests
+dotnet test --filter "Name~Result"          # Run specific tests
+dotnet clean                                # Clean artifacts
+
+# Python (from root)
+uv run ruff format .                        # Format Python
+uv run ruff check .                         # Lint Python
+uv run mypy .                               # Type check
+```
+
+---
+
+## 🏗️ Architecture Patterns
+
+### Error Management
+- **All errors in** `libs/core/errors/E.cs`
+- **Code ranges**: 1000-1999 (Results), 2000-2999 (Geometry), 3000-3999 (Validation), 4000-4999 (Spatial)
+- **Usage**: `E.Validation.GeometryInvalid`, `E.Geometry.InvalidCount.WithContext("msg")`
+- **Never construct directly**: Use `E.*` constants only
+
+### Validation System
+- **ValidationRules** compiles expression trees at runtime
+- **Don't call directly** - used by `Result.Validate()` and `UnifiedOperation`
+- **Validation modes**: Combine with `|` operator: `V.Standard | V.Degeneracy`
+
+### Operation Configuration
+- **UnifiedOperation** for all polymorphic operations
+- **OperationConfig<TIn, TOut>** controls validation, parallelism, error handling
+- **Never handroll** dispatch logic - use UnifiedOperation
+
+---
+
+## 🎓 Learning Resources
+
+1. **Study exemplar files first** (see Core Principles section)
+2. **Read `/CLAUDE.md`** for detailed patterns and examples
+3. **Check `.editorconfig`** for enforced style rules
+4. **Review `Directory.Build.props`** for analyzer configuration
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Don't create helper methods** - Improve the algorithm instead
+2. **Don't use exceptions for control flow** - Use Result<T>
+3. **Don't skip validation** - Use V.None explicitly if skipping
+4. **Don't mix validation modes** - Be intentional about V.* flags
+5. **Don't put multiple types in one file** - CA1050 enforces this
+6. **Don't forget trailing commas** - Required for all multi-line collections
+7. **Don't use unnamed parameters** - Name all non-obvious arguments
+
+---
+
+## 🐍 Python Standards (Brief)
+
+- **Type annotations required** on all functions
+- **Ruff formatting** via `uv run ruff format`
+- **Rhino interop**: Use `Rhino.*` types correctly (they're .NET assemblies)
+- **Module structure**: Keep Rhino imports separate from standard library
+
+---
+
+## 🚀 Quick Start Checklist
+
+Before writing any C# code:
+
+- [ ] Read `/CLAUDE.md` thoroughly
+- [ ] Study the 5 exemplar files listed above
+- [ ] Understand Result<T> monad pattern
+- [ ] Understand UnifiedOperation dispatch pattern
+- [ ] Know the validation flags (V.*)
+- [ ] Know the error registry (E.*)
+- [ ] Verify you understand: no var, no if/else, named params, trailing commas
+- [ ] Run `dotnet build` to ensure clean starting state
+
+---
+
+**Remember**: These standards are enforced by build analyzers. Violations = build failures. When in doubt, check exemplar files and `/CLAUDE.md`.
