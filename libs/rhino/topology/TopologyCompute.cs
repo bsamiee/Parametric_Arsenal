@@ -18,46 +18,43 @@ internal static class TopologyCompute {
                 V.Standard | V.Topology,
                 (g, ctx, args) => {
                     Brep brep = (Brep)g;
-                    bool orderLoops = args.Length > 0 && args[0] is bool b && b;
-                    IReadOnlyList<int> nakedIndices = [.. System.Linq.Enumerable.Range(0, brep.Edges.Count)
-                        .Where(i => brep.Edges[i].Valence == 1),];
-                    IReadOnlyList<Curve> curves = [.. nakedIndices
-                        .Select(i => brep.Edges[i].DuplicateCurve()),];
+                    (int idx, Curve curve)[] nakedEdges = [.. Enumerable.Range(0, brep.Edges.Count)
+                        .Where(i => brep.Edges[i].Valence == 1)
+                        .Select(i => (i, brep.Edges[i].DuplicateCurve())),];
                     return ResultFactory.Create(value: (Topology.IResult)new NakedEdgeData(
-                        EdgeCurves: curves,
-                        EdgeIndices: nakedIndices,
-                        Valences: [.. nakedIndices.Select(_ => 1),],
-                        IsOrdered: orderLoops,
+                        EdgeCurves: [.. nakedEdges.Select(e => e.curve),],
+                        EdgeIndices: [.. nakedEdges.Select(e => e.idx),],
+                        Valences: [.. nakedEdges.Select(_ => 1),],
+                        IsOrdered: args is [bool order, ..] && order,
                         TotalEdgeCount: brep.Edges.Count,
-                        TotalLength: curves.Sum(c => c.GetLength())));
+                        TotalLength: nakedEdges.Sum(e => e.curve.GetLength())));
                 }),
 
             [(typeof(Mesh), TopologyMode.NakedEdges)] = (
                 V.Standard | V.MeshSpecific,
                 (g, ctx, args) => {
                     Mesh mesh = (Mesh)g;
-                    int[] nakedIndices = mesh.GetNakedEdges() ?? [];
-                    IReadOnlyList<Curve> curves = [.. nakedIndices.Select(i => {
+                    (int idx, Curve curve)[] nakedEdges = [.. (mesh.GetNakedEdges() ?? []).Select(i => {
                         (int vi, int vj) = mesh.TopologyEdges.GetTopologyVertices(i);
-                        return new Polyline([
+                        return (i, new Polyline([
                             (Point3d)mesh.TopologyVertices[vi],
                             (Point3d)mesh.TopologyVertices[vj],
-                        ]).ToNurbsCurve();
+                        ]).ToNurbsCurve());
                     }),];
                     return ResultFactory.Create(value: (Topology.IResult)new NakedEdgeData(
-                        EdgeCurves: curves,
-                        EdgeIndices: [.. nakedIndices,],
-                        Valences: [.. nakedIndices.Select(_ => 1),],
-                        IsOrdered: args.Length > 0 && args[0] is bool b && b,
+                        EdgeCurves: [.. nakedEdges.Select(e => e.curve),],
+                        EdgeIndices: [.. nakedEdges.Select(e => e.idx),],
+                        Valences: [.. nakedEdges.Select(_ => 1),],
+                        IsOrdered: args is [bool order, ..] && order,
                         TotalEdgeCount: mesh.TopologyEdges.Count,
-                        TotalLength: curves.Sum(c => c.GetLength())));
+                        TotalLength: nakedEdges.Sum(e => e.curve.GetLength())));
                 }),
 
             [(typeof(Brep), TopologyMode.BoundaryLoops)] = (
                 V.Standard | V.Topology,
                 (g, ctx, args) => {
                     Brep brep = (Brep)g;
-                    double tol = args.Length > 0 && args[0] is double d ? d : ctx.AbsoluteTolerance;
+                    double tol = args is [double tolerance, ..] ? tolerance : ctx.AbsoluteTolerance;
                     Curve[] nakedCurves = [.. brep.Edges
                         .Where(e => e.Valence == 1)
                         .Select(e => e.DuplicateCurve()),];
@@ -79,32 +76,33 @@ internal static class TopologyCompute {
                     System.Array.Fill(componentIds, -1);
                     int componentCount = 0;
                     for (int seed = 0; seed < brep.Faces.Count; seed++) {
-                        componentCount = componentIds[seed] != -1 ? componentCount : (() => {
-                            System.Collections.Generic.Queue<int> queue = new([seed,]);
-                            componentIds[seed] = componentCount;
-                            while (queue.Count > 0) {
-                                int faceIdx = queue.Dequeue();
-                                foreach (int edgeIdx in brep.Faces[faceIdx].AdjacentEdges()) {
-                                    foreach (int adjFace in brep.Edges[edgeIdx].AdjacentFaces()) {
-                                        componentIds[adjFace] = componentIds[adjFace] == -1 ? (() => {
-                                            queue.Enqueue(adjFace);
-                                            return componentCount;
-                                        })() : componentIds[adjFace];
+                        componentCount = componentIds[seed] switch {
+                            -1 => (() => {
+                                System.Collections.Generic.Queue<int> queue = new([seed,]);
+                                componentIds[seed] = componentCount;
+                                while (queue.Count > 0) {
+                                    int faceIdx = queue.Dequeue();
+                                    foreach (int adjFace in brep.Faces[faceIdx].AdjacentEdges()
+                                        .SelectMany(e => brep.Edges[e].AdjacentFaces())
+                                        .Where(f => componentIds[f] == -1)) {
+                                        componentIds[adjFace] = componentCount;
+                                        queue.Enqueue(adjFace);
                                     }
                                 }
-                            }
-                            return componentCount + 1;
-                        })();
+                                return componentCount + 1;
+                            })(),
+                            _ => componentCount,
+                        };
                     }
-                    IReadOnlyList<IReadOnlyList<int>>[] components = [.. System.Linq.Enumerable.Range(0, componentCount)
-                        .Select(c => (IReadOnlyList<int>)[.. System.Linq.Enumerable.Range(0, brep.Faces.Count).Where(f => componentIds[f] == c),]),];
+                    IReadOnlyList<IReadOnlyList<int>>[] components = [.. Enumerable.Range(0, componentCount)
+                        .Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, brep.Faces.Count).Where(f => componentIds[f] == c),]),];
                     return ResultFactory.Create(value: (Topology.IResult)new ConnectivityData(
                         ComponentIndices: components,
                         ComponentSizes: [.. components.Select(c => c.Count),],
                         ComponentBounds: [.. components.Select(c => BoundingBox.Union(c.Select(i => brep.Faces[i].GetBoundingBox(accurate: false)))),],
                         TotalComponents: componentCount,
                         IsFullyConnected: componentCount == 1,
-                        AdjacencyGraph: [.. System.Linq.Enumerable.Range(0, brep.Faces.Count)
+                        AdjacencyGraph: [.. Enumerable.Range(0, brep.Faces.Count)
                             .Select(f => (f, (IReadOnlyList<int>)[.. brep.Faces[f].AdjacentEdges()
                                 .SelectMany(e => brep.Edges[e].AdjacentFaces())
                                 .Where(adj => adj != f),])),].ToFrozenDictionary(x => x.f, x => x.Item2)));
@@ -114,86 +112,77 @@ internal static class TopologyCompute {
                 V.Standard | V.Topology,
                 (g, ctx, _) => {
                     Brep brep = (Brep)g;
-                    IReadOnlyList<int> nonManifoldEdgeIndices = [.. System.Linq.Enumerable.Range(0, brep.Edges.Count)
-                        .Where(i => brep.Edges[i].Valence > 2),];
-                    IReadOnlyList<int> valences = [.. nonManifoldEdgeIndices
-                        .Select(i => brep.Edges[i].Valence),];
-                    IReadOnlyList<Point3d> locations = [.. nonManifoldEdgeIndices
-                        .Select(i => brep.Edges[i].PointAt(0.5)),];
+                    (int idx, int valence, Point3d location)[] nonManifold = [.. Enumerable.Range(0, brep.Edges.Count)
+                        .Where(i => brep.Edges[i].Valence > 2)
+                        .Select(i => (i, brep.Edges[i].Valence, brep.Edges[i].PointAt(0.5))),];
                     return ResultFactory.Create(value: (Topology.IResult)new NonManifoldData(
-                        EdgeIndices: nonManifoldEdgeIndices,
+                        EdgeIndices: [.. nonManifold.Select(e => e.idx),],
                         VertexIndices: [],
-                        Valences: valences,
-                        Locations: locations,
-                        IsManifold: nonManifoldEdgeIndices.Count == 0,
+                        Valences: [.. nonManifold.Select(e => e.valence),],
+                        Locations: [.. nonManifold.Select(e => e.location),],
+                        IsManifold: nonManifold.Length == 0,
                         IsOrientable: brep.IsSolid,
-                        MaxValence: valences.Count > 0 ? valences.Max() : 0));
+                        MaxValence: nonManifold.Length > 0 ? nonManifold.Max(e => e.valence) : 0));
                 }),
 
             [(typeof(Mesh), TopologyMode.NonManifold)] = (
                 V.Standard | V.MeshSpecific,
                 (g, ctx, _) => {
                     Mesh mesh = (Mesh)g;
-                    bool isManifold = mesh.IsManifold(topologicalTest: true, out bool isOriented, out bool isConnected);
-                    IReadOnlyList<int> nonManifoldEdgeIndices = isManifold
+                    bool isManifold = mesh.IsManifold(topologicalTest: true, out bool isOriented, out bool _);
+                    (int idx, int valence, Point3d location)[] nonManifold = isManifold
                         ? []
-                        : [.. System.Linq.Enumerable.Range(0, mesh.TopologyEdges.Count)
-                            .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length != 2),];
-                    IReadOnlyList<int> valences = [.. nonManifoldEdgeIndices
-                        .Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-                    IReadOnlyList<Point3d> locations = [.. nonManifoldEdgeIndices
-                        .Select(i => {
-                            (int vi, int vj) = mesh.TopologyEdges.GetTopologyVertices(i);
-                            Point3d pi = (Point3d)mesh.TopologyVertices[vi];
-                            Point3d pj = (Point3d)mesh.TopologyVertices[vj];
-                            return pi + 0.5 * (pj - pi);
-                        }),];
+                        : [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
+                            .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length != 2)
+                            .Select(i => {
+                                (int vi, int vj) = mesh.TopologyEdges.GetTopologyVertices(i);
+                                Point3d pi = (Point3d)mesh.TopologyVertices[vi];
+                                Point3d pj = (Point3d)mesh.TopologyVertices[vj];
+                                return (i, mesh.TopologyEdges.GetConnectedFaces(i).Length, 0.5 * (pi + pj));
+                            }),];
                     return ResultFactory.Create(value: (Topology.IResult)new NonManifoldData(
-                        EdgeIndices: nonManifoldEdgeIndices,
+                        EdgeIndices: [.. nonManifold.Select(e => e.idx),],
                         VertexIndices: [],
-                        Valences: valences,
-                        Locations: locations,
+                        Valences: [.. nonManifold.Select(e => e.valence),],
+                        Locations: [.. nonManifold.Select(e => e.location),],
                         IsManifold: isManifold,
                         IsOrientable: isOriented,
-                        MaxValence: valences.Count > 0 ? valences.Max() : 0));
+                        MaxValence: nonManifold.Length > 0 ? nonManifold.Max(e => e.valence) : 0));
                 }),
 
             [(typeof(Brep), TopologyMode.EdgeClassification)] = (
                 V.Standard | V.Topology,
                 (g, ctx, args) => {
                     Brep brep = (Brep)g;
-                    Continuity minContinuity = args.Length > 0 && args[0] is Continuity c ? c : Continuity.G1_continuous;
-                    IReadOnlyList<int> edgeIndices = [.. System.Linq.Enumerable.Range(0, brep.Edges.Count),];
-                    IReadOnlyList<EdgeContinuityType> classifications = [.. edgeIndices.Select(i => {
-                        BrepEdge edge = brep.Edges[i];
-                        return edge.Valence switch {
-                            1 => EdgeContinuityType.Boundary,
-                            > 2 => EdgeContinuityType.NonManifold,
-                            2 => edge.EdgeCurve.IsContinuous(minContinuity) switch {
-                                true => minContinuity >= Continuity.G2_continuous ? EdgeContinuityType.Curvature :
-                                        minContinuity >= Continuity.G1_continuous ? EdgeContinuityType.Smooth :
-                                        EdgeContinuityType.Interior,
-                                false => EdgeContinuityType.Sharp,
-                            },
-                            _ => EdgeContinuityType.Sharp,
-                        };
-                    }),];
-                    IReadOnlyList<double> measures = [.. edgeIndices.Select(i => {
-                        BrepEdge edge = brep.Edges[i];
-                        return edge.Valence == 2 && edge.AdjacentFaces().Length == 2 ? (() => {
-                            int[] faces = edge.AdjacentFaces();
-                            Vector3d n1 = brep.Faces[faces[0]].NormalAt(0.5, 0.5);
-                            Vector3d n2 = brep.Faces[faces[1]].NormalAt(0.5, 0.5);
-                            return System.Math.Acos(System.Math.Max(-1.0, System.Math.Min(1.0, n1 * n2)));
-                        })() : 0.0;
-                    }),];
+                    Continuity minContinuity = args is [Continuity c, ..] ? c : Continuity.G1_continuous;
+                    (int idx, EdgeContinuityType classification, double measure)[] edges = [.. Enumerable.Range(0, brep.Edges.Count)
+                        .Select(i => {
+                            BrepEdge edge = brep.Edges[i];
+                            EdgeContinuityType classification = edge.Valence switch {
+                                1 => EdgeContinuityType.Boundary,
+                                > 2 => EdgeContinuityType.NonManifold,
+                                2 => edge.EdgeCurve.IsContinuous(minContinuity)
+                                    ? minContinuity >= Continuity.G2_continuous ? EdgeContinuityType.Curvature
+                                    : minContinuity >= Continuity.G1_continuous ? EdgeContinuityType.Smooth
+                                    : EdgeContinuityType.Interior
+                                    : EdgeContinuityType.Sharp,
+                                _ => EdgeContinuityType.Sharp,
+                            };
+                            double measure = edge.Valence == 2 && edge.AdjacentFaces() is { Length: 2 } faces
+                                ? System.Math.Acos(System.Math.Clamp(
+                                    brep.Faces[faces[0]].NormalAt(0.5, 0.5) * brep.Faces[faces[1]].NormalAt(0.5, 0.5),
+                                    -1.0, 1.0))
+                                : 0.0;
+                            return (i, classification, measure);
+                        }),];
                     return ResultFactory.Create(value: (Topology.IResult)new EdgeClassificationData(
-                        EdgeIndices: edgeIndices,
-                        Classifications: classifications,
-                        ContinuityMeasures: measures,
-                        GroupedByType: [.. System.Linq.Enumerable.Range(0, 6)
-                            .Select(type => ((EdgeContinuityType)type, (IReadOnlyList<int>)[.. edgeIndices
-                                .Where(i => (int)classifications[i] == type),])),]
+                        EdgeIndices: [.. edges.Select(e => e.idx),],
+                        Classifications: [.. edges.Select(e => e.classification),],
+                        ContinuityMeasures: [.. edges.Select(e => e.measure),],
+                        GroupedByType: [.. Enumerable.Range(0, 6)
+                            .Select(type => ((EdgeContinuityType)type, (IReadOnlyList<int>)[.. edges
+                                .Where(e => (int)e.classification == type)
+                                .Select(e => e.idx),])),]
                             .ToFrozenDictionary(x => x.Item1, x => x.Item2),
                         MinimumContinuity: minContinuity));
                 }),
