@@ -6,8 +6,8 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Zero-allocation error structure with domain classification and contextual information.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct SystemError(ErrorDomain domain, int code, string message) : IEquatable<SystemError> {
-    public ErrorDomain Domain { get; } = domain;
+public readonly struct SystemError(Domain domain, int code, string message) : IEquatable<SystemError> {
+    public Domain Domain { get; } = domain;
     public int Code { get; } = code;
     public string Message { get; } = message;
 

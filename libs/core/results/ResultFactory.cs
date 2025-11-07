@@ -25,8 +25,8 @@ public static class ResultFactory {
             (_, null, null, var d, null, null) when d is not null => new Result<T>(isSuccess: false, default!, [], deferred: d),
             (var v, null, null, null, var conds, null) when v is not null && conds is not null => new Result<T>(isSuccess: true, v, [], deferred: null).Ensure([.. conds]),
             (_, null, null, null, null, var n) when n.HasValue => n.Value.Match(onSuccess: inner => inner, onFailure: errs => new Result<T>(isSuccess: false, default!, errs, deferred: null)),
-            (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [ResultErrors.Factory.NoValueProvided,], deferred: null),
-            _ => throw new ArgumentException(ResultErrors.Factory.InvalidCreateParameters.Message, nameof(value)),
+            (_, null, null, null, null, null) => new Result<T>(isSuccess: false, default!, [E.Results.NoValueProvided,], deferred: null),
+            _ => throw new ArgumentException(E.Results.InvalidCreate.Message, nameof(value)),
         };
 
     /// <summary>Validates Result using polymorphic parameter detection with unified validation semantics.</summary>
@@ -45,10 +45,10 @@ public static class ResultFactory {
             (Func<T, bool> p, null, null, _) when error.HasValue => result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
             (Func<T, bool> p, Func<T, Result<T>> v, null, _) => result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure(vs),
-            (null, null, null, [IGeometryContext ctx, ValidationMode mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
+            (null, null, null, [IGeometryContext ctx, V mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(runtimeType: g!.GetType(), mode: mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
                 var errs => Create<T>(errors: errs),
             }),
-            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), ValidationMode.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
+            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(runtimeType: g!.GetType(), mode: V.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
                 var errs => Create<T>(errors: errs),
             }),
             (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
@@ -86,7 +86,7 @@ public static class ResultFactory {
                         } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
                 .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
             (var ar, var rc, _, var a) => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture,
-                $"{ResultErrors.Factory.InvalidLiftParameters.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
+                $"{E.Results.InvalidLift.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
         };
     }
 

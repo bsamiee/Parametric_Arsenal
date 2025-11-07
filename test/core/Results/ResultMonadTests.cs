@@ -9,7 +9,7 @@ namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic tests for Result monadic laws, operations, and invariants using zero-boilerplate composition.</summary>
 public sealed class ResultMonadTests {
-    private static readonly SystemError TestError = new(ErrorDomain.Results, 1001, "Test error");
+    private static readonly SystemError TestError = new(Domain.Results, 1001, "Test error");
 
     /// <summary>Verifies functor category laws: identity and composition.</summary>
     [Fact]
@@ -104,8 +104,8 @@ public sealed class ResultMonadTests {
     public void EnsureMultipleValidationsAccumulatesErrors() {
         (SystemError e1, SystemError e2, SystemError e3) = (
             TestError,
-            new(ErrorDomain.Results, 1002, "E2"),
-            new(ErrorDomain.Results, 1003, "E3"));
+            new(Domain.Results, 1002, "E2"),
+            new(Domain.Results, 1003, "E3"));
         TestGen.RunAll(
             () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure(x => x > 0, e1).IsSuccess)), 50),
             () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.False(ResultFactory.Create(value: v).Ensure(x => x < 0, e1).IsSuccess)), 50),
@@ -128,8 +128,8 @@ public sealed class ResultMonadTests {
     [Fact]
     public void ApplyApplicativeFunctorAccumulatesErrorsInParallel() {
         (SystemError funcErr, SystemError valErr) = (
-            new(ErrorDomain.Results, 5001, "Function error"),
-            new(ErrorDomain.Results, 5002, "Value error"));
+            new(Domain.Results, 5001, "Function error"),
+            new(Domain.Results, 5002, "Value error"));
         TestGen.RunAll(
             () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
                 Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => x + b));
@@ -219,7 +219,7 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies OnError transformation and recovery using algebraic error morphisms with explicit overloads.</summary>
     [Fact]
     public void OnErrorErrorHandlingTransformsAndRecovers() {
-        (SystemError e1, SystemError e2) = (TestError, new(ErrorDomain.Results, 1002, "E2"));
+        (SystemError e1, SystemError e2) = (TestError, new(Domain.Results, 1002, "E2"));
         TestGen.RunAll(
             () => {
                 Result<int> mapped = ResultFactory.Create<int>(error: e1).OnError(_ => [e2]);
