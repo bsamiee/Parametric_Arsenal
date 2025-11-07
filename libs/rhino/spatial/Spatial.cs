@@ -28,25 +28,25 @@ public static class Spatial {
         }.ToFrozenDictionary();
 
     /// <summary>Algorithm configuration mapping input/query type pairs to validation modes and buffer strategies.</summary>
-    private static readonly FrozenDictionary<(Type Input, Type Query), (ValidationMode Mode, int BufferSize)> _algorithmConfig =
-        new Dictionary<(Type, Type), (ValidationMode, int)> {
-            [(typeof(Point3d[]), typeof(Sphere))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof(BoundingBox))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (ValidationMode.None, 2048),
-            [(typeof(PointCloud), typeof(Sphere))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof(BoundingBox))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof((Point3d[], int)))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof((Point3d[], double)))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Mesh), typeof(Sphere))] = (ValidationMode.MeshSpecific, 2048),
-            [(typeof(Mesh), typeof(BoundingBox))] = (ValidationMode.MeshSpecific, 2048),
-            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (ValidationMode.MeshSpecific, 4096),
-            [(typeof(Curve[]), typeof(Sphere))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Curve[]), typeof(BoundingBox))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Surface[]), typeof(Sphere))] = (ValidationMode.BoundingBox, 2048),
-            [(typeof(Surface[]), typeof(BoundingBox))] = (ValidationMode.BoundingBox, 2048),
-            [(typeof(Brep[]), typeof(Sphere))] = (ValidationMode.Topology, 2048),
-            [(typeof(Brep[]), typeof(BoundingBox))] = (ValidationMode.Topology, 2048),
+    private static readonly FrozenDictionary<(Type Input, Type Query), (V Mode, int BufferSize)> _algorithmConfig =
+        new Dictionary<(Type, Type), (V, int)> {
+            [(typeof(Point3d[]), typeof(Sphere))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof(BoundingBox))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (V.None, 2048),
+            [(typeof(PointCloud), typeof(Sphere))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof(BoundingBox))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof((Point3d[], int)))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof((Point3d[], double)))] = (V.Degeneracy, 2048),
+            [(typeof(Mesh), typeof(Sphere))] = (V.MeshSpecific, 2048),
+            [(typeof(Mesh), typeof(BoundingBox))] = (V.MeshSpecific, 2048),
+            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (V.MeshSpecific, 4096),
+            [(typeof(Curve[]), typeof(Sphere))] = (V.Degeneracy, 2048),
+            [(typeof(Curve[]), typeof(BoundingBox))] = (V.Degeneracy, 2048),
+            [(typeof(Surface[]), typeof(Sphere))] = (V.BoundingBox, 2048),
+            [(typeof(Surface[]), typeof(BoundingBox))] = (V.BoundingBox, 2048),
+            [(typeof(Brep[]), typeof(Sphere))] = (V.Topology, 2048),
+            [(typeof(Brep[]), typeof(BoundingBox))] = (V.Topology, 2048),
         }.ToFrozenDictionary();
 
     /// <summary>Performs spatial indexing operations using RhinoCommon RTree algorithms with type-based query dispatch.</summary>
@@ -56,7 +56,7 @@ public static class Spatial {
         TQuery query,
         IGeometryContext context,
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
-        _algorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (ValidationMode mode, int bufferSize) config) switch {
+        _algorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize) config) switch {
             true => UnifiedOperation.Apply(
                 input: input,
                 operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => ExecuteAlgorithm(item, query, context, config.bufferSize)),
@@ -67,7 +67,7 @@ public static class Spatial {
                     EnableDiagnostics = enableDiagnostics,
                 }),
             false => ResultFactory.Create<IReadOnlyList<int>>(
-                error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext(
+                error: E.Spatial.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
@@ -86,10 +86,10 @@ public static class Spatial {
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // Point array proximity queries
             (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ => tuple1.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK)
                 : ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
             (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ => tuple2.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance)
                 : ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
             // PointCloud range queries
             (PointCloud cloud, Sphere sphere) => GetTree(cloud).Bind(tree =>
@@ -98,10 +98,10 @@ public static class Spatial {
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // PointCloud proximity queries
             (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 => tuple3.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidK)
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK)
                 : ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
             (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 => tuple4.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.InvalidDistance)
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance)
                 : ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
@@ -128,7 +128,7 @@ public static class Spatial {
             (Brep[] breps, BoundingBox box) => GetTree(breps).Bind(tree =>
                 ExecuteRangeSearch(tree, box, bufferSize)),
             _ => ResultFactory.Create<IReadOnlyList<int>>(
-                error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext(
+                error: E.Spatial.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
@@ -166,8 +166,8 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteKNearestPoints(Point3d[] points, Point3d[] needles, int k) =>
         RTree.Point3dKNeighbors(points, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
     /// <summary>Executes distance-limited proximity search for point arrays using RTree.Point3dClosestPoints.</summary>
@@ -175,8 +175,8 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedPoints(Point3d[] points, Point3d[] needles, double limit) =>
         RTree.Point3dClosestPoints(points, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
     /// <summary>Executes k-nearest neighbor search for point clouds using RTree.PointCloudKNeighbors.</summary>
@@ -184,8 +184,8 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteKNearestCloud(PointCloud cloud, Point3d[] needles, int k) =>
         RTree.PointCloudKNeighbors(cloud, needles, k) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
     /// <summary>Executes distance-limited proximity search for point clouds using RTree.PointCloudClosestPoints.</summary>
@@ -193,8 +193,8 @@ public static class Spatial {
     private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedCloud(PointCloud cloud, Point3d[] needles, double limit) =>
         RTree.PointCloudClosestPoints(cloud, needles, limit) switch {
             int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
     /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
@@ -215,7 +215,7 @@ public static class Spatial {
             });
             return success switch {
                 true => ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []),
-                false => ResultFactory.Create<IReadOnlyList<int>>(error: SpatialErrors.Query.ProximityFailed),
+                false => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             };
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
@@ -227,7 +227,7 @@ public static class Spatial {
     private static Result<RTree> GetTree<T>(T source) where T : notnull =>
         _treeFactories.TryGetValue(typeof(T), out Func<object, RTree>? factory) switch {
             true => ResultFactory.Create(value: _treeCache.GetValue(key: source, createValueCallback: _ => factory(source!))),
-            false => ResultFactory.Create<RTree>(error: SpatialErrors.Query.UnsupportedTypeCombo.WithContext($"Type: {typeof(T).Name}")),
+            false => ResultFactory.Create<RTree>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Type: {typeof(T).Name}")),
         };
 
     /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>

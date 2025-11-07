@@ -23,7 +23,7 @@ public static class UnifiedOperation {
 
         Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
             Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
-            Func<TIn, ValidationMode, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
+            Func<TIn, V, Result<IReadOnlyList<TOut>>> deferred => deferred(item, config.ValidationMode),
             Func<TIn, Result<Result<IReadOnlyList<TOut>>>> nested => nested(item).Bind(inner => inner),
             Func<TIn, Result<TOut>> single => single(item).Map(v => (IReadOnlyList<TOut>)[v]),
             IReadOnlyList<Func<TIn, Result<TOut>>> ops => ops.Aggregate(
@@ -35,7 +35,7 @@ public static class UnifiedOperation {
             (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
                 pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
             _ => ResultFactory.Create<IReadOnlyList<TOut>>(
-                error: ValidationErrors.Operations.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
+                error: E.Validation.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
         };
 
         Result<IReadOnlyList<TOut>> execute(TIn item) {
@@ -49,8 +49,8 @@ public static class UnifiedOperation {
 
             Result<TIn> validated = ResultFactory.Create(value: item)
                 .Ensure(config.InputFilter ?? (_ => true),
-                    config.ErrorPrefix is null ? ValidationErrors.Operations.InputFiltered : ValidationErrors.Operations.InputFiltered.WithContext(config.ErrorPrefix))
-                .Validate(args: config.ValidationMode is ValidationMode.None ? null :
+                    config.ErrorPrefix is null ? E.Validation.UnsupportedOperationType : E.Validation.UnsupportedOperationType.WithContext(config.ErrorPrefix))
+                .Validate(args: config.ValidationMode == V.None ? null :
                     [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []]);
 
             Result<IReadOnlyList<TOut>> compute() => (config.SkipInvalid ? validated.OnError(_ => item) : validated)

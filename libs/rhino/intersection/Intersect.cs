@@ -48,9 +48,9 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        ValidationMode mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out ValidationMode m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out ValidationMode m2) ? m2
-            : ValidationMode.None;
+        V mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V m1) ? m1
+            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V m2) ? m2
+            : V.None;
 
         return UnifiedOperation.Apply(
             geometryA,
@@ -74,40 +74,40 @@ public static class Intersect {
     }
 
     private static class IntersectionCore {
-        internal static readonly FrozenDictionary<(Type, Type), ValidationMode> _validationConfig =
-            new Dictionary<(Type, Type), ValidationMode> {
-                [(typeof(Curve), typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Curve), typeof(Surface))] = ValidationMode.Standard,
-                [(typeof(Curve), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Curve), typeof(BrepFace))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Curve), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Curve), typeof(Line))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Brep), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Brep), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Brep), typeof(Surface))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Surface), typeof(Surface))] = ValidationMode.Standard,
-                [(typeof(Mesh), typeof(Mesh))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Ray3d))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Plane))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Line))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(PolylineCurve))] = ValidationMode.MeshSpecific,
-                [(typeof(Line), typeof(Line))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(BoundingBox))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Cylinder))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(BoundingBox))] = ValidationMode.Standard,
-                [(typeof(Sphere), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Circle), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Arc), typeof(Arc))] = ValidationMode.Standard,
-                [(typeof(Point3d[]), typeof(Brep[]))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Point3d[]), typeof(Mesh[]))] = ValidationMode.MeshSpecific,
-                [(typeof(Ray3d), typeof(GeometryBase[]))] = ValidationMode.Standard,
+        internal static readonly FrozenDictionary<(Type, Type), V> _validationConfig =
+            new Dictionary<(Type, Type), V> {
+                [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,
+                [(typeof(Curve), typeof(Surface))] = V.Standard,
+                [(typeof(Curve), typeof(Brep))] = V.Standard | V.Topology,
+                [(typeof(Curve), typeof(BrepFace))] = V.Standard | V.Topology,
+                [(typeof(Curve), typeof(Plane))] = V.Standard | V.Degeneracy,
+                [(typeof(Curve), typeof(Line))] = V.Standard | V.Degeneracy,
+                [(typeof(Brep), typeof(Brep))] = V.Standard | V.Topology,
+                [(typeof(Brep), typeof(Plane))] = V.Standard | V.Topology,
+                [(typeof(Brep), typeof(Surface))] = V.Standard | V.Topology,
+                [(typeof(Surface), typeof(Surface))] = V.Standard,
+                [(typeof(Mesh), typeof(Mesh))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Ray3d))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Plane))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Line))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(PolylineCurve))] = V.MeshSpecific,
+                [(typeof(Line), typeof(Line))] = V.Standard,
+                [(typeof(Line), typeof(BoundingBox))] = V.Standard,
+                [(typeof(Line), typeof(Plane))] = V.Standard,
+                [(typeof(Line), typeof(Sphere))] = V.Standard,
+                [(typeof(Line), typeof(Cylinder))] = V.Standard,
+                [(typeof(Line), typeof(Circle))] = V.Standard,
+                [(typeof(Plane), typeof(Plane))] = V.Standard,
+                [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = V.Standard,
+                [(typeof(Plane), typeof(Circle))] = V.Standard,
+                [(typeof(Plane), typeof(Sphere))] = V.Standard,
+                [(typeof(Plane), typeof(BoundingBox))] = V.Standard,
+                [(typeof(Sphere), typeof(Sphere))] = V.Standard,
+                [(typeof(Circle), typeof(Circle))] = V.Standard,
+                [(typeof(Arc), typeof(Arc))] = V.Standard,
+                [(typeof(Point3d[]), typeof(Brep[]))] = V.Standard | V.Topology,
+                [(typeof(Point3d[]), typeof(Mesh[]))] = V.MeshSpecific,
+                [(typeof(Ray3d), typeof(GeometryBase[]))] = V.Standard,
             }.ToFrozenDictionary();
 
         [Pure]
@@ -155,7 +155,7 @@ public static class Intersect {
                                       [.. from pl in sections from pt in pl select pt],
                                       [], [], [], [],
                                       [.. sections])),
-                    null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                    null => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                 };
 
@@ -163,7 +163,7 @@ public static class Intersect {
 
             return (a, b, opts) switch {
                 (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: E.Geometry.InvalidProjection),
                 (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, ctx.AbsoluteTolerance, out int[] ids1)],
@@ -173,7 +173,7 @@ public static class Intersect {
                         [.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, ctx.AbsoluteTolerance)],
                         [], [], [], [], [])),
                 (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidProjectionDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: E.Geometry.InvalidProjection),
                 (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, ctx.AbsoluteTolerance, out int[] ids2)],
@@ -183,9 +183,9 @@ public static class Intersect {
                         [.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, ctx.AbsoluteTolerance)],
                         [], [], [], [], [])),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when ray.Direction.Length <= RhinoMath.ZeroTolerance =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidRayDirection),
+                    ResultFactory.Create<IntersectionOutput>(error: E.Geometry.InvalidRay),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when hits <= 0 =>
-                    ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Parameters.InvalidMaxHitCount),
+                    ResultFactory.Create<IntersectionOutput>(error: E.Geometry.InvalidMaxHits),
                 (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) =>
                     ResultFactory.Create(value: new IntersectionOutput(
                         [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
@@ -223,7 +223,7 @@ public static class Intersect {
                         Line[] { Length: > 0 } lines => ResultFactory.Create(value: new IntersectionOutput(
                             [.. from l in lines select l.From, .. from l in lines select l.To],
                             [], [], [], [], [])),
-                        null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        null => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Mesh ma, Mesh mb, { Sorted: true }) =>
@@ -240,26 +240,26 @@ public static class Intersect {
                     RhinoIntersect.MeshLine(ma, lb) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], [], [])),
-                        null => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        null => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Mesh ma, Line lb, { Sorted: true }) =>
                     RhinoIntersect.MeshLineSorted(ma, lb, out int[] ids3) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids3.Length > 0 ? [.. ids3] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     },
                 (Mesh ma, PolylineCurve pc, { Sorted: false }) =>
                     RhinoIntersect.MeshPolyline(ma, pc, out int[] ids4) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids4.Length > 0 ? [.. ids4] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     },
                 (Mesh ma, PolylineCurve pc, { Sorted: true }) =>
                     RhinoIntersect.MeshPolylineSorted(ma, pc, out int[] ids5) switch {
                         Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new IntersectionOutput(
                             [.. points], [], [], [], ids5.Length > 0 ? [.. ids5] : [], [])),
-                        _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.ComputationFailed),
+                        _ => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     },
                 (Line la, Line lb, _) =>
                     RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false) switch {
@@ -337,7 +337,7 @@ public static class Intersect {
                     fromCountedPoints((int)RhinoIntersect.CircleCircle(ca, cb, out Point3d ccp1, out Point3d ccp2), ccp1, ccp2, tolerance),
                 (Arc aa, Arc ab, _) =>
                     fromCountedPoints((int)RhinoIntersect.ArcArc(aa, ab, out Point3d aap1, out Point3d aap2), aap1, aap2, tolerance),
-                _ => ResultFactory.Create<IntersectionOutput>(error: IntersectionErrors.Operation.UnsupportedMethod),
+                _ => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.UnsupportedIntersection),
             };
         }
     }
