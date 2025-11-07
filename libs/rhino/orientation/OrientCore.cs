@@ -19,54 +19,41 @@ internal static class OrientCore {
                     ResultFactory.Create(value: frame),
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
-            [typeof(NurbsCurve)] = (g, ctx) => ((NurbsCurve)g) switch {
-                NurbsCurve c when c.FrameAt(c.Domain.Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(LineCurve)] = (g, ctx) => ((LineCurve)g) switch {
-                LineCurve c when c.FrameAt(c.Domain.Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(PolylineCurve)] = (g, ctx) => ((PolylineCurve)g) switch {
-                PolylineCurve c when c.FrameAt(c.Domain.Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(ArcCurve)] = (g, ctx) => ((ArcCurve)g) switch {
-                ArcCurve c when c.FrameAt(c.Domain.Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
             [typeof(Surface)] = (g, ctx) => ((Surface)g) switch {
                 Surface s when s.FrameAt(s.Domain(0).Mid, s.Domain(1).Mid, out Plane frame) && frame.IsValid =>
                     ResultFactory.Create(value: frame),
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
-            [typeof(NurbsSurface)] = (g, ctx) => ((NurbsSurface)g) switch {
-                NurbsSurface s when s.FrameAt(s.Domain(0).Mid, s.Domain(1).Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(PlaneSurface)] = (g, ctx) => ((PlaneSurface)g) switch {
-                PlaneSurface s when s.FrameAt(s.Domain(0).Mid, s.Domain(1).Mid, out Plane frame) && frame.IsValid =>
-                    ResultFactory.Create(value: frame),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
             [typeof(Brep)] = (g, ctx) => ((Brep)g) switch {
-                Brep { IsSolid: true } b => VolumeMassProperties.Compute(b) switch {
-                    { Centroid: Point3d ct } when ct.IsValid => b.Faces.Count > 0 && b.Faces[0].NormalAt(0.5, 0.5) is Vector3d n && n.IsValid
-                        ? ResultFactory.Create(value: new Plane(ct, n))
-                        : ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
-                    _ => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
-                },
-                Brep b => AreaMassProperties.Compute(b) switch {
-                    { Centroid: Point3d ct } when ct.IsValid => b.Faces.Count > 0 && b.Faces[0].NormalAt(0.5, 0.5) is Vector3d n && n.IsValid
-                        ? ResultFactory.Create(value: new Plane(ct, n))
-                        : ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
-                    _ => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
-                },
+                Brep { IsSolid: true, Faces.Count: > 0 } b =>
+                    ResultFactory.Create(value: VolumeMassProperties.Compute(b))
+                        .Tap(onSuccess: mp => mp?.Dispose())
+                        .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid switch {
+                            true => b.Faces.Aggregate((largest: b.Faces[0], area: b.Faces[0].GetSurfaceSize().X * b.Faces[0].GetSurfaceSize().Y),
+                                    (acc, face) => (face.GetSurfaceSize().X * face.GetSurfaceSize().Y) > acc.area
+                                        ? (face, face.GetSurfaceSize().X * face.GetSurfaceSize().Y)
+                                        : acc) switch {
+                                    var (face, _) when face.NormalAt(0.5, 0.5) is Vector3d n && n.IsValid =>
+                                        ResultFactory.Create(value: new Plane(ct, n)),
+                                    _ => ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
+                                },
+                            _ => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
+                        }),
+                Brep { Faces.Count: > 0 } b =>
+                    ResultFactory.Create(value: AreaMassProperties.Compute(b))
+                        .Tap(onSuccess: mp => mp?.Dispose())
+                        .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid switch {
+                            true => b.Faces.Aggregate((largest: b.Faces[0], area: b.Faces[0].GetSurfaceSize().X * b.Faces[0].GetSurfaceSize().Y),
+                                    (acc, face) => (face.GetSurfaceSize().X * face.GetSurfaceSize().Y) > acc.area
+                                        ? (face, face.GetSurfaceSize().X * face.GetSurfaceSize().Y)
+                                        : acc) switch {
+                                    var (face, _) when face.NormalAt(0.5, 0.5) is Vector3d n && n.IsValid =>
+                                        ResultFactory.Create(value: new Plane(ct, n)),
+                                    _ => ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
+                                },
+                            _ => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
+                        }),
+                Brep b => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
             },
             [typeof(Extrusion)] = (g, ctx) => ((Extrusion)g).ToBrep(splitKinkyFaces: true) switch {
                 Brep b => PlaneExtractors[typeof(Brep)](b, ctx).Tap(onSuccess: _ => b.Dispose()),
@@ -75,24 +62,35 @@ internal static class OrientCore {
                 Brep b => PlaneExtractors[typeof(Brep)](b, ctx).Tap(onSuccess: _ => b.Dispose()),
             },
             [typeof(Mesh)] = (g, ctx) => ((Mesh)g) switch {
-                Mesh { IsClosed: true } m => VolumeMassProperties.Compute(m) switch {
-                    { Centroid: Point3d ct } when ct.IsValid => m.Normals.Count > 0
-                        ? ResultFactory.Create(value: new Plane(ct, m.Normals[0]))
-                        : ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
-                    _ => ResultFactory.Create(value: new Plane(m.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
-                },
-                Mesh m => AreaMassProperties.Compute(m) switch {
-                    { Centroid: Point3d ct } when ct.IsValid => m.Normals.Count > 0
-                        ? ResultFactory.Create(value: new Plane(ct, m.Normals[0]))
-                        : ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
-                    _ => ResultFactory.Create(value: new Plane(m.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
-                },
+                Mesh { IsClosed: true, Normals.Count: > 0 } m =>
+                    ResultFactory.Create(value: VolumeMassProperties.Compute(m))
+                        .Tap(onSuccess: mp => mp?.Dispose())
+                        .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid switch {
+                            true => m.Normals.Take(Math.Min(m.Normals.Count, 100)).Aggregate(Vector3d.Zero, (sum, n) => sum + n) switch {
+                                Vector3d avg when avg.Length > OrientConfig.ToleranceDefaults.MinVectorLength =>
+                                    ResultFactory.Create(value: new Plane(ct, avg / Math.Min(m.Normals.Count, 100))),
+                                _ => ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
+                            },
+                            _ => ResultFactory.Create(value: new Plane(m.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
+                        }),
+                Mesh { Normals.Count: > 0 } m =>
+                    ResultFactory.Create(value: AreaMassProperties.Compute(m))
+                        .Tap(onSuccess: mp => mp?.Dispose())
+                        .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid switch {
+                            true => m.Normals.Take(Math.Min(m.Normals.Count, 100)).Aggregate(Vector3d.Zero, (sum, n) => sum + n) switch {
+                                Vector3d avg when avg.Length > OrientConfig.ToleranceDefaults.MinVectorLength =>
+                                    ResultFactory.Create(value: new Plane(ct, avg / Math.Min(m.Normals.Count, 100))),
+                                _ => ResultFactory.Create(value: new Plane(ct, Vector3d.ZAxis)),
+                            },
+                            _ => ResultFactory.Create(value: new Plane(m.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
+                        }),
+                Mesh m => ResultFactory.Create(value: new Plane(m.GetBoundingBox(accurate: false).Center, Vector3d.ZAxis)),
             },
             [typeof(Point)] = (g, ctx) =>
                 ResultFactory.Create(value: new Plane(((Point)g).Location, Vector3d.ZAxis)),
-            [typeof(PointCloud)] = (g, ctx) => ((PointCloud)g).Count > 0 switch {
-                true => ResultFactory.Create(value: new Plane(((PointCloud)g).GetPoint(0).Location, Vector3d.ZAxis)),
-                false => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            [typeof(PointCloud)] = (g, ctx) => ((PointCloud)g) switch {
+                PointCloud { Count: > 0 } pc => ResultFactory.Create(value: new Plane(pc.GetPoint(0).Location, Vector3d.ZAxis)),
+                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
         }.ToFrozenDictionary();
 
@@ -114,30 +112,42 @@ internal static class OrientCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid<T>(T geometry, bool useMassCentroid, IGeometryContext context) where T : GeometryBase =>
         (geometry, useMassCentroid) switch {
-            (Brep { IsSolid: true } b, true) => VolumeMassProperties.Compute(b) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: b.GetBoundingBox(accurate: false).Center),
-            },
-            (Brep b, _) => AreaMassProperties.Compute(b) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: b.GetBoundingBox(accurate: false).Center),
-            },
-            (Mesh { IsClosed: true } m, true) => VolumeMassProperties.Compute(m) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: m.GetBoundingBox(accurate: false).Center),
-            },
-            (Mesh m, _) => AreaMassProperties.Compute(m) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: m.GetBoundingBox(accurate: false).Center),
-            },
-            (Curve { IsClosed: true } c, _) => AreaMassProperties.Compute(c) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: c.GetBoundingBox(accurate: false).Center),
-            },
-            (Surface s, _) => AreaMassProperties.Compute(s) switch {
-                { Centroid: Point3d ct } when ct.IsValid => ResultFactory.Create(value: ct),
-                _ => ResultFactory.Create(value: s.GetBoundingBox(accurate: false).Center),
-            },
+            (Brep { IsSolid: true } b, true) =>
+                ResultFactory.Create(value: VolumeMassProperties.Compute(b))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: b.GetBoundingBox(accurate: false).Center)),
+            (Brep b, _) =>
+                ResultFactory.Create(value: AreaMassProperties.Compute(b))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: b.GetBoundingBox(accurate: false).Center)),
+            (Mesh { IsClosed: true } m, true) =>
+                ResultFactory.Create(value: VolumeMassProperties.Compute(m))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: m.GetBoundingBox(accurate: false).Center)),
+            (Mesh m, _) =>
+                ResultFactory.Create(value: AreaMassProperties.Compute(m))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: m.GetBoundingBox(accurate: false).Center)),
+            (Curve { IsClosed: true } c, _) =>
+                ResultFactory.Create(value: AreaMassProperties.Compute(c))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: c.GetBoundingBox(accurate: false).Center)),
+            (Surface s, _) =>
+                ResultFactory.Create(value: AreaMassProperties.Compute(s))
+                    .Tap(onSuccess: mp => mp?.Dispose())
+                    .Bind(mp => mp?.Centroid is Point3d ct && ct.IsValid
+                        ? ResultFactory.Create(value: ct)
+                        : ResultFactory.Create(value: s.GetBoundingBox(accurate: false).Center)),
             (Extrusion ext, bool mass) => ext.ToBrep(splitKinkyFaces: true) switch {
                 Brep b => ExtractCentroid(b, mass, context).Tap(onSuccess: _ => b.Dispose()),
             },
@@ -145,10 +155,8 @@ internal static class OrientCore {
                 Brep b => ExtractCentroid(b, mass, context).Tap(onSuccess: _ => b.Dispose()),
             },
             (Point p, _) => ResultFactory.Create(value: p.Location),
-            (PointCloud pc, _) => pc.Count > 0 switch {
-                true => ResultFactory.Create(value: pc.GetPoint(0).Location),
-                false => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-            },
+            (PointCloud { Count: > 0 } pc, _) => ResultFactory.Create(value: pc.GetPoint(0).Location),
+            (PointCloud, _) => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
             _ => ResultFactory.Create(value: geometry.GetBoundingBox(accurate: false).Center),
         };
 
@@ -198,7 +206,7 @@ internal static class OrientCore {
         };
 
     /// <summary>Flips geometry direction with type-specific in-place mutation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> FlipGeometryDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
         geometry switch {
             Curve c => c.Reverse() switch {
