@@ -14,19 +14,19 @@ public readonly struct DiagnosticContext(
     string operation,
     TimeSpan elapsed,
     long allocations,
-    ValidationMode? validationApplied = null,
+    V? validationApplied = null,
     bool? cacheHit = null,
     int? errorCount = null) : IEquatable<DiagnosticContext> {
     public string Operation { get; } = operation;
     public TimeSpan Elapsed { get; } = elapsed;
     public long Allocations { get; } = allocations;
-    public ValidationMode? ValidationApplied { get; } = validationApplied;
+    public V? ValidationApplied { get; } = validationApplied;
     public bool? CacheHit { get; } = cacheHit;
     public int? ErrorCount { get; } = errorCount;
 
     [Pure]
-    private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
-        $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(CultureInfo.InvariantCulture)}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(CultureInfo.InvariantCulture)}" : string.Empty)}");
+    private string DebuggerDisplay => string.Create(provider: CultureInfo.InvariantCulture,
+        handler: $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(provider: CultureInfo.InvariantCulture)}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value.ToUInt16().ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}");
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(DiagnosticContext left, DiagnosticContext right) => left.Equals(right);

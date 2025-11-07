@@ -2,24 +2,17 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Intersection operation error definitions.</summary>
+/// <summary>Intersection operation error definitions - aliases to E.Geometry for backward compatibility.</summary>
+[Obsolete("Use E.Geometry instead", error: false)]
 public static class IntersectionErrors {
     public static class Operation {
-        public static readonly SystemError UnsupportedMethod =
-            new(ErrorDomain.Geometry, 2200, "Intersection method not supported for geometry types");
-
-        public static readonly SystemError ComputationFailed =
-            new(ErrorDomain.Geometry, 2201, "Intersection computation failed");
+        public static readonly SystemError UnsupportedMethod = E.Geometry.UnsupportedIntersection;
+        public static readonly SystemError ComputationFailed = E.Geometry.IntersectionFailed;
     }
 
     public static class Parameters {
-        public static readonly SystemError InvalidProjectionDirection =
-            new(ErrorDomain.Geometry, 2202, "Projection direction vector is invalid or zero-length");
-
-        public static readonly SystemError InvalidRayDirection =
-            new(ErrorDomain.Geometry, 2204, "Ray direction vector is invalid or zero-length");
-
-        public static readonly SystemError InvalidMaxHitCount =
-            new(ErrorDomain.Geometry, 2205, "Maximum hit count must be positive");
+        public static readonly SystemError InvalidProjectionDirection = E.Geometry.InvalidProjection;
+        public static readonly SystemError InvalidRayDirection = E.Geometry.InvalidRay;
+        public static readonly SystemError InvalidMaxHitCount = E.Geometry.InvalidMaxHits;
     }
 }

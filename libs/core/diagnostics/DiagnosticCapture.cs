@@ -20,7 +20,7 @@ public static class DiagnosticCapture {
     public static Result<T> Capture<T>(
         this Result<T> result,
         string operation,
-        ValidationMode? validationApplied = null,
+        V? validationApplied = null,
         bool? cacheHit = null,
         [CallerMemberName] string callerMember = "",
         [CallerFilePath] string callerFile = "",
@@ -28,20 +28,20 @@ public static class DiagnosticCapture {
 #if DEBUG
         long startBytes = GC.GetAllocatedBytesForCurrentThread();
         Stopwatch stopwatch = Stopwatch.StartNew();
-        Activity? activity = _activitySource.StartActivity(operation);
+        Activity? activity = _activitySource.StartActivity(name: operation);
         _ = result.IsSuccess;
         stopwatch.Stop();
         long allocated = GC.GetAllocatedBytesForCurrentThread() - startBytes;
-        DiagnosticContext ctx = new(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, result.IsSuccess ? null : result.Errors.Count);
-        activity?.SetTag("operation", operation)
-            .SetTag("elapsed_ms", stopwatch.Elapsed.TotalMilliseconds)
-            .SetTag("allocations", allocated)
-            .SetTag("caller", $"{callerFile}:{callerLine.ToString(CultureInfo.InvariantCulture)} ({callerMember})")
-            .SetTag("success", result.IsSuccess)
-            .SetTag("validation", validationApplied?.ToString() ?? "None")
-            .SetTag("cache_hit", cacheHit?.ToString() ?? "N/A")
+        DiagnosticContext ctx = new(operation: operation, elapsed: stopwatch.Elapsed, allocations: allocated, validationApplied: validationApplied, cacheHit: cacheHit, errorCount: result.IsSuccess ? null : result.Errors.Count);
+        activity?.SetTag(key: "operation", value: operation)
+            .SetTag(key: "elapsed_ms", value: stopwatch.Elapsed.TotalMilliseconds)
+            .SetTag(key: "allocations", value: allocated)
+            .SetTag(key: "caller", value: $"{callerFile}:{callerLine.ToString(provider: CultureInfo.InvariantCulture)} ({callerMember})")
+            .SetTag(key: "success", value: result.IsSuccess)
+            .SetTag(key: "validation", value: validationApplied.HasValue ? validationApplied.Value.ToUInt16().ToString(provider: CultureInfo.InvariantCulture) : "None")
+            .SetTag(key: "cache_hit", value: cacheHit?.ToString(provider: CultureInfo.InvariantCulture) ?? "N/A")
             .Dispose();
-        _metadata.AddOrUpdate(result, new StrongBox<DiagnosticContext>(ctx));
+        _metadata.AddOrUpdate(key: result, value: new StrongBox<DiagnosticContext>(value: ctx));
         return result;
 #else
         _ = operation; _ = validationApplied; _ = cacheHit; _ = callerMember; _ = callerFile; _ = callerLine;

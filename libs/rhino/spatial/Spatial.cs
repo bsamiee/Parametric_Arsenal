@@ -28,25 +28,25 @@ public static class Spatial {
         }.ToFrozenDictionary();
 
     /// <summary>Algorithm configuration mapping input/query type pairs to validation modes and buffer strategies.</summary>
-    private static readonly FrozenDictionary<(Type Input, Type Query), (ValidationMode Mode, int BufferSize)> _algorithmConfig =
-        new Dictionary<(Type, Type), (ValidationMode, int)> {
-            [(typeof(Point3d[]), typeof(Sphere))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof(BoundingBox))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (ValidationMode.None, 2048),
-            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (ValidationMode.None, 2048),
-            [(typeof(PointCloud), typeof(Sphere))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof(BoundingBox))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof((Point3d[], int)))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(PointCloud), typeof((Point3d[], double)))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Mesh), typeof(Sphere))] = (ValidationMode.MeshSpecific, 2048),
-            [(typeof(Mesh), typeof(BoundingBox))] = (ValidationMode.MeshSpecific, 2048),
-            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (ValidationMode.MeshSpecific, 4096),
-            [(typeof(Curve[]), typeof(Sphere))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Curve[]), typeof(BoundingBox))] = (ValidationMode.Degeneracy, 2048),
-            [(typeof(Surface[]), typeof(Sphere))] = (ValidationMode.BoundingBox, 2048),
-            [(typeof(Surface[]), typeof(BoundingBox))] = (ValidationMode.BoundingBox, 2048),
-            [(typeof(Brep[]), typeof(Sphere))] = (ValidationMode.Topology, 2048),
-            [(typeof(Brep[]), typeof(BoundingBox))] = (ValidationMode.Topology, 2048),
+    private static readonly FrozenDictionary<(Type Input, Type Query), (V Mode, int BufferSize)> _algorithmConfig =
+        new Dictionary<(Type, Type), (V, int)> {
+            [(typeof(Point3d[]), typeof(Sphere))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof(BoundingBox))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (V.None, 2048),
+            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (V.None, 2048),
+            [(typeof(PointCloud), typeof(Sphere))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof(BoundingBox))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof((Point3d[], int)))] = (V.Degeneracy, 2048),
+            [(typeof(PointCloud), typeof((Point3d[], double)))] = (V.Degeneracy, 2048),
+            [(typeof(Mesh), typeof(Sphere))] = (V.MeshSpecific, 2048),
+            [(typeof(Mesh), typeof(BoundingBox))] = (V.MeshSpecific, 2048),
+            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (V.MeshSpecific, 4096),
+            [(typeof(Curve[]), typeof(Sphere))] = (V.Degeneracy, 2048),
+            [(typeof(Curve[]), typeof(BoundingBox))] = (V.Degeneracy, 2048),
+            [(typeof(Surface[]), typeof(Sphere))] = (V.BoundingBox, 2048),
+            [(typeof(Surface[]), typeof(BoundingBox))] = (V.BoundingBox, 2048),
+            [(typeof(Brep[]), typeof(Sphere))] = (V.Topology, 2048),
+            [(typeof(Brep[]), typeof(BoundingBox))] = (V.Topology, 2048),
         }.ToFrozenDictionary();
 
     /// <summary>Performs spatial indexing operations using RhinoCommon RTree algorithms with type-based query dispatch.</summary>
@@ -56,7 +56,7 @@ public static class Spatial {
         TQuery query,
         IGeometryContext context,
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
-        _algorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (ValidationMode mode, int bufferSize) config) switch {
+        _algorithmConfig.TryGetValue(key: (typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize) config) switch {
             true => UnifiedOperation.Apply(
                 input: input,
                 operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => ExecuteAlgorithm(item, query, context, config.bufferSize)),

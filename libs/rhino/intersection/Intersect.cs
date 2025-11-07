@@ -48,9 +48,9 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        ValidationMode mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out ValidationMode m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out ValidationMode m2) ? m2
-            : ValidationMode.None;
+        V mode = IntersectionCore._validationConfig.TryGetValue(key: (t1Type, t2Type), out V m1) ? m1
+            : IntersectionCore._validationConfig.TryGetValue(key: (elementType, t2Type), out V m2) ? m2
+            : V.None;
 
         return UnifiedOperation.Apply(
             geometryA,
@@ -74,40 +74,40 @@ public static class Intersect {
     }
 
     private static class IntersectionCore {
-        internal static readonly FrozenDictionary<(Type, Type), ValidationMode> _validationConfig =
-            new Dictionary<(Type, Type), ValidationMode> {
-                [(typeof(Curve), typeof(Curve))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Curve), typeof(Surface))] = ValidationMode.Standard,
-                [(typeof(Curve), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Curve), typeof(BrepFace))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Curve), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Curve), typeof(Line))] = ValidationMode.Standard | ValidationMode.Degeneracy,
-                [(typeof(Brep), typeof(Brep))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Brep), typeof(Plane))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Brep), typeof(Surface))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Surface), typeof(Surface))] = ValidationMode.Standard,
-                [(typeof(Mesh), typeof(Mesh))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Ray3d))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Plane))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(Line))] = ValidationMode.MeshSpecific,
-                [(typeof(Mesh), typeof(PolylineCurve))] = ValidationMode.MeshSpecific,
-                [(typeof(Line), typeof(Line))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(BoundingBox))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Cylinder))] = ValidationMode.Standard,
-                [(typeof(Line), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Plane), typeof(BoundingBox))] = ValidationMode.Standard,
-                [(typeof(Sphere), typeof(Sphere))] = ValidationMode.Standard,
-                [(typeof(Circle), typeof(Circle))] = ValidationMode.Standard,
-                [(typeof(Arc), typeof(Arc))] = ValidationMode.Standard,
-                [(typeof(Point3d[]), typeof(Brep[]))] = ValidationMode.Standard | ValidationMode.Topology,
-                [(typeof(Point3d[]), typeof(Mesh[]))] = ValidationMode.MeshSpecific,
-                [(typeof(Ray3d), typeof(GeometryBase[]))] = ValidationMode.Standard,
+        internal static readonly FrozenDictionary<(Type, Type), V> _validationConfig =
+            new Dictionary<(Type, Type), V> {
+                [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,
+                [(typeof(Curve), typeof(Surface))] = V.Standard,
+                [(typeof(Curve), typeof(Brep))] = V.Standard | V.Topology,
+                [(typeof(Curve), typeof(BrepFace))] = V.Standard | V.Topology,
+                [(typeof(Curve), typeof(Plane))] = V.Standard | V.Degeneracy,
+                [(typeof(Curve), typeof(Line))] = V.Standard | V.Degeneracy,
+                [(typeof(Brep), typeof(Brep))] = V.Standard | V.Topology,
+                [(typeof(Brep), typeof(Plane))] = V.Standard | V.Topology,
+                [(typeof(Brep), typeof(Surface))] = V.Standard | V.Topology,
+                [(typeof(Surface), typeof(Surface))] = V.Standard,
+                [(typeof(Mesh), typeof(Mesh))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Ray3d))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Plane))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(Line))] = V.MeshSpecific,
+                [(typeof(Mesh), typeof(PolylineCurve))] = V.MeshSpecific,
+                [(typeof(Line), typeof(Line))] = V.Standard,
+                [(typeof(Line), typeof(BoundingBox))] = V.Standard,
+                [(typeof(Line), typeof(Plane))] = V.Standard,
+                [(typeof(Line), typeof(Sphere))] = V.Standard,
+                [(typeof(Line), typeof(Cylinder))] = V.Standard,
+                [(typeof(Line), typeof(Circle))] = V.Standard,
+                [(typeof(Plane), typeof(Plane))] = V.Standard,
+                [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = V.Standard,
+                [(typeof(Plane), typeof(Circle))] = V.Standard,
+                [(typeof(Plane), typeof(Sphere))] = V.Standard,
+                [(typeof(Plane), typeof(BoundingBox))] = V.Standard,
+                [(typeof(Sphere), typeof(Sphere))] = V.Standard,
+                [(typeof(Circle), typeof(Circle))] = V.Standard,
+                [(typeof(Arc), typeof(Arc))] = V.Standard,
+                [(typeof(Point3d[]), typeof(Brep[]))] = V.Standard | V.Topology,
+                [(typeof(Point3d[]), typeof(Mesh[]))] = V.MeshSpecific,
+                [(typeof(Ray3d), typeof(GeometryBase[]))] = V.Standard,
             }.ToFrozenDictionary();
 
         [Pure]
