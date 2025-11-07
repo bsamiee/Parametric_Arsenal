@@ -141,7 +141,7 @@ public sealed record AdjacencyData(
 }
 
 /// <summary>Internal topology computation algorithms with FrozenDictionary-based type dispatch.</summary>
-internal static class TopologyCompute {
+internal static class TopologyCore {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 
     [Pure]
