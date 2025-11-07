@@ -17,6 +17,27 @@ These violations fail the build. Check for and fix immediately:
 5. ❌ **Using `if`/`else`** → Replace with pattern matching/switch expressions
 6. ❌ **Redundant `new Type()`** → Use target-typed `new()`
 7. ❌ **Old collection syntax** → Use collection expressions `[]`
+8. ❌ **Folder has >4 files** → Consolidate into 2-3 files
+9. ❌ **Folder has >10 types** → Consolidate into 6-8 types
+10. ❌ **Member has >300 LOC** → Improve algorithm, don't extract helpers
+
+---
+
+## 📐 Organizational Limits (STRICTLY ENFORCED)
+
+These limits force better, denser code:
+
+**ABSOLUTE MAXIMUMS** (violations are unacceptable):
+- **4 files maximum** per folder
+- **10 types maximum** per folder
+- **300 LOC maximum** per member
+
+**IDEAL TARGETS** (aim for these):
+- **2-3 files** per folder (preferred)
+- **6-8 types** per folder (optimal)
+- **150-250 LOC** per member (dense but readable)
+
+**PURPOSE**: Force identification of better members instead of low-quality sprawl. Every type must justify existence. Every line must be algorithmically valuable.
 
 ---
 
