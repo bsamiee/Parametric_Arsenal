@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
@@ -16,6 +18,7 @@ public static class Analysis {
     }
 
     /// <summary>Curve analysis result containing derivatives, curvature, frame data, discontinuities, and metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CurveData(
         Point3d Location,
         Vector3d[] Derivatives,
@@ -26,9 +29,12 @@ public static class Analysis {
         double[] DiscontinuityParameters,
         Continuity[] DiscontinuityTypes,
         double Length,
-        Point3d Centroid) : IResult;
+        Point3d Centroid) : IResult {
+        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Curve @ {this.Location} | κ={this.Curvature:F3} | L={this.Length:F3} | Disc={this.DiscontinuityParameters?.Length.ToString(CultureInfo.InvariantCulture) ?? "0"}");
+    }
 
     /// <summary>Surface analysis result containing derivatives, principal curvatures, frame data, singularity detection, and metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SurfaceData(
         Point3d Location,
         Vector3d[] Derivatives,
@@ -43,9 +49,12 @@ public static class Analysis {
         bool AtSeam,
         bool AtSingularity,
         double Area,
-        Point3d Centroid) : IResult;
+        Point3d Centroid) : IResult {
+        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}{(this.AtSingularity ? " [singular]" : string.Empty)}");
+    }
 
     /// <summary>Brep analysis result containing surface evaluation, topology navigation, proximity data, and solid metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BrepData(
         Point3d Location,
         Vector3d[] Derivatives,
@@ -67,9 +76,12 @@ public static class Analysis {
         (double U, double V) SurfaceUV,
         double Area,
         double Volume,
-        Point3d Centroid) : IResult;
+        Point3d Centroid) : IResult {
+        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsSolid ? " [solid]" : string.Empty)}{(this.IsManifold ? " [manifold]" : string.Empty)}");
+    }
 
     /// <summary>Mesh analysis result containing topology navigation, manifold state, and volume metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshData(
         Point3d Location,
         Plane Frame,
@@ -79,7 +91,9 @@ public static class Analysis {
         bool IsManifold,
         bool IsClosed,
         double Area,
-        double Volume) : IResult;
+        double Volume) : IResult {
+        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsClosed ? " [closed]" : string.Empty)}{(this.IsManifold ? " [manifold]" : string.Empty)}");
+    }
 
     /// <summary>Analyzes curve geometry producing comprehensive derivative, curvature, frame, and discontinuity data.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
