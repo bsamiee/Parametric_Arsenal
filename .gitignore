@@ -107,6 +107,14 @@ yarn-error.log*
 todo.txt
 placeholder.txt
 
+# --- Documentation not for commit ---------------------------------------------
+COMPLIANCE_VERIFICATION.md
+TEST_REFACTORING_SUMMARY.md
+
+# --- Obsolete test files (replaced by ResultAlgebraTests.cs) ------------------
+test/core/Results/ResultMonadTests.cs
+test/core/Results/ResultFactoryTests.cs
+
 # ------------------------------------------------------------------------------
 # Leave Rhino / Grasshopper assets *tracked* via Git LFS
 #   *.3dm

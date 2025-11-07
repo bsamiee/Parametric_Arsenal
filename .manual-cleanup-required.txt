@@ -1,0 +1,23 @@
+MANUAL CLEANUP REQUIRED
+=======================
+
+The following files need to be manually deleted from the repository:
+
+1. COMPLIANCE_VERIFICATION.md - Documentation file not needed in final commit
+2. TEST_REFACTORING_SUMMARY.md - Documentation file not needed in final commit
+3. test/core/Results/ResultMonadTests.cs - Replaced by ResultAlgebraTests.cs
+4. test/core/Results/ResultFactoryTests.cs - Replaced by ResultAlgebraTests.cs
+
+These files have been added to .gitignore to prevent them from being tracked going forward.
+
+To remove them from git history, run:
+  git rm COMPLIANCE_VERIFICATION.md
+  git rm TEST_REFACTORING_SUMMARY.md
+  git rm test/core/Results/ResultMonadTests.cs
+  git rm test/core/Results/ResultFactoryTests.cs
+  git commit -m "Remove documentation files and obsolete test files"
+  git push
+
+After deletion, the test structure will be:
+- test/core/Results/ - 2 files: ResultAlgebraTests.cs, ResultEdgeCaseTests.cs, ResultGenerators.cs (3 total)
+- test/rhino/ - 1 file: RhinoGeometryTests.cs
