@@ -446,7 +446,7 @@ internal static class TopologyCompute {
 
     [Pure]
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ExecuteMeshEdgeClassification(Mesh mesh, double angleThreshold) {
-        double curvatureThreshold = angleThreshold * 0.1;
+        double curvatureThreshold = angleThreshold * TopologyConfig.CurvatureThresholdRatio;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => {
             int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(i);

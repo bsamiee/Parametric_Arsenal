@@ -33,7 +33,7 @@ public static class Topology {
         /// <summary>Equality comparison by value.</summary>
         public bool Equals(EdgeContinuityType other) => this.Value == other.Value;
         /// <summary>Hash code based on value.</summary>
-        public override int GetHashCode() => this.Value.GetHashCode();
+        public override int GetHashCode() => this.Value;
         /// <summary>Equality override for object comparison.</summary>
         public override bool Equals(object? obj) => obj is EdgeContinuityType other && this.Equals(other);
         /// <summary>Equality operator.</summary>
@@ -149,12 +149,12 @@ public static class Topology {
     /// <summary>Naked edge analysis result containing edge curves and indices with topology metadata.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NakedEdgeData(
-    IReadOnlyList<Curve> EdgeCurves,
-    IReadOnlyList<int> EdgeIndices,
-    IReadOnlyList<int> Valences,
-    bool IsOrdered,
-    int TotalEdgeCount,
-    double TotalLength) : Topology.IResult {
+        IReadOnlyList<Curve> EdgeCurves,
+        IReadOnlyList<int> EdgeIndices,
+        IReadOnlyList<int> Valences,
+        bool IsOrdered,
+        int TotalEdgeCount,
+        double TotalLength) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
@@ -164,12 +164,12 @@ public static class Topology {
     /// <summary>Boundary loop analysis result with closed loop curves and join diagnostics.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BoundaryLoopData(
-    IReadOnlyList<Curve> Loops,
-    IReadOnlyList<IReadOnlyList<int>> EdgeIndicesPerLoop,
-    IReadOnlyList<double> LoopLengths,
-    IReadOnlyList<bool> IsClosedPerLoop,
-    double JoinTolerance,
-    int FailedJoins) : Topology.IResult {
+        IReadOnlyList<Curve> Loops,
+        IReadOnlyList<IReadOnlyList<int>> EdgeIndicesPerLoop,
+        IReadOnlyList<double> LoopLengths,
+        IReadOnlyList<bool> IsClosedPerLoop,
+        double JoinTolerance,
+        int FailedJoins) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
@@ -179,13 +179,13 @@ public static class Topology {
     /// <summary>Non-manifold topology analysis result with diagnostic data for irregular vertices and edges.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NonManifoldData(
-    IReadOnlyList<int> EdgeIndices,
-    IReadOnlyList<int> VertexIndices,
-    IReadOnlyList<int> Valences,
-    IReadOnlyList<Point3d> Locations,
-    bool IsManifold,
-    bool IsOrientable,
-    int MaxValence) : Topology.IResult {
+        IReadOnlyList<int> EdgeIndices,
+        IReadOnlyList<int> VertexIndices,
+        IReadOnlyList<int> Valences,
+        IReadOnlyList<Point3d> Locations,
+        bool IsManifold,
+        bool IsOrientable,
+        int MaxValence) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => this.IsManifold
             ? "Manifold: No issues detected"
@@ -197,12 +197,12 @@ public static class Topology {
     /// <summary>Connected component analysis result with adjacency graph and spatial bounds.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ConnectivityData(
-    IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
-    IReadOnlyList<int> ComponentSizes,
-    IReadOnlyList<BoundingBox> ComponentBounds,
-    int TotalComponents,
-    bool IsFullyConnected,
-    System.Collections.Frozen.FrozenDictionary<int, IReadOnlyList<int>> AdjacencyGraph) : Topology.IResult {
+        IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
+        IReadOnlyList<int> ComponentSizes,
+        IReadOnlyList<BoundingBox> ComponentBounds,
+        int TotalComponents,
+        bool IsFullyConnected,
+        System.Collections.Frozen.FrozenDictionary<int, IReadOnlyList<int>> AdjacencyGraph) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => this.IsFullyConnected
             ? "Connectivity: Single connected component"
@@ -214,11 +214,11 @@ public static class Topology {
     /// <summary>Edge classification result by continuity type with geometric measures.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record EdgeClassificationData(
-    IReadOnlyList<int> EdgeIndices,
-    IReadOnlyList<Topology.EdgeContinuityType> Classifications,
-    IReadOnlyList<double> ContinuityMeasures,
-    System.Collections.Frozen.FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> GroupedByType,
-    Continuity MinimumContinuity) : Topology.IResult {
+        IReadOnlyList<int> EdgeIndices,
+        IReadOnlyList<Topology.EdgeContinuityType> Classifications,
+        IReadOnlyList<double> ContinuityMeasures,
+        System.Collections.Frozen.FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> GroupedByType,
+        Continuity MinimumContinuity) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             System.Globalization.CultureInfo.InvariantCulture,
@@ -228,12 +228,12 @@ public static class Topology {
     /// <summary>Face adjacency query result with neighbor data and dihedral angle computation.</summary>
     [System.Diagnostics.DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record AdjacencyData(
-    int EdgeIndex,
-    IReadOnlyList<int> AdjacentFaceIndices,
-    IReadOnlyList<Vector3d> FaceNormals,
-    double DihedralAngle,
-    bool IsManifold,
-    bool IsBoundary) : Topology.IResult {
+        int EdgeIndex,
+        IReadOnlyList<int> AdjacentFaceIndices,
+        IReadOnlyList<Vector3d> FaceNormals,
+        double DihedralAngle,
+        bool IsManifold,
+        bool IsBoundary) : Topology.IResult {
         [Pure]
         private string DebuggerDisplay => this.IsBoundary
             ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: Boundary (valence=1)")
