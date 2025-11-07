@@ -63,6 +63,7 @@ public static class ValidationRules {
             [V.SelfIntersection] = ([], ["SelfIntersections",], E.Validation.SelfIntersecting),
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
+            [V.EdgeTopology] = (["IsValid",], [], E.Geometry.InvalidEdge),
         }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>

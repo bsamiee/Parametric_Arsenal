@@ -23,13 +23,14 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static readonly V SelfIntersection = new(128);
     public static readonly V MeshSpecific = new(256);
     public static readonly V SurfaceContinuity = new(512);
+    public static readonly V EdgeTopology = new(1024);
     public static readonly V All = new((ushort)(
         Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
         Topology._flags | Degeneracy._flags | Tolerance._flags | SelfIntersection._flags |
-        MeshSpecific._flags | SurfaceContinuity._flags
+        MeshSpecific._flags | SurfaceContinuity._flags | EdgeTopology._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,]).ToFrozenSet();
+    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity, EdgeTopology,]).ToFrozenSet();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
@@ -85,6 +86,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             128 => nameof(SelfIntersection),
             256 => nameof(MeshSpecific),
             512 => nameof(SurfaceContinuity),
+            1024 => nameof(EdgeTopology),
             _ => $"Combined({this._flags})",
         };
 }
