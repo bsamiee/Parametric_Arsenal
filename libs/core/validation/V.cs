@@ -1,0 +1,94 @@
+using System.Diagnostics.Contracts;
+using System.Runtime.CompilerServices;
+
+namespace Arsenal.Core.Validation;
+
+/// <summary>
+/// Validation mode configuration using bitwise flag operations for combinable validation rules.
+///
+/// <para><b>Usage:</b></para>
+/// <code>
+/// V mode = V.Standard | V.Topology;
+/// bool hasStandard = mode.Has(V.Standard);  // true
+/// bool hasArea = mode.Has(V.AreaCentroid);  // false
+/// if (mode == V.None) { ... }  // Equality check
+/// </code>
+///
+/// <para><b>Extensibility:</b></para>
+/// <para>1. Add new flag constant (next power of 2)</para>
+/// <para>2. Update All computation to include new flag</para>
+/// <para>3. Add validation rule to ValidationRules.cs</para>
+/// </summary>
+public readonly struct V(ushort flags) : IEquatable<V> {
+    private readonly ushort _flags = flags;
+
+    // Predefined validation mode flags
+    public static readonly V None = new(0);
+    public static readonly V Standard = new(1);
+    public static readonly V AreaCentroid = new(2);
+    public static readonly V BoundingBox = new(4);
+    public static readonly V MassProperties = new(8);
+    public static readonly V Topology = new(16);
+    public static readonly V Degeneracy = new(32);
+    public static readonly V Tolerance = new(64);
+    public static readonly V SelfIntersection = new(128);
+    public static readonly V MeshSpecific = new(256);
+    public static readonly V SurfaceContinuity = new(512);
+
+    // Computed All value from all flags
+    public static readonly V All = new((ushort)(
+        Standard._flags | AreaCentroid._flags | BoundingBox._flags |
+        MassProperties._flags | Topology._flags | Degeneracy._flags |
+        Tolerance._flags | SelfIntersection._flags | MeshSpecific._flags |
+        SurfaceContinuity._flags
+    ));
+
+    // Bitwise operators for combining validation modes
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
+    public static V operator |(V left, V right) => new((ushort)(left._flags | right._flags));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
+    public static V operator &(V left, V right) => new((ushort)(left._flags & right._flags));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator ==(V left, V right) => left._flags == right._flags;
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool operator !=(V left, V right) => left._flags != right._flags;
+
+    /// <summary>Checks if this mode contains the specified flag(s), with special handling for None.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Has(V other) =>
+        other._flags == 0
+            ? this._flags == 0
+            : (this._flags & other._flags) == other._flags;
+
+    // IEquatable implementation
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public override bool Equals(object? obj) => obj is V other && this._flags == other._flags;
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public override int GetHashCode() => this._flags;
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(V other) => this._flags == other._flags;
+
+    [Pure]
+    public override string ToString() => this._flags switch {
+        0 => nameof(None),
+        1 => nameof(Standard),
+        2 => nameof(AreaCentroid),
+        4 => nameof(BoundingBox),
+        8 => nameof(MassProperties),
+        16 => nameof(Topology),
+        32 => nameof(Degeneracy),
+        64 => nameof(Tolerance),
+        128 => nameof(SelfIntersection),
+        256 => nameof(MeshSpecific),
+        512 => nameof(SurfaceContinuity),
+        1023 => nameof(All),
+        _ => $"V({this._flags.ToString(System.Globalization.CultureInfo.InvariantCulture)})",
+    };
+}
