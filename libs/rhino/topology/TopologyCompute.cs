@@ -81,7 +81,7 @@ public sealed record NonManifoldData(
         ? "Manifold: No issues detected"
         : string.Create(
             CultureInfo.InvariantCulture,
-            $"NonManifold: Edges={EdgeIndices.Count.ToString(CultureInfo.InvariantCulture)} | Verts={VertexIndices.Count.ToString(CultureInfo.InvariantCulture)} | MaxVal={MaxValence.ToString(CultureInfo.InvariantCulture)}");
+            $"NonManifold: Edges={EdgeIndices.Count} | Verts={VertexIndices.Count} | MaxVal={MaxValence}");
 }
 
 /// <summary>Connected component analysis result with adjacency graph and spatial bounds.</summary>
@@ -143,6 +143,9 @@ public sealed record AdjacencyData(
 /// <summary>Internal topology computation algorithms with FrozenDictionary-based type dispatch.</summary>
 internal static class TopologyCompute {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
+
+    /// <summary>Curvature threshold multiplier: mesh edges with angles below angleThreshold * this value are classified as G2-equivalent.</summary>
+    private const double CurvatureThresholdMultiplier = 0.1;
 
     [Pure]
     internal static Result<NakedEdgeData> ExecuteNakedEdges<T>(
@@ -554,7 +557,7 @@ internal static class TopologyCompute {
                 1 => EdgeContinuityType.Boundary,
                 > 2 => EdgeContinuityType.NonManifold,
                 2 => CalculateDihedralAngle(mesh: mesh, faceIdx1: connectedFaces[0], faceIdx2: connectedFaces[1]) switch {
-                    double angle when Math.Abs(angle) < angleThreshold * 0.1 => EdgeContinuityType.Curvature,
+                    double angle when Math.Abs(angle) < angleThreshold * CurvatureThresholdMultiplier => EdgeContinuityType.Curvature,
                     double angle when Math.Abs(angle) < angleThreshold => EdgeContinuityType.Smooth,
                     _ => EdgeContinuityType.Sharp,
                 },
