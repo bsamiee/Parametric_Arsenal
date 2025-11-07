@@ -50,7 +50,10 @@ public static class Analysis {
         bool AtSingularity,
         double Area,
         Point3d Centroid) : IResult {
-        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}{(this.AtSingularity ? " [singular]" : string.Empty)}");
+        [Pure] private string DebuggerDisplay => this.AtSingularity switch {
+            true => string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3} [singular]"),
+            false => string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}"),
+        };
     }
 
     /// <summary>Brep analysis result containing surface evaluation, topology navigation, proximity data, and solid metrics.</summary>
@@ -77,7 +80,12 @@ public static class Analysis {
         double Area,
         double Volume,
         Point3d Centroid) : IResult {
-        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsSolid ? " [solid]" : string.Empty)}{(this.IsManifold ? " [manifold]" : string.Empty)}");
+        [Pure] private string DebuggerDisplay => (this.IsSolid, this.IsManifold) switch {
+            (true, true) => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [solid] [manifold]"),
+            (true, false) => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [solid]"),
+            (false, true) => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [manifold]"),
+            (false, false) => string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}"),
+        };
     }
 
     /// <summary>Mesh analysis result containing topology navigation, manifold state, and volume metrics.</summary>
@@ -92,7 +100,12 @@ public static class Analysis {
         bool IsClosed,
         double Area,
         double Volume) : IResult {
-        [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsClosed ? " [closed]" : string.Empty)}{(this.IsManifold ? " [manifold]" : string.Empty)}");
+        [Pure] private string DebuggerDisplay => (this.IsClosed, this.IsManifold) switch {
+            (true, true) => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [closed] [manifold]"),
+            (true, false) => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [closed]"),
+            (false, true) => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [manifold]"),
+            (false, false) => string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}"),
+        };
     }
 
     /// <summary>Analyzes curve geometry producing comprehensive derivative, curvature, frame, and discontinuity data.</summary>

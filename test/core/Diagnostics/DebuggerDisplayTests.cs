@@ -85,8 +85,9 @@ public sealed class DebuggerDisplayTests {
             "DebuggerDisplay",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        return prop is not null && value is not null
-            ? (string?)prop.GetValue(value) ?? string.Empty
-            : string.Empty;
+        return (prop, value) switch {
+            (not null, not null) => (string?)prop.GetValue(value) ?? string.Empty,
+            _ => string.Empty,
+        };
     }
 }
