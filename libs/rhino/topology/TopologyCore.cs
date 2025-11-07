@@ -64,11 +64,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.NakedEdgeData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.GetNakedEdges.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -90,11 +86,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.BoundaryLoopData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.GetBoundaryLoops.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -115,11 +107,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.NonManifoldData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.GetNonManifold.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -140,11 +128,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.ConnectivityData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.GetConnectivity.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -172,11 +156,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.EdgeClassificationData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.ClassifyEdges.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
@@ -204,11 +184,7 @@ internal static class TopologyCore {
             }),
             config: new OperationConfig<T, Topology.AdjacencyData> {
                 Context = context,
-                ValidationMode = input switch {
-                    Brep => V.Standard | V.Topology,
-                    Mesh => V.Standard | V.MeshSpecific,
-                    _ => V.None,
-                },
+                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
                 OperationName = $"Topology.GetAdjacency.{typeof(T).Name}",
                 EnableDiagnostics = enableDiagnostics,
             })

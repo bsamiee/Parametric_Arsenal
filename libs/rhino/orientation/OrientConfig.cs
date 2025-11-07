@@ -6,6 +6,7 @@ namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Configuration constants and validation dispatch for orientation operations.</summary>
 internal static class OrientConfig {
+    /// <summary>Validation mode mapping for orientation geometry types.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
