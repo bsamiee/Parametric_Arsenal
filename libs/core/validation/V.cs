@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -7,6 +8,7 @@ namespace Arsenal.Core.Validation;
 /// <summary>
 /// Validation mode configuration using bitwise flag operations for combinable validation rules.
 /// </summary>
+[DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct V(ushort flags) : IEquatable<V> {
     private readonly ushort _flags = flags;
 
@@ -65,6 +67,8 @@ public readonly struct V(ushort flags) : IEquatable<V> {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override int GetHashCode() => this._flags;
+
+    [Pure] private string DebuggerDisplay => this.ToString();
 
     [Pure]
     public override string ToString() => this._flags == All._flags

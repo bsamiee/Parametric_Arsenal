@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
+using System.Globalization;
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
@@ -5,6 +8,7 @@ using Arsenal.Core.Validation;
 namespace Arsenal.Core.Operations;
 
 /// <summary>Polymorphic operation configuration enabling composable transformations, validation, and error handling strategies.</summary>
+[DebuggerDisplay("{DebuggerDisplay}")]
 public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Polymorphic geometry context providing validation and tolerance contracts</summary>
     public required IGeometryContext Context { get; init; }
@@ -56,4 +60,16 @@ public sealed record OperationConfig<TIn, TOut> {
 
     /// <summary>Enable diagnostic capture for allocation and timing instrumentation in DEBUG builds</summary>
     public bool EnableDiagnostics { get; init; }
+
+    [Pure]
+    private string DebuggerDisplay => (this.EnableCache, this.EnableParallel, this.EnableDiagnostics) switch {
+        (true, true, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [parallel] [diag]"),
+        (true, true, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [parallel]"),
+        (true, false, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [diag]"),
+        (true, false, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached]"),
+        (false, true, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [parallel] [diag]"),
+        (false, true, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [parallel]"),
+        (false, false, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [diag]"),
+        (false, false, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode}"),
+    };
 }
