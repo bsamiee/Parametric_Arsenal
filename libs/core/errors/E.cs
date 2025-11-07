@@ -6,30 +6,6 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>
 /// Consolidated error registry with FrozenDictionary dispatch for zero-allocation error retrieval.
-///
-/// <para><b>Error Code Ranges:</b></para>
-/// <list type="bullet">
-/// <item>1000-1999: Results system errors</item>
-/// <item>2000-2099: Geometry extraction errors</item>
-/// <item>2200-2299: Geometry intersection errors</item>
-/// <item>2300-2399: Geometry analysis errors</item>
-/// <item>3000-3999: Validation errors</item>
-/// <item>4000-4099: Spatial indexing errors</item>
-/// </list>
-///
-/// <para><b>Domain Computation:</b></para>
-/// <para>Error domain is automatically computed from code range, eliminating need for separate domain storage.</para>
-///
-/// <para><b>Usage:</b></para>
-/// <code>
-/// SystemError error = E.Results.NoValueProvided;
-/// SystemError withContext = E.Get(1001, context: "MethodName");
-/// Result&lt;T&gt; result = ResultFactory.Create&lt;T&gt;(error: E.Validation.GeometryInvalid);
-/// </code>
-///
-/// <para><b>Extensibility:</b></para>
-/// <para>1. Add error code and message to _m dictionary</para>
-/// <para>2. Add property to appropriate nested class</para>
 /// </summary>
 public static class E {
     private static readonly FrozenDictionary<int, string> _m =
@@ -77,17 +53,17 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Domain GetDomain(int code) => code switch {
-        >= 1000 and < 2000 => Domain.Results,
-        >= 2000 and < 3000 => Domain.Geometry,
-        >= 3000 and < 4000 => Domain.Validation,
-        >= 4000 and < 5000 => Domain.Spatial,
-        _ => Domain.Unknown,
+    private static ErrorDomain GetDomain(int code) => code switch {
+        >= 1000 and < 2000 => ErrorDomain.Results,
+        >= 2000 and < 3000 => ErrorDomain.Geometry,
+        >= 3000 and < 4000 => ErrorDomain.Validation,
+        >= 4000 and < 5000 => ErrorDomain.Spatial,
+        _ => ErrorDomain.Unknown,
     };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError Get(int code, string? context = null) {
-        Domain domain = GetDomain(code);
+        ErrorDomain domain = GetDomain(code);
         string message = _m.TryGetValue(code, out string? msg)
             ? msg
             : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}";

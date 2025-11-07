@@ -4,8 +4,8 @@ using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Diagnostics;
-using Arsenal.Core.Results;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 

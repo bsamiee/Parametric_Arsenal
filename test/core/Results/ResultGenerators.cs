@@ -11,7 +11,7 @@ namespace Arsenal.Core.Tests.Results;
 public static class ResultGenerators {
     /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
     public static Gen<SystemError> SystemErrorGen =>
-        from domain in Gen.OneOf(Gen.Const(Domain.Results), Gen.Const(Domain.Validation), Gen.Const(Domain.Geometry))
+        from domain in Gen.OneOf(Gen.Const(ErrorDomain.Results), Gen.Const(ErrorDomain.Validation), Gen.Const(ErrorDomain.Geometry))
         from code in Gen.Int[1000, 9999]
         from message in Gen.String.Where(static s => !string.IsNullOrWhiteSpace(s))
         select new SystemError(domain, code, message);
@@ -74,20 +74,20 @@ public static class ResultGenerators {
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
                         succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
-                                 : ResultFactory.Create<string>(error: new SystemError(Domain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
+                                 : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (multiplier, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
-                        succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(Domain.Results, 9002, "Transform failed")))),
+                        succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
                         succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: val + offset)
-                                                                                                       : ResultFactory.Create<double>(error: new SystemError(Domain.Results, 9003, "Parse failed")))),
+                                                                                                       : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
-                        succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(Domain.Results, 9004, "Length calc failed")))),
+                        succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
             _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
         };
 

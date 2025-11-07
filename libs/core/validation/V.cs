@@ -5,18 +5,6 @@ namespace Arsenal.Core.Validation;
 
 /// <summary>
 /// Validation mode configuration using bitwise flag operations for combinable validation rules.
-///
-/// <para><b>Usage:</b></para>
-/// <code>
-/// V mode = V.Standard | V.Topology;
-/// bool hasStandard = mode.Has(V.Standard);  // true
-/// bool hasArea = mode.Has(V.AreaCentroid);  // false
-/// </code>
-///
-/// <para><b>Extensibility:</b></para>
-/// <para>1. Add new flag constant (next power of 2)</para>
-/// <para>2. Update All computation to include new flag</para>
-/// <para>3. Add validation rule to ValidationRules.cs</para>
 /// </summary>
 public readonly struct V(ushort flags) : IEquatable<V> {
     private readonly ushort _flags = flags;
