@@ -93,12 +93,12 @@ internal static class ExtractionCore {
                     [ct, crv.PointAtStart, crv.PointAt(crv.Domain.ParameterAt(0.5)), crv.PointAtEnd],
                 (_, Curve crv) => [crv.PointAtStart, crv.PointAt(crv.Domain.ParameterAt(0.5)), crv.PointAtEnd],
             },
-            (1, Surface s, _) => ((Func<Surface, Point3d[]>)(sf => (AreaMassProperties.Compute(sf), sf.Domain(0), sf.Domain(1)) switch {
-                ( { Centroid: { IsValid: true } ct }, Interval u, Interval v) =>
+            (1, Surface s, _) => (AreaMassProperties.Compute(s), s, s.Domain(0), s.Domain(1)) switch {
+                ( { Centroid: { IsValid: true } ct }, Surface sf, Interval u, Interval v) =>
                     [ct, sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max)],
-                (_, Interval u, Interval v) =>
+                (_, Surface sf, Interval u, Interval v) =>
                     [sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max)],
-            }))(s),
+            },
             (1, Mesh m, _) => (VolumeMassProperties.Compute(m), m) switch {
                 ( { Centroid: { IsValid: true } ct }, Mesh mesh) => [ct, .. mesh.Vertices.ToPoint3dArray()],
                 (_, Mesh mesh) => mesh.Vertices.ToPoint3dArray(),
@@ -106,9 +106,10 @@ internal static class ExtractionCore {
             (1, PointCloud pc, _) => pc.GetPoints() is Point3d[] pts && pts.Length > 0 ?
                 [pts.Aggregate(Point3d.Origin, static (s, p) => s + p) / pts.Length, .. pts] : [],
             (2, Curve c, _) => [c.PointAtStart, c.PointAtEnd],
-            (2, Surface s, _) => ((Func<Surface, Point3d[]>)(sf => (sf.Domain(0), sf.Domain(1)) switch {
-                (Interval u, Interval v) => [sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max)],
-            }))(s),
+            (2, Surface s, _) => (s.Domain(0), s.Domain(1), s) switch {
+                (Interval u, Interval v, Surface sf) =>
+                    [sf.PointAt(u.Min, v.Min), sf.PointAt(u.Max, v.Min), sf.PointAt(u.Max, v.Max), sf.PointAt(u.Min, v.Max)],
+            },
             (2, GeometryBase g, _) => g.GetBoundingBox(accurate: true).GetCorners(),
             (3, NurbsCurve nc, _) => [.. nc.GrevillePoints()],
             (3, NurbsSurface ns, _) => ns.Points is NurbsSurfacePointList pts ?
@@ -138,7 +139,7 @@ internal static class ExtractionCore {
                 NurbsCurve nc => ((Func<NurbsCurve, Point3d[]>)(n => { try { return n.InflectionPoints() ?? []; } finally { n.Dispose(); } }))(nc),
                 _ => [],
             },
-            (5, Curve c, _) => ((Func<(Curve, double), Point3d[]>)(tup => tup switch {
+            (5, Curve c, _) => (c, context.AbsoluteTolerance) switch {
                 (Curve crv, double tol) when crv.TryGetCircle(out Circle circ, tol) =>
                     [circ.PointAt(0), circ.PointAt(Math.PI / 2), circ.PointAt(Math.PI), circ.PointAt(3 * Math.PI / 2)],
                 (Curve crv, double tol) when crv.TryGetEllipse(out Ellipse e, tol) =>
@@ -150,7 +151,7 @@ internal static class ExtractionCore {
                 (Curve crv, double tol) when crv.TryGetPolyline(out Polyline pl) => [.. pl],
                 (Curve crv, double tol) when crv.IsLinear(tol) => [crv.PointAtStart, crv.PointAtEnd],
                 _ => [],
-            }))((c, context.AbsoluteTolerance)),
+            },
             (6, Brep b, _) => [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))],
             (6, Mesh m, _) => [.. Enumerable.Range(0, m.TopologyEdges.Count)
                 .Select(i => m.TopologyEdges.EdgeLine(i))
@@ -179,15 +180,16 @@ internal static class ExtractionCore {
                 double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
-            (10, Surface s, int d) => ((Func<Surface, Point3d[]>)(sf => (sf.Domain(0), sf.Domain(1)) switch {
-                (Interval u, Interval v) =>
+            (10, Surface s, int d) => (s.Domain(0), s.Domain(1), s) switch {
+                (Interval u, Interval v, Surface sf) =>
                     [.. from ui in Enumerable.Range(0, d)
                         from vi in Enumerable.Range(0, d)
                         let up = d == 1 ? 0.5 : includeEnds ? ui / (double)(d - 1) : (ui + 0.5) / d
                         let vp = d == 1 ? 0.5 : includeEnds ? vi / (double)(d - 1) : (vi + 0.5) / d
                         select sf.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),
                     ],
-            }))(s),
+                _ => [],
+            },
             (11, Curve c, double length) => c.DivideByLength(length, includeEnds) switch {
                 double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],

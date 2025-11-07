@@ -84,6 +84,11 @@ internal static class AnalysisCompute {
                         .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
                         .Bind(sf => surfaceLogic(sf, ctx, uv, order))),
 
+                [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+                    ResultFactory.Create(value: (NurbsSurface)g)
+                        .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
+                        .Bind(sf => surfaceLogic(sf, ctx, uv, order))),
+
                 [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
                 ResultFactory.Create(value: (Brep)g)
                     .Validate(args: [ctx, V.Standard | V.Topology | V.MassProperties])
