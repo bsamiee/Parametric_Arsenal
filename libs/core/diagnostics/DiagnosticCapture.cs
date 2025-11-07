@@ -20,7 +20,7 @@ public static class DiagnosticCapture {
     public static Result<T> Capture<T>(
         this Result<T> result,
         string operation,
-        ValidationMode? validationApplied = null,
+        V? validationApplied = null,
         bool? cacheHit = null,
         [CallerMemberName] string callerMember = "",
         [CallerFilePath] string callerFile = "",
@@ -32,7 +32,7 @@ public static class DiagnosticCapture {
         _ = result.IsSuccess;
         stopwatch.Stop();
         long allocated = GC.GetAllocatedBytesForCurrentThread() - startBytes;
-        DiagnosticContext ctx = new(operation, stopwatch.Elapsed, allocated, validationApplied, cacheHit, result.IsSuccess ? null : result.Errors.Count);
+        DiagnosticContext ctx = new(operation: operation, elapsed: stopwatch.Elapsed, allocated: allocated, validationApplied: validationApplied, cacheHit: cacheHit, errorCount: result.IsSuccess ? null : result.Errors.Count);
         activity?.SetTag("operation", operation)
             .SetTag("elapsed_ms", stopwatch.Elapsed.TotalMilliseconds)
             .SetTag("allocations", allocated)

@@ -54,10 +54,14 @@ internal static class ExtractionCore {
         };
 #pragma warning restore IDE0004
 
-        if (kind is 0) {
-            return ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction);
-        }
+        return kind switch {
+            0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
+            _ => ExecuteValidated(geometry: geometry, kind: kind, param: param, includeEnds: includeEnds, context: context),
+        };
+    }
 
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Point3d>> ExecuteValidated(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) {
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
             Extrusion ext when kind is 1 or 6 => (ext.ToBrep(splitKinkyFaces: true), true),
             SubD sd when kind is 1 or 6 => (sd.ToBrep(), true),
@@ -73,8 +77,8 @@ internal static class ExtractionCore {
                     .First();
 
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode is V.None ? null : [context, mode])
-                .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g, kind, param, includeEnds, context).AsReadOnly()));
+                .Validate(args: mode == V.None ? null : [context, mode])
+                .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)ExtractCore(g: g, kind: kind, param: param, includeEnds: includeEnds, context: context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
                 (normalized as IDisposable)?.Dispose();
