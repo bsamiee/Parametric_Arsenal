@@ -69,9 +69,9 @@ internal static class SpatialCore {
             (PointCloud cloud, BoundingBox box) => GetTree(cloud).Bind(tree =>
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // PointCloud proximity queries
-            (PointCloud cloud, ValueTuple<Point3d[], int> (var needles, var k)) =>
+            (PointCloud cloud, ValueTuple<Point3d[], int>(var needles, var k)) =>
                 ExecuteProximitySearch(cloud, needles, k, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
-            (PointCloud cloud, ValueTuple<Point3d[], double> (var needles, var distance)) =>
+            (PointCloud cloud, ValueTuple<Point3d[], double>(var needles, var distance)) =>
                 ExecuteProximitySearch(cloud, needles, distance, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
@@ -79,7 +79,7 @@ internal static class SpatialCore {
             (Mesh mesh, BoundingBox box) => GetTree(mesh).Bind(tree =>
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // Mesh overlap detection
-            (ValueTuple<Mesh, Mesh> (var mesh1, var mesh2), double tolerance) => GetTree(mesh1).Bind(t1 =>
+            (ValueTuple<Mesh, Mesh>(var mesh1, var mesh2), double tolerance) => GetTree(mesh1).Bind(t1 =>
                 GetTree(mesh2).Bind(t2 =>
                     ExecuteOverlapSearch(t1, t2, context.AbsoluteTolerance + tolerance, bufferSize))),
             // Curve array range queries

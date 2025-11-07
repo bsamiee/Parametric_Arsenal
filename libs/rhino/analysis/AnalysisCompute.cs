@@ -44,7 +44,7 @@ internal static class AnalysisCompute {
             } finally {
                 pool.Return(buffer, clearArray: true);
             }
-        }), (Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>>)((sf, ctx, uv, order) => {
+        }), (Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>>)((sf, _, uv, order) => {
             (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
             AreaMassProperties amp = AreaMassProperties.Compute(sf);
             return !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)
@@ -129,27 +129,27 @@ internal static class AnalysisCompute {
                             : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
                     })),
 
-            [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
-                ResultFactory.Create(value: (Mesh)g)
-                    .Validate(args: [ctx, V.MeshSpecific])
-                    .Bind(mesh => {
-                        int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
-                        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
-                        AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
-                        VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
-                        return amp is null || vmp is null
-                            ? ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)
-                            : ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
-                                mesh.Vertices[vIdx],
-                                new Plane(mesh.Vertices[vIdx], normal),
-                                normal,
-                                [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
-                                [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
-                                mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
-                                mesh.IsClosed,
-                                amp.Area,
-                                vmp.Volume));
-                    })),
+                [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
+                    ResultFactory.Create(value: (Mesh)g)
+                        .Validate(args: [ctx, V.MeshSpecific])
+                        .Bind(mesh => {
+                            int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
+                            Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
+                            AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
+                            VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
+                            return amp is null || vmp is null
+                                ? ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)
+                                : ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
+                                    mesh.Vertices[vIdx],
+                                    new Plane(mesh.Vertices[vIdx], normal),
+                                    normal,
+                                    [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
+                                    [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
+                                    mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
+                                    mesh.IsClosed,
+                                    amp.Area,
+                                    vmp.Volume));
+                        })),
             }.ToFrozenDictionary(),
         };
 
