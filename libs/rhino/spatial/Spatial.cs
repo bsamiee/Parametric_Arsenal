@@ -17,7 +17,7 @@ public static class Spatial {
 
     /// <summary>Performs spatial indexing operations using RhinoCommon RTree algorithms with type-based query dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
+    public static Result<IReadOnlyList<int>> Search<TInput, TQuery>(
         TInput input,
         TQuery query,
         IGeometryContext context,

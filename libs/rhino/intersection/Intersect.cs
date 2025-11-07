@@ -32,7 +32,7 @@ public static class Intersect {
     }
     /// <summary>Performs intersection with automatic type detection, validation, and collection handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IntersectionOutput> Execute<T1, T2>(
+    public static Result<IntersectionOutput> Compute<T1, T2>(
         T1 geometryA,
         T2 geometryB,
         IGeometryContext context,
