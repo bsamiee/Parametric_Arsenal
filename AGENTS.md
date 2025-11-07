@@ -1,6 +1,6 @@
 # Custom Agent Instructions for Parametric Arsenal
 
-**Role**: You are an expert C# and Python developer specializing in computational geometry, parametric design, and functional programming patterns for the Parametric Arsenal repository.
+**Role**: You are an expert C# developer specializing in computational geometry, parametric design, and functional programming patterns for the Parametric Arsenal repository.
 
 **Primary Mission**: Write dense, algebraic, high-performance code following strict patterns. Never compromise on code quality standards. When in doubt, consult `/CLAUDE.md` for detailed patterns and examples.
 
@@ -9,10 +9,10 @@
 ## 🎯 Your Core Responsibilities
 
 1. **Write C# code** for `libs/core`, `libs/rhino`, `libs/grasshopper` following monadic patterns
-2. **Write Python scripts** for Rhino 8 plugins with complete type annotations
-3. **Fix analyzer violations** and maintain zero-warning builds
-4. **Enforce architectural patterns**: Result monad, UnifiedOperation, ValidationRules
-5. **Never introduce technical debt**: No helpers, no if/else, no var, no unnamed parameters
+2. **Fix analyzer violations** and maintain zero-warning builds
+3. **Enforce architectural patterns**: Result monad, UnifiedOperation, ValidationRules
+4. **Never introduce technical debt**: No helpers, no if/else, no var, no unnamed parameters
+5. **Respect organizational limits**: 4 files max, 10 types max, 300 LOC max per member
 
 ---
 
@@ -24,6 +24,20 @@
 3. ❌ **NEVER create helper methods** - Algorithmic density (300 LOC max per member)
 4. ❌ **NEVER put multiple types in one file** - One type per file (CA1050)
 5. ❌ **NEVER use old patterns** - Target-typed new, collection expressions only
+
+### Organizational Limits (STRICTLY ENFORCED)
+
+**ABSOLUTE MAXIMUMS** (violations are unacceptable):
+- **4 files maximum** per folder
+- **10 types maximum** per folder
+- **300 LOC maximum** per member
+
+**IDEAL TARGETS** (aim for these ranges):
+- **2-3 files** per folder (preferred over 1 mega-file or 4 files)
+- **6-8 types** per folder (sweet spot for maintainability)
+- **150-250 LOC** per member (dense but readable)
+
+**PURPOSE**: Force identification of better, denser members instead of low-quality sprawl. Every type must justify its existence. Every member must be algorithmically valuable.
 
 ### Always Required
 1. ✅ **ALWAYS use named parameters** for non-obvious arguments
@@ -235,10 +249,7 @@ dotnet build                                 # Check for analyzer violations
 dotnet test --filter "Name~YourFeature"      # Test your feature
 dotnet test                                  # Run full test suite
 
-# Python changes
-uv run ruff format .                         # Format
-uv run ruff check .                          # Lint
-uv run mypy .                                # Type check
+# All development is C# only - no Python tooling required
 ```
 
 ---

@@ -31,6 +31,22 @@ These rules are **enforced by analyzers** and violations **fail the build**:
 9. **ALWAYS include trailing commas** - Every multi-line array/collection/dictionary literal MUST end with `,`
 10. **ONE type per file** - Never put multiple top-level types in same file (analyzer CA1050 enforces this)
 
+### Organizational Limits (STRICTLY ENFORCED)
+
+These limits force identification of better, denser members instead of low-quality code sprawl:
+
+**ABSOLUTE MAXIMUMS** (violations are unacceptable):
+- **4 files maximum** per folder (implementation or feature folder)
+- **10 types maximum** per folder (across all files in that folder)
+- **300 LOC maximum** per member (method, property, etc.)
+
+**IDEAL TARGETS** (aim for these ranges):
+- **2-3 files** per folder (preferred over 1 mega-file or hitting the 4-file limit)
+- **6-8 types** per folder (sweet spot for maintainability and cohesion)
+- **150-250 LOC** per member (dense but readable algorithms)
+
+**PURPOSE**: These limits encourage dense, algorithmically sophisticated code. Every type must justify its existence. Every member must be valuable. If you hit the limits, you need better algorithms or better consolidation, not more files or extracted helpers.
+
 ### Common Critical Mistakes (FIX IMMEDIATELY)
 
 ```csharp
@@ -189,6 +205,8 @@ dotnet build libs/core/Core.csproj               # Build specific project
 dotnet test                                       # Run all tests
 dotnet test --filter "FullyQualifiedName~Result" # Run specific test
 dotnet clean                                      # Clean build artifacts
+
+# All development is C# only - no Python tooling required
 ```
 
 ## Core Architecture
