@@ -10,26 +10,6 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Polymorphic intersection engine with automatic type-based method detection.</summary>
 public static class Intersect {
-    /// <summary>Type-safe optional parameters for intersection operations.</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct IntersectionOptions(
-        double? Tolerance = null,
-        Vector3d? ProjectionDirection = null,
-        int? MaxHits = null,
-        bool WithIndices = false,
-        bool Sorted = false);
-
-    /// <summary>Unified intersection output with zero nullable fields.</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct IntersectionOutput(
-        IReadOnlyList<Point3d> Points,
-        IReadOnlyList<Curve> Curves,
-        IReadOnlyList<double> ParametersA,
-        IReadOnlyList<double> ParametersB,
-        IReadOnlyList<int> FaceIndices,
-        IReadOnlyList<Polyline> Sections) {
-        public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
-    }
     /// <summary>Performs intersection with automatic type detection, validation, and collection handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IntersectionOutput> Execute<T1, T2>(
@@ -44,8 +24,8 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        V mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V m2) ? m2
+        V mode = IntersectionData.ValidationConfig.TryGetValue((t1Type, t2Type), out V m1) ? m1
+            : IntersectionData.ValidationConfig.TryGetValue((elementType, t2Type), out V m2) ? m2
             : V.None;
 
         return UnifiedOperation.Apply(
