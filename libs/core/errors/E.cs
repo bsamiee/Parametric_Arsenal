@@ -30,6 +30,8 @@ public static class E {
             [2311] = "Surface analysis computation failed",
             [2312] = "Brep analysis computation failed",
             [2313] = "Mesh analysis computation failed",
+            [2406] = "Invalid edge index",
+            [2409] = "Invalid edge topology",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -100,6 +102,8 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError InvalidEdgeIndex = Get(2406);
+        public static readonly SystemError InvalidEdge = Get(2409);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>
