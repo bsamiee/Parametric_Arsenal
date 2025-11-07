@@ -12,18 +12,16 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
-internal static class AnalysisCompute {
-    private const int MaxDiscontinuities = 20;
-
+internal static class AnalysisCore {
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         ((Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>>)((cv, ctx, t, order) => {
             double param = t ?? cv.Domain.Mid;
             ArrayPool<double> pool = ArrayPool<double>.Shared;
-            double[] buffer = pool.Rent(MaxDiscontinuities);
+            double[] buffer = pool.Rent(AnalysisConfig.MaxDiscontinuities);
             try {
                 (int discCount, double s) = (0, cv.Domain.Min);
-                while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                while (discCount < AnalysisConfig.MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
                     buffer[discCount++] = td;
                     s = td + ctx.AbsoluteTolerance;
                 }
@@ -34,7 +32,7 @@ internal static class AnalysisCompute {
                         cv.DerivativeAt(param, order) ?? [],
                         cv.CurvatureAt(param).Length,
                         frame,
-                        cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
+                        cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
                         cv.IsClosed ? cv.TorsionAt(param) : 0,
                         [.. buffer[..discCount]],
                         [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
