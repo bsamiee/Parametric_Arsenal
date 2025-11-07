@@ -179,16 +179,15 @@ internal static class ExtractionCore {
                 double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
             },
-            (10, Surface s, int d) => (s.Domain(0), s.Domain(1), s) switch {
-                (Interval u, Interval v, Surface sf) =>
+            (10, Surface s, int d) => ((Func<Surface, Point3d[]>)(sf => (sf.Domain(0), sf.Domain(1)) switch {
+                (Interval u, Interval v) =>
                     [.. from ui in Enumerable.Range(0, d)
                         from vi in Enumerable.Range(0, d)
                         let up = d == 1 ? 0.5 : includeEnds ? ui / (double)(d - 1) : (ui + 0.5) / d
                         let vp = d == 1 ? 0.5 : includeEnds ? vi / (double)(d - 1) : (vi + 0.5) / d
                         select sf.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),
                     ],
-                _ => [],
-            },
+            }))(s),
             (11, Curve c, double length) => c.DivideByLength(length, includeEnds) switch {
                 double[] ts => [.. ts.Select(c.PointAt)],
                 _ => [],
