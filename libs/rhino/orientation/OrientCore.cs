@@ -90,29 +90,44 @@ internal static class OrientCore {
     internal static Result<Point3d> ExtractCentroid<T>(T geometry, bool useMassProperties) where T : GeometryBase =>
         (geometry, useMassProperties) switch {
             (Brep { IsSolid: true } brep, true) => VolumeMassProperties.Compute(brep) switch {
-                VolumeMassProperties props => ResultFactory.Create(value: props.Centroid)
-                    .Tap(onSuccess: _ => props.Dispose(), onFailure: _ => props.Dispose()),
+                VolumeMassProperties props => ((Func<Result<Point3d>>)(() => {
+                    Point3d centroid = props.Centroid;
+                    props.Dispose();
+                    return ResultFactory.Create(value: centroid);
+                }))(),
                 _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
             },
             (Brep brep, false) when brep.SolidOrientation != BrepSolidOrientation.None =>
                 AreaMassProperties.Compute(brep) switch {
-                    AreaMassProperties props => ResultFactory.Create(value: props.Centroid)
-                        .Tap(onSuccess: _ => props.Dispose(), onFailure: _ => props.Dispose()),
+                    AreaMassProperties props => ((Func<Result<Point3d>>)(() => {
+                        Point3d centroid = props.Centroid;
+                        props.Dispose();
+                        return ResultFactory.Create(value: centroid);
+                    }))(),
                     _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
                 },
             (Mesh { IsClosed: true } mesh, true) => VolumeMassProperties.Compute(mesh) switch {
-                VolumeMassProperties props => ResultFactory.Create(value: props.Centroid)
-                    .Tap(onSuccess: _ => props.Dispose(), onFailure: _ => props.Dispose()),
+                VolumeMassProperties props => ((Func<Result<Point3d>>)(() => {
+                    Point3d centroid = props.Centroid;
+                    props.Dispose();
+                    return ResultFactory.Create(value: centroid);
+                }))(),
                 _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
             },
             (Mesh mesh, false) => AreaMassProperties.Compute(mesh) switch {
-                AreaMassProperties props => ResultFactory.Create(value: props.Centroid)
-                    .Tap(onSuccess: _ => props.Dispose(), onFailure: _ => props.Dispose()),
+                AreaMassProperties props => ((Func<Result<Point3d>>)(() => {
+                    Point3d centroid = props.Centroid;
+                    props.Dispose();
+                    return ResultFactory.Create(value: centroid);
+                }))(),
                 _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
             },
             (Curve { IsClosed: true } curve, _) => AreaMassProperties.Compute(curve) switch {
-                AreaMassProperties props => ResultFactory.Create(value: props.Centroid)
-                    .Tap(onSuccess: _ => props.Dispose(), onFailure: _ => props.Dispose()),
+                AreaMassProperties props => ((Func<Result<Point3d>>)(() => {
+                    Point3d centroid = props.Centroid;
+                    props.Dispose();
+                    return ResultFactory.Create(value: centroid);
+                }))(),
                 _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
             },
             (GeometryBase g, _) => g.GetBoundingBox(accurate: true) switch {

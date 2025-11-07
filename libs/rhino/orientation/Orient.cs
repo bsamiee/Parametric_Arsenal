@@ -59,15 +59,15 @@ public static class Orient {
 
         /// <summary>Creates orientation specification targeting a plane.</summary>
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static OrientSpec Plane(Plane plane) => new() { Target = plane, TargetPlane = plane, };
+        public static OrientSpec Plane(Plane plane) => new() { Target = plane, TargetPlane = plane };
 
         /// <summary>Creates orientation specification targeting a point.</summary>
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static OrientSpec Point(Point3d point) => new() { Target = point, TargetPoint = point, };
+        public static OrientSpec Point(Point3d point) => new() { Target = point, TargetPoint = point };
 
         /// <summary>Creates orientation specification targeting a vector direction.</summary>
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static OrientSpec Vector(Vector3d vector) => new() { Target = vector, TargetVector = vector, };
+        public static OrientSpec Vector(Vector3d vector) => new() { Target = vector, TargetVector = vector };
 
         /// <summary>Creates orientation specification targeting a curve frame at parameter t.</summary>
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
