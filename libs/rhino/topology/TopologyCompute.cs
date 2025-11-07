@@ -281,7 +281,8 @@ internal static class TopologyCompute {
             operation: (Func<T, Result<IReadOnlyList<EdgeClassificationData>>>)(g => g switch {
                 Brep brep => ExecuteBrepEdgeClassification(
                     brep: brep,
-                    minContinuity: minimumContinuity ?? Continuity.G1_continuous),
+                    minContinuity: minimumContinuity ?? Continuity.G1_continuous,
+                    angleThreshold: angleThreshold ?? context.AngleToleranceRadians),
                 Mesh mesh => ExecuteMeshEdgeClassification(
                     mesh: mesh,
                     angleThreshold: angleThreshold ?? context.AngleToleranceRadians),
@@ -508,12 +509,13 @@ internal static class TopologyCompute {
     }
 
     [Pure]
-    private static Result<IReadOnlyList<EdgeClassificationData>> ExecuteBrepEdgeClassification(Brep brep, Continuity minContinuity) {
+    private static Result<IReadOnlyList<EdgeClassificationData>> ExecuteBrepEdgeClassification(Brep brep, Continuity minContinuity, double angleThreshold) {
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, brep.Edges.Count),];
         IReadOnlyList<EdgeContinuityType> classifications = [.. edgeIndices.Select(i => ClassifyBrepEdge(
             edge: brep.Edges[i],
             _: brep,
-            minContinuity: minContinuity)),];
+            minContinuity: minContinuity,
+            angleThreshold: angleThreshold)),];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => brep.Edges[i].GetLength()),];
         FrozenDictionary<EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices
             .Select((idx, pos) => (idx, type: classifications[pos]))
@@ -530,13 +532,13 @@ internal static class TopologyCompute {
     }
 
     [Pure]
-    private static EdgeContinuityType ClassifyBrepEdge(BrepEdge edge, Brep _, Continuity minContinuity) =>
+    private static EdgeContinuityType ClassifyBrepEdge(BrepEdge edge, Brep _, Continuity minContinuity, double angleThreshold) =>
         edge.Valence switch {
             EdgeAdjacency.Naked => EdgeContinuityType.Boundary,
             EdgeAdjacency.NonManifold => EdgeContinuityType.NonManifold,
             EdgeAdjacency.Interior => edge.EdgeCurve switch {
                 Curve crv when crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid) => EdgeContinuityType.Curvature,
-                Curve crv when edge.IsSmoothManifoldEdge(angleToleranceRadians: 0.01) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => EdgeContinuityType.Smooth,
+                Curve crv when edge.IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => EdgeContinuityType.Smooth,
                 _ when minContinuity >= Continuity.G1_continuous => EdgeContinuityType.Sharp,
                 _ => EdgeContinuityType.Interior,
             },
@@ -552,11 +554,11 @@ internal static class TopologyCompute {
                 1 => EdgeContinuityType.Boundary,
                 > 2 => EdgeContinuityType.NonManifold,
                 2 => CalculateDihedralAngle(mesh: mesh, faceIdx1: connectedFaces[0], faceIdx2: connectedFaces[1]) switch {
-                    double angle when Math.Abs(angle) < angleThreshold / 10.0 => EdgeContinuityType.Curvature,
+                    double angle when Math.Abs(angle) < angleThreshold * 0.1 => EdgeContinuityType.Curvature,
                     double angle when Math.Abs(angle) < angleThreshold => EdgeContinuityType.Smooth,
                     _ => EdgeContinuityType.Sharp,
                 },
-                _ => EdgeContinuityType.Interior,
+                _ => EdgeContinuityType.Sharp,
             };
         }),];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => {
