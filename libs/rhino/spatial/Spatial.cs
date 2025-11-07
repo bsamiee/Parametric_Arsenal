@@ -22,10 +22,10 @@ public static class Spatial {
         TQuery query,
         IGeometryContext context,
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.AlgorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize) config) switch {
+        SpatialConfig.AlgorithmConfig.TryGetValue((typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize) config) switch {
             true => UnifiedOperation.Apply(
                 input: input,
-                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => SpatialCore.ExecuteAlgorithm(item, query, context, config.bufferSize)),
+                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => SpatialEngine.ExecuteAlgorithm(item, query, context, config.bufferSize)),
                 config: new OperationConfig<TInput, int> {
                     Context = context,
                     ValidationMode = config.mode,

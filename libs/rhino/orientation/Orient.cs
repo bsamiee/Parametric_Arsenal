@@ -41,9 +41,9 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? ex)
+                (OrientEngine.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? ex)
                     ? ex(item)
-                    : OrientCore.PlaneExtractors
+                    : OrientEngine.PlaneExtractors
                         .Where(kv => kv.Key.IsInstanceOfType(item))
                         .OrderByDescending(kv => kv.Key, Comparer<Type>.Create((a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                         .Select(kv => kv.Value(item))

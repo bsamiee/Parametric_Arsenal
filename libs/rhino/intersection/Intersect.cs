@@ -44,14 +44,14 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        V mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V m2) ? m2
+        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1Type, t2Type), out V m1) ? m1
+            : IntersectionConfig.ValidationModes.TryGetValue((elementType, t2Type), out V m2) ? m2
             : V.None;
 
         return UnifiedOperation.Apply(
             geometryA,
             (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item =>
-                IntersectionCore.ExecutePair(item, geometryB, context, opts)
+                IntersectionEngine.ExecutePair(item, geometryB, context, opts)
                     .Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
             new OperationConfig<object, IntersectionOutput> {
                 Context = context,

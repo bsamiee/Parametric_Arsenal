@@ -1,9 +1,7 @@
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
@@ -12,49 +10,13 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Internal intersection computation engine with RhinoCommon SDK algorithms and type-based dispatch.</summary>
-internal static class IntersectionCore {
-    internal static readonly FrozenDictionary<(Type, Type), V> _validationConfig =
-        new Dictionary<(Type, Type), V> {
-            [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(typeof(Curve), typeof(Surface))] = V.Standard,
-            [(typeof(Curve), typeof(Brep))] = V.Standard | V.Topology,
-            [(typeof(Curve), typeof(BrepFace))] = V.Standard | V.Topology,
-            [(typeof(Curve), typeof(Plane))] = V.Standard | V.Degeneracy,
-            [(typeof(Curve), typeof(Line))] = V.Standard | V.Degeneracy,
-            [(typeof(Brep), typeof(Brep))] = V.Standard | V.Topology,
-            [(typeof(Brep), typeof(Plane))] = V.Standard | V.Topology,
-            [(typeof(Brep), typeof(Surface))] = V.Standard | V.Topology,
-            [(typeof(Surface), typeof(Surface))] = V.Standard,
-            [(typeof(Mesh), typeof(Mesh))] = V.MeshSpecific,
-            [(typeof(Mesh), typeof(Ray3d))] = V.MeshSpecific,
-            [(typeof(Mesh), typeof(Plane))] = V.MeshSpecific,
-            [(typeof(Mesh), typeof(Line))] = V.MeshSpecific,
-            [(typeof(Mesh), typeof(PolylineCurve))] = V.MeshSpecific,
-            [(typeof(Line), typeof(Line))] = V.Standard,
-            [(typeof(Line), typeof(BoundingBox))] = V.Standard,
-            [(typeof(Line), typeof(Plane))] = V.Standard,
-            [(typeof(Line), typeof(Sphere))] = V.Standard,
-            [(typeof(Line), typeof(Cylinder))] = V.Standard,
-            [(typeof(Line), typeof(Circle))] = V.Standard,
-            [(typeof(Plane), typeof(Plane))] = V.Standard,
-            [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = V.Standard,
-            [(typeof(Plane), typeof(Circle))] = V.Standard,
-            [(typeof(Plane), typeof(Sphere))] = V.Standard,
-            [(typeof(Plane), typeof(BoundingBox))] = V.Standard,
-            [(typeof(Sphere), typeof(Sphere))] = V.Standard,
-            [(typeof(Circle), typeof(Circle))] = V.Standard,
-            [(typeof(Arc), typeof(Arc))] = V.Standard,
-            [(typeof(Point3d[]), typeof(Brep[]))] = V.Standard | V.Topology,
-            [(typeof(Point3d[]), typeof(Mesh[]))] = V.MeshSpecific,
-            [(typeof(Ray3d), typeof(GeometryBase[]))] = V.Standard,
-        }.ToFrozenDictionary();
-
+internal static class IntersectionEngine {
     [Pure]
-#pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction
+#pragma warning disable MA0051
     internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, Intersect.IntersectionOptions opts) where T1 : notnull where T2 : notnull {
 #pragma warning restore MA0051
         static Result<Intersect.IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
-#pragma warning disable IDISP007 // Don't dispose injected - CurveIntersections created by caller and owned by this method
+#pragma warning disable IDISP007
             using (results) {
 #pragma warning restore IDISP007
                 return results switch {
@@ -129,21 +91,21 @@ internal static class IntersectionCore {
                     [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
                     [], [], [], [], [])),
             (Curve ca, Curve cb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+#pragma warning disable IDISP004
                 fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
 #pragma warning restore IDISP004
             (Curve ca, BrepFace bf, _) =>
                 fromBrepIntersection((RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2)),
             (Curve ca, Surface sb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+#pragma warning disable IDISP004
                 fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance), overlapSource: null),
 #pragma warning restore IDISP004
             (Curve ca, Plane pb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+#pragma warning disable IDISP004
                 fromCurveIntersections(RhinoIntersect.CurvePlane(ca, pb, tolerance), overlapSource: null),
 #pragma warning restore IDISP004
             (Curve ca, Line lb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+#pragma warning disable IDISP004
                 fromCurveIntersections(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance), overlapSource: null),
 #pragma warning restore IDISP004
             (Curve ca, Brep bb, _) =>
@@ -222,7 +184,7 @@ internal static class IntersectionCore {
                 fromCountedPointsWithParams(((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lct1, lcp2, lct2, tolerance)),
             (Plane pa, Plane pb, _) =>
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
+#pragma warning disable IDISP004
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new LineCurve(line)], [], [], [], []))
 #pragma warning restore IDISP004
@@ -243,7 +205,7 @@ internal static class IntersectionCore {
                 },
             (Plane pa, Sphere sb, _) =>
                 ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
+#pragma warning disable IDISP004
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(psc)], [], [], [], [])),
 #pragma warning restore IDISP004
@@ -258,7 +220,7 @@ internal static class IntersectionCore {
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (Sphere sa, Sphere sb, _) =>
                 ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
+#pragma warning disable IDISP004
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(ssc)], [], [], [], [])),
 #pragma warning restore IDISP004

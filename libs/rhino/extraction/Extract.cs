@@ -47,7 +47,7 @@ public static class Extract {
             int or double or (int, bool) or (double, bool) or Vector3d or Continuity or Semantic =>
                 UnifiedOperation.Apply(
                     input,
-                    (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
+                    (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionEngine.Execute(item, spec, context)),
                     new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.None }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };

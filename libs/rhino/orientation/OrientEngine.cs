@@ -6,7 +6,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Core dispatch tables for frame extraction without helper methods - all logic inlined in API.</summary>
-internal static class OrientCore {
+internal static class OrientEngine {
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
             [typeof(Curve)] = g => ((Curve)g).FrameAt(((Curve)g).Domain.Mid, out Plane f) && f.IsValid
