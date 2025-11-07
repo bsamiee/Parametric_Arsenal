@@ -44,7 +44,7 @@ public static class ValidationRules {
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
-    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray))!;
+    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
 
     private static readonly FrozenDictionary<ValidationMode, (string[] Properties, string[] Methods, SystemError Error)> _validationRules =
         new Dictionary<ValidationMode, (string[], string[], SystemError)> {

@@ -64,8 +64,9 @@ internal static class ExtractionCore {
         };
 
         try {
-            ValidationMode mode = _validationConfig.TryGetValue((kind, normalized.GetType()), out ValidationMode exact) ? exact :
-                _validationConfig.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(normalized.GetType()))
+            Type normalizedType = normalized.GetType();
+            ValidationMode mode = _validationConfig.TryGetValue((kind, normalizedType), out ValidationMode exact) ? exact :
+                _validationConfig.Where(kv => kv.Key.Item1 == kind && kv.Key.Item2.IsInstanceOfType(normalized))
                     .OrderByDescending(kv => kv.Key.Item2, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                     .Select(kv => kv.Value)
                     .DefaultIfEmpty(ValidationMode.Standard)
