@@ -144,9 +144,6 @@ public sealed record AdjacencyData(
 internal static class TopologyCompute {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 
-    /// <summary>Curvature threshold multiplier: mesh edges with angles below angleThreshold * this value are classified as G2-equivalent.</summary>
-    private const double CurvatureThresholdMultiplier = 0.1;
-
     [Pure]
     internal static Result<NakedEdgeData> ExecuteNakedEdges<T>(
         T input,
@@ -156,20 +153,30 @@ internal static class TopologyCompute {
         UnifiedOperation.Apply(
             input: input,
             operation: (Func<T, Result<IReadOnlyList<NakedEdgeData>>>)(g => g switch {
-                Brep brep => ResultFactory.Create(value: (IReadOnlyList<NakedEdgeData>)[
-                    new NakedEdgeData(
-                        EdgeCurves: [.. Enumerable.Range(0, brep.Edges.Count)
-                            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-                            .Select(i => brep.Edges[i].DuplicateCurve()),],
-                        EdgeIndices: [.. Enumerable.Range(0, brep.Edges.Count)
-                            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),],
-                        Valences: [.. Enumerable.Range(0, brep.Edges.Count)
-                            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-                            .Select(_ => 1),],
-                        IsOrdered: orderLoops,
-                        TotalEdgeCount: brep.Edges.Count,
-                        TotalLength: brep.Edges.Where(e => e.Valence == EdgeAdjacency.Naked).Sum(e => e.GetLength())),
-                ]),
+                Brep brep => brep.Edges.Count switch {
+                    0 => ResultFactory.Create(value: (IReadOnlyList<NakedEdgeData>)[
+                        new NakedEdgeData(
+                            EdgeCurves: [],
+                            EdgeIndices: [],
+                            Valences: [],
+                            IsOrdered: orderLoops,
+                            TotalEdgeCount: 0,
+                            TotalLength: 0.0),
+                    ]),
+                    _ => Enumerable.Range(0, brep.Edges.Count)
+                        .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
+                        .ToArray() switch {
+                        int[] nakedIndices => ResultFactory.Create(value: (IReadOnlyList<NakedEdgeData>)[
+                            new NakedEdgeData(
+                                EdgeCurves: [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),],
+                                EdgeIndices: [.. nakedIndices,],
+                                Valences: [.. Enumerable.Repeat(1, nakedIndices.Length),],
+                                IsOrdered: orderLoops,
+                                TotalEdgeCount: brep.Edges.Count,
+                                TotalLength: nakedIndices.Sum(i => brep.Edges[i].GetLength())),
+                        ]),
+                    },
+                },
                 Mesh mesh => (mesh.GetNakedEdges() ?? []) switch {
                     Polyline[] nakedPolylines => ResultFactory.Create(value: (IReadOnlyList<NakedEdgeData>)[
                         new NakedEdgeData(
@@ -478,11 +485,18 @@ internal static class TopologyCompute {
             BoundingBox.Empty,
             (union, fIdx) => {
                 MeshFace face = mesh.Faces[fIdx];
-                BoundingBox fBox = new(mesh.Vertices[face.A], mesh.Vertices[face.B]);
-                fBox.Union(mesh.Vertices[face.C]);
-                if (face.IsQuad) {
-                    fBox.Union(mesh.Vertices[face.D]);
-                }
+                BoundingBox fBox = face.IsQuad
+                    ? new BoundingBox([
+                        mesh.Vertices[face.A],
+                        mesh.Vertices[face.B],
+                        mesh.Vertices[face.C],
+                        mesh.Vertices[face.D],
+                    ])
+                    : new BoundingBox([
+                        mesh.Vertices[face.A],
+                        mesh.Vertices[face.B],
+                        mesh.Vertices[face.C],
+                    ]);
                 return union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
             })),];
         return ResultFactory.Create(value: (IReadOnlyList<ConnectivityData>)[
@@ -550,6 +564,7 @@ internal static class TopologyCompute {
 
     [Pure]
     private static Result<IReadOnlyList<EdgeClassificationData>> ExecuteMeshEdgeClassification(Mesh mesh, double angleThreshold) {
+        double curvatureThreshold = angleThreshold * 0.1;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
         IReadOnlyList<EdgeContinuityType> classifications = [.. edgeIndices.Select(i => {
             int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(i);
@@ -557,7 +572,7 @@ internal static class TopologyCompute {
                 1 => EdgeContinuityType.Boundary,
                 > 2 => EdgeContinuityType.NonManifold,
                 2 => CalculateDihedralAngle(mesh: mesh, faceIdx1: connectedFaces[0], faceIdx2: connectedFaces[1]) switch {
-                    double angle when Math.Abs(angle) < angleThreshold * CurvatureThresholdMultiplier => EdgeContinuityType.Curvature,
+                    double angle when Math.Abs(angle) < curvatureThreshold => EdgeContinuityType.Curvature,
                     double angle when Math.Abs(angle) < angleThreshold => EdgeContinuityType.Smooth,
                     _ => EdgeContinuityType.Sharp,
                 },
@@ -595,10 +610,9 @@ internal static class TopologyCompute {
         IReadOnlyList<int> adjFaces = [.. edge.AdjacentFaces(),];
         IReadOnlyList<Vector3d> normals = [.. adjFaces.Select(i => {
             BrepFace face = brep.Faces[i];
-            (double u, double v) = face.Domain(0).Mid switch {
-                double uMid => (uMid, face.Domain(1).Mid),
-            };
-            return face.NormalAt(u, v);
+            double uMid = face.Domain(0).Mid;
+            double vMid = face.Domain(1).Mid;
+            return face.NormalAt(uMid, vMid);
         }),];
         double dihedralAngle = normals.Count == 2 ? Vector3d.VectorAngle(normals[0], normals[1]) : 0.0;
         return ResultFactory.Create(value: (IReadOnlyList<AdjacencyData>)[
