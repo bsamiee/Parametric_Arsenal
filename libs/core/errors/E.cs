@@ -50,6 +50,7 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [2406] = "Invalid edge index",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -100,6 +101,7 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError InvalidEdgeIndex = Get(2406);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>
