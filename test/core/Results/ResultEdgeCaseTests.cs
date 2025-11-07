@@ -8,7 +8,7 @@ using Xunit;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Comprehensive edge case tests for Result operations covering untested branches and boundary conditions.</summary>
-public sealed class ResultEdgeCaseTests {
+internal sealed class ResultEdgeCaseTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 7001, "Edge1"),
         new(ErrorDomain.Results, 7002, "Edge2"),

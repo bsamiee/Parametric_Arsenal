@@ -7,7 +7,7 @@ using Xunit;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic tests for ResultFactory operations using zero-boilerplate composition and pattern matching.</summary>
-public sealed class ResultFactoryTests {
+internal sealed class ResultFactoryTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 1001, "E1"),
         new(ErrorDomain.Results, 1002, "E2"),

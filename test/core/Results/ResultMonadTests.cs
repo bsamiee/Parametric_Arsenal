@@ -8,7 +8,7 @@ using Xunit;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic tests for Result monadic laws, operations, and invariants using zero-boilerplate composition.</summary>
-public sealed class ResultMonadTests {
+internal sealed class ResultMonadTests {
     private static readonly SystemError TestError = new(ErrorDomain.Results, 1001, "Test error");
 
     /// <summary>Verifies functor category laws: identity and composition.</summary>
