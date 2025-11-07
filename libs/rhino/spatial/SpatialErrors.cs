@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Spatial indexing error definitions - aliases to E.Spatial for backward compatibility.</summary>
-[Obsolete("Use E.Spatial instead", error: false)]
+/// <summary>Spatial indexing error definitions - aliases to E.Spatial for backward compatibility during transition.</summary>
 public static class SpatialErrors {
     /// <summary>Query parameter and type combination validation errors.</summary>
     public static class Query {

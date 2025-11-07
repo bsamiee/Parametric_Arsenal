@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Analysis error definitions - aliases to E.Geometry for backward compatibility.</summary>
-[Obsolete("Use E.Geometry instead", error: false)]
+/// <summary>Analysis error definitions - aliases to E.Geometry for backward compatibility during transition.</summary>
 public static class AnalysisErrors {
     /// <summary>Operation-level errors for unsupported geometry types or dispatch failures.</summary>
     public static class Operation {

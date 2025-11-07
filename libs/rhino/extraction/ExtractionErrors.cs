@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Error codes for point extraction operations - aliases to E.Geometry for backward compatibility.</summary>
-[Obsolete("Use E.Geometry instead", error: false)]
+/// <summary>Error codes for point extraction operations - aliases to E.Geometry for backward compatibility during transition.</summary>
 public static class ExtractionErrors {
     /// <summary>Operation-level extraction errors for geometry processing failures.</summary>
     public static class Operation {

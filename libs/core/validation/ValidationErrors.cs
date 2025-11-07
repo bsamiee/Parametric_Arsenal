@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Hierarchical validation error factory - aliases to E.Validation for backward compatibility.</summary>
-[Obsolete("Use E.Validation instead", error: false)]
+/// <summary>Hierarchical validation error factory - aliases to E.Validation for backward compatibility during transition.</summary>
 public static class ValidationErrors {
     /// <summary>Geometry validation errors (3000-3999).</summary>
     public static class Geometry {

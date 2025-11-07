@@ -1,7 +1,6 @@
 namespace Arsenal.Core.Validation;
 
-/// <summary>Type alias for V struct - use V instead for new code.</summary>
-[Obsolete("Use V struct instead", error: false)]
+/// <summary>Type alias for V struct - use V instead for new code during transition.</summary>
 public readonly struct ValidationMode(ushort flags) : IEquatable<ValidationMode> {
     private readonly ushort _flags = flags;
 

@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Result system errors (1000-1999) - aliases to E.Results for backward compatibility.</summary>
-[Obsolete("Use E.Results instead", error: false)]
+/// <summary>Result system errors (1000-1999) - aliases to E.Results for backward compatibility during transition.</summary>
 public static class ResultErrors {
     /// <summary>Result creation and manipulation errors (1000-1099).</summary>
     internal static class Factory {

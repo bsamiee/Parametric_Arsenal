@@ -2,8 +2,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Intersection operation error definitions - aliases to E.Geometry for backward compatibility.</summary>
-[Obsolete("Use E.Geometry instead", error: false)]
+/// <summary>Intersection operation error definitions - aliases to E.Geometry for backward compatibility during transition.</summary>
 public static class IntersectionErrors {
     public static class Operation {
         public static readonly SystemError UnsupportedMethod = E.Geometry.UnsupportedIntersection;
