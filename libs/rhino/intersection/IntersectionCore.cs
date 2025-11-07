@@ -70,17 +70,24 @@ internal static class IntersectionCore {
         }
 
         static Result<Intersect.IntersectionOutput> fromBrepIntersection((bool success, Curve[] curves, Point3d[] points) result) =>
-            result switch {
-                (true, { Length: > 0 } c, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. p], [.. c], [], [], [], [])),
-                (true, { Length: > 0 } c, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [.. c], [], [], [], [])),
-                (true, _, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. p], [], [], [], [], [])),
+            result.success switch {
+                true when result.curves.Length > 0 && result.points.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. result.points], [.. result.curves], [], [], [], [])),
+                true when result.curves.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [.. result.curves], [], [], [], [])),
+                true when result.points.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. result.points], [], [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             };
 
         static Result<Intersect.IntersectionOutput> fromCountedPoints((int count, Point3d p1, Point3d p2, double tolerance) data) =>
-            data switch {
-                ( > 1, Point3d p1, Point3d p2, double tol) when p1.DistanceTo(p2) > tol => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], [], [], [], [])),
-                ( > 0, Point3d p1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1], [], [], [], [], [])),
+            data.count switch {
+                > 1 when data.p1.DistanceTo(data.p2) > data.tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1, data.p2], [], [], [], [], [])),
+                > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            };
+
+        static Result<Intersect.IntersectionOutput> fromCountedPointsWithParams((int count, Point3d p1, double t1, Point3d p2, double t2, double tolerance) data) =>
+            data.count switch {
+                > 1 when data.p1.DistanceTo(data.p2) > data.tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1, data.p2], [], [data.t1, data.t2], [], [], [])),
+                > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1], [], [data.t1], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             };
 
@@ -212,13 +219,7 @@ internal static class IntersectionCore {
             (Line la, Cylinder cylb, _) =>
                 fromCountedPoints(((int)RhinoIntersect.LineCylinder(la, cylb, out Point3d pc1, out Point3d pc2), pc1, pc2, tolerance)),
             (Line la, Circle cb, _) =>
-                ((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2)) switch {
-                    > 1 when lcp1.DistanceTo(lcp2) > tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [lcp1, lcp2], [], [lct1, lct2], [], [], [])),
-                    > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [lcp1], [], [lct1], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                fromCountedPointsWithParams(((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lct1, lcp2, lct2, tolerance)),
             (Plane pa, Plane pb, _) =>
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
