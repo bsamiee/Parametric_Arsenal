@@ -26,7 +26,7 @@ public readonly struct DiagnosticContext(
 
     [Pure]
     private string DebuggerDisplay => string.Create(provider: CultureInfo.InvariantCulture,
-        handler: $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(provider: CultureInfo.InvariantCulture)}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value.ToUInt16().ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}");
+        $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(provider: CultureInfo.InvariantCulture)}b{(this.CacheHit.HasValue ? this.CacheHit.Value ? " [cached]" : " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value.ToUInt16().ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(provider: CultureInfo.InvariantCulture)}" : string.Empty)}");
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(DiagnosticContext left, DiagnosticContext right) => left.Equals(right);

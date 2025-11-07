@@ -39,7 +39,7 @@ public static class DiagnosticCapture {
             .SetTag(key: "caller", value: $"{callerFile}:{callerLine.ToString(provider: CultureInfo.InvariantCulture)} ({callerMember})")
             .SetTag(key: "success", value: result.IsSuccess)
             .SetTag(key: "validation", value: validationApplied.HasValue ? validationApplied.Value.ToUInt16().ToString(provider: CultureInfo.InvariantCulture) : "None")
-            .SetTag(key: "cache_hit", value: cacheHit?.ToString(provider: CultureInfo.InvariantCulture) ?? "N/A")
+            .SetTag(key: "cache_hit", value: cacheHit?.ToString() ?? "N/A")
             .Dispose();
         _metadata.AddOrUpdate(key: result, value: new StrongBox<DiagnosticContext>(value: ctx));
         return result;
