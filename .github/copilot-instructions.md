@@ -14,7 +14,7 @@ These violations fail the build. Check for and fix immediately:
 2. ❌ **Missing trailing commas** in multi-line collections → Add `,` at end
 3. ❌ **Unnamed parameters** in non-obvious calls → Add `parameter: value`
 4. ❌ **Using `var`** → Replace with explicit type
-5. ❌ **Using `if`/`else`** → Replace with pattern matching/switch expressions
+5. ❌ **Using `if`/`else` statements** → Replace with ternary (binary), switch expression (multiple), or pattern matching (type discrimination)
 6. ❌ **Redundant `new Type()`** → Use target-typed `new()`
 7. ❌ **Old collection syntax** → Use collection expressions `[]`
 8. ❌ **Folder has >4 files** → Consolidate into 2-3 files
@@ -107,16 +107,29 @@ mode.Has(V.Standard)                          // Check flag
 - **300 LOC hard limit** per member - improve logic, don't extract helpers
 - **Inline complex expressions** - no convenience methods
 
-### 2. Pattern Matching Over Control Flow
+### 2. Conditional Expressions (Not Statements)
 ```csharp
-// ✅ CORRECT
+// ✅ CORRECT - Ternary for binary choice
+return count > 0 
+    ? ProcessItems(items)
+    : ResultFactory.Create(error: E.Validation.Empty);
+
+// ✅ CORRECT - Switch expression for multiple branches
 return value switch {
     null => ResultFactory.Create(error: E.X),
     var v when v.IsValid => ResultFactory.Create(value: v),
     _ => ResultFactory.Create(error: E.Y),
 };
 
-// ❌ WRONG - Never use if/else
+// ✅ CORRECT - Pattern matching for type discrimination
+return geometry switch {
+    Point3d p => ProcessPoint(p),
+    Curve c => ProcessCurve(c),
+    Surface s => ProcessSurface(s),
+    _ => ResultFactory.Create(error: E.Geometry.Unsupported),
+};
+
+// ❌ WRONG - Never use if/else statements
 if (value == null) return ResultFactory.Create(error: E.X);
 else if (value.IsValid) return ResultFactory.Create(value: value);
 else return ResultFactory.Create(error: E.Y);

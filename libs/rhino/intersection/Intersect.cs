@@ -134,13 +134,12 @@ public static class Intersect {
             }
 
             static Result<IntersectionOutput> fromBrepIntersection(bool success, Curve[] curves, Point3d[] points) =>
-                success switch {
-                    true when points.Length > 0 || curves.Length > 0 => ResultFactory.Create(value: new IntersectionOutput(
+                success && (points.Length > 0 || curves.Length > 0)
+                    ? ResultFactory.Create(value: new IntersectionOutput(
                         [.. points],
                         curves.Length > 0 ? [.. curves] : [],
-                        [], [], [], [])),
-                    _ => ResultFactory.Create(value: IntersectionOutput.Empty),
-                };
+                        [], [], [], []))
+                    : ResultFactory.Create(value: IntersectionOutput.Empty);
 
             static Result<IntersectionOutput> fromCountedPoints(int count, Point3d p1, Point3d p2, double tolerance) =>
                 count switch {
@@ -263,23 +262,20 @@ public static class Intersect {
                         _ => ResultFactory.Create<IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     },
                 (Line la, Line lb, _) =>
-                    RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false) switch {
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [la.PointAt(pa)], [], [pa], [pb], [], [])),
-                        false => ResultFactory.Create(value: IntersectionOutput.Empty),
-                    },
+                    RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false)
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [la.PointAt(pa)], [], [pa], [pb], [], []))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty),
                 (Line la, BoundingBox boxb, _) =>
-                    RhinoIntersect.LineBox(la, boxb, tolerance, out Interval interval) switch {
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [la.PointAt(interval.Min), la.PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], [])),
-                        false => ResultFactory.Create(value: IntersectionOutput.Empty),
-                    },
+                    RhinoIntersect.LineBox(la, boxb, tolerance, out Interval interval)
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [la.PointAt(interval.Min), la.PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty),
                 (Line la, Plane pb, _) =>
-                    RhinoIntersect.LinePlane(la, pb, out double param) switch {
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [la.PointAt(param)], [], [param], [], [], [])),
-                        false => ResultFactory.Create(value: IntersectionOutput.Empty),
-                    },
+                    RhinoIntersect.LinePlane(la, pb, out double param)
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [la.PointAt(param)], [], [param], [], [], []))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty),
                 (Line la, Sphere sb, _) =>
                     fromCountedPoints((int)RhinoIntersect.LineSphere(la, sb, out Point3d ps1, out Point3d ps2), ps1, ps2, tolerance),
                 (Line la, Cylinder cylb, _) =>
@@ -293,11 +289,10 @@ public static class Intersect {
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Plane pa, Plane pb, _) =>
-                    RhinoIntersect.PlanePlane(pa, pb, out Line line) switch {
-                        true => ResultFactory.Create(value: new IntersectionOutput(
-                            [], [new LineCurve(line)], [], [], [], [])),
-                        false => ResultFactory.Create(value: IntersectionOutput.Empty),
-                    },
+                    RhinoIntersect.PlanePlane(pa, pb, out Line line)
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [], [new LineCurve(line)], [], [], [], []))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty),
                 (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
                     RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point) switch {
                         true => ResultFactory.Create(value: new IntersectionOutput(
@@ -321,11 +316,10 @@ public static class Intersect {
                         _ => ResultFactory.Create(value: IntersectionOutput.Empty),
                     },
                 (Plane pa, BoundingBox boxb, _) =>
-                    RhinoIntersect.PlaneBoundingBox(pa, boxb, out Polyline poly) switch {
-                        true when poly?.Count > 0 => ResultFactory.Create(value: new IntersectionOutput(
-                            [.. from pt in poly select pt], [], [], [], [], [poly])),
-                        _ => ResultFactory.Create(value: IntersectionOutput.Empty),
-                    },
+                    RhinoIntersect.PlaneBoundingBox(pa, boxb, out Polyline poly) && poly?.Count > 0
+                        ? ResultFactory.Create(value: new IntersectionOutput(
+                            [.. from pt in poly select pt], [], [], [], [], [poly]))
+                        : ResultFactory.Create(value: IntersectionOutput.Empty),
                 (Sphere sa, Sphere sb, _) =>
                     ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
                         1 => ResultFactory.Create(value: new IntersectionOutput(
