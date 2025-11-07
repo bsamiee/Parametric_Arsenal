@@ -30,6 +30,17 @@ public static class E {
             [2311] = "Surface analysis computation failed",
             [2312] = "Brep analysis computation failed",
             [2313] = "Mesh analysis computation failed",
+            [2400] = "Naked edge extraction failed",
+            [2401] = "Boundary loop construction failed",
+            [2402] = "Non-manifold edge detected",
+            [2403] = "Non-manifold vertex detected",
+            [2404] = "Connected component analysis failed",
+            [2405] = "Edge classification failed",
+            [2406] = "Invalid edge index",
+            [2407] = "Edge curve extraction failed",
+            [2408] = "Boundary loop join failed",
+            [2409] = "Invalid edge topology",
+            [2410] = "Adjacency query failed",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -100,6 +111,17 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError NakedEdgeFailed = Get(2400);
+        public static readonly SystemError BoundaryLoopFailed = Get(2401);
+        public static readonly SystemError NonManifoldEdge = Get(2402);
+        public static readonly SystemError NonManifoldVertex = Get(2403);
+        public static readonly SystemError ConnectivityFailed = Get(2404);
+        public static readonly SystemError EdgeClassificationFailed = Get(2405);
+        public static readonly SystemError InvalidEdgeIndex = Get(2406);
+        public static readonly SystemError EdgeCurveExtractionFailed = Get(2407);
+        public static readonly SystemError BoundaryLoopJoinFailed = Get(2408);
+        public static readonly SystemError InvalidEdge = Get(2409);
+        public static readonly SystemError AdjacencyFailed = Get(2410);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>
