@@ -27,7 +27,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
         MeshSpecific._flags | SurfaceContinuity._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = new HashSet<V> { Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity, }.ToFrozenSet();
+    public static readonly FrozenSet<V> AllFlags = new V[] { Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity, }.ToFrozenSet();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
