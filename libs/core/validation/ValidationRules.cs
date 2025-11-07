@@ -85,10 +85,8 @@ public static class ValidationRules {
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
 
-        V[] allFlags = [V.Standard, V.AreaCentroid, V.BoundingBox, V.MassProperties, V.Topology, V.Degeneracy, V.Tolerance, V.SelfIntersection, V.MeshSpecific, V.SurfaceContinuity,];
-
         (MemberInfo Member, SystemError Error)[] memberValidations =
-            [.. allFlags
+            [.. V.AllFlags
                 .Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag))
                 .SelectMany(flag => {
                     (string[] properties, string[] methods, SystemError error) = _validationRules[flag];

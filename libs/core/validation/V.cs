@@ -38,6 +38,8 @@ public readonly struct V(ushort flags) : IEquatable<V> {
         MeshSpecific._flags | SurfaceContinuity._flags
     ));
 
+    public static ReadOnlySpan<V> AllFlags => [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,];
+
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static V operator |(V left, V right) => new((ushort)(left._flags | right._flags));
 
@@ -72,19 +74,20 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public override int GetHashCode() => this._flags;
 
     [Pure]
-    public override string ToString() => this._flags switch {
-        0 => nameof(None),
-        1 => nameof(Standard),
-        2 => nameof(AreaCentroid),
-        4 => nameof(BoundingBox),
-        8 => nameof(MassProperties),
-        16 => nameof(Topology),
-        32 => nameof(Degeneracy),
-        64 => nameof(Tolerance),
-        128 => nameof(SelfIntersection),
-        256 => nameof(MeshSpecific),
-        512 => nameof(SurfaceContinuity),
-        1023 => nameof(All),
-        _ => $"Combined({this._flags})",
-    };
+    public override string ToString() => this._flags == All._flags
+        ? nameof(All)
+        : this._flags switch {
+            0 => nameof(None),
+            1 => nameof(Standard),
+            2 => nameof(AreaCentroid),
+            4 => nameof(BoundingBox),
+            8 => nameof(MassProperties),
+            16 => nameof(Topology),
+            32 => nameof(Degeneracy),
+            64 => nameof(Tolerance),
+            128 => nameof(SelfIntersection),
+            256 => nameof(MeshSpecific),
+            512 => nameof(SurfaceContinuity),
+            _ => $"Combined({this._flags})",
+        };
 }

@@ -68,7 +68,8 @@ public static class E {
             [3902] = "Angle tolerance must be in range (0, 2π]",
             [3903] = "Geometry exceeds tolerance threshold",
             [3920] = "Invalid unit conversion scale",
-            [4000] = "Unsupported operation type",
+            [3930] = "Unsupported operation type",
+            [3931] = "Input filtered by predicate",
             [4001] = "K-nearest neighbor count must be positive",
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
@@ -141,7 +142,8 @@ public static class E {
         public static readonly SystemError ToleranceAngleInvalid = Get(3902);
         public static readonly SystemError ToleranceExceeded = Get(3903);
         public static readonly SystemError InvalidUnitConversion = Get(3920);
-        public static readonly SystemError UnsupportedOperationType = Get(4000);
+        public static readonly SystemError UnsupportedOperationType = Get(3930);
+        public static readonly SystemError InputFiltered = Get(3931);
     }
 
     /// <summary>Spatial indexing errors (4000-4099)</summary>

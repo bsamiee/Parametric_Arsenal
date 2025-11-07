@@ -49,7 +49,7 @@ public static class UnifiedOperation {
 
             Result<TIn> validated = ResultFactory.Create(value: item)
                 .Ensure(config.InputFilter ?? (_ => true),
-                    config.ErrorPrefix is null ? E.Validation.UnsupportedOperationType : E.Validation.UnsupportedOperationType.WithContext(config.ErrorPrefix))
+                    config.ErrorPrefix is null ? E.Validation.InputFiltered : E.Validation.InputFiltered.WithContext(config.ErrorPrefix))
                 .Validate(args: config.ValidationMode == V.None ? null :
                     [config.Context, config.ValidationMode, .. config.ValidationArgs ?? []]);
 
