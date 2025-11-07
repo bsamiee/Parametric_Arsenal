@@ -46,18 +46,18 @@ UnifiedOperation.Apply(
     input,
     (Func<object, Result<IReadOnlyList<T>>>)(item => item switch {
         GeometryBase g => Strategies.Process(g, method, context),
-        _ => ResultFactory.Create<IReadOnlyList<T>>(error: ValidationErrors.Geometry.Invalid),
+        _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.GeometryInvalid),
     }),
-    new OperationConfig<object, T> { Context = context, ValidationMode = ValidationMode.None })
+    new OperationConfig<object, T> { Context = context, ValidationMode = V.None })
 ```
 
 **FrozenDictionary Configuration** - Compile-time lookups with trailing commas:
 
 ```csharp
-private static readonly FrozenDictionary<(SpatialMethod, Type), (ValidationMode Mode, Func<object, RTree?>? TreeFactory)> _config =
-    new Dictionary<(SpatialMethod, Type), (ValidationMode, Func<object, RTree?>?)> {
-        [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (ValidationMode.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),
-        [(SpatialMethod.MeshOverlap, typeof(ValueTuple<Mesh, Mesh>))] = (ValidationMode.MeshSpecific, null),  // ✅ Trailing comma
+private static readonly FrozenDictionary<(SpatialMethod, Type), (V Mode, Func<object, RTree?>? TreeFactory)> _config =
+    new Dictionary<(SpatialMethod, Type), (V, Func<object, RTree?>?)> {
+        [(SpatialMethod.PointsRange, typeof(Point3d[]))] = (V.Standard, s => RTree.CreateFromPointArray((Point3d[])s)),
+        [(SpatialMethod.MeshOverlap, typeof(ValueTuple<Mesh, Mesh>))] = (V.MeshSpecific, null),  // ✅ Trailing comma
     }.ToFrozenDictionary();
 ```
 
@@ -90,7 +90,7 @@ ResultFactory.Create(error: err)               // ✅ Named parameter for errors
 ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 .Map(x => transform)                           // Functor transform
 .Bind(x => Result<Y>)                          // Monadic chain
-.Ensure(predicate, error: ValidationErrors.X)  // ✅ Validation with named error parameter
+.Ensure(predicate, error: E.Validation.X)      // ✅ Validation with named error parameter
 .Match(onSuccess, onFailure)                   // Pattern match exhaustive
 .Tap(onSuccess, onFailure)                     // Side effects, preserves state
 .Apply(Result<Func>)                           // Applicative parallel validation
@@ -116,23 +116,57 @@ ResultFactory.Create(errors: [err1, err2,])    // ✅ Named + trailing comma
 
 ValidationRules compiles validators at runtime using expression trees - never handwrite validation logic.
 
-### Error Pattern (Each folder has own errors)
+### Error System (E.cs Registry)
+
+**CRITICAL**: Use E.Category.Error pattern for all errors. Domain computed from code ranges.
 
 ```csharp
-// libs/core/validation/ValidationErrors.cs
-public static class ValidationErrors {
-    public static class Geometry {
-        public static readonly SystemError Invalid = new(ErrorDomain.Validation, 3001, "...");
-    }
+// ✅ Use E.Category.Error pattern
+return ResultFactory.Create<T>(error: E.Results.NoValueProvided);
+return ResultFactory.Create<T>(error: E.Geometry.InvalidExtraction);
+return ResultFactory.Create<T>(error: E.Validation.GeometryInvalid);
+return ResultFactory.Create<T>(error: E.Spatial.InvalidK);
+
+// ✅ Add context when needed
+return ResultFactory.Create<T>(error: E.Get(code: 1001, context: "MyMethod"));
+
+// ❌ Never create SystemError directly
+return ResultFactory.Create<T>(error: new SystemError(...));  // DON'T
+
+// Error Code Ranges (domain computed automatically):
+// 1000-1999: E.Results.*
+// 2000-2999: E.Geometry.* (extraction, intersection, analysis)
+// 3000-3999: E.Validation.*
+// 4000-4099: E.Spatial.*
+```
+
+### Validation Modes (V Struct)
+
+**CRITICAL**: Use V struct with bitwise operations for validation modes.
+
+```csharp
+// ✅ Combine with | operator
+V mode = V.Standard | V.Topology | V.Degeneracy;
+
+// ✅ Check with Has method
+if (mode.Has(flag: V.Standard)) { ... }
+
+// ✅ Compare with ==
+if (mode == V.None) { ... }
+
+// ✅ Pass to operations
+config: new OperationConfig<TIn, TOut> {
+    Context = context,
+    ValidationMode = V.Standard | V.Topology,
 }
 
-// libs/rhino/spatial/SpatialErrors.cs - Folder-specific errors
-public static class SpatialErrors {
-    public static class Parameters {
-        public static readonly SystemError InvalidCount = new(ErrorDomain.Geometry, 2221, "...");
-    }
-}
+// ❌ Don't use is pattern for struct comparison
+if (mode is V.None) { ... }  // WRONG
 ```
+
+### Legacy Error Pattern (Backward Compatibility)
+
+**Note**: ValidationErrors, ResultErrors, and specific error files (ExtractionErrors, IntersectionErrors, etc.) are maintained as aliases for backward compatibility during transition. New code should use E.* pattern.
 
 ### Analyzers Enforced
 
