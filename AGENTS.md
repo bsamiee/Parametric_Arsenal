@@ -20,7 +20,7 @@
 
 ### Absolute Prohibitions
 1. ❌ **NEVER use `var`** - Always explicit types
-2. ❌ **NEVER use `if`/`else`** - Pattern matching or switch expressions only
+2. ❌ **NEVER use `if`/`else` STATEMENTS** - Use expressions: ternary operators (simple binary), switch expressions (multiple branches), pattern matching (type discrimination). **Note**: `if` without `else` for early return/throw is acceptable.
 3. ❌ **NEVER create helper methods** - Algorithmic density (300 LOC max per member)
 4. ❌ **NEVER put multiple types in one file** - One type per file (CA1050)
 5. ❌ **NEVER use old patterns** - Target-typed new, collection expressions only
@@ -45,6 +45,7 @@
 3. ✅ **ALWAYS use Result<T>** for error handling (never exceptions)
 4. ✅ **ALWAYS use UnifiedOperation** for polymorphic dispatch
 5. ✅ **ALWAYS use K&R brace style** (opening brace on same line)
+6. ✅ **ALWAYS prefer expressions over statements** - Use ternary, switch expressions, not if/else
 
 ---
 
@@ -89,6 +90,35 @@ UnifiedOperation.Apply(
 - **Location**: `libs/core/errors/E.cs`
 - **Domains**: Results (1000-1999), Geometry (2000-2999), Validation (3000-3999), Spatial (4000-4999)
 - **Usage**: `E.Validation.GeometryInvalid`, `E.Geometry.InvalidCount.WithContext("msg")`
+
+### Conditional Expressions (Critical)
+**Rule**: Never use `if`/`else` statements. Use expressions that return values.
+
+```csharp
+// ✅ Ternary (simple binary choice)
+return count > 0 ? Process(items) : ResultFactory.Create(error: E.Validation.Empty);
+
+// ✅ Switch expression (multiple branches)
+return count switch {
+    0 => ResultFactory.Create(error: E.Validation.Empty),
+    1 => ProcessSingle(items[0]),
+    _ => ProcessMultiple(items),
+};
+
+// ✅ Pattern matching (type discrimination)
+return value switch {
+    Point3d p => ProcessPoint(p),
+    Curve c => ProcessCurve(c),
+    _ => ResultFactory.Create(error: E.Geometry.UnsupportedType),
+};
+
+// ❌ Never use if/else statements
+if (count > 0) {
+    return Process(items);
+} else {
+    return ResultFactory.Create(error: E.Validation.Empty);
+}
+```
 
 ---
 
