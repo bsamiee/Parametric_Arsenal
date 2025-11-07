@@ -47,7 +47,8 @@ dotnet_diagnostic.IDE0301.severity = error                                     #
 dotnet_diagnostic.IDE0302.severity = error                                     # Collection expression for stackalloc
 dotnet_diagnostic.IDE0303.severity = error                                     # Collection expression for Create
 dotnet_diagnostic.IDE0304.severity = error                                     # Collection expression for builder
-dotnet_diagnostic.IDE0305.severity = warning                                   # Collection expression for fluent
+dotnet_diagnostic.IDE0305.severity = warning                                   # Implict lambda's
+dotnet_diagnostic.IDE0350.severity = warning                                   # Collection expression for fluent
 
 # --------------------------------------------------------------------
 # Pattern Matching (Required over if/else)

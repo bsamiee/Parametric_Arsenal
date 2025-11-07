@@ -50,7 +50,8 @@ public static class Analysis {
         bool AtSingularity,
         double Area,
         Point3d Centroid) : IResult {
-        [Pure] private string DebuggerDisplay => this.AtSingularity
+        [Pure]
+        private string DebuggerDisplay => this.AtSingularity
             ? string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3} [singular]")
             : string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}");
     }
@@ -79,7 +80,8 @@ public static class Analysis {
         double Area,
         double Volume,
         Point3d Centroid) : IResult {
-        [Pure] private string DebuggerDisplay => this.IsSolid && this.IsManifold
+        [Pure]
+        private string DebuggerDisplay => this.IsSolid && this.IsManifold
             ? string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [solid] [manifold]")
             : this.IsSolid
                 ? string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [solid]")
@@ -100,7 +102,8 @@ public static class Analysis {
         bool IsClosed,
         double Area,
         double Volume) : IResult {
-        [Pure] private string DebuggerDisplay => this.IsClosed && this.IsManifold
+        [Pure]
+        private string DebuggerDisplay => this.IsClosed && this.IsManifold
             ? string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [closed] [manifold]")
             : this.IsClosed
                 ? string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3} [closed]")
