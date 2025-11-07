@@ -1,74 +1,120 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Topology analysis mode enumeration for operation dispatch.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "byte enum for performance and memory efficiency")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Enums grouped with primary API type")]
-public enum TopologyMode : byte {
-    /// <summary>Extract naked (boundary) edges with valence=1.</summary>
-    NakedEdges = 0,
-    /// <summary>Construct closed boundary loops from naked edges.</summary>
-    BoundaryLoops = 1,
-    /// <summary>Detect non-manifold vertices and edges.</summary>
-    NonManifold = 2,
-    /// <summary>Analyze connected components and adjacency graph.</summary>
-    Connectivity = 3,
-    /// <summary>Classify edges by continuity type (sharp, smooth, curvature).</summary>
-    EdgeClassification = 4,
-}
-
-/// <summary>Edge continuity classification enumeration for geometric analysis.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "byte enum for performance and memory efficiency")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Enums grouped with primary API type")]
-public enum EdgeContinuityType : byte {
-    /// <summary>G0 discontinuous or below minimum continuity threshold.</summary>
-    Sharp = 0,
-    /// <summary>G1 continuous (tangent continuity).</summary>
-    Smooth = 1,
-    /// <summary>G2 continuous (curvature continuity).</summary>
-    Curvature = 2,
-    /// <summary>Interior manifold edge (valence=2, meets continuity requirement).</summary>
-    Interior = 3,
-    /// <summary>Boundary naked edge (valence=1).</summary>
-    Boundary = 4,
-    /// <summary>Non-manifold edge (valence>2).</summary>
-    NonManifold = 5,
-}
-
-/// <summary>Polymorphic topology engine with type-driven FrozenDictionary dispatch for structural and connectivity analysis.</summary>
+/// <summary>Polymorphic topology engine with type-based overload dispatch for structural and connectivity analysis.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Topology is the primary API entry point for the Topology namespace")]
 public static class Topology {
     /// <summary>Topology result marker interface for polymorphic return discrimination.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface pattern for polymorphic result dispatch")]
     public interface IResult { }
 
-    /// <summary>Executes topology operations using type-driven dispatch with mode parameter controlling operation type.</summary>
+    /// <summary>Extracts naked (boundary) edges from Brep geometry with valence=1 classification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<TResult> Analyze<TGeometry, TResult>(
-        TGeometry geometry,
+    public static Result<NakedEdgeData> GetNakedEdges(
+        Brep geometry,
         IGeometryContext context,
-        TopologyMode mode,
-        params object[] args)
-        where TGeometry : notnull
-        where TResult : IResult =>
-        TopologyCompute.StrategyConfig.TryGetValue((typeof(TGeometry), mode), out (V validationMode, Func<object, IGeometryContext, object[], Result<IResult>> compute) strategy) switch {
-            true => UnifiedOperation.Apply(
-                input: geometry,
-                operation: (Func<TGeometry, Result<IReadOnlyList<IResult>>>)(g => strategy.compute(g, context, args).Map(r => (IReadOnlyList<IResult>)[r])),
-                config: new OperationConfig<TGeometry, IResult> {
-                    Context = context,
-                    ValidationMode = strategy.validationMode,
-                    OperationName = $"Topology.{typeof(TGeometry).Name}.{mode}",
-                })
-                .Map(results => (TResult)results[0]),
-            false => ResultFactory.Create<TResult>(
-                error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(TGeometry).Name}, Mode: {mode}")),
-        };
+        bool orderLoops = false,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Extracts naked (boundary) edges from Mesh geometry with topological edge classification.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<NakedEdgeData> GetNakedEdges(
+        Mesh geometry,
+        IGeometryContext context,
+        bool orderLoops = false,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Constructs closed boundary loops from Brep naked edges using curve joining algorithms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<BoundaryLoopData> GetBoundaryLoops(
+        Brep geometry,
+        IGeometryContext context,
+        double? tolerance = null,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Constructs closed boundary loops from Mesh naked edges using polyline joining algorithms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<BoundaryLoopData> GetBoundaryLoops(
+        Mesh geometry,
+        IGeometryContext context,
+        double? tolerance = null,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Detects non-manifold vertices and edges in Brep geometry with valence>2 classification.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<NonManifoldData> GetNonManifoldData(
+        Brep geometry,
+        IGeometryContext context,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Detects non-manifold vertices and edges in Mesh geometry with topological manifold analysis.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<NonManifoldData> GetNonManifoldData(
+        Mesh geometry,
+        IGeometryContext context,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes connected components and builds adjacency graph for Brep geometry using BFS traversal.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<ConnectivityData> GetConnectivity(
+        Brep geometry,
+        IGeometryContext context,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes connected components and builds adjacency graph for Mesh geometry using BFS traversal.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<ConnectivityData> GetConnectivity(
+        Mesh geometry,
+        IGeometryContext context,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Classifies Brep edges by continuity type (G0/G1/G2) with geometric continuity analysis.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<EdgeClassificationData> ClassifyEdges(
+        Brep geometry,
+        IGeometryContext context,
+        Continuity minimumContinuity = Continuity.G1_continuous,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Classifies Mesh edges by dihedral angle with sharp/smooth discrimination.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<EdgeClassificationData> ClassifyEdges(
+        Mesh geometry,
+        IGeometryContext context,
+        double? angleThreshold = null,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteEdgeClassification(input: geometry, context: context, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Queries face adjacency data for specific Brep edge with dihedral angle computation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<AdjacencyData> GetAdjacency(
+        Brep geometry,
+        IGeometryContext context,
+        int edgeIndex,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Queries face adjacency data for specific Mesh edge with dihedral angle computation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<AdjacencyData> GetAdjacency(
+        Mesh geometry,
+        IGeometryContext context,
+        int edgeIndex,
+        bool enableDiagnostics = false) =>
+        TopologyCompute.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
 }
