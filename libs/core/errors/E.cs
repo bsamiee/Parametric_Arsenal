@@ -167,7 +167,7 @@ public static class E {
         public static readonly SystemError UnsupportedTypeCombo = Get(code: 4003);
     }
 
-    /// <summary>Spatial indexing errors (4001-4004).</summary>
+    /// <summary>Spatial indexing errors (4001-4002, 4004) - code 4003 shared with Validation.</summary>
     public static class Spatial {
         public static readonly SystemError InvalidK = Get(code: 4001);
         public static readonly SystemError InvalidDistance = Get(code: 4002);
