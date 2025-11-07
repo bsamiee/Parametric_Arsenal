@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Globalization;
 using Rhino.Geometry;
 
@@ -33,7 +34,7 @@ public sealed record NakedEdgeData(
     bool IsOrdered,
     int TotalEdgeCount,
     double TotalLength) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => string.Create(
         CultureInfo.InvariantCulture,
@@ -50,7 +51,7 @@ public sealed record BoundaryLoopData(
     IReadOnlyList<bool> IsClosedPerLoop,
     double JoinTolerance,
     int FailedJoins) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => string.Create(
         CultureInfo.InvariantCulture,
@@ -68,7 +69,7 @@ public sealed record NonManifoldData(
     bool IsManifold,
     bool IsOrientable,
     int MaxValence) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => IsManifold
         ? "Manifold: No issues detected"
@@ -87,7 +88,7 @@ public sealed record ConnectivityData(
     int TotalComponents,
     bool IsFullyConnected,
     FrozenDictionary<int, IReadOnlyList<int>> AdjacencyGraph) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => IsFullyConnected
         ? "Connectivity: Single connected component"
@@ -105,7 +106,7 @@ public sealed record EdgeClassificationData(
     IReadOnlyList<double> ContinuityMeasures,
     FrozenDictionary<EdgeContinuityType, IReadOnlyList<int>> GroupedByType,
     Continuity MinimumContinuity) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => string.Create(
         CultureInfo.InvariantCulture,
@@ -122,7 +123,7 @@ public sealed record AdjacencyData(
     double DihedralAngle,
     bool IsManifold,
     bool IsBoundary) : Topology.IResult {
-    [System.Diagnostics.Contracts.Pure]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0009:Member access should be qualified", Justification = "this. qualification not required in records")]
     private string DebuggerDisplay => IsBoundary
         ? string.Create(CultureInfo.InvariantCulture, $"Edge[{EdgeIndex}]: Boundary (valence=1)")
