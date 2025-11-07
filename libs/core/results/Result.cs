@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Arsenal.Core.Errors;
@@ -8,6 +10,7 @@ namespace Arsenal.Core.Results;
 
 /// <summary>Monadic result container with lazy evaluation and functional composition.</summary>
 [StructLayout(LayoutKind.Auto)]
+[DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct Result<T> : IEquatable<Result<T>> {
     private readonly T _value;
     private readonly SystemError[] _errors;
@@ -20,6 +23,14 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     [Pure] public IReadOnlyList<SystemError> Errors => this.Eval._isSuccess ? [] : this.Eval._errors;
     [Pure] public SystemError Error => this.Eval switch { { _errors: [var head, ..] } => head, _ => default };
     [Pure] private Result<T> Eval => this._deferred is not null ? this._deferred().Eval : this;
+
+    [Pure]
+    private string DebuggerDisplay => (this._deferred is not null, this._isSuccess) switch {
+        (true, _) => string.Create(CultureInfo.InvariantCulture, $"Deferred<{typeof(T).Name}>"),
+        (false, true) => string.Create(CultureInfo.InvariantCulture, $"Success: {this._value?.ToString() ?? "null"}"),
+        (false, false) when this._errors is [var single] => string.Create(CultureInfo.InvariantCulture, $"Error: {single}"),
+        (false, false) => string.Create(CultureInfo.InvariantCulture, $"Errors({this._errors?.Length.ToString(CultureInfo.InvariantCulture) ?? "0"}): {(this._errors?.Length > 0 ? this._errors[0].ToString() : "none")}"),
+    };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(Result<T> left, Result<T> right) => left.Equals(right);
