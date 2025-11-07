@@ -30,6 +30,16 @@ public static class E {
             [2311] = "Surface analysis computation failed",
             [2312] = "Brep analysis computation failed",
             [2313] = "Mesh analysis computation failed",
+            [2400] = "Invalid target plane for orientation operation",
+            [2401] = "Failed to extract source frame from geometry",
+            [2402] = "Geometry type not supported for orientation operations",
+            [2403] = "Invalid orientation mode specified",
+            [2404] = "Source and target vectors are invalid or zero-length",
+            [2406] = "Failed to extract geometry centroid",
+            [2407] = "Transform application failed on geometry",
+            [2408] = "Parallel or antiparallel vectors require reference plane for alignment",
+            [2409] = "Invalid curve parameter for frame extraction",
+            [2410] = "Invalid surface UV parameters for frame extraction",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -100,6 +110,16 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError InvalidOrientationPlane = Get(2400);
+        public static readonly SystemError FrameExtractionFailed = Get(2401);
+        public static readonly SystemError UnsupportedOrientationType = Get(2402);
+        public static readonly SystemError InvalidOrientationMode = Get(2403);
+        public static readonly SystemError InvalidOrientationVectors = Get(2404);
+        public static readonly SystemError CentroidExtractionFailed = Get(2406);
+        public static readonly SystemError TransformFailed = Get(2407);
+        public static readonly SystemError ParallelVectorAlignment = Get(2408);
+        public static readonly SystemError InvalidCurveParameter = Get(2409);
+        public static readonly SystemError InvalidSurfaceUV = Get(2410);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>
