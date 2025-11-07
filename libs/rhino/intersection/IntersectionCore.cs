@@ -223,8 +223,10 @@ internal static class IntersectionCore {
                 },
             (Plane pa, Plane pb, _) =>
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new LineCurve(line)], [], [], [], []))
+#pragma warning restore IDISP004
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
                 RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point) switch {
@@ -242,8 +244,10 @@ internal static class IntersectionCore {
                 },
             (Plane pa, Sphere sb, _) =>
                 ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(psc)], [], [], [], [])),
+#pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [psc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
@@ -255,8 +259,10 @@ internal static class IntersectionCore {
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (Sphere sa, Sphere sb, _) =>
                 ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(ssc)], [], [], [], [])),
+#pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [ssc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
