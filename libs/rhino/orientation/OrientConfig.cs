@@ -20,7 +20,6 @@ internal static class OrientConfig {
             [typeof(Brep)] = V.Standard | V.Topology,
             [typeof(Extrusion)] = V.Standard | V.Topology,
             [typeof(Mesh)] = V.Standard | V.MeshSpecific,
-            [typeof(Point)] = V.None,
             [typeof(Point3d)] = V.None,
             [typeof(PointCloud)] = V.None,
         }.ToFrozenDictionary();

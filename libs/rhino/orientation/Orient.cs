@@ -24,7 +24,6 @@ public static class Orient {
 
     /// <summary>Polymorphic specification for orientation alignment targets.</summary>
     public readonly record struct OrientSpec {
-        public required object Target { get; init; }
         public Plane? TargetPlane { get; init; }
         public Point3d? TargetPoint { get; init; }
         public Vector3d? TargetVector { get; init; }
@@ -33,11 +32,11 @@ public static class Orient {
         public double CurveParameter { get; init; }
         public (double u, double v) SurfaceUV { get; init; }
 
-        public static OrientSpec Plane(Plane plane) => new() { Target = plane, TargetPlane = plane, };
-        public static OrientSpec Point(Point3d point) => new() { Target = point, TargetPoint = point, };
-        public static OrientSpec Vector(Vector3d vector) => new() { Target = vector, TargetVector = vector, };
-        public static OrientSpec Curve(Curve curve, double t) => new() { Target = curve, TargetCurve = curve, CurveParameter = t, };
-        public static OrientSpec Surface(Surface surface, double u, double v) => new() { Target = surface, TargetSurface = surface, SurfaceUV = (u, v), };
+        public static OrientSpec Plane(Plane plane) => new() { TargetPlane = plane, };
+        public static OrientSpec Point(Point3d point) => new() { TargetPoint = point, };
+        public static OrientSpec Vector(Vector3d vector) => new() { TargetVector = vector, };
+        public static OrientSpec Curve(Curve curve, double t) => new() { TargetCurve = curve, CurveParameter = t, };
+        public static OrientSpec Surface(Surface surface, double u, double v) => new() { TargetSurface = surface, SurfaceUV = (u, v), };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,13 +49,8 @@ public static class Orient {
                         false => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationPlane),
                         _ => ResultFactory.Create(value: Transform.PlaneToPlane(sourcePlane, targetPlane)),
                     })
-                    .Map(xform => {
-                        T result = (T)item.Duplicate();
-                        return result.Transform(xform) switch {
-                            true => (IReadOnlyList<T>)[result,],
-                            false => throw new InvalidOperationException(E.Geometry.TransformFailed.Message),
-                        };
-                    })),
+                    .Bind(xform => OrientCore.ApplyTransform(item, xform))
+                    .Map(result => (IReadOnlyList<T>)[result,])),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V mode) ? mode : V.Standard,
@@ -68,13 +62,8 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ComputeCanonicalTransform(item, mode, context)
-                    .Map(xform => {
-                        T result = (T)item.Duplicate();
-                        return result.Transform(xform) switch {
-                            true => (IReadOnlyList<T>)[result,],
-                            false => throw new InvalidOperationException(E.Geometry.TransformFailed.Message),
-                        };
-                    })),
+                    .Bind(xform => OrientCore.ApplyTransform(item, xform))
+                    .Map(result => (IReadOnlyList<T>)[result,])),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = mode.Mode switch {
@@ -92,13 +81,8 @@ public static class Orient {
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractCentroid(item, useMassCentroid, context)
                     .Map(centroid => Transform.Translation(target - centroid))
-                    .Map(xform => {
-                        T result = (T)item.Duplicate();
-                        return result.Transform(xform) switch {
-                            true => (IReadOnlyList<T>)[result,],
-                            false => throw new InvalidOperationException(E.Geometry.TransformFailed.Message),
-                        };
-                    })),
+                    .Bind(xform => OrientCore.ApplyTransform(item, xform))
+                    .Map(result => (IReadOnlyList<T>)[result,])),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = useMassCentroid ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
@@ -115,13 +99,8 @@ public static class Orient {
                         targetDirection,
                         center,
                         context))
-                    .Map(xform => {
-                        T result = (T)item.Duplicate();
-                        return result.Transform(xform) switch {
-                            true => (IReadOnlyList<T>)[result,],
-                            false => throw new InvalidOperationException(E.Geometry.TransformFailed.Message),
-                        };
-                    })),
+                    .Bind(xform => OrientCore.ApplyTransform(item, xform))
+                    .Map(result => (IReadOnlyList<T>)[result,])),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -135,13 +114,8 @@ public static class Orient {
                 mirrorPlane.IsValid switch {
                     false => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane),
                     _ => ResultFactory.Create(value: Transform.Mirror(mirrorPlane))
-                        .Map(xform => {
-                            T result = (T)item.Duplicate();
-                            return result.Transform(xform) switch {
-                                true => (IReadOnlyList<T>)[result,],
-                                false => throw new InvalidOperationException(E.Geometry.TransformFailed.Message),
-                            };
-                        }),
+                        .Bind(xform => OrientCore.ApplyTransform(item, xform))
+                        .Map(result => (IReadOnlyList<T>)[result,]),
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -166,9 +140,9 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 (spec.TargetPlane, spec.TargetPoint, spec.TargetVector, spec.TargetCurve, spec.TargetSurface) switch {
-                    (Plane p, null, null, null, null) => ToPlane(item, p, context).Map(r => (IReadOnlyList<T>)[r,]),
-                    (null, Point3d pt, null, null, null) => ToPoint(item, pt, useMassCentroid: false, context).Map(r => (IReadOnlyList<T>)[r,]),
-                    (null, null, Vector3d v, null, null) => ToVector(item, v, sourceAxis: null, context).Map(r => (IReadOnlyList<T>)[r,]),
+                    (Plane p, null, null, null, null) when p != default => ToPlane(item, p, context).Map(r => (IReadOnlyList<T>)[r,]),
+                    (null, Point3d pt, null, null, null) when pt != default => ToPoint(item, pt, useMassCentroid: false, context).Map(r => (IReadOnlyList<T>)[r,]),
+                    (null, null, Vector3d v, null, null) when v != default => ToVector(item, v, sourceAxis: null, context).Map(r => (IReadOnlyList<T>)[r,]),
                     (null, null, null, Curve c, null) => c.FrameAt(spec.CurveParameter, out Plane frame) switch {
                         true when frame.IsValid => ToPlane(item, frame, context).Map(r => (IReadOnlyList<T>)[r,]),
                         _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidCurveParameter),
