@@ -59,24 +59,20 @@ internal static class SpatialCore {
             (Point3d[] pts, BoundingBox box) => GetTree(pts).Bind(tree =>
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // Point array proximity queries
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ => tuple1.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK)
-                : ExecuteKNearestPoints(pts, tuple1.Item1, tuple1.Item2)),
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ => tuple2.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance)
-                : ExecuteDistanceLimitedPoints(pts, tuple2.Item1, tuple2.Item2)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ =>
+                ExecuteProximitySearch(pts, tuple1.Item1, tuple1.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
+            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ =>
+                ExecuteProximitySearch(pts, tuple2.Item1, tuple2.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
             // PointCloud range queries
             (PointCloud cloud, Sphere sphere) => GetTree(cloud).Bind(tree =>
                 ExecuteRangeSearch(tree, sphere, bufferSize)),
             (PointCloud cloud, BoundingBox box) => GetTree(cloud).Bind(tree =>
                 ExecuteRangeSearch(tree, box, bufferSize)),
             // PointCloud proximity queries
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 => tuple3.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK)
-                : ExecuteKNearestCloud(cloud, tuple3.Item1, tuple3.Item2),
-            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 => tuple4.Item2 <= 0
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance)
-                : ExecuteDistanceLimitedCloud(cloud, tuple4.Item1, tuple4.Item2),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], int> tuple3 =>
+                ExecuteProximitySearch(cloud, tuple3.Item1, tuple3.Item2, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
+            (PointCloud cloud, object q) when q is ValueTuple<Point3d[], double> tuple4 =>
+                ExecuteProximitySearch(cloud, tuple4.Item1, tuple4.Item2, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
             // Mesh range queries
             (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
                 ExecuteRangeSearch(tree, sphere, bufferSize)),
@@ -108,66 +104,36 @@ internal static class SpatialCore {
 
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
     [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(
-        RTree tree,
-        object queryShape,
-        int bufferSize) {
+    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            (queryShape switch {
-                Sphere sphere => (Action)(() => tree.Search(sphere, (_, args) => {
-                    if (count < buffer.Length) {
-                        buffer[count++] = args.Id;
-                    }
-                })),
-                BoundingBox box => () => tree.Search(box, (_, args) => {
-                    if (count < buffer.Length) {
-                        buffer[count++] = args.Id;
-                    }
-                }),
-                _ => () => { }
-                ,
-            })();
+            Action search = queryShape switch {
+                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) buffer[count++] = args.Id; }),
+                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) buffer[count++] = args.Id; }),
+                _ => () => { },
+            };
+            search();
             return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
     }
 
-    /// <summary>Executes k-nearest neighbor search for point arrays using RTree.Point3dKNeighbors.</summary>
+    /// <summary>Executes k-nearest or distance-limited proximity search using RTree algorithms.</summary>
     [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteKNearestPoints(Point3d[] points, Point3d[] needles, int k) =>
-        RTree.Point3dKNeighbors(points, needles, k) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-        };
-
-    /// <summary>Executes distance-limited proximity search for point arrays using RTree.Point3dClosestPoints.</summary>
-    [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedPoints(Point3d[] points, Point3d[] needles, double limit) =>
-        RTree.Point3dClosestPoints(points, needles, limit) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-        };
-
-    /// <summary>Executes k-nearest neighbor search for point clouds using RTree.PointCloudKNeighbors.</summary>
-    [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteKNearestCloud(PointCloud cloud, Point3d[] needles, int k) =>
-        RTree.PointCloudKNeighbors(cloud, needles, k) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-        };
-
-    /// <summary>Executes distance-limited proximity search for point clouds using RTree.PointCloudClosestPoints.</summary>
-    [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedCloud(PointCloud cloud, Point3d[] needles, double limit) =>
-        RTree.PointCloudClosestPoints(cloud, needles, limit) switch {
-            int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-            null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+    private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, int[][]> kNearest, Func<T, Point3d[], double, int[][]> distLimited) where T : notnull =>
+        limit switch {
+            int k when k > 0 => kNearest(source, needles, k) switch {
+                int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            },
+            double d when d > 0 => distLimited(source, needles, d) switch {
+                int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            },
+            int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
+            double => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
