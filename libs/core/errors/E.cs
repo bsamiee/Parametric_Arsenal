@@ -78,15 +78,15 @@ public static class E {
             [3903] = "Geometry exceeds tolerance threshold",
             [3920] = "Invalid unit conversion scale",
 
-            // Operation/Validation errors in 4000 range (exposed via E.Validation)
-            [4000] = "Unsupported operation type",
-            [4001] = "Input filtered",
+            // Spatial (4001-4099)
+            [4001] = "K-nearest neighbor count must be positive",
+            [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
+            [4004] = "Proximity search operation failed",
 
-            // Spatial (4002-4099) - 4000-4001, 4003 used by Validation
-            [4002] = "K-nearest neighbor count must be positive",
-            [4004] = "Distance limit must be positive",
-            [4005] = "Proximity search operation failed",
+            // Operation/Validation errors (4000, 4005+ in 4000 range)
+            [4000] = "Unsupported operation type",
+            [4005] = "Input filtered",
         }.ToFrozenDictionary();
 
     /// <summary>Computes error domain from code range for automatic domain classification.</summary>
@@ -163,14 +163,14 @@ public static class E {
         public static readonly SystemError ToleranceExceeded = Get(code: 3903);
         public static readonly SystemError InvalidUnitConversion = Get(code: 3920);
         public static readonly SystemError UnsupportedOperationType = Get(code: 4000);
-        public static readonly SystemError InputFiltered = Get(code: 4001);
+        public static readonly SystemError InputFiltered = Get(code: 4005);
         public static readonly SystemError UnsupportedTypeCombo = Get(code: 4003);
     }
 
-    /// <summary>Spatial indexing errors (4000-4099).</summary>
+    /// <summary>Spatial indexing errors (4001-4004).</summary>
     public static class Spatial {
-        public static readonly SystemError InvalidK = Get(code: 4002);
-        public static readonly SystemError InvalidDistance = Get(code: 4004);
-        public static readonly SystemError ProximityFailed = Get(code: 4005);
+        public static readonly SystemError InvalidK = Get(code: 4001);
+        public static readonly SystemError InvalidDistance = Get(code: 4002);
+        public static readonly SystemError ProximityFailed = Get(code: 4004);
     }
 }
