@@ -48,8 +48,8 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        V? mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V? m1) ? m1
-            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V? m2) ? m2
+        V mode = IntersectionCore._validationConfig.TryGetValue((t1Type, t2Type), out V? m1) ? m1 ?? V.None
+            : IntersectionCore._validationConfig.TryGetValue((elementType, t2Type), out V? m2) ? m2 ?? V.None
             : V.None;
 
         return UnifiedOperation.Apply(

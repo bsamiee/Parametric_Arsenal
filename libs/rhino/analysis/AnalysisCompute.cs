@@ -17,9 +17,9 @@ internal static class AnalysisCompute {
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V? Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         new Dictionary<Type, (V?, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
-            [typeof(Curve)] = (V.Standard | V?.Degeneracy, (g, ctx, t, _, _, _, order) =>
+            [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                 ResultFactory.Create(value: (Curve)g)
-                    .Validate(args: [ctx, V.Standard | V?.Degeneracy])
+                    .Validate(args: [ctx, V.Standard | V.Degeneracy])
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
                         ArrayPool<double> pool = ArrayPool<double>.Shared;
@@ -49,9 +49,9 @@ internal static class AnalysisCompute {
                         }
                     })),
 
-            [typeof(NurbsCurve)] = (V.Standard | V?.Degeneracy, (g, ctx, t, _, _, _, order) =>
+            [typeof(NurbsCurve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                 ResultFactory.Create(value: (NurbsCurve)g)
-                    .Validate(args: [ctx, V.Standard | V?.Degeneracy])
+                    .Validate(args: [ctx, V.Standard | V.Degeneracy])
                     .Bind(cv => {
                         double param = t ?? cv.Domain.Mid;
                         ArrayPool<double> pool = ArrayPool<double>.Shared;
@@ -81,9 +81,9 @@ internal static class AnalysisCompute {
                         }
                     })),
 
-            [typeof(Surface)] = (V.Standard | V?.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+            [typeof(Surface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
                 ResultFactory.Create(value: (Surface)g)
-                    .Validate(args: [ctx, V.Standard | V?.SurfaceContinuity])
+                    .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
@@ -110,9 +110,9 @@ internal static class AnalysisCompute {
                             : ResultFactory.Create<Analysis.IResult>(error: Arsenal.Core.Errors.E.Geometry.SurfaceAnalysisFailed);
                     })),
 
-            [typeof(NurbsSurface)] = (V.Standard | V?.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+            [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
                 ResultFactory.Create(value: (NurbsSurface)g)
-                    .Validate(args: [ctx, V.Standard | V?.SurfaceContinuity])
+                    .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
                     .Bind(sf => {
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                         AreaMassProperties amp = AreaMassProperties.Compute(sf);
@@ -139,9 +139,9 @@ internal static class AnalysisCompute {
                             : ResultFactory.Create<Analysis.IResult>(error: Arsenal.Core.Errors.E.Geometry.SurfaceAnalysisFailed);
                     })),
 
-            [typeof(Brep)] = (V.Standard | V?.Topology | V?.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
+            [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
                 ResultFactory.Create(value: (Brep)g)
-                    .Validate(args: [ctx, V.Standard | V?.Topology | V?.MassProperties])
+                    .Validate(args: [ctx, V.Standard | V.Topology | V.MassProperties])
                     .Bind(brep => {
                         int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
                         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
@@ -179,9 +179,9 @@ internal static class AnalysisCompute {
                             : ResultFactory.Create<Analysis.IResult>(error: Arsenal.Core.Errors.E.Geometry.BrepAnalysisFailed);
                     })),
 
-            [typeof(Mesh)] = (V?.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
+            [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
                 ResultFactory.Create(value: (Mesh)g)
-                    .Validate(args: [ctx, V?.MeshSpecific])
+                    .Validate(args: [ctx, V.MeshSpecific])
                     .Bind(mesh => {
                         int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
                         Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
