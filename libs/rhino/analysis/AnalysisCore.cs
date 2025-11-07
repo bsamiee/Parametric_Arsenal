@@ -14,6 +14,7 @@ namespace Arsenal.Rhino.Analysis;
 /// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
 internal static class AnalysisCore {
     private const int MaxDiscontinuities = 20;
+    private const double ClosestPointSearchDistanceFactor = 100.0;
 
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<IAnalysisResult>> Compute)> _strategies =
@@ -99,7 +100,7 @@ internal static class AnalysisCore {
                         Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
                         AreaMassProperties? amp = AreaMassProperties.Compute(brep);
                         VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                        if (amp is null || vmp is null || !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame) || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)) {
+                        if (amp is null || vmp is null || !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame) || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * ClosestPointSearchDistanceFactor, out Vector3d _)) {
                             return ResultFactory.Create<IAnalysisResult>(error: E.Geometry.BrepAnalysisFailed);
                         }
                         SurfaceCurvature sc = sf.CurvatureAt(u, v);

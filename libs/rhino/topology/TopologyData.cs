@@ -10,7 +10,7 @@ namespace Arsenal.Rhino.Topology;
 public interface ITopologyResult;
 
 /// <summary>Edge continuity classification using readonly struct pattern (replaces enum for zero-enum policy).</summary>
-public readonly struct EdgeContinuity(byte value) {
+public readonly struct EdgeContinuity(byte value) : IEquatable<EdgeContinuity> {
     private readonly byte Value = value;
 
     /// <summary>G0 discontinuous or below minimum continuity threshold.</summary>
@@ -26,10 +26,11 @@ public readonly struct EdgeContinuity(byte value) {
     /// <summary>Non-manifold edge (valence>2).</summary>
     public static readonly EdgeContinuity NonManifold = new(5);
 
+    public bool Equals(EdgeContinuity other) => Value == other.Value;
     public static bool operator ==(EdgeContinuity left, EdgeContinuity right) => left.Value == right.Value;
     public static bool operator !=(EdgeContinuity left, EdgeContinuity right) => !(left == right);
-    public override bool Equals(object? obj) => obj is EdgeContinuity other && this == other;
-    public override int GetHashCode() => Value.GetHashCode();
+    public override bool Equals(object? obj) => obj is EdgeContinuity other && Equals(other);
+    public override int GetHashCode() => Value;
 }
 
 /// <summary>Naked edge analysis result containing edge curves and indices with topology metadata.</summary>
@@ -126,7 +127,7 @@ public sealed record AdjacencyData(
         : IsManifold
             ? string.Create(
                 CultureInfo.InvariantCulture,
-                $"Edge[{EdgeIndex}]: Manifold | Angle={DihedralAngle:F1}° | Faces={AdjacentFaceIndices.Count}")
+                $"Edge[{EdgeIndex}]: Manifold | Angle={DihedralAngle * 180.0 / Math.PI:F1}° | Faces={AdjacentFaceIndices.Count}")
             : string.Create(
                 CultureInfo.InvariantCulture,
                 $"Edge[{EdgeIndex}]: NonManifold | Faces={AdjacentFaceIndices.Count}");
