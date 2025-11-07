@@ -61,7 +61,7 @@ public static class Topology {
         TopologyCompute.StrategyConfig.TryGetValue((typeof(TGeometry), mode), out (V validationMode, Func<object, IGeometryContext, object[], Result<IResult>> compute) strategy) switch {
             true => UnifiedOperation.Apply(
                 input: geometry,
-                operation: (Func<TGeometry, Result<IReadOnlyList<IResult>>>)(g => strategy.compute(g, context, args).Map(r => (IReadOnlyList<IResult>)[r,])),
+                operation: (Func<TGeometry, Result<IReadOnlyList<IResult>>>)(g => strategy.compute(g, context, args).Map(r => (IReadOnlyList<IResult>)[r])),
                 config: new OperationConfig<TGeometry, IResult> {
                     Context = context,
                     ValidationMode = strategy.validationMode,

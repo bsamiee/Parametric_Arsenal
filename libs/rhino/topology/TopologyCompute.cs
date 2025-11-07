@@ -102,6 +102,8 @@ public sealed record EdgeClassificationData(
 
 /// <summary>Internal topology computation algorithms with FrozenDictionary-based strategy dispatch.</summary>
 internal static class TopologyCompute {
+    /// <summary>Reusable empty list to avoid allocating empty arrays for edge indices per loop.</summary>
+    private static readonly IReadOnlyList<int> EmptyIndices = Array.Empty<int>();
     /// <summary>Strategy configuration mapping (Type, TopologyMode) pairs to validation and computation functions.</summary>
     internal static readonly FrozenDictionary<(Type, TopologyMode), (V Mode, Func<object, IGeometryContext, object[], Result<Topology.IResult>> Compute)> StrategyConfig =
         new Dictionary<(Type, TopologyMode), (V, Func<object, IGeometryContext, object[], Result<Topology.IResult>>)> {
@@ -110,12 +112,12 @@ internal static class TopologyCompute {
                 (g, _, args) => {
                     Brep brep = (Brep)g;
                     bool orderLoops = args.Length > 0 && args[0] is bool b && b;
-                    IReadOnlyList<int> nakedIndices = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),];
-                    IReadOnlyList<Curve> curves = [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),];
+                    IReadOnlyList<int> nakedIndices = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)];
+                    IReadOnlyList<Curve> curves = [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve())];
                     return ResultFactory.Create(value: (Topology.IResult)new NakedEdgeData(
                         EdgeCurves: curves,
                         EdgeIndices: nakedIndices,
-                        Valences: [.. nakedIndices.Select(_ => 1),],
+                        Valences: [.. Enumerable.Repeat(1, nakedIndices.Count)],
                         IsOrdered: orderLoops,
                         TotalEdgeCount: brep.Edges.Count,
                         TotalLength: curves.Sum(c => c.GetLength())));
@@ -126,7 +128,7 @@ internal static class TopologyCompute {
                 (g, _, args) => {
                     Mesh mesh = (Mesh)g;
                     Polyline[] nakedPolylines = mesh.GetNakedEdges() ?? [];
-                    Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),];
+                    Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve())];
                     return nakedCurves.Length switch {
                         0 => ResultFactory.Create(value: (Topology.IResult)new NakedEdgeData(
                             EdgeCurves: [],
@@ -136,9 +138,9 @@ internal static class TopologyCompute {
                             TotalEdgeCount: mesh.TopologyEdges.Count,
                             TotalLength: 0.0)),
                         _ => ResultFactory.Create(value: (Topology.IResult)new NakedEdgeData(
-                            EdgeCurves: [.. nakedCurves,],
-                            EdgeIndices: [.. Enumerable.Range(0, nakedCurves.Length),],
-                            Valences: [.. Enumerable.Range(0, nakedCurves.Length).Select(_ => 1),],
+                            EdgeCurves: [.. nakedCurves],
+                            EdgeIndices: [.. Enumerable.Range(0, nakedCurves.Length)],
+                            Valences: [.. Enumerable.Repeat(1, nakedCurves.Length)],
                             IsOrdered: args.Length > 0 && args[0] is bool b2 && b2,
                             TotalEdgeCount: mesh.TopologyEdges.Count,
                             TotalLength: nakedCurves.Sum(c => c.GetLength()))),
@@ -173,16 +175,16 @@ internal static class TopologyCompute {
                     Mesh mesh = (Mesh)g;
                     double tol = args.Length > 0 && args[0] is double d ? d : ctx.AbsoluteTolerance;
                     Polyline[] nakedPolylines = mesh.GetNakedEdges() ?? [];
-                    Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),];
+                    Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve())];
                     Curve[] joined = nakedCurves.Length > 0
                         ? Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false)
                         : [];
 #pragma warning disable IDE0301 // Collection initialization syntax not valid in lambda expression
                     return ResultFactory.Create(value: (Topology.IResult)new BoundaryLoopData(
-                        Loops: [.. joined,],
-                        EdgeIndicesPerLoop: [.. joined.Select(static _ => (IReadOnlyList<int>)Array.Empty<int>()),],
-                        LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                        IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
+                        Loops: [.. joined],
+                        EdgeIndicesPerLoop: [.. joined.Select(static _ => EmptyIndices)],
+                        LoopLengths: [.. joined.Select(c => c.GetLength())],
+                        IsClosedPerLoop: [.. joined.Select(c => c.IsClosed)],
                         JoinTolerance: tol,
                         FailedJoins: nakedCurves.Length - joined.Length));
 #pragma warning restore IDE0301
@@ -194,7 +196,7 @@ internal static class TopologyCompute {
                     Brep brep = (Brep)g;
                     IReadOnlyList<int> nonManifoldEdges = [.. Enumerable.Range(0, brep.Edges.Count)
                         .Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),];
-                    IReadOnlyList<int> valences = [.. Enumerable.Range(0, nonManifoldEdges.Count).Select(_ => 3),];
+                    IReadOnlyList<int> valences = [.. nonManifoldEdges.Select(i => (int)brep.Edges[i].Valence),];
                     IReadOnlyList<Point3d> locations = [.. nonManifoldEdges
                         .Select(i => brep.Edges[i].PointAtStart),];
                     return ResultFactory.Create(value: (Topology.IResult)new NonManifoldData(
@@ -249,11 +251,9 @@ internal static class TopologyCompute {
                         while (queue.Count > 0) {
                             int faceIdx = queue.Dequeue();
                             foreach (int edgeIdx in brep.Faces[faceIdx].AdjacentEdges()) {
-                                foreach (int adjFace in brep.Edges[edgeIdx].AdjacentFaces()) {
-                                    if (componentIds[adjFace] == -1) {
-                                        componentIds[adjFace] = componentCount;
-                                        queue.Enqueue(adjFace);
-                                    }
+                                foreach (int adjFace in brep.Edges[edgeIdx].AdjacentFaces().Where(f => componentIds[f] == -1)) {
+                                    componentIds[adjFace] = componentCount;
+                                    queue.Enqueue(adjFace);
                                 }
                             }
                         }
@@ -297,11 +297,9 @@ internal static class TopologyCompute {
                         componentIds[seed] = componentCount;
                         while (queue.Count > 0) {
                             int faceIdx = queue.Dequeue();
-                            foreach (int adjFace in mesh.Faces.AdjacentFaces(faceIdx)) {
-                                if (adjFace >= 0 && componentIds[adjFace] == -1) {
-                                    componentIds[adjFace] = componentCount;
-                                    queue.Enqueue(adjFace);
-                                }
+                            foreach (int adjFace in mesh.Faces.AdjacentFaces(faceIdx).Where(f => f >= 0 && componentIds[f] == -1)) {
+                                componentIds[adjFace] = componentCount;
+                                queue.Enqueue(adjFace);
                             }
                         }
                         componentCount++;
@@ -311,11 +309,15 @@ internal static class TopologyCompute {
                     IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => {
                         BoundingBox union = BoundingBox.Empty;
                         foreach (int fIdx in c) {
-                            Point3d p1 = mesh.Vertices[mesh.Faces[fIdx].A];
-                            Point3d p2 = mesh.Vertices[mesh.Faces[fIdx].B];
-                            Point3d p3 = mesh.Vertices[mesh.Faces[fIdx].C];
+                            MeshFace face = mesh.Faces[fIdx];
+                            Point3d p1 = mesh.Vertices[face.A];
+                            Point3d p2 = mesh.Vertices[face.B];
+                            Point3d p3 = mesh.Vertices[face.C];
                             BoundingBox fBox = new(p1, p2);
                             fBox.Union(p3);
+                            if (face.IsQuad) {
+                                fBox.Union(mesh.Vertices[face.D]);
+                            }
                             union = union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
                         }
                         return union;
