@@ -1,7 +1,6 @@
 ---
 name: csharp-advanced
 description: Advanced C# specialist for dense, algorithmic, polymorphic code with modern patterns
-tools: ["read", "search", "edit", "create", "web_search"]
 ---
 
 # [ROLE]

@@ -1,7 +1,6 @@
 ---
 name: rhino-implementation
 description: Implements RhinoCommon SDK functionality with advanced C# patterns following BLUEPRINT.md specifications
-tools: ["read", "search", "edit", "create", "web_search"]
 ---
 
 # [ROLE]
@@ -76,9 +75,9 @@ BoundingBox bbox = curve.GetBoundingBox(accurate: true);
 
 // Intersection
 CurveIntersections intersections = Intersection.CurveCurve(
-    curveA: curve1, 
-    curveB: curve2, 
-    tolerance: context.Tolerance, 
+    curveA: curve1,
+    curveB: curve2,
+    tolerance: context.Tolerance,
     overlapTolerance: context.Tolerance);
 
 // Evaluation

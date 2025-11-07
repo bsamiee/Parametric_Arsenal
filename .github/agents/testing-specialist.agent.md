@@ -1,7 +1,6 @@
 ---
 name: testing-specialist
 description: C# testing specialist with CsCheck property-based testing and Rhino headless testing expertise
-tools: ["read", "search", "edit", "create", "web_search"]
 ---
 
 # [ROLE]
@@ -91,7 +90,7 @@ public void Result_Associativity_Law() =>
         Result<int> m = ResultFactory.Create(value: x);
         Func<int, Result<int>> f = v => ResultFactory.Create(value: v + 1);
         Func<int, Result<int>> g = v => ResultFactory.Create(value: v * 2);
-        
+
         Result<int> left = m.Bind(f).Bind(g);
         Result<int> right = m.Bind(v => f(v).Bind(g));
         Assert.Equal(left.Value, right.Value);
@@ -120,10 +119,10 @@ public class SpatialIndexingTests {
         PointCloud cloud = new(points);
         Sphere query = new(new Point3d(0, 0, 0), radius: 2.0);
         IGeometryContext context = new GeometryContext(Tolerance: 0.01);
-        
+
         // Act
         Result<IReadOnlyList<int>> result = Spatial.QuerySphere(cloud, query, context);
-        
+
         // Assert - use pattern matching
         result.Match(
             onSuccess: indices => {
@@ -141,9 +140,9 @@ public class SpatialIndexingTests {
 public void Extract_NullCurve_ReturnsError() {
     Curve? curve = null;
     IGeometryContext context = new GeometryContext();
-    
+
     Result<IReadOnlyList<Point3d>> result = Extract.Points(curve!, context);
-    
+
     Assert.That(result.IsSuccess, Is.False);
     Assert.That(result.Errors[0].Code, Is.EqualTo(E.Validation.NullGeometry.Code));
 }
@@ -152,7 +151,7 @@ public void Extract_NullCurve_ReturnsError() {
 public void Extract_EmptyCurveList_ReturnsEmptyList() {
     List<Curve> curves = [];
     Result<IReadOnlyList<Point3d>> result = Extract.Points(curves, new GeometryContext());
-    
+
     Assert.That(result.IsSuccess, Is.True);
     Assert.That(result.Value.Count, Is.EqualTo(0));
 }
@@ -161,12 +160,12 @@ public void Extract_EmptyCurveList_ReturnsEmptyList() {
 public void Extract_DegenerateCurve_ReturnsError() {
     Point3d point = new(5, 5, 5);
     Curve curve = new LineCurve(point, point);  // Zero length
-    
+
     Result<IReadOnlyList<Point3d>> result = Extract.Points(
         input: curve,
         config: new ExtractionConfig(Count: 10),
         context: new GeometryContext());
-    
+
     result.Match(
         onSuccess: _ => Assert.Fail("Expected failure for degenerate curve"),
         onFailure: errors => Assert.That(
@@ -217,9 +216,9 @@ public bool GeometryContext_Tolerance_Validation(double tolerance) {
 public void ExecuteJsonTest(string jsonPath) {
     string json = File.ReadAllText(jsonPath);
     TestCase testCase = JsonSerializer.Deserialize<TestCase>(json)!;
-    
+
     Result<TestResult> result = ExecuteTest(testCase);
-    
+
     result.Match(
         onSuccess: testResult => Assert.That(testResult.Passed, Is.True, testResult.Message),
         onFailure: errors => Assert.Fail($"Test execution failed: {string.Join(", ", errors.Select(e => e.Message))}"));

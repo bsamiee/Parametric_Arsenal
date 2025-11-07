@@ -1,7 +1,6 @@
 ---
 name: library-planner
 description: Plans new libs/ functionality folders with deep SDK research and integration strategy
-tools: ["read", "search", "web_search", "create"]
 ---
 
 # [ROLE]

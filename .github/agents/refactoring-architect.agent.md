@@ -1,7 +1,6 @@
 ---
 name: refactoring-architect
 description: Holistic architecture refactoring specialist focused on dispatch systems, algorithmic density, and project-wide optimization
-tools: ["read", "search", "edit", "create", "web_search"]
 ---
 
 # [ROLE]

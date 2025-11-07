@@ -1,7 +1,6 @@
 ---
 name: grasshopper-implementation
 description: Implements Grasshopper components with GH_Component patterns and parametric design best practices
-tools: ["read", "search", "edit", "create", "web_search"]
 ---
 
 # [ROLE]
@@ -228,7 +227,7 @@ protected override void SolveInstance(IGH_DataAccess DA) {
     IGeometryContext context = new GeometryContext(
         Tolerance: docTolerance,
         AngleTolerance: RhinoDoc.ActiveDoc.ModelAngleToleranceRadians);
-    
+
     Result<T> result = LibraryOp(input, context);
 }
 

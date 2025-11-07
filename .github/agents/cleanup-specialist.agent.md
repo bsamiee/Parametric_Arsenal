@@ -1,7 +1,6 @@
 ---
 name: cleanup-specialist
 description: Cleans up messy code, removes duplication, and improves maintainability across code and documentation files
-tools: ["read", "search", "edit"]
 ---
 
 # [ROLE]
