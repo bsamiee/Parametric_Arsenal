@@ -291,6 +291,7 @@ dotnet_diagnostic.CA1307.severity = none                                       #
 dotnet_diagnostic.CA1308.severity = none                                       # Case normalization discretionary
 dotnet_diagnostic.CA1309.severity = none                                       # Ordinal comparison context-specific
 dotnet_diagnostic.CA1310.severity = none                                       # StringComparison context-specific
+dotnet_diagnostic.CA1515.severity = none                                       # API surface internal/public discretionary
 
 # Security rules (CA2100-CA2199, CA3000-CA5999) - explicitly excluded per requirements
 dotnet_diagnostic.CA2100.severity = none                                       # SQL injection review manual

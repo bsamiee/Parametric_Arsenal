@@ -45,18 +45,24 @@ public static class ValidationRules {
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
 
+    private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
+    private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
+    private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
+    private static readonly ConstantExpression _constantZero = Expression.Constant(0);
+    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
+
     private static readonly FrozenDictionary<V, (string[] Properties, string[] Methods, SystemError Error)> _validationRules =
         new Dictionary<V, (string[], string[], SystemError)> {
-            [V.Standard] = (["IsValid"], [], E.Validation.GeometryInvalid),
-            [V.AreaCentroid] = (["IsClosed"], ["IsPlanar"], E.Validation.CurveNotClosedOrPlanar),
-            [V.BoundingBox] = ([], ["GetBoundingBox"], E.Validation.BoundingBoxInvalid),
-            [V.MassProperties] = (["IsSolid", "IsClosed"], [], E.Validation.MassPropertiesComputationFailed),
-            [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface"], ["IsManifold", "IsPointInside"], E.Validation.InvalidTopology),
-            [V.Degeneracy] = (["IsPeriodic", "IsPolyline"], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular"], E.Validation.DegenerateGeometry),
-            [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse"], E.Validation.ToleranceExceeded),
-            [V.SelfIntersection] = ([], ["SelfIntersections"], E.Validation.SelfIntersecting),
-            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh"], ["IsValidWithLog"], E.Validation.NonManifoldEdges),
-            [V.SurfaceContinuity] = (["IsPeriodic"], ["IsContinuous"], E.Validation.PositionalDiscontinuity),
+            [V.Standard] = (["IsValid",], [], E.Validation.GeometryInvalid),
+            [V.AreaCentroid] = (["IsClosed",], ["IsPlanar",], E.Validation.CurveNotClosedOrPlanar),
+            [V.BoundingBox] = ([], ["GetBoundingBox",], E.Validation.BoundingBoxInvalid),
+            [V.MassProperties] = (["IsSolid", "IsClosed",], [], E.Validation.MassPropertiesComputationFailed),
+            [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
+            [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular",], E.Validation.DegenerateGeometry),
+            [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse",], E.Validation.ToleranceExceeded),
+            [V.SelfIntersection] = ([], ["SelfIntersections",], E.Validation.SelfIntersecting),
+            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
+            [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
@@ -91,11 +97,11 @@ public static class ValidationRules {
                     (string[] properties, string[] methods, SystemError error) = _validationRules[flag];
                     return (IEnumerable<(MemberInfo Member, SystemError Error)>)[
                         .. properties.Select(prop => (
-                            Member: _memberCache.GetOrAdd(new CacheKey(runtimeType, default, prop, 1),
+                            Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: prop, kind: 1),
                                 static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
                             error)),
                         .. methods.Select(method => (
-                            Member: _memberCache.GetOrAdd(new CacheKey(runtimeType, default, method, 2),
+                            Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: method, kind: 2),
                                 static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
                             error)),
                     ];
@@ -108,26 +114,26 @@ public static class ValidationRules {
                 PropertyInfo { PropertyType: Type pt } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                        Expression.Constant(null, typeof(SystemError?))),
+                        _nullSystemError),
                 MethodInfo method => Expression.Condition(
                     (method.GetParameters(), method.ReturnType, method.Name) switch {
                         ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method)),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(double) =>
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(true))),
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue)),
                         (_, _, string name) when string.Equals(name, "SelfIntersections", StringComparison.Ordinal) =>
-                            Expression.NotEqual(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method), "Count"), Expression.Constant(0)),
+                            Expression.NotEqual(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method), "Count"), _constantZero),
                         (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(true)), "IsValid")),
+                            Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue), "IsValid")),
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Constant(new Point3d(0, 0, 0)),
-                                Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), Expression.Constant(false))),
-                        _ => Expression.Constant(false),
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _originPoint,
+                                Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), _constantFalse)),
+                        _ => _constantFalse,
                     },
                     Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                    Expression.Constant(null, typeof(SystemError?))),
-                _ => Expression.Constant(null, typeof(SystemError?)),
+                    _nullSystemError),
+                _ => _nullSystemError,
             }),
         ];
 
@@ -136,7 +142,7 @@ public static class ValidationRules {
                 Expression.Call(_enumerableSelect.MakeGenericMethod(typeof(SystemError?), typeof(SystemError)),
                     Expression.Call(_enumerableWhere.MakeGenericMethod(typeof(SystemError?)),
                         Expression.NewArrayInit(typeof(SystemError?), validationExpressions),
-                        Expression.Lambda<Func<SystemError?, bool>>(Expression.NotEqual(error, Expression.Constant(null, typeof(SystemError?))), error)),
+                        Expression.Lambda<Func<SystemError?, bool>>(Expression.NotEqual(error, _nullSystemError), error)),
                     Expression.Lambda<Func<SystemError?, SystemError>>(Expression.Convert(error, typeof(SystemError)), error))),
             geometry, context).Compile();
     }

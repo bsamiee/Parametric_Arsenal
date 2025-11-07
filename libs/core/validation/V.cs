@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 
@@ -28,7 +29,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
         MeshSpecific._flags | SurfaceContinuity._flags
     ));
 
-    public static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,];
+    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,]).ToFrozenSet();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
