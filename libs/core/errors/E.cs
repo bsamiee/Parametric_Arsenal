@@ -77,11 +77,13 @@ public static class E {
             [3902] = "Angle tolerance must be in range (0, 2π]",
             [3903] = "Geometry exceeds tolerance threshold",
             [3920] = "Invalid unit conversion scale",
+
+            // Operation/Validation errors in 4000 range (exposed via E.Validation)
             [4000] = "Unsupported operation type",
             [4001] = "Input filtered",
             [4003] = "Input and query type combination not supported",
 
-            // Spatial (4000-4099)
+            // Spatial (4002-4099) - 4000-4001, 4003 used by Validation
             [4002] = "K-nearest neighbor count must be positive",
             [4004] = "Distance limit must be positive",
             [4005] = "Proximity search operation failed",
