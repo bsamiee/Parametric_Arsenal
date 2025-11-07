@@ -23,19 +23,25 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: EditorConfig Compliance Check
+        uses: editorconfig-checker/action-editorconfig-checker@v2
+        with:
+          version: latest
+
       - name: Restore
         run: dotnet restore Parametric_Arsenal.sln
+
+      - name: Verify .NET Formatting
+        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity diagnostic
 
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
-      - name: Verify Formatting
-        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity diagnostic
-
       - name: Summary
         if: success()
         run: |
-          echo "Build passed"
-          echo "Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
-          echo "Code Style: .editorconfig enforced"
-          echo "Formatting: Verified"
+          echo ">> Build passed"
+          echo ">> EditorConfig compliance verified"
+          echo ">> .NET formatting verified"
+          echo ">> Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
+          echo ">> Code Style: .editorconfig enforced"

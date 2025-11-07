@@ -88,6 +88,12 @@
 
     <!-- Microsoft .NET code quality analyzers (CA rules) -->
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
+
+    <!-- Async/await best practices and common mistakes -->
+    <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" />
+
+    <!-- Reflection usage analysis and optimization -->
+    <PackageReference Include="ReflectionAnalyzers" Version="0.3.1" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- ============================================ -->
