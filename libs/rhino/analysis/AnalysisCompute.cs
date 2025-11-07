@@ -15,130 +15,82 @@ namespace Arsenal.Rhino.Analysis;
 internal static class AnalysisCompute {
     private const int MaxDiscontinuities = 20;
 
+    private static Result<Analysis.IResult> ComputeCurveAnalysis(Curve cv, IGeometryContext ctx, double? t, int order) {
+        double param = t ?? cv.Domain.Mid;
+        ArrayPool<double> pool = ArrayPool<double>.Shared;
+        double[] buffer = pool.Rent(MaxDiscontinuities);
+        try {
+            (int discCount, double s) = (0, cv.Domain.Min);
+            while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                buffer[discCount++] = td;
+                s = td + ctx.AbsoluteTolerance;
+            }
+            AreaMassProperties amp = AreaMassProperties.Compute(cv);
+            return amp is not null && cv.FrameAt(param, out Plane frame)
+                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
+                    cv.PointAt(param),
+                    cv.DerivativeAt(param, order) ?? [],
+                    cv.CurvatureAt(param).Length,
+                    frame,
+                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
+                    cv.IsClosed ? cv.TorsionAt(param) : 0,
+                    [.. buffer[..discCount]],
+                    [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                    cv.GetLength(),
+                    amp.Centroid))
+                : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
+        } finally {
+            pool.Return(buffer, clearArray: true);
+        }
+    }
+
+    private static Result<Analysis.IResult> ComputeSurfaceAnalysis(Surface sf, IGeometryContext ctx, (double, double)? uv, int order) {
+        (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
+        AreaMassProperties amp = AreaMassProperties.Compute(sf);
+        return !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)
+            ? ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)
+            : ((Func<SurfaceCurvature, Result<Analysis.IResult>>)(sc =>
+                !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                    ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                        sf.PointAt(u, v),
+                        derivs,
+                        sc.Gaussian,
+                        sc.Mean,
+                        sc.Kappa(0),
+                        sc.Kappa(1),
+                        sc.Direction(0),
+                        sc.Direction(1),
+                        frame,
+                        frame.Normal,
+                        sf.IsAtSeam(u, v) != 0,
+                        sf.IsAtSingularity(u, v, exact: true),
+                        amp.Area,
+                        amp.Centroid))
+                    : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)))(sf.CurvatureAt(u, v));
+    }
+
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
             [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                 ResultFactory.Create(value: (Curve)g)
                     .Validate(args: [ctx, V.Standard | V.Degeneracy])
-                    .Bind(cv => {
-                        double param = t ?? cv.Domain.Mid;
-                        ArrayPool<double> pool = ArrayPool<double>.Shared;
-                        double[] buffer = pool.Rent(MaxDiscontinuities);
-                        try {
-                            (int discCount, double s) = (0, cv.Domain.Min);
-                            while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
-                                buffer[discCount++] = td;
-                                s = td + ctx.AbsoluteTolerance;
-                            }
-                            AreaMassProperties amp = AreaMassProperties.Compute(cv);
-                            return amp is not null && cv.FrameAt(param, out Plane frame)
-                                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
-                                    cv.PointAt(param),
-                                    cv.DerivativeAt(param, order) ?? [],
-                                    cv.CurvatureAt(param).Length,
-                                    frame,
-                                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
-                                    cv.IsClosed ? cv.TorsionAt(param) : 0,
-                                    [.. buffer[..discCount]],
-                                    [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
-                                    cv.GetLength(),
-                                    amp.Centroid))
-                                : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
-                        } finally {
-                            pool.Return(buffer, clearArray: true);
-                        }
-                    })),
+                    .Bind(cv => ComputeCurveAnalysis(cv, ctx, t, order))),
 
             [typeof(NurbsCurve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                 ResultFactory.Create(value: (NurbsCurve)g)
                     .Validate(args: [ctx, V.Standard | V.Degeneracy])
-                    .Bind(cv => {
-                        double param = t ?? cv.Domain.Mid;
-                        ArrayPool<double> pool = ArrayPool<double>.Shared;
-                        double[] buffer = pool.Rent(MaxDiscontinuities);
-                        try {
-                            (int discCount, double s) = (0, cv.Domain.Min);
-                            while (discCount < MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
-                                buffer[discCount++] = td;
-                                s = td + ctx.AbsoluteTolerance;
-                            }
-                            AreaMassProperties amp = AreaMassProperties.Compute(cv);
-                            return amp is not null && cv.FrameAt(param, out Plane frame)
-                                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
-                                    cv.PointAt(param),
-                                    cv.DerivativeAt(param, order) ?? [],
-                                    cv.CurvatureAt(param).Length,
-                                    frame,
-                                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
-                                    cv.IsClosed ? cv.TorsionAt(param) : 0,
-                                    [.. buffer[..discCount]],
-                                    [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
-                                    cv.GetLength(),
-                                    amp.Centroid))
-                                : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
-                        } finally {
-                            pool.Return(buffer, clearArray: true);
-                        }
-                    })),
+                    .Bind(cv => ComputeCurveAnalysis(cv, ctx, t, order))),
 
             [typeof(Surface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
                 ResultFactory.Create(value: (Surface)g)
                     .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
-                    .Bind(sf => {
-                        (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
-                        AreaMassProperties amp = AreaMassProperties.Compute(sf);
-                        if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed);
-                        }
-                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
-                        return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
-                                sf.PointAt(u, v),
-                                derivs,
-                                sc.Gaussian,
-                                sc.Mean,
-                                sc.Kappa(0),
-                                sc.Kappa(1),
-                                sc.Direction(0),
-                                sc.Direction(1),
-                                frame,
-                                frame.Normal,
-                                sf.IsAtSeam(u, v) != 0,
-                                sf.IsAtSingularity(u, v, exact: true),
-                                amp.Area,
-                                amp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed);
-                    })),
+                    .Bind(sf => ComputeSurfaceAnalysis(sf, ctx, uv, order))),
 
             [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
                 ResultFactory.Create(value: (NurbsSurface)g)
                     .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
-                    .Bind(sf => {
-                        (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
-                        AreaMassProperties amp = AreaMassProperties.Compute(sf);
-                        if (!sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed);
-                        }
-                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
-                        return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
-                                sf.PointAt(u, v),
-                                derivs,
-                                sc.Gaussian,
-                                sc.Mean,
-                                sc.Kappa(0),
-                                sc.Kappa(1),
-                                sc.Direction(0),
-                                sc.Direction(1),
-                                frame,
-                                frame.Normal,
-                                sf.IsAtSeam(u, v) != 0,
-                                sf.IsAtSingularity(u, v, exact: true),
-                                amp.Area,
-                                amp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed);
-                    })),
+                    .Bind(sf => ComputeSurfaceAnalysis(sf, ctx, uv, order))),
 
             [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
                 ResultFactory.Create(value: (Brep)g)
