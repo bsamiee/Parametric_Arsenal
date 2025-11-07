@@ -26,7 +26,7 @@ public sealed class ResultMonadTests {
         () => Assert.Equal(10, ResultFactory.Create(value: 5).Map(static x => x * 2).Value),
         () => Assert.Equal("42", ResultFactory.Create(value: 42).Map(static x => x.ToString(CultureInfo.InvariantCulture)).Value),
         () => Assert.Equal(3, ResultFactory.Create(value: "abc").Map(static s => s.Length).Value),
-        () => Gen.Int.Run((Action<int>)(n => Assert.Equal(n + 100, ResultFactory.Create(value: n).Map(x => x + 100).Value))),
+        () => Gen.Int.Run((Action<int>)(n => Assert.Equal(unchecked(n + 100), ResultFactory.Create(value: n).Map(x => unchecked(x + 100)).Value))),
         () => Assert.False(ResultFactory.Create<int>(error: TestError).Map(static x => x * 2).IsSuccess));
 
     /// <summary>Verifies Bind actually chains transformations with concrete examples.</summary>
@@ -34,8 +34,8 @@ public sealed class ResultMonadTests {
     public void BindValueTransformationChainsCorrectly() => TestGen.RunAll(
         () => Assert.Equal(15, ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: x * 3)).Value),
         () => Assert.Equal("10", ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: (x * 2).ToString(CultureInfo.InvariantCulture))).Value),
-        () => Gen.Int.Run((Action<int>)(n => Assert.Equal((n * 2) + 10,
-            ResultFactory.Create(value: n).Bind(x => ResultFactory.Create(value: x * 2)).Bind(x => ResultFactory.Create(value: x + 10)).Value))),
+        () => Gen.Int.Run((Action<int>)(n => Assert.Equal(unchecked((n * 2) + 10),
+            ResultFactory.Create(value: n).Bind(x => ResultFactory.Create(value: unchecked(x * 2))).Bind(x => ResultFactory.Create(value: unchecked(x + 10))).Value))),
         () => Assert.False(ResultFactory.Create<int>(error: TestError).Bind(static x => ResultFactory.Create(value: x * 2)).IsSuccess),
         () => Assert.False(ResultFactory.Create(value: 5).Bind(static _ => ResultFactory.Create<int>(error: TestError)).IsSuccess));
 
@@ -118,9 +118,9 @@ public sealed class ResultMonadTests {
     /// <summary>Verifies Match using algebraic pattern exhaustion.</summary>
     [Fact]
     public void MatchPatternMatchingInvokesCorrectHandler() => TestGen.RunAll(
-        () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v * 2, ResultFactory.Create(value: v).Match(x => x * 2, _ => -1)))),
+        () => Gen.Int.Run((Action<int>)(v => Assert.Equal(unchecked(v * 2), ResultFactory.Create(value: v).Match(x => unchecked(x * 2), _ => -1)))),
         () => ResultGenerators.SystemErrorArrayGen.Run((Action<SystemError[]>)(errs =>
-            Assert.Equal(errs.Length, ResultFactory.Create<int>(errors: errs).Match(v => v * 2, e => e.Length)))),
+            Assert.Equal(errs.Length, ResultFactory.Create<int>(errors: errs).Match(v => unchecked(v * 2), e => e.Length)))),
         () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v.ToString(CultureInfo.InvariantCulture),
             ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Match(x => x.ToString(CultureInfo.InvariantCulture), _ => "error"))), 50));
 
@@ -154,7 +154,7 @@ public sealed class ResultMonadTests {
     public void TraverseCollectionTransformationTransformsAndAccumulates() => TestGen.RunAll(
         () => Gen.Int.Run((Action<int>)(v => Assert.Single(ResultFactory.Create(value: v).Traverse(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture))).Value))),
         () => Gen.Int.List[1, 10].Run((Action<List<int>>)(items => {
-            Result<IReadOnlyList<int>> traversed = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: x * 2));
+            Result<IReadOnlyList<int>> traversed = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2)));
             Assert.Equal(items.Count, traversed.Value.Count);
         }), 50),
         () => Gen.Int.List[1, 10].Run((Action<List<int>>)(items =>
@@ -162,7 +162,7 @@ public sealed class ResultMonadTests {
                 ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => x % 2 == 0
                     ? ResultFactory.Create(value: x) : ResultFactory.Create<int>(error: TestError)).IsSuccess)), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: x * 2)).IsSuccess)), 50));
+            Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).IsSuccess)), 50));
 
     /// <summary>Verifies deferred execution using lazy evaluation algebra and resource safety.</summary>
     [Fact]
