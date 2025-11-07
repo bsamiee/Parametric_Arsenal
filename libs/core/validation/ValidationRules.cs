@@ -99,11 +99,11 @@ public static class ValidationRules {
                     return (IEnumerable<(MemberInfo Member, SystemError Error)>)[
                         .. properties.Select(prop => (
                             Member: _memberCache.GetOrAdd(key: new CacheKey(type: runtimeType, mode: V.None, member: prop, kind: 1),
-                                valueFactory: static (key, type) => (type.GetProperty(name: key.Member!, bindingAttr: BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly) ?? (MemberInfo)typeof(void)), factoryArgument: runtimeType),
+                                valueFactory: static (key, type) => (type.GetProperty(name: key.Member!, bindingAttr: BindingFlags.Public | BindingFlags.Instance) ?? (MemberInfo)typeof(void)), factoryArgument: runtimeType),
                             error)),
                         .. methods.Select(method => (
                             Member: _memberCache.GetOrAdd(key: new CacheKey(type: runtimeType, mode: V.None, member: method, kind: 2),
-                                valueFactory: static (key, type) => (type.GetMethod(name: key.Member!, bindingAttr: BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly) ?? (MemberInfo)typeof(void)), factoryArgument: runtimeType),
+                                valueFactory: static (key, type) => (type.GetMethod(name: key.Member!, bindingAttr: BindingFlags.Public | BindingFlags.Instance) ?? (MemberInfo)typeof(void)), factoryArgument: runtimeType),
                             error)),
                     ];
                 }),

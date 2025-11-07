@@ -64,12 +64,14 @@ internal static class ExtractionCore {
         };
 
         try {
+#pragma warning disable REFL040 // IsAssignableFrom is correct for checking type hierarchy compatibility
             V mode = _validationConfig.TryGetValue(key: (kind, normalized.GetType()), out V exact) ? exact :
-                _validationConfig.Where(predicate: kv => kv.Key.Item1 == kind && kv.Key.Item2.IsInstanceOfType(o: normalized))
+                _validationConfig.Where(predicate: kv => kv.Key.Item1 == kind && kv.Key.Item2.IsAssignableFrom(c: normalized.GetType()))
                     .OrderByDescending(keySelector: kv => kv.Key.Item2, comparer: Comparer<Type>.Create(comparison: static (a, b) => a.IsAssignableFrom(c: b) ? -1 : b.IsAssignableFrom(c: a) ? 1 : 0))
                     .Select(selector: kv => kv.Value)
                     .DefaultIfEmpty(defaultValue: V.Standard)
                     .First();
+#pragma warning restore REFL040
 
             return ResultFactory.Create(value: normalized)
                 .Validate(args: mode == V.None ? null : [context, mode])
