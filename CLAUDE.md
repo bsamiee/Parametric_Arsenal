@@ -20,7 +20,7 @@
 
 These rules are **enforced by analyzers** and violations **fail the build**:
 
-1. **NO `if`/`else` EVER** - Use pattern matching, switch expressions, ternary operators, or boolean expressions
+1. **NO `if`/`else` STATEMENTS** - Use expressions that return values: ternary operators, switch expressions, pattern matching, or boolean composition. **Note**: `if` without `else` for guard clauses is acceptable when it returns/throws immediately.
 2. **NO `var` EVER** - Explicit types always (`int`, `string`, `Result<T>`, etc.)
 3. **NO helper methods or "Extract Method" refactoring** - Improve the logic algorithmically instead (hard 300 LOC limit per member)
 4. **NO old C# patterns** - Use target-typed `new()`, collection expressions `[]`, tuple deconstruction
@@ -632,19 +632,71 @@ public static Result<IReadOnlyList<T>> Process(...) =>
 private static Point3d Transform(Point3d p, Transform xform) => xform * p;
 ```
 
+### Conditional Expression Hierarchy (Most Important)
+
+**THE RULE**: Never use `if`/`else` STATEMENTS. Always use EXPRESSIONS that return values.
+
+```csharp
+// ❌ WRONG - if/else STATEMENTS (forbidden)
+if (count > 0) {
+    return ProcessItems(items);
+} else {
+    return ResultFactory.Create(error: E.Validation.Empty);
+}
+
+// ✅ CORRECT - Ternary operator (simple binary choice)
+return count > 0
+    ? ProcessItems(items)
+    : ResultFactory.Create(error: E.Validation.Empty);
+
+// ✅ CORRECT - Switch expression (multiple branches)
+return count switch {
+    0 => ResultFactory.Create(error: E.Validation.Empty),
+    1 => ProcessSingle(items[0]),
+    _ => ProcessMultiple(items),
+};
+
+// ✅ CORRECT - Pattern matching with switch (type discrimination)
+return value switch {
+    Point3d p => ProcessPoint(p),
+    Curve c => ProcessCurve(c),
+    Surface s => ProcessSurface(s),
+    _ => ResultFactory.Create(error: E.Geometry.UnsupportedType),
+};
+
+// ✅ CORRECT - Boolean expression composition (guards)
+return value is Point3d p && p.IsValid
+    ? Process(p)
+    : ResultFactory.Create(error: E.Validation.Invalid);
+
+// ✅ CORRECT - Nested ternary for complex conditions (acceptable when readable)
+return result.IsSuccess
+    ? result.Value.Count > 0
+        ? ProcessNonEmpty(result.Value)
+        : ProcessEmpty()
+    : HandleError(result.Errors);
+```
+
+**Decision Tree**:
+1. **Simple binary (true/false)** → Ternary operator (`condition ? true : false`)
+2. **Multiple distinct cases** → Switch expression (`value switch { ... }`)
+3. **Type discrimination** → Pattern matching with switch (`value switch { Type t => ..., _ => ... }`)
+4. **Complex boolean logic** → Ternary with composed predicates or switch on tuple
+5. **Never** → `if`/`else` statements
+
 ### Pattern Matching vs Switch Expression
 ```csharp
-// Use pattern matching (is) when:
-// - Single branch condition
-// - Type check with immediate action
-if (value is Point3d p && p.IsValid) {
-    return Process(p);
-}
+// Use inline pattern matching when:
+// - Single branch with early return
+// - Guard clause pattern
+return value is not Point3d p || !p.IsValid
+    ? ResultFactory.Create(error: E.Validation.Invalid)
+    : Process(p);
 
 // Use switch expression when:
 // - Multiple cases
-// - Returning value
 // - Exhaustive matching
+// - Returning different values per case
 return value switch {
     Point3d p => ProcessPoint(p),
     Curve c => ProcessCurve(c),
