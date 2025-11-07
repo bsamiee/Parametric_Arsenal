@@ -109,9 +109,10 @@ internal static class SpatialCore {
         int count = 0;
         try {
             Action search = queryShape switch {
-                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) buffer[count++] = args.Id; }),
-                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) buffer[count++] = args.Id; }),
-                _ => () => { },
+                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
+                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
+                _ => () => { }
+                ,
             };
             search();
             return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
@@ -122,13 +123,13 @@ internal static class SpatialCore {
 
     /// <summary>Executes k-nearest or distance-limited proximity search using RTree algorithms.</summary>
     [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, int[][]> kNearest, Func<T, Point3d[], double, int[][]> distLimited) where T : notnull =>
+    private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
-            int k when k > 0 => kNearest(source, needles, k) switch {
+            int k when k > 0 => kNearest(source, needles, k).ToArray() switch {
                 int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             },
-            double d when d > 0 => distLimited(source, needles, d) switch {
+            double d when d > 0 => distLimited(source, needles, d).ToArray() switch {
                 int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             },

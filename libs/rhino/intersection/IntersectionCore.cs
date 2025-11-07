@@ -58,13 +58,12 @@ internal static class IntersectionCore {
             using (results) {
 #pragma warning restore IDISP007
                 return results switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA],
-                        overlapSource is not null ? [.. from e in r where e.IsOverlap let c = overlapSource.Trim(e.OverlapA) where c is not null select c] : [],
-                        [.. from e in r select e.ParameterA],
-                        [.. from e in r select e.ParameterB],
-                        [], [])),
+                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty), { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                                                                                 [.. from e in r select e.PointA],
+                                                                                                 overlapSource is not null ? [.. from e in r where e.IsOverlap let c = overlapSource.Trim(e.OverlapA) where c is not null select c] : [],
+                                                                                                 [.. from e in r select e.ParameterA],
+                                                                                                 [.. from e in r select e.ParameterB],
+                                                                                                 [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 };
             }
@@ -80,14 +79,13 @@ internal static class IntersectionCore {
 
         static Result<Intersect.IntersectionOutput> fromCountedPoints((int count, Point3d p1, Point3d p2, double tolerance) data) =>
             data switch {
-                (> 1, Point3d p1, Point3d p2, double tol) when p1.DistanceTo(p2) > tol => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], [], [], [], [])),
-                (> 0, Point3d p1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1], [], [], [], [], [])),
+                ( > 1, Point3d p1, Point3d p2, double tol) when p1.DistanceTo(p2) > tol => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], [], [], [], [])),
+                ( > 0, Point3d p1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([p1], [], [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             };
 
         static Result<Intersect.IntersectionOutput> fromPolylines(Polyline[]? sections) =>
-            sections switch {
-                { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from pl in sections from pt in pl select pt], [], [], [], [], [.. sections])),
+            sections switch { { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from pl in sections from pt in pl select pt], [], [], [], [], [.. sections])),
                 null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             };
