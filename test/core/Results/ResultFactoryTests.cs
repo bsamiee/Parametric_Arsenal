@@ -7,7 +7,7 @@ using Xunit;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Algebraic tests for ResultFactory operations using zero-boilerplate composition and pattern matching.</summary>
-internal sealed class ResultFactoryTests {
+public sealed class ResultFactoryTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 1001, "E1"),
         new(ErrorDomain.Results, 1002, "E2"),
@@ -54,8 +54,8 @@ internal sealed class ResultFactoryTests {
             Assert.Equal((v is > 0 and < 100 && v % 2 == 0), result.IsSuccess);
         }), 50),
         () => Gen.Int.Run((Action<int>)(v => {
-            Result<int> result = ResultFactory.Create(value: v).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2));
-            Assert.Equal(v > 10 ? v * 2 : v, result.Value);
+            Result<int> result = ResultFactory.Create(value: v).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: unchecked(x * 2)));
+            Assert.Equal(v > 10 ? unchecked(v * 2) : v, result.Value);
         }), 50),
         () => Gen.Int.Run((Action<int>)(v =>
             Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(args: [(Func<int, bool>)(x => x > 0), Errors.E1]).IsSuccess)), 50));
@@ -63,11 +63,11 @@ internal sealed class ResultFactoryTests {
     /// <summary>Verifies Lift using algebraic applicative composition and partial application.</summary>
     [Fact]
     public void LiftFunctionLiftingAccumulatesErrorsApplicatively() {
-        Func<int, int, int> add = static (x, y) => x + y;
+        Func<int, int, int> add = static (x, y) => unchecked(x + y);
         TestGen.RunAll(
             () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: a), ResultFactory.Create(value: b));
-                Assert.Equal((true, a + b), (result.IsSuccess, result.Value));
+                Assert.Equal((true, unchecked(a + b)), (result.IsSuccess, result.Value));
             }), 50),
             () => Gen.Int.Select(ResultGenerators.SystemErrorGen).Run((Action<int, SystemError>)((v, err) => {
                 Result<int> result = (Result<int>)ResultFactory.Lift<int>(add, ResultFactory.Create(value: v), ResultFactory.Create<int>(error: err));
@@ -78,23 +78,23 @@ internal sealed class ResultFactoryTests {
                 Assert.Equal((false, 2), (result.IsSuccess, result.Errors.Count));
             }), 50),
             () => Gen.Int.Run((Action<int>)(v =>
-                Assert.True(((Result<Func<object[], int>>)ResultFactory.Lift<int>((Func<int, int, int, int>)((x, y, z) => x + y + z), [ResultFactory.Create(value: v)])).IsSuccess)), 50));
+                Assert.True(((Result<Func<object[], int>>)ResultFactory.Lift<int>((Func<int, int, int, int>)((x, y, z) => unchecked(x + y + z)), [ResultFactory.Create(value: v)])).IsSuccess)), 50));
     }
 
     /// <summary>Verifies TraverseElements using algebraic collection monadic composition.</summary>
     [Fact]
     public void TraverseElementsCollectionTransformationAccumulatesErrors() => TestGen.RunAll(
         () => Gen.Int.List[1, 10].Run((Action<List<int>>)(items => {
-            Result<IReadOnlyList<int>> result = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: x * 2));
-            Assert.Equal((true, items.Count, items.Select(x => x * 2)), (result.IsSuccess, result.Value.Count, result.Value));
+            Result<IReadOnlyList<int>> result = ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2)));
+            Assert.Equal((true, items.Count, items.Select(x => unchecked(x * 2))), (result.IsSuccess, result.Value.Count, result.Value));
         }), 50),
         () => Gen.Int.List[1, 10].Run((Action<List<int>>)(items =>
             Assert.Equal(!items.Exists(x => x % 2 != 0),
                 ResultFactory.Create<IEnumerable<int>>(value: items).TraverseElements(x => x % 2 == 0
                     ? ResultFactory.Create(value: x) : ResultFactory.Create<int>(error: Errors.E1)).IsSuccess)), 50),
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
-            Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: x * 2)).IsSuccess)), 50),
-        () => Assert.Empty(ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: x * 2)).Value));
+            Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).IsSuccess)), 50),
+        () => Assert.Empty(ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).Value));
 
     /// <summary>Verifies null argument handling using algebraic exception pattern matching.</summary>
     [Fact]

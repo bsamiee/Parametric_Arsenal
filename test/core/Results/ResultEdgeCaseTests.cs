@@ -8,7 +8,7 @@ using Xunit;
 namespace Arsenal.Core.Tests.Results;
 
 /// <summary>Comprehensive edge case tests for Result operations covering untested branches and boundary conditions.</summary>
-internal sealed class ResultEdgeCaseTests {
+public sealed class ResultEdgeCaseTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 7001, "Edge1"),
         new(ErrorDomain.Results, 7002, "Edge2"),
@@ -99,7 +99,7 @@ internal sealed class ResultEdgeCaseTests {
     public void LiftPartialApplicationExecutesCorrectly() => TestGen.RunAll(
         () => {
             Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
-                (Func<int, int, int, int>)((x, y, z) => x + y + z),
+                (Func<int, int, int, int>)((x, y, z) => unchecked(x + y + z)),
                 [ResultFactory.Create(value: 10)]);
             Assert.True(partial.IsSuccess);
             int result = partial.Value([20, 30]);
@@ -107,9 +107,9 @@ internal sealed class ResultEdgeCaseTests {
         },
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
             Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
-                (Func<int, int, int>)((x, y) => x * y),
+                (Func<int, int, int>)((x, y) => unchecked(x * y)),
                 [ResultFactory.Create(value: a)]);
-            Assert.Equal(a * b, partial.Value([b]));
+            Assert.Equal(unchecked(a * b), partial.Value([b]));
         }), 20));
 
     /// <summary>Verifies Ensure with deferred results evaluates lazily then filters.</summary>
@@ -140,14 +140,14 @@ internal sealed class ResultEdgeCaseTests {
         () => Gen.Int.Run((Action<int>)(v => {
             bool successCalled = false, failureCalled = false;
             int result = ResultFactory.Create(value: v).Match(
-                onSuccess: x => { successCalled = true; return x * 2; },
+                onSuccess: x => { successCalled = true; return unchecked(x * 2); },
                 onFailure: _ => { failureCalled = true; return -1; });
-            Assert.Equal((v * 2, true, false), (result, successCalled, failureCalled));
+            Assert.Equal((unchecked(v * 2), true, false), (result, successCalled, failureCalled));
         })),
         () => ResultGenerators.SystemErrorArrayGen.Run((Action<SystemError[]>)(errs => {
             bool successCalled = false, failureCalled = false;
             int result = ResultFactory.Create<int>(errors: errs).Match(
-                onSuccess: x => { successCalled = true; return x * 2; },
+                onSuccess: x => { successCalled = true; return unchecked(x * 2); },
                 onFailure: e => { failureCalled = true; return e.Length; });
             Assert.Equal((errs.Length, false, true), (result, successCalled, failureCalled));
         }), 20));
@@ -190,8 +190,8 @@ internal sealed class ResultEdgeCaseTests {
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> validated = ResultFactory.Create(value: v).Validate(
                 predicate: x => x > 10,
-                validation: x => ResultFactory.Create(value: x * 2));
-            Assert.Equal(v > 10 ? v * 2 : v, validated.Value);
+                validation: x => ResultFactory.Create(value: unchecked(x * 2)));
+            Assert.Equal(v > 10 ? unchecked(v * 2) : v, validated.Value);
         })),
         () => Assert.Equal(5, ResultFactory.Create(value: 5).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2)).Value),
         () => Assert.Equal(30, ResultFactory.Create(value: 15).Validate(predicate: x => x > 10, validation: x => ResultFactory.Create(value: x * 2)).Value));
@@ -245,10 +245,10 @@ internal sealed class ResultEdgeCaseTests {
         () => Gen.Int.Run((Action<int>)(v => {
             int evalCount = 0, mapCount = 0, bindCount = 0;
             Result<int> deferred = ResultFactory.Create(deferred: () => { evalCount++; return ResultFactory.Create(value: v); });
-            Result<int> chained = deferred.Map(x => { mapCount++; return x * 2; }).Bind(x => { bindCount++; return ResultFactory.Create(value: x + 10); });
+            Result<int> chained = deferred.Map(x => { mapCount++; return unchecked(x * 2); }).Bind(x => { bindCount++; return ResultFactory.Create(value: unchecked(x + 10)); });
             Assert.Equal((0, 0, 0), (evalCount, mapCount, bindCount));
             int final = chained.Value;
-            Assert.Equal(((v * 2) + 10, 1, 1, 1), (final, evalCount, mapCount, bindCount));
+            Assert.Equal((unchecked((v * 2) + 10), 1, 1, 1), (final, evalCount, mapCount, bindCount));
         }), 20));
 
     /// <summary>Verifies OnError does not execute handlers on success with all overloads.</summary>
