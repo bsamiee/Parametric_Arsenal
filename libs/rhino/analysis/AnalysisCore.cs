@@ -12,12 +12,12 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
-internal static class AnalysisCompute {
+internal static class AnalysisCore {
     private const int MaxDiscontinuities = 20;
 
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
-    private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
-        ((Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>>)((cv, ctx, t, order) => {
+    private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<IAnalysisResult>> Compute)> _strategies =
+        ((Func<Curve, IGeometryContext, double?, int, Result<IAnalysisResult>>)((cv, ctx, t, order) => {
             double param = t ?? cv.Domain.Mid;
             ArrayPool<double> pool = ArrayPool<double>.Shared;
             double[] buffer = pool.Rent(MaxDiscontinuities);
@@ -29,7 +29,7 @@ internal static class AnalysisCompute {
                 }
                 AreaMassProperties amp = AreaMassProperties.Compute(cv);
                 return amp is not null && cv.FrameAt(param, out Plane frame)
-                    ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
+                    ? ResultFactory.Create(value: (IAnalysisResult)new CurveData(
                         cv.PointAt(param),
                         cv.DerivativeAt(param, order) ?? [],
                         cv.CurvatureAt(param).Length,
@@ -40,18 +40,18 @@ internal static class AnalysisCompute {
                         [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                         cv.GetLength(),
                         amp.Centroid))
-                    : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
+                    : ResultFactory.Create<IAnalysisResult>(error: E.Geometry.CurveAnalysisFailed);
             } finally {
                 pool.Return(buffer, clearArray: true);
             }
-        }), (Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>>)((sf, _, uv, order) => {
+        }), (Func<Surface, IGeometryContext, (double, double)?, int, Result<IAnalysisResult>>)((sf, _, uv, order) => {
             (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
             AreaMassProperties amp = AreaMassProperties.Compute(sf);
             return !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || amp is null || !sf.FrameAt(u, v, out Plane frame)
-                ? ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)
-                : ((Func<SurfaceCurvature, Result<Analysis.IResult>>)(sc =>
+                ? ResultFactory.Create<IAnalysisResult>(error: E.Geometry.SurfaceAnalysisFailed)
+                : ((Func<SurfaceCurvature, Result<IAnalysisResult>>)(sc =>
                     !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                        ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
+                        ? ResultFactory.Create(value: (IAnalysisResult)new SurfaceData(
                             sf.PointAt(u, v),
                             derivs,
                             sc.Gaussian,
@@ -66,9 +66,9 @@ internal static class AnalysisCompute {
                             sf.IsAtSingularity(u, v, exact: true),
                             amp.Area,
                             amp.Centroid))
-                        : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)))(sf.CurvatureAt(u, v));
+                        : ResultFactory.Create<IAnalysisResult>(error: E.Geometry.SurfaceAnalysisFailed)))(sf.CurvatureAt(u, v));
         })) switch {
-            (var curveLogic, var surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
+            (var curveLogic, var surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<IAnalysisResult>>)> {
                 [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
                     ResultFactory.Create(value: (Curve)g)
                         .Validate(args: [ctx, V.Standard | V.Degeneracy])
@@ -100,11 +100,11 @@ internal static class AnalysisCompute {
                         AreaMassProperties? amp = AreaMassProperties.Compute(brep);
                         VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
                         if (amp is null || vmp is null || !sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame) || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)) {
-                            return ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
+                            return ResultFactory.Create<IAnalysisResult>(error: E.Geometry.BrepAnalysisFailed);
                         }
                         SurfaceCurvature sc = sf.CurvatureAt(u, v);
                         return !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
-                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
+                            ? ResultFactory.Create(value: (IAnalysisResult)new BrepData(
                                 sf.PointAt(u, v),
                                 derivs,
                                 sc.Gaussian,
@@ -126,7 +126,7 @@ internal static class AnalysisCompute {
                                 amp.Area,
                                 vmp.Volume,
                                 vmp.Centroid))
-                            : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
+                            : ResultFactory.Create<IAnalysisResult>(error: E.Geometry.BrepAnalysisFailed);
                     })),
 
                 [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
@@ -138,8 +138,8 @@ internal static class AnalysisCompute {
                             AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
                             VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
                             return amp is null || vmp is null
-                                ? ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)
-                                : ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
+                                ? ResultFactory.Create<IAnalysisResult>(error: E.Geometry.MeshAnalysisFailed)
+                                : ResultFactory.Create(value: (IAnalysisResult)new MeshData(
                                     mesh.Vertices[vIdx],
                                     new Plane(mesh.Vertices[vIdx], normal),
                                     normal,
@@ -155,7 +155,7 @@ internal static class AnalysisCompute {
 
     /// <summary>Executes type-driven dispatch with automatic validation and geometry-specific computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<Analysis.IResult>> Execute(
+    internal static Result<IReadOnlyList<IAnalysisResult>> Execute(
         object geometry,
         IGeometryContext context,
         double? t,
@@ -164,11 +164,11 @@ internal static class AnalysisCompute {
         Point3d? testPoint,
         int derivativeOrder,
         bool enableDiagnostics = false) =>
-        _strategies.TryGetValue(geometry.GetType(), out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)
+        _strategies.TryGetValue(geometry.GetType(), out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<IAnalysisResult>> compute) strategy)
             ? (enableDiagnostics
                 ? strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder)
                     .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
                 : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
-                .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
-            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometry.GetType().Name));
+                .Map(r => (IReadOnlyList<IAnalysisResult>)[r])
+            : ResultFactory.Create<IReadOnlyList<IAnalysisResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometry.GetType().Name));
 }
