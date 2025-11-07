@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
@@ -193,11 +194,11 @@ internal static class TopologyCore {
                 Brep brep => edgeIndex >= 0 && edgeIndex < brep.Edges.Count
                     ? ExecuteBrepAdjacency(brep: brep, edgeIndex: edgeIndex)
                     : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex}, Max: {brep.Edges.Count - 1}"))),
+                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 Mesh mesh => edgeIndex >= 0 && edgeIndex < mesh.TopologyEdges.Count
                     ? ExecuteMeshAdjacency(mesh: mesh, edgeIndex: edgeIndex)
                     : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex}, Max: {mesh.TopologyEdges.Count - 1}"))),
+                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
                     error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             }),
