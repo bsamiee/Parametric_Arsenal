@@ -56,38 +56,31 @@ internal static class OrientCore {
                     ResultFactory.Create(value: frame),
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
-            [typeof(Brep)] = (g, ctx) => {
-                Brep brep = (Brep)g;
-                VolumeMassProperties? volProps = brep.IsSolid ? VolumeMassProperties.Compute(brep) : null;
-                AreaMassProperties? areaProps = volProps is null && brep.IsClosed ? AreaMassProperties.Compute(brep) : null;
-                Point3d centroid = volProps?.Centroid ?? areaProps?.Centroid ?? brep.GetBoundingBox(accurate: false).Center;
-                Vector3d normal = brep.Faces.Count > 0 && brep.Faces[0].FrameAt(0.5, 0.5, out Plane faceFrame)
-                    ? faceFrame.ZAxis
-                    : Vector3d.ZAxis;
-                return normal.Length > OrientConfig.ToleranceDefaults.MinVectorLength
-                    ? ResultFactory.Create(value: new Plane(centroid, normal))
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            [typeof(Brep)] = (g, ctx) => (Brep)g switch {
+                Brep brep when brep.IsSolid && VolumeMassProperties.Compute(brep) is VolumeMassProperties vProps =>
+                    ResultFactory.Create(value: new Plane(vProps.Centroid, vProps.WorldCoordinatesPrincipalAxesRotation.ZAxis)),
+                Brep brep when brep.IsClosed && AreaMassProperties.Compute(brep) is AreaMassProperties aProps =>
+                    ResultFactory.Create(value: new Plane(aProps.Centroid, aProps.WorldCoordinatesPrincipalAxesRotation.ZAxis)),
+                Brep brep when brep.Faces.Count > 0 && brep.Faces[0].FrameAt(0.5, 0.5, out Plane faceFrame) && faceFrame.IsValid =>
+                    ResultFactory.Create(value: new Plane(brep.GetBoundingBox(accurate: true).Center, faceFrame.ZAxis)),
+                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
-            [typeof(Mesh)] = (g, ctx) => {
-                Mesh mesh = (Mesh)g;
-                VolumeMassProperties? volProps = mesh.IsClosed ? VolumeMassProperties.Compute(mesh) : null;
-                AreaMassProperties? areaProps = volProps is null ? AreaMassProperties.Compute(mesh) : null;
-                Point3d centroid = volProps?.Centroid ?? areaProps?.Centroid ?? mesh.GetBoundingBox(accurate: false).Center;
-                Vector3d normal = mesh.Normals.Count > 0
-                    ? mesh.Normals[0]
-                    : mesh.FaceNormals.Count > 0
-                        ? mesh.FaceNormals[0]
-                        : Vector3d.ZAxis;
-                return normal.Length > OrientConfig.ToleranceDefaults.MinVectorLength
-                    ? ResultFactory.Create(value: new Plane(centroid, normal))
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            [typeof(Mesh)] = (g, ctx) => (Mesh)g switch {
+                Mesh mesh when mesh.IsClosed && VolumeMassProperties.Compute(mesh) is VolumeMassProperties vProps =>
+                    ResultFactory.Create(value: new Plane(vProps.Centroid, vProps.WorldCoordinatesPrincipalAxesRotation.ZAxis)),
+                Mesh mesh when AreaMassProperties.Compute(mesh) is AreaMassProperties aProps =>
+                    ResultFactory.Create(value: new Plane(aProps.Centroid, aProps.WorldCoordinatesPrincipalAxesRotation.ZAxis)),
+                Mesh mesh when mesh.Normals.Count > 0 || mesh.FaceNormals.Count > 0 =>
+                    ResultFactory.Create(value: new Plane(
+                        mesh.GetBoundingBox(accurate: true).Center,
+                        mesh.Normals.Count > 0 ? mesh.Normals[0] : mesh.FaceNormals[0])),
+                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
             [typeof(Point)] = (g, ctx) =>
                 ResultFactory.Create(value: new Plane(((Point)g).Location, Vector3d.ZAxis)),
-            [typeof(PointCloud)] = (g, ctx) => ((PointCloud)g).Count > 0 switch {
-                true => ResultFactory.Create(value: new Plane(((PointCloud)g).GetPoint(0).Location, Vector3d.ZAxis)),
-                false => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
+            [typeof(PointCloud)] = (g, ctx) => ((PointCloud)g).Count > 0
+                ? ResultFactory.Create(value: new Plane(((PointCloud)g).GetPoint(0).Location, Vector3d.ZAxis))
+                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
         }.ToFrozenDictionary();
 
     /// <summary>Extracts source plane from geometry using type-based dispatch with fallback hierarchy traversal.</summary>
@@ -174,12 +167,12 @@ internal static class OrientCore {
             false => (source.Unitize(), target.Unitize(), Vector3d.CrossProduct(source, target)) switch {
                 (true, true, Vector3d cross) when cross.Length > OrientConfig.ToleranceDefaults.MinVectorLength =>
                     ResultFactory.Create(value: Transform.Rotation(source, target, center)),
-                (true, true, _) when source * target > 0.999999 =>
+                (true, true, _) when source * target > OrientConfig.ToleranceDefaults.ParallelVectorThreshold =>
                     ResultFactory.Create(value: Transform.Identity),
                 (true, true, _) =>
                     ResultFactory.Create(value: Transform.Rotation(
                         angleRadians: Math.PI,
-                        rotationAxis: Math.Abs(source * Vector3d.XAxis) < 0.9
+                        rotationAxis: Math.Abs(source * Vector3d.XAxis) < OrientConfig.ToleranceDefaults.PerpendicularVectorThreshold
                             ? Vector3d.CrossProduct(source, Vector3d.XAxis)
                             : Vector3d.CrossProduct(source, Vector3d.YAxis),
                         rotationCenter: center)),
@@ -187,7 +180,7 @@ internal static class OrientCore {
             },
         };
 
-    /// <summary>Flips geometry direction using type-specific in-place mutations with result wrapping.</summary>
+    /// <summary>Flips geometry direction using type-specific in-place mutations with result wrapping. Surface reversal only flips U direction.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> FlipGeometryDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
         geometry.Duplicate() switch {
@@ -200,7 +193,7 @@ internal static class OrientCore {
                 ResultFactory.Create(value: (T)(object)mesh),
             Surface surface => surface.Reverse(direction: 0) switch {
                 true => ResultFactory.Create(value: (T)(object)surface),
-                false => ResultFactory.Create<T>(error: E.Geometry.TransformFailed.WithContext("Surface reverse failed")),
+                false => ResultFactory.Create<T>(error: E.Geometry.TransformFailed.WithContext("Surface reverse failed: U-direction")),
             },
             _ => ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(
                 $"FlipDirection not supported for {geometry.GetType().Name}")),
@@ -211,6 +204,7 @@ internal static class OrientCore {
     internal static Result<Plane> ExtractTargetPlane(object target, (double u, double v) surfaceUV, double curveParam, IGeometryContext context) =>
         target switch {
             Plane p when p.IsValid => ResultFactory.Create(value: p),
+            Plane => ResultFactory.Create<Plane>(error: E.Geometry.InvalidOrientationPlane.WithContext("Plane is invalid")),
             Curve c when c.FrameAt(curveParam, out Plane frame) && frame.IsValid =>
                 ResultFactory.Create(value: frame),
             Curve => ResultFactory.Create<Plane>(error: E.Geometry.InvalidCurveParameter.WithContext($"t={curveParam}")),

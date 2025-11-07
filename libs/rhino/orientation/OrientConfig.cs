@@ -31,5 +31,7 @@ internal static class OrientConfig {
         internal const double MinVectorLength = 1e-8;
         internal const double MinRotationAngle = 1e-10;
         internal const double MinDeterminant = 1e-12;
+        internal const double ParallelVectorThreshold = 0.999999;
+        internal const double PerpendicularVectorThreshold = 0.9;
     }
 }

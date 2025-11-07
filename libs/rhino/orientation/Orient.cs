@@ -51,7 +51,7 @@ public static class Orient {
         Vector3d targetDirection,
         Vector3d? sourceAxis,
         IGeometryContext context) where T : GeometryBase =>
-        (sourceAxis ?? Vector3d.ZAxis, geometry.GetBoundingBox(accurate: false)) switch {
+        (sourceAxis ?? Vector3d.ZAxis, geometry.GetBoundingBox(accurate: true)) switch {
             (Vector3d src, BoundingBox bbox) when bbox.IsValid =>
                 OrientCore.ComputeVectorAlignment(src, targetDirection, bbox.Center, context)
                     .Bind(xform => ApplyTransform(geometry, xform, context)),
@@ -73,16 +73,19 @@ public static class Orient {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> FlipDirection<T>(
         T geometry,
-        IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                OrientCore.FlipGeometryDirection(item, context)
-                    .Map(flipped => (IReadOnlyList<T>)[flipped,])),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(geometry.GetType(), out V mode) ? mode : V.Standard,
-            }).Map(results => results[0]);
+        IGeometryContext context) where T : GeometryBase => (
+            OrientConfig.ValidationModes.TryGetValue(geometry.GetType(), out V validationMode) ? validationMode : V.Standard,
+            UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    OrientCore.FlipGeometryDirection(item, context)
+                        .Map(flipped => (IReadOnlyList<T>)[flipped,])),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = validationMode,
+                })) switch {
+            (_, Result<IReadOnlyList<T>> result) => result.Map(results => results[0]),
+        };
 
     /// <summary>Applies orientation using polymorphic OrientSpec target specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -105,22 +108,25 @@ public static class Orient {
 
     /// <summary>Applies transform to geometry with validation and duplicate handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<T> ApplyTransform<T>(T geometry, Transform xform, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => (xform.IsValid, Math.Abs(xform.Determinant)) switch {
-                (false, _) => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext("Invalid transform")),
-                (true, double det) when det < OrientConfig.ToleranceDefaults.MinDeterminant =>
-                    ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext($"Degenerate transform: det={det}")),
-                (true, _) => item.Duplicate() switch {
-                    T duplicate when duplicate.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[duplicate,]),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext("Transform application failed")),
-                },
-            }),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(geometry.GetType(), out V mode) ? mode : V.Standard,
-            }).Map(results => results[0]);
+    private static Result<T> ApplyTransform<T>(T geometry, Transform xform, IGeometryContext context) where T : GeometryBase => (
+            OrientConfig.ValidationModes.TryGetValue(geometry.GetType(), out V validationMode) ? validationMode : V.Standard,
+            UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item => (xform.IsValid, Math.Abs(xform.Determinant)) switch {
+                    (false, _) => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext("Invalid transform")),
+                    (true, double det) when det < OrientConfig.ToleranceDefaults.MinDeterminant =>
+                        ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext($"Degenerate transform: det={det}")),
+                    (true, _) => item.Duplicate() switch {
+                        T duplicate when duplicate.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[duplicate,]),
+                        _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext($"Transform failed on {item.GetType().Name}")),
+                    },
+                }),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = validationMode,
+                })) switch {
+            (_, Result<IReadOnlyList<T>> result) => result.Map(results => results[0]),
+        };
 }
 
 /// <summary>Semantic marker for canonical positioning modes using byte-encoded dispatch.</summary>
@@ -136,11 +142,11 @@ public readonly struct Canonical(byte mode) {
     /// <summary>Aligns bounding box to World XZ plane with center at origin.</summary>
     public static readonly Canonical WorldXZ = new(3);
 
-    /// <summary>Translates area centroid to origin for closed curves and surfaces.</summary>
-    public static readonly Canonical AreaCentroid = new(4);
+    /// <summary>Translates geometry centroid to origin using bounding box center for open geometry or area centroid for closed curves/surfaces.</summary>
+    public static readonly Canonical BoundingCentroid = new(4);
 
-    /// <summary>Translates volume centroid to origin for solid geometry.</summary>
-    public static readonly Canonical VolumeCentroid = new(5);
+    /// <summary>Translates mass centroid to origin using volume centroid for solids or area centroid for closed surfaces.</summary>
+    public static readonly Canonical MassCentroid = new(5);
 }
 
 /// <summary>Polymorphic orientation target specification with discriminated union semantics.</summary>
