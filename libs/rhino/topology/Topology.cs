@@ -1,7 +1,6 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
 
@@ -12,7 +11,7 @@ namespace Arsenal.Rhino.Topology;
 public static class Topology {
     /// <summary>Topology result marker interface for polymorphic return discrimination.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface pattern for polymorphic result dispatch")]
-    public interface IResult { }
+    public interface IResult;
 
     /// <summary>Extracts naked (boundary) edges from Brep geometry with valence=1 classification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
