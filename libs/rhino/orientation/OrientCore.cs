@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino.Geometry;

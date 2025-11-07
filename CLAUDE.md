@@ -96,8 +96,8 @@ Always use UnifiedOperation for operations on multiple input types/configuration
 
 ```csharp
 public static Result<IReadOnlyList<T>> Process<TInput>(
-    TInput input, 
-    MethodSpec method, 
+    TInput input,
+    MethodSpec method,
     IGeometryContext context) where TInput : notnull =>
     UnifiedOperation.Apply(
         input,
@@ -139,13 +139,13 @@ public static Result<T> Create<T>(
     SystemError? error = null,
     Func<Result<T>>? deferred = null) =>
     (value, errors, error, deferred) switch {
-        (var v, null, null, null) when v is not null => 
+        (var v, null, null, null) when v is not null =>
             new Result<T>(isSuccess: true, v, [], deferred: null),
-        (_, var e, null, null) when e?.Length > 0 => 
+        (_, var e, null, null) when e?.Length > 0 =>
             new Result<T>(isSuccess: false, default!, e, deferred: null),
-        (_, null, var e, null) when e.HasValue => 
+        (_, null, var e, null) when e.HasValue =>
             new Result<T>(isSuccess: false, default!, [e.Value,], deferred: null),
-        (_, null, null, var d) when d is not null => 
+        (_, null, null, var d) when d is not null =>
             new Result<T>(isSuccess: false, default!, [], deferred: d),
         _ => throw new ArgumentException(E.Results.InvalidCreate.Message),
     };
@@ -179,13 +179,13 @@ Use expression trees for runtime code generation (see ValidationRules.cs):
 private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type type, V mode) {
     ParameterExpression geometry = Expression.Parameter(typeof(object), "g");
     ParameterExpression context = Expression.Parameter(typeof(IGeometryContext), "c");
-    
+
     Expression[] validations = [.. GetValidationRules(type, mode)
         .Select(rule => Expression.Condition(
             BuildPredicate(geometry, context, rule),
             Expression.Constant(rule.Error),
             Expression.Constant(null, typeof(SystemError?))))];
-    
+
     return Expression.Lambda<Func<object, IGeometryContext, SystemError[]>>(
         Expression.Call(
             _toArrayMethod,
@@ -309,7 +309,7 @@ V.SurfaceContinuity                                 // Continuity checks
 V.All                                               // All validations combined
 
 // ValidationRules compiles expression trees at runtime
-Func<object, IGeometryContext, SystemError[]> validator = 
+Func<object, IGeometryContext, SystemError[]> validator =
     ValidationRules.GetOrCompileValidator(typeof(Curve), V.Standard | V.Degeneracy);
 SystemError[] errors = validator(curve, context);
 ```
@@ -513,10 +513,10 @@ public void Result_Bind_Associativity_Law() =>
         Result<int> result = ResultFactory.Create(value: x);
         Func<int, Result<int>> f = v => ResultFactory.Create(value: v + 1);
         Func<int, Result<int>> g = v => ResultFactory.Create(value: v * 2);
-        
+
         Result<int> left = result.Bind(f).Bind(g);
         Result<int> right = result.Bind(v => f(v).Bind(g));
-        
+
         Assert.Equal(left, right);
     });
 ```
@@ -536,10 +536,10 @@ public void Spatial_PointCloud_SphereQuery_ReturnsIndices() {
     PointCloud cloud = new(points);
     Sphere query = new(new Point3d(0, 0, 0), radius: 2.0);
     IGeometryContext context = new GeometryContext();
-    
+
     // Act
     Result<IReadOnlyList<int>> result = Spatial.Analyze(cloud, query, context);
-    
+
     // Assert
     Assert.That(result.IsSuccess, Is.True);
     Assert.That(result.Value.Count, Is.EqualTo(2));  // Points 0 and 1 are within sphere

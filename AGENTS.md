@@ -215,7 +215,7 @@ public static Result<IReadOnlyList<T>> Process<TInput>(
     IGeometryContext context) where TInput : GeometryBase =>
     UnifiedOperation.Apply(
         input: input,
-        operation: (Func<TInput, Result<IReadOnlyList<T>>>)(item => 
+        operation: (Func<TInput, Result<IReadOnlyList<T>>>)(item =>
             ProcessCore(item, context)),
         config: new OperationConfig<TInput, T> {
             Context = context,
@@ -240,10 +240,10 @@ public void Feature_ValidInput_ReturnsSuccess() {
     // Arrange
     TInput input = CreateValidInput();
     IGeometryContext context = new GeometryContext();
-    
+
     // Act
     Result<TOutput> result = Feature.Process(input, context);
-    
+
     // Assert
     Assert.True(result.IsSuccess);
     Assert.NotNull(result.Value);
@@ -255,10 +255,10 @@ public void Feature_RhinoGeometry_ProcessesCorrectly() {
     // Arrange
     Curve curve = CreateTestCurve();
     IGeometryContext context = new GeometryContext();
-    
+
     // Act
     Result<IReadOnlyList<Point3d>> result = Feature.Process(curve, context);
-    
+
     // Assert
     Assert.That(result.IsSuccess, Is.True);
     Assert.That(result.Value.Count, Is.GreaterThan(0));

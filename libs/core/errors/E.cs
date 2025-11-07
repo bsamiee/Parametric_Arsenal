@@ -41,6 +41,16 @@ public static class E {
             [2408] = "Boundary loop join failed",
             [2409] = "Invalid edge topology",
             [2410] = "Adjacency query failed",
+            [2500] = "Unsupported orientation geometry type",
+            [2501] = "Invalid orientation plane",
+            [2502] = "Geometry transformation failed",
+            [2503] = "Centroid extraction failed",
+            [2504] = "Invalid orientation mode",
+            [2505] = "Parallel vectors cannot be aligned",
+            [2506] = "Invalid orientation vectors",
+            [2507] = "Invalid curve parameter for orientation",
+            [2508] = "Invalid surface UV parameters",
+            [2509] = "Frame extraction failed",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -122,6 +132,16 @@ public static class E {
         public static readonly SystemError BoundaryLoopJoinFailed = Get(2408);
         public static readonly SystemError InvalidEdge = Get(2409);
         public static readonly SystemError AdjacencyFailed = Get(2410);
+        public static readonly SystemError UnsupportedOrientationType = Get(2500);
+        public static readonly SystemError InvalidOrientationPlane = Get(2501);
+        public static readonly SystemError TransformFailed = Get(2502);
+        public static readonly SystemError CentroidExtractionFailed = Get(2503);
+        public static readonly SystemError InvalidOrientationMode = Get(2504);
+        public static readonly SystemError ParallelVectorAlignment = Get(2505);
+        public static readonly SystemError InvalidOrientationVectors = Get(2506);
+        public static readonly SystemError InvalidCurveParameter = Get(2507);
+        public static readonly SystemError InvalidSurfaceUV = Get(2508);
+        public static readonly SystemError FrameExtractionFailed = Get(2509);
     }
 
     /// <summary>Validation errors (3000-3999)</summary>

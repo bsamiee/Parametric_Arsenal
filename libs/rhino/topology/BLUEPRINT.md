@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The **topology/** library provides structural and connectivity analysis for Rhino geometry, focusing on **manifold structure, boundary detection, edge classification, and component connectivity**. This is distinct from **analysis/** which handles **differential geometry** (derivatives, curvature, frames, discontinuities). 
+The **topology/** library provides structural and connectivity analysis for Rhino geometry, focusing on **manifold structure, boundary detection, edge classification, and component connectivity**. This is distinct from **analysis/** which handles **differential geometry** (derivatives, curvature, frames, discontinuities).
 
 **Key Architectural Decision**: We are **NOT moving existing code** from `analysis/` because those topological properties (IsManifold, Vertices, Edges) are **correctly co-located with differential analysis** - they support surface evaluation and proximity queries. The `topology/` module provides **standalone topological operations** like naked edge detection, boundary loop extraction, and connectivity analysis that are **pure graph/combinatorial operations** independent of differential properties.
 
@@ -219,8 +219,8 @@ public static class Topology {
         TGeometry geometry,
         IGeometryContext context,
         TopologyMode mode,
-        params object[] args) 
-        where TGeometry : notnull 
+        params object[] args)
+        where TGeometry : notnull
         where TResult : IResult =>
         TopologyCompute.StrategyConfig.TryGetValue((typeof(TGeometry), mode), out (V validationMode, Func<object, IGeometryContext, object[], Result<IResult>> compute) strategy) switch {
             true => UnifiedOperation.Apply(
@@ -404,8 +404,8 @@ public static Result<TResult> Analyze<TGeometry, TResult>(
     TGeometry geometry,
     IGeometryContext context,
     TopologyMode mode,
-    params object[] args) 
-    where TGeometry : notnull 
+    params object[] args)
+    where TGeometry : notnull
     where TResult : IResult
 ```
 
@@ -874,7 +874,7 @@ Reuse existing patterns from `test/shared/`:
 - **Count**: 10 types (6 in Topology.cs, 4 in TopologyCompute.cs)
 - **Assessment**: ⚠ At absolute 10-type maximum, above ideal 6-8 range
 - **Justification**: Domain complexity requires separate result types for each operation mode. Merging types would sacrifice type safety and API clarity.
-- **Alternatives Considered**: 
+- **Alternatives Considered**:
   - Merge NakedEdgeData + BoundaryLoopData → reduces to 9 types, but loses semantic distinction
   - Use single `TopologyResult<T>` generic → reduces types but complicates dispatch and debugging
 

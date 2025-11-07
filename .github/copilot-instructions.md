@@ -110,7 +110,7 @@ mode.Has(V.Standard)                          // Check flag
 ### 2. Conditional Expressions (Not Statements)
 ```csharp
 // ✅ CORRECT - Ternary for binary choice
-return count > 0 
+return count > 0
     ? ProcessItems(items)
     : ResultFactory.Create(error: E.Validation.Empty);
 
