@@ -1,15 +1,10 @@
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
-using Rhino;
 using Rhino.Geometry;
-using Rhino.Geometry.Intersect;
-using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
