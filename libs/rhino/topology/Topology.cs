@@ -9,27 +9,8 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Edge continuity classification enumeration for geometric analysis.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "byte enum for performance and memory efficiency")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
-public enum EdgeContinuityType : byte {
-    /// <summary>G0 discontinuous or below minimum continuity threshold.</summary>
-    Sharp = 0,
-    /// <summary>G1 continuous (tangent continuity).</summary>
-    Smooth = 1,
-    /// <summary>G2 continuous (curvature continuity).</summary>
-    Curvature = 2,
-    /// <summary>Interior manifold edge (valence=2, meets continuity requirement).</summary>
-    Interior = 3,
-    /// <summary>Boundary naked edge (valence=1).</summary>
-    Boundary = 4,
-    /// <summary>Non-manifold edge (valence>2).</summary>
-    NonManifold = 5,
-}
-
 /// <summary>Naked edge analysis result containing edge curves and indices with topology metadata.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record NakedEdgeData(
     IReadOnlyList<Curve> EdgeCurves,
     IReadOnlyList<int> EdgeIndices,
@@ -46,7 +27,6 @@ public sealed record NakedEdgeData(
 
 /// <summary>Boundary loop analysis result with closed loop curves and join diagnostics.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record BoundaryLoopData(
     IReadOnlyList<Curve> Loops,
     IReadOnlyList<IReadOnlyList<int>> EdgeIndicesPerLoop,
@@ -63,7 +43,6 @@ public sealed record BoundaryLoopData(
 
 /// <summary>Non-manifold topology analysis result with diagnostic data for irregular vertices and edges.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record NonManifoldData(
     IReadOnlyList<int> EdgeIndices,
     IReadOnlyList<int> VertexIndices,
@@ -83,7 +62,6 @@ public sealed record NonManifoldData(
 
 /// <summary>Connected component analysis result with adjacency graph and spatial bounds.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record ConnectivityData(
     IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
     IReadOnlyList<int> ComponentSizes,
@@ -102,7 +80,6 @@ public sealed record ConnectivityData(
 
 /// <summary>Edge classification result by continuity type with geometric measures.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record EdgeClassificationData(
     IReadOnlyList<int> EdgeIndices,
     IReadOnlyList<EdgeContinuityType> Classifications,
@@ -118,7 +95,6 @@ public sealed record EdgeClassificationData(
 
 /// <summary>Face adjacency query result with neighbor data and dihedral angle computation.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "Result types grouped semantically in Topology.cs")]
 public sealed record AdjacencyData(
     int EdgeIndex,
     IReadOnlyList<int> AdjacentFaceIndices,
