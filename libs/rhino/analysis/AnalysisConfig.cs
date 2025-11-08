@@ -10,16 +10,16 @@ internal static class AnalysisConfig {
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
-            [typeof(NurbsCurve)] = V.Standard | V.Degeneracy,
+            [typeof(NurbsCurve)] = V.Standard | V.Degeneracy | V.NurbsGeometry,
             [typeof(LineCurve)] = V.Standard | V.Degeneracy,
             [typeof(ArcCurve)] = V.Standard | V.Degeneracy,
-            [typeof(PolyCurve)] = V.Standard | V.Degeneracy,
+            [typeof(PolyCurve)] = V.Standard | V.Degeneracy | V.PolycurveStructure,
             [typeof(PolylineCurve)] = V.Standard | V.Degeneracy,
-            [typeof(Surface)] = V.Standard,
-            [typeof(NurbsSurface)] = V.Standard,
+            [typeof(Surface)] = V.Standard | V.UVDomain,
+            [typeof(NurbsSurface)] = V.Standard | V.NurbsGeometry | V.UVDomain,
             [typeof(PlaneSurface)] = V.Standard,
             [typeof(Brep)] = V.Standard | V.Topology,
-            [typeof(Extrusion)] = V.Standard | V.Topology,
+            [typeof(Extrusion)] = V.Standard | V.Topology | V.ExtrusionGeometry,
             [typeof(Mesh)] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 

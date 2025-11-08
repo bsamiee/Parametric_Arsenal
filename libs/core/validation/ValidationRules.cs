@@ -44,11 +44,15 @@ public static class ValidationRules {
             [V.BoundingBox] = ([], ["GetBoundingBox",], E.Validation.BoundingBoxInvalid),
             [V.MassProperties] = (["IsSolid", "IsClosed",], [], E.Validation.MassPropertiesComputationFailed),
             [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
-            [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular",], E.Validation.DegenerateGeometry),
+            [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular", "GetLength",], E.Validation.DegenerateGeometry),
             [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse",], E.Validation.ToleranceExceeded),
             [V.SelfIntersection] = ([], ["SelfIntersections",], E.Validation.SelfIntersecting),
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
+            [V.PolycurveStructure] = (["IsValid",], ["HasGap", "IsContinuous",], E.Validation.PolycurveGaps),
+            [V.NurbsGeometry] = (["IsValid", "IsPeriodic",], ["IsRational", "IsClamped",], E.Validation.NurbsControlPointCount),
+            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed",], ["GetPathPlane",], E.Validation.ExtrusionProfileInvalid),
+            [V.UVDomain] = (["IsValid",], ["IsSingular", "IsAtSingularity", "IsSphere", "IsTorus",], E.Validation.UVDomainSingularity),
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
@@ -130,6 +134,8 @@ public static class ValidationRules {
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _originPoint,
                                 Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), _constantFalse)),
+                        (_, Type rt, string name) when string.Equals(name, "GetLength", StringComparison.Ordinal) && rt == typeof(double) =>
+                            Expression.LessThanOrEqual(Expression.Call(Expression.Convert(geometry, runtimeType), method), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance))),
                         _ => _constantFalse,
                     },
                     Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),

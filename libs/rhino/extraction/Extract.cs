@@ -45,11 +45,15 @@ public static class Extract {
             (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
             (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
             Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
-            int or double or (int, bool) or (double, bool) or Vector3d or Continuity or Semantic =>
+            Semantic sem => UnifiedOperation.Apply(
+                input,
+                (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
+                new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(sem.Kind, typeof(T)) }),
+            int or double or (int, bool) or (double, bool) or Vector3d or Continuity =>
                 UnifiedOperation.Apply(
                     input,
                     (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.None }),
+                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
 }
