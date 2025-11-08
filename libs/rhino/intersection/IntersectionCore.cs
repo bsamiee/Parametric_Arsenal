@@ -92,7 +92,7 @@ internal static class IntersectionCore {
                     [], [], [], [], [])),
             (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurveSelf(ca, tolerance), ca),
+                fromCurveIntersections(RhinoIntersect.CurveSelf(ca, tolerance), cb),
 #pragma warning restore IDISP004
             (Curve ca, Curve cb, _) =>
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
