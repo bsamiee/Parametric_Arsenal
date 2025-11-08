@@ -15,6 +15,65 @@ namespace Arsenal.Rhino.Topology;
 internal static class TopologyCore {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 
+    /// <summary>Geometry-specific naked edge extractors for Brep and Mesh.</summary>
+    private static readonly FrozenDictionary<Type, Func<object, (Curve[] Curves, int TotalCount, double TotalLength)>> _nakedEdgeExtractors =
+        new Dictionary<Type, Func<object, (Curve[], int, double)>> {
+            [typeof(Brep)] = g => ((Brep)g) switch {
+                Brep brep => Enumerable.Range(0, brep.Edges.Count)
+                    .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
+                    .ToArray() switch {
+                        int[] nakedIndices => (
+                            [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),],
+                            brep.Edges.Count,
+                            nakedIndices.Sum(i => brep.Edges[i].GetLength())),
+                    },
+            },
+            [typeof(Mesh)] = g => ((Mesh)g).GetNakedEdges() switch {
+                Polyline[] nakedPolylines => (
+                    [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),],
+                    ((Mesh)g).TopologyEdges.Count,
+                    nakedPolylines.Sum(pl => pl.Length)),
+                _ => ([], 0, 0.0),
+            },
+        }.ToFrozenDictionary();
+
+    /// <summary>Geometry-specific non-manifold edge extractors for Brep and Mesh.</summary>
+    private static readonly FrozenDictionary<Type, Func<object, (IReadOnlyList<int> Edges, IReadOnlyList<int> Valences, IReadOnlyList<Point3d> Locations, bool IsManifold, bool IsOrientable)>> _nonManifoldExtractors =
+        new Dictionary<Type, Func<object, (IReadOnlyList<int>, IReadOnlyList<int>, IReadOnlyList<Point3d>, bool, bool)>> {
+            [typeof(Brep)] = g => ((Brep)g) switch {
+                Brep brep => (IReadOnlyList<int>)[.. Enumerable.Range(0, brep.Edges.Count)
+                    .Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),
+                ] switch {
+                    IReadOnlyList<int> edges => (
+                        edges,
+                        [.. edges.Select(i => (int)brep.Edges[i].Valence),],
+                        [.. edges.Select(i => brep.Edges[i].PointAtStart),],
+                        edges.Count == 0,
+                        brep.IsSolid),
+                },
+            },
+            [typeof(Mesh)] = g => ((Mesh)g) switch {
+                Mesh mesh => mesh.IsManifold(topologicalTest: true, out bool isOriented, out bool _) switch {
+                    bool isManifold => (IReadOnlyList<int>)[.. Enumerable.Range(0, mesh.TopologyEdges.Count)
+                        .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),
+                    ] switch {
+                        IReadOnlyList<int> edges => (
+                            edges,
+                            [.. edges.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),],
+                            [.. edges.Select(i => {
+                                IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
+                                Point3d p1 = mesh.TopologyVertices[verts.I];
+                                Point3d p2 = mesh.TopologyVertices[verts.J];
+                                return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
+                            }),
+                            ],
+                            isManifold,
+                            isOriented),
+                    },
+                },
+            },
+        }.ToFrozenDictionary();
+
     [Pure]
     internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(
         T input,
@@ -78,12 +137,26 @@ internal static class TopologyCore {
         bool enableDiagnostics) where T : notnull =>
         UnifiedOperation.Apply(
             input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(g => g switch {
-                Brep brep => ExecuteBrepBoundaryLoops(brep: brep, tol: tolerance ?? context.AbsoluteTolerance),
-                Mesh mesh => ExecuteMeshBoundaryLoops(mesh: mesh, tol: tolerance ?? context.AbsoluteTolerance),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.BoundaryLoopData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
+            operation: (Func<T, Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(g =>
+                _nakedEdgeExtractors.TryGetValue(g.GetType(), out Func<object, (Curve[], int, double)>? extractor) switch {
+                    true => extractor(g) switch {
+                        (Curve[] nakedCurves, int, double) => (nakedCurves.Length > 0
+                            ? Curve.JoinCurves(nakedCurves, joinTolerance: tolerance ?? context.AbsoluteTolerance, preserveDirection: false)
+                            : []) switch {
+                            Curve[] joined => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[
+                                new Topology.BoundaryLoopData(
+                                    Loops: [.. joined,],
+                                    EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
+                                    LoopLengths: [.. joined.Select(c => c.GetLength()),],
+                                    IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
+                                    JoinTolerance: tolerance ?? context.AbsoluteTolerance,
+                                    FailedJoins: nakedCurves.Length - joined.Length),
+                            ]),
+                        },
+                    },
+                    false => ResultFactory.Create<IReadOnlyList<Topology.BoundaryLoopData>>(
+                        error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
+                }),
             config: new OperationConfig<T, Topology.BoundaryLoopData> {
                 Context = context,
                 ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
@@ -99,12 +172,24 @@ internal static class TopologyCore {
         bool enableDiagnostics) where T : notnull =>
         UnifiedOperation.Apply(
             input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.NonManifoldData>>>)(g => g switch {
-                Brep brep => ExecuteBrepNonManifold(brep: brep),
-                Mesh mesh => ExecuteMeshNonManifold(mesh: mesh),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
+            operation: (Func<T, Result<IReadOnlyList<Topology.NonManifoldData>>>)(g =>
+                _nonManifoldExtractors.TryGetValue(g.GetType(), out Func<object, (IReadOnlyList<int>, IReadOnlyList<int>, IReadOnlyList<Point3d>, bool, bool)>? extractor) switch {
+                    true => extractor(g) switch {
+                        (IReadOnlyList<int> edges, IReadOnlyList<int> valences, IReadOnlyList<Point3d> locations, bool isManifold, bool isOrientable) =>
+                            ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
+                                new Topology.NonManifoldData(
+                                    EdgeIndices: edges,
+                                    VertexIndices: [],
+                                    Valences: valences,
+                                    Locations: locations,
+                                    IsManifold: isManifold,
+                                    IsOrientable: isOrientable,
+                                    MaxValence: valences.Count > 0 ? valences.Max() : 0),
+                            ]),
+                    },
+                    false => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(
+                        error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
+                }),
             config: new OperationConfig<T, Topology.NonManifoldData> {
                 Context = context,
                 ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
@@ -189,89 +274,6 @@ internal static class TopologyCore {
                 EnableDiagnostics = enableDiagnostics,
             })
             .Map(results => results[0]);
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.BoundaryLoopData>> ExecuteBrepBoundaryLoops(Brep brep, double tol) {
-        Curve[] nakedCurves = [.. Enumerable.Range(0, brep.Edges.Count)
-            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-            .Select(i => brep.Edges[i].DuplicateCurve()),
-        ];
-        Curve[] joined = nakedCurves.Length > 0
-            ? Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false)
-            : [];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[
-            new Topology.BoundaryLoopData(
-                Loops: [.. joined,],
-                EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
-                LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
-                JoinTolerance: tol,
-                FailedJoins: nakedCurves.Length - joined.Length),
-        ]);
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.BoundaryLoopData>> ExecuteMeshBoundaryLoops(Mesh mesh, double tol) {
-        Polyline[] nakedPolylines = mesh.GetNakedEdges() ?? [];
-        Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),];
-        Curve[] joined = nakedCurves.Length > 0
-            ? Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false)
-            : [];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[
-            new Topology.BoundaryLoopData(
-                Loops: [.. joined,],
-                EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
-                LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
-                JoinTolerance: tol,
-                FailedJoins: nakedCurves.Length - joined.Length),
-        ]);
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.NonManifoldData>> ExecuteBrepNonManifold(Brep brep) {
-        IReadOnlyList<int> nonManifoldEdges = [.. Enumerable.Range(0, brep.Edges.Count)
-            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),
-        ];
-        IReadOnlyList<int> valences = [.. nonManifoldEdges.Select(i => (int)brep.Edges[i].Valence),];
-        IReadOnlyList<Point3d> locations = [.. nonManifoldEdges.Select(i => brep.Edges[i].PointAtStart),];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-            new Topology.NonManifoldData(
-                EdgeIndices: nonManifoldEdges,
-                VertexIndices: [],
-                Valences: valences,
-                Locations: locations,
-                IsManifold: nonManifoldEdges.Count == 0,
-                IsOrientable: brep.IsSolid,
-                MaxValence: valences.Count > 0 ? valences.Max() : 0),
-        ]);
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.NonManifoldData>> ExecuteMeshNonManifold(Mesh mesh) {
-        bool isManifold = mesh.IsManifold(topologicalTest: true, out bool isOriented, out bool _);
-        IReadOnlyList<int> nonManifoldEdges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
-            .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),
-        ];
-        IReadOnlyList<int> valences = [.. nonManifoldEdges.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-        IReadOnlyList<Point3d> locations = [.. nonManifoldEdges.Select(i => {
-            IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
-            Point3d p1 = mesh.TopologyVertices[verts.I];
-            Point3d p2 = mesh.TopologyVertices[verts.J];
-            return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
-        }),
-        ];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-            new Topology.NonManifoldData(
-                EdgeIndices: nonManifoldEdges,
-                VertexIndices: [],
-                Valences: valences,
-                Locations: locations,
-                IsManifold: isManifold,
-                IsOrientable: isOriented,
-                MaxValence: valences.Count > 0 ? valences.Max() : 0),
-        ]);
-    }
 
     [Pure]
     private static Result<IReadOnlyList<Topology.ConnectivityData>> ExecuteBrepConnectivity(Brep brep) {
