@@ -146,7 +146,8 @@ internal static class TopologyCore {
                                 Point3d p1 = mesh.TopologyVertices[v.I];
                                 Point3d p2 = mesh.TopologyVertices[v.J];
                                 return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
-                            }),],
+                            }),
+                            ],
                             IsManifold: manifold,
                             IsOrientable: oriented,
                             MaxValence: vals.Count > 0 ? vals.Max() : 0),
@@ -261,7 +262,8 @@ internal static class TopologyCore {
             MeshFace face = mesh.Faces[fIdx];
             BoundingBox fBox = face.IsQuad ? new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C], mesh.Vertices[face.D],]) : new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C],]);
             return union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
-        })),];
+        })),
+        ];
         return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, mesh.Faces.Count).Select(f => (f, (IReadOnlyList<int>)[.. mesh.Faces.AdjacentFaces(f).Where(adj => adj >= 0),])).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
     }
 
@@ -278,7 +280,8 @@ internal static class TopologyCore {
                 _ => Topology.EdgeContinuityType.Interior,
             },
             _ => Topology.EdgeContinuityType.Sharp,
-        }),];
+        }),
+        ];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => brep.Edges[i].GetLength()),];
         FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
         return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: minContinuity),]);
@@ -297,7 +300,8 @@ internal static class TopologyCore {
                 _ => Topology.EdgeContinuityType.Sharp,
             },
             _ => Topology.EdgeContinuityType.Sharp,
-        }),];
+        }),
+        ];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair verts => mesh.TopologyVertices[verts.I].DistanceTo(mesh.TopologyVertices[verts.J]) }),];
         FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
         return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: Continuity.C0_continuous),]);
