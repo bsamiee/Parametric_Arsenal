@@ -66,12 +66,12 @@ public static class ValidationRules {
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
 
-    /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
+    /// <summary>Gets or compiles cached validator for runtime type and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, V mode) =>
         _validatorCache.GetOrAdd(new CacheKey(runtimeType, mode), static k => CompileValidator(k.Type, k.Mode));
 
-    /// <summary>Generates validation errors for tolerance values.</summary>
+    /// <summary>Generates validation errors for tolerance values (used by GeometryContext).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
@@ -86,7 +86,7 @@ public static class ValidationRules {
             _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for runtime type and validation mode.</summary>
+    /// <summary>Compiles expression tree validator for runtime type (zero-allocation).</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
