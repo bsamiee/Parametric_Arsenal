@@ -12,12 +12,13 @@ namespace Arsenal.Rhino.Analysis;
 /// <summary>Polymorphic analysis engine with geometry-specific overloads and unified internal dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Analysis is the primary API entry point for the Analysis namespace")]
 public static class Analysis {
-    /// <summary>Analysis result marker interface for polymorphic return discrimination.</summary>
+    /// <summary>Polymorphic analysis result marker providing location property for spatial queries.</summary>
     public interface IResult {
+        /// <summary>Evaluation point location in world coordinates.</summary>
         public Point3d Location { get; }
     }
 
-    /// <summary>Curve analysis result containing derivatives, curvature, frame data, discontinuities, and metrics.</summary>
+    /// <summary>Curve differential geometry: derivatives, curvature, torsion, frames, discontinuities.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CurveData(
         Point3d Location,
@@ -33,7 +34,7 @@ public static class Analysis {
         [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Curve @ {this.Location} | κ={this.Curvature:F3} | L={this.Length:F3} | Disc={this.DiscontinuityParameters?.Length.ToString(CultureInfo.InvariantCulture) ?? "0"}");
     }
 
-    /// <summary>Surface analysis result containing derivatives, principal curvatures, frame data, singularity detection, and metrics.</summary>
+    /// <summary>Surface differential geometry: Gaussian/mean curvature, principal directions, singularities.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SurfaceData(
         Point3d Location,
@@ -56,7 +57,7 @@ public static class Analysis {
             : string.Create(CultureInfo.InvariantCulture, $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}");
     }
 
-    /// <summary>Brep analysis result containing surface evaluation, topology navigation, proximity data, and solid metrics.</summary>
+    /// <summary>Brep topology and geometry: vertices/edges, manifold state, proximity, volume properties.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BrepData(
         Point3d Location,
@@ -90,7 +91,7 @@ public static class Analysis {
                     : string.Create(CultureInfo.InvariantCulture, $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}");
     }
 
-    /// <summary>Mesh analysis result containing topology navigation, manifold state, and volume metrics.</summary>
+    /// <summary>Mesh topology: vertices/edges, manifold detection, closure state, volume properties.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshData(
         Point3d Location,

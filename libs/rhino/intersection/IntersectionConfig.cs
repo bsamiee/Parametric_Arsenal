@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Configuration constants and validation dispatch for intersection operations.</summary>
+/// <summary>Type-pair validation mode mapping for 40+ intersection combinations.</summary>
 internal static class IntersectionConfig {
     /// <summary>Validation mode mapping for intersection type pairs.</summary>
     internal static readonly FrozenDictionary<(Type, Type), V> ValidationModes =

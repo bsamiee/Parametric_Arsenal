@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Configuration constants and validation dispatch for extraction operations.</summary>
+/// <summary>Semantic extraction validation mode mapping with type inheritance fallback.</summary>
 internal static class ExtractionConfig {
     /// <summary>Validation mode mapping for semantic extraction kinds and geometry types.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =

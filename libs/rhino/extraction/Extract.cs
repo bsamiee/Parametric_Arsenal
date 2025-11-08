@@ -11,29 +11,30 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Polymorphic point extraction with singular API.</summary>
 public static class Extract {
-    /// <summary>Semantic extraction marker for parameterless methods.</summary>
+    /// <summary>Type-safe semantic extraction mode specifier for point extraction operations.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct Semantic(byte kind) {
         internal readonly byte Kind = kind;
 
-        /// <summary>Extracts mass property centroids and characteristic points (vertices, corners, midpoints).</summary>
+        /// <summary>Centroids and characteristic vertices (corners, midpoints) via mass properties.</summary>
         public static readonly Semantic Analytical = new(1);
 
-        /// <summary>Extracts geometric extrema (curve endpoints, surface domain corners, bounding box corners).</summary>
+        /// <summary>Geometric extrema: curve endpoints, surface domain corners, bounding box vertices.</summary>
         public static readonly Semantic Extremal = new(2);
 
-        /// <summary>Extracts Greville points from NURBS curves and surfaces.</summary>
+        /// <summary>NURBS Greville points computed from knot vectors.</summary>
         public static readonly Semantic Greville = new(3);
 
-        /// <summary>Extracts inflection points from curves where curvature changes sign.</summary>
+        /// <summary>Curve inflection points where curvature sign changes.</summary>
         public static readonly Semantic Inflection = new(4);
 
-        /// <summary>Extracts quadrant points from circular and elliptical curves.</summary>
+        /// <summary>Circle/ellipse quadrant points at 0°, 90°, 180°, 270°.</summary>
         public static readonly Semantic Quadrant = new(5);
 
-        /// <summary>Extracts edge midpoints from Brep, Mesh, and polycurve topology.</summary>
+        /// <summary>Topology edge midpoints for Brep, Mesh, and polycurve structures.</summary>
         public static readonly Semantic EdgeMidpoints = new(6);
 
-        /// <summary>Extracts face centroids from Brep and Mesh topology.</summary>
+        /// <summary>Topology face centroids via area mass properties.</summary>
         public static readonly Semantic FaceCentroids = new(7);
     }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

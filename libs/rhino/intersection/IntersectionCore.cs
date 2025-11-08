@@ -9,7 +9,7 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Internal intersection computation engine with RhinoCommon SDK algorithms and type-based dispatch.</summary>
+/// <summary>RhinoCommon intersection dispatch with 40+ type combinations and result normalization.</summary>
 internal static class IntersectionCore {
     [Pure]
 #pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction

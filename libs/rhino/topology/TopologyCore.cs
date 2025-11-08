@@ -11,7 +11,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Internal topology computation algorithms with FrozenDictionary-based type dispatch.</summary>
+/// <summary>Topology analysis execution with BFS connectivity, edge classification, and adjacency queries.</summary>
 internal static class TopologyCore {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 

@@ -5,7 +5,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Core dispatch tables for frame and centroid extraction without helper methods - all logic inlined in API.</summary>
+/// <summary>Plane/centroid extraction and transformation dispatch with mass property computation.</summary>
 internal static class OrientCore {
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
