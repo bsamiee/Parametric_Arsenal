@@ -90,6 +90,10 @@ internal static class IntersectionCore {
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
                     [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
                     [], [], [], [], [])),
+            (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+                fromCurveIntersections(RhinoIntersect.CurveSelf(ca, tolerance), ca),
+#pragma warning restore IDISP004
             (Curve ca, Curve cb, _) =>
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                 fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),

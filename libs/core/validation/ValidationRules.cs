@@ -46,7 +46,6 @@ public static class ValidationRules {
             [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
             [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular", "GetLength",], E.Validation.DegenerateGeometry),
             [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse",], E.Validation.ToleranceExceeded),
-            [V.SelfIntersection] = ([], ["SelfIntersections",], E.Validation.SelfIntersecting),
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
             [V.PolycurveStructure] = (["IsValid", "HasGap",], [], E.Validation.PolycurveGaps),
@@ -127,8 +126,6 @@ public static class ValidationRules {
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue)),
-                        (_, _, string name) when string.Equals(name, "SelfIntersections", StringComparison.Ordinal) =>
-                            Expression.NotEqual(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method), "Count"), _constantZero),
                         (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
                             Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue), "IsValid")),
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>

@@ -303,7 +303,6 @@ V.MassProperties                                    // IsSolid, IsClosed
 V.Topology                                          // IsManifold, IsClosed, IsSolid
 V.Degeneracy                                        // IsPeriodic, IsDegenerate, IsShort
 V.Tolerance                                         // IsPlanar, IsLinear within tolerance
-V.SelfIntersection                                  // SelfIntersections check
 V.MeshSpecific                                      // Mesh-specific validations
 V.SurfaceContinuity                                 // Continuity checks
 V.All                                               // All validations combined

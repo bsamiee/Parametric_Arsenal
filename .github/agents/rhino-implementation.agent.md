@@ -99,7 +99,7 @@ bool success = transformed.Transform(xform);
 
 **Use V.* flags via UnifiedOperation:**
 ```csharp
-V.None, V.Standard, V.Degeneracy, V.BoundingBox, V.AreaCentroid, V.MassProperties, V.Topology, V.SelfIntersection, V.All
+V.None, V.Standard, V.Degeneracy, V.BoundingBox, V.AreaCentroid, V.MassProperties, V.Topology, V.All
 
 // Combine with |
 ValidationMode = V.Standard | V.Degeneracy | V.BoundingBox
