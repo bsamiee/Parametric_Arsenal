@@ -31,8 +31,17 @@ internal static class TopologyCore {
                         int[] nakedIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),], EdgeIndices: [.. nakedIndices,], Valences: [.. Enumerable.Repeat(1, nakedIndices.Length),], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: nakedIndices.Sum(i => brep.Edges[i].GetLength())),]),
                     },
                 },
-                Mesh mesh => (mesh.GetNakedEdges() ?? []) switch {
-                    Polyline[] nakedPolylines => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),], EdgeIndices: [.. Enumerable.Range(0, nakedPolylines.Length),], Valences: [.. Enumerable.Repeat(1, nakedPolylines.Length),], IsOrdered: orderLoops, TotalEdgeCount: mesh.TopologyEdges.Count, TotalLength: nakedPolylines.Sum(pl => pl.Length)),]),
+                Mesh mesh => mesh.TopologyEdges.Count switch {
+                    0 => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
+                    _ => Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1).ToArray() switch {
+                        int[] nakedIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [.. nakedIndices.Select(i => {
+                            IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
+                            return new LineCurve(mesh.TopologyVertices[verts.I], mesh.TopologyVertices[verts.J]);
+                        }),], EdgeIndices: [.. nakedIndices,], Valences: [.. Enumerable.Repeat(1, nakedIndices.Length),], IsOrdered: orderLoops, TotalEdgeCount: mesh.TopologyEdges.Count, TotalLength: nakedIndices.Sum(i => {
+                            IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
+                            return mesh.TopologyVertices[verts.I].DistanceTo(mesh.TopologyVertices[verts.J]);
+                        })),]),
+                    },
                 },
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
