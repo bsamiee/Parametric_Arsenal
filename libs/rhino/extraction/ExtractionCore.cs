@@ -52,7 +52,7 @@ internal static class ExtractionCore {
         try {
             V mode = ExtractionConfig.GetValidationMode(kind, normalized.GetType());
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode == V.None ? null : [context, mode,])
+                .Validate(args: mode == V.None ? null : [context, mode])
                 .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)DispatchExtraction(g, kind, param, includeEnds, context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
@@ -66,7 +66,7 @@ internal static class ExtractionCore {
         _handlers.TryGetValue((kind, geometry.GetType()), out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
             ? handler(geometry, param, includeEnds, context)
             : _handlers.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
                 .Select(kv => kv.Value)
                 .DefaultIfEmpty(static (_, _, _, _) => [])
                 .First()(geometry, param, includeEnds, context);
@@ -95,9 +95,23 @@ internal static class ExtractionCore {
             [(2, typeof(Surface))] = static (g, _, _, _) => g is Surface s ? (s.Domain(0), s.Domain(1)) switch { (Interval u, Interval v) => [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)], } : [],
             [(2, typeof(GeometryBase))] = static (g, _, _, _) => g.GetBoundingBox(accurate: true).GetCorners(),
             [(3, typeof(NurbsCurve))] = static (g, _, _, _) => g is NurbsCurve nc ? [.. nc.GrevillePoints()] : [],
-            [(3, typeof(NurbsSurface))] = static (g, _, _, _) => g is NurbsSurface ns && ns.Points is NurbsSurfacePointList pts ? [.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select ns.PointAt(gp.X, gp.Y),] : [],
+            [(3, typeof(NurbsSurface))] = static (g, _, _, _) => g is NurbsSurface ns && ns.Points is NurbsSurfacePointList pts
+                ? [.. from u in Enumerable.Range(0, pts.CountU)
+                      from v in Enumerable.Range(0, pts.CountV)
+                      let gp = pts.GetGrevillePoint(u, v)
+                      select ns.PointAt(gp.X, gp.Y),]
+                : [],
             [(3, typeof(Curve))] = static (g, _, _, _) => g is Curve c && c.ToNurbsCurve() is NurbsCurve nc ? ((Func<NurbsCurve, Point3d[]>)(n => { try { return [.. n.GrevillePoints()]; } finally { n.Dispose(); } }))(nc) : [],
-            [(3, typeof(Surface))] = static (g, _, _, _) => g is Surface s && s.ToNurbsSurface() is NurbsSurface ns && ns.Points is NurbsSurfacePointList pts ? ((Func<NurbsSurface, Point3d[]>)(n => { try { return [.. from u in Enumerable.Range(0, pts.CountU) from v in Enumerable.Range(0, pts.CountV) let gp = pts.GetGrevillePoint(u, v) select n.PointAt(gp.X, gp.Y),]; } finally { n.Dispose(); } }))(ns) : [],
+            [(3, typeof(Surface))] = static (g, _, _, _) => g is Surface s && s.ToNurbsSurface() is NurbsSurface ns && ns.Points is not null
+                ? ((Func<NurbsSurface, Point3d[]>)(n => {
+                    try {
+                        return [.. from u in Enumerable.Range(0, n.Points.CountU)
+                                   from v in Enumerable.Range(0, n.Points.CountV)
+                                   let gp = n.Points.GetGrevillePoint(u, v)
+                                   select n.PointAt(gp.X, gp.Y),];
+                    } finally { n.Dispose(); }
+                }))(ns)
+                : [],
             [(4, typeof(NurbsCurve))] = static (g, _, _, _) => g is NurbsCurve nc ? nc.InflectionPoints() switch { Point3d[] { Length: > 0 } pts => pts, _ => [] } : [],
             [(4, typeof(Curve))] = static (g, _, _, _) => g is Curve c && c.ToNurbsCurve() is NurbsCurve nc ? ((Func<NurbsCurve, Point3d[]>)(n => { try { return n.InflectionPoints() ?? []; } finally { n.Dispose(); } }))(nc) : [],
             [(5, typeof(Curve))] = static (g, _, _, ctx) => g is Curve c ? (c, ctx.AbsoluteTolerance) switch {
@@ -109,16 +123,31 @@ internal static class ExtractionCore {
             } : [],
             [(6, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? [.. b.Edges.Select(e => e.PointAtNormalizedLength(0.5))] : [],
             [(6, typeof(Mesh))] = static (g, _, _, _) => g is Mesh m ? [.. Enumerable.Range(0, m.TopologyEdges.Count).Select(i => m.TopologyEdges.EdgeLine(i)).Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5)),] : [],
-            [(6, typeof(Curve))] = static (g, _, _, _) => g is Curve c ? c.DuplicateSegments() is Curve[] { Length: > 0 } segs ? [.. segs.Select(static seg => seg.PointAtNormalizedLength(0.5))] : c.TryGetPolyline(out Polyline pl) ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5))] : [] : [],
+            [(6, typeof(Curve))] = static (g, _, _, _) => g is Curve c
+                ? c.DuplicateSegments() is Curve[] { Length: > 0 } segs
+                    ? ((Func<Curve[], Point3d[]>)(segments => {
+                        try { return [.. segments.Select(seg => seg.PointAtNormalizedLength(0.5))]; }
+                        finally { foreach (Curve seg in segments) { seg.Dispose(); } }
+                    }))(segs)
+                    : c.TryGetPolyline(out Polyline pl)
+                        ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5))]
+                        : []
+                : [],
             [(7, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => { try { return AreaMassProperties.Compute(d)?.Centroid ?? Point3d.Unset; } finally { d.Dispose(); } }))(dup),
                 _ => Point3d.Unset,
             }).Where(static p => p != Point3d.Unset),] : [],
             [(7, typeof(Mesh))] = static (g, _, _, _) => g is Mesh m ? [.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static pt => pt.IsValid),] : [],
             [(10, typeof(Curve))] = static (g, p, ends, _) => g is Curve c && p is int count ? c.DivideByCount(count, ends) switch { double[] ts => [.. ts.Select(c.PointAt)], _ => [] } : [],
-            [(10, typeof(Surface))] = static (g, p, ends, _) => g is Surface s && p is int d ? (s.Domain(0), s.Domain(1)) switch {
-                (Interval u, Interval v) => [.. from ui in Enumerable.Range(0, d) from vi in Enumerable.Range(0, d) let up = d == 1 ? 0.5 : ends ? ui / (double)(d - 1) : (ui + 0.5) / d let vp = d == 1 ? 0.5 : ends ? vi / (double)(d - 1) : (vi + 0.5) / d select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),],
-            } : [],
+            [(10, typeof(Surface))] = static (g, p, ends, _) => g is Surface s && p is int d
+                ? (s.Domain(0), s.Domain(1)) switch {
+                    (Interval u, Interval v) => [.. from ui in Enumerable.Range(0, d)
+                                                    from vi in Enumerable.Range(0, d)
+                                                    let up = d == 1 ? 0.5 : ends ? ui / (double)(d - 1) : (ui + 0.5) / d
+                                                    let vp = d == 1 ? 0.5 : ends ? vi / (double)(d - 1) : (vi + 0.5) / d
+                                                    select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),],
+                }
+                : [],
             [(11, typeof(Curve))] = static (g, p, ends, _) => g is Curve c && p is double length ? c.DivideByLength(length, ends) switch { double[] ts => [.. ts.Select(c.PointAt)], _ => [] } : [],
             [(12, typeof(Curve))] = static (g, p, _, _) => g is Curve c && p is Vector3d dir ? c.ExtremeParameters(dir) switch { double[] ts => [.. ts.Select(c.PointAt)], _ => [] } : [],
             [(13, typeof(Curve))] = static (g, p, _, _) => g is Curve c && p is Continuity cont ? ((Func<List<Point3d>>)(() => {
