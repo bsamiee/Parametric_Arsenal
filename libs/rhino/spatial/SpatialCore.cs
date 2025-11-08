@@ -76,9 +76,6 @@ internal static class SpatialCore {
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
-        if (bufferSize <= 0) {
-            return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidBufferSize.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"BufferSize: {bufferSize}")));
-        }
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {

@@ -28,9 +28,6 @@ public static class E {
             [2311] = "Surface analysis computation failed",
             [2312] = "Brep analysis computation failed",
             [2313] = "Mesh analysis computation failed",
-            [2314] = "Curvature extrema computation failed",
-            [2315] = "Multi-face brep analysis failed",
-            [2316] = "Batch parameter evaluation requires non-empty parameter list",
             [2400] = "Naked edge extraction failed",
             [2401] = "Boundary loop construction failed",
             [2402] = "Non-manifold edge detected",
@@ -77,7 +74,7 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
-            [4005] = "Buffer size invalid or overflow occurred",
+            [4005] = "Spatial query exceeded buffer capacity",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -121,9 +118,6 @@ public static class E {
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
-        public static readonly SystemError CurvatureExtremaFailed = Get(2314);
-        public static readonly SystemError MultiFaceBrepFailed = Get(2315);
-        public static readonly SystemError EmptyParameterList = Get(2316);
         public static readonly SystemError NakedEdgeFailed = Get(2400);
         public static readonly SystemError BoundaryLoopFailed = Get(2401);
         public static readonly SystemError NonManifoldEdge = Get(2402);
@@ -178,6 +172,6 @@ public static class E {
         public static readonly SystemError InvalidDistance = Get(4002);
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
-        public static readonly SystemError InvalidBufferSize = Get(4005);
+        public static readonly SystemError BufferOverflow = Get(4005);
     }
 }
