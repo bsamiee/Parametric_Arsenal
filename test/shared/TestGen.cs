@@ -41,7 +41,7 @@ public static class TestGen {
         bool isAction = assertion.GetType() == typeof(Action<,>).MakeGenericType(genType.GetGenericArguments());
         Func<T, bool> runner = isAction
             ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),]); return true; }
-            : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),])!;
+        : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),])!;
         gen.Sample(runner, iter: iter);
     }
 
@@ -49,7 +49,7 @@ public static class TestGen {
         bool isAction = assertion.GetType() == typeof(Action<,,>).MakeGenericType(genType.GetGenericArguments());
         Func<T, bool> runner = isAction
             ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),]); return true; }
-            : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),])!;
+        : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),])!;
         gen.Sample(runner, iter: iter);
     }
 
