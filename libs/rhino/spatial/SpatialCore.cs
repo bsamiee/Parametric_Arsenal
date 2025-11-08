@@ -125,4 +125,59 @@ internal static class SpatialCore {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
     }
+
+    /// <summary>Computes closest point on geometry to test point using RhinoCommon algorithms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Spatial.ClosestPointData>> ComputeClosestPoint(GeometryBase geometry, Point3d testPoint, IGeometryContext _) =>
+        geometry switch {
+            Curve c => c.ClosestPoint(testPoint, out double t)
+                ? ResultFactory.Create(value: (IReadOnlyList<Spatial.ClosestPointData>)[new Spatial.ClosestPointData(Point: c.PointAt(t), Distance: testPoint.DistanceTo(c.PointAt(t)), Parameter: t, ComponentIndex: ComponentIndex.Unset),])
+                : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed),
+            Surface s => s.ClosestPoint(testPoint, out double u, out double v)
+                ? ResultFactory.Create(value: (IReadOnlyList<Spatial.ClosestPointData>)[new Spatial.ClosestPointData(Point: s.PointAt(u, v), Distance: testPoint.DistanceTo(s.PointAt(u, v)), Parameter: u, ComponentIndex: ComponentIndex.Unset),])
+                : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed),
+            Brep b => b.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double u2, out double v2, double.MaxValue, out Vector3d _)
+                ? ResultFactory.Create(value: (IReadOnlyList<Spatial.ClosestPointData>)[new Spatial.ClosestPointData(Point: cp, Distance: testPoint.DistanceTo(cp), Parameter: u2, ComponentIndex: ci),])
+                : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed),
+            Mesh m => ((Func<Result<IReadOnlyList<Spatial.ClosestPointData>>>)(() => {
+                Point3d mcp = m.ClosestPoint(testPoint);
+                return mcp.IsValid
+                    ? ResultFactory.Create(value: (IReadOnlyList<Spatial.ClosestPointData>)[new Spatial.ClosestPointData(Point: mcp, Distance: testPoint.DistanceTo(mcp), Parameter: 0, ComponentIndex: ComponentIndex.Unset),])
+                    : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed);
+            }))(),
+            PointCloud pc => pc.Count > 0
+                ? ((Func<Result<IReadOnlyList<Spatial.ClosestPointData>>>)(() => {
+                    int closestIndex = pc.ClosestPoint(testPoint);
+                    return closestIndex >= 0
+                        ? ResultFactory.Create(value: (IReadOnlyList<Spatial.ClosestPointData>)[new Spatial.ClosestPointData(Point: pc[closestIndex].Location, Distance: testPoint.DistanceTo(pc[closestIndex].Location), Parameter: 0, ComponentIndex: ComponentIndex.Unset),])
+                        : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed);
+                }))()
+                : ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.ClosestPointFailed),
+            _ => ResultFactory.Create<IReadOnlyList<Spatial.ClosestPointData>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Geometry type: {geometry.GetType().Name}")),
+        };
+
+    /// <summary>Computes minimum distance between two geometries using RhinoCommon distance algorithms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<double>> ComputeDistance(GeometryBase geometry1, GeometryBase geometry2, IGeometryContext _) =>
+        (geometry1, geometry2) switch {
+            (Curve c1, Curve c2) => ((Func<Result<IReadOnlyList<double>>>)(() => {
+                bool success = Curve.GetDistancesBetweenCurves(c1, c2, tolerance: 0.001, out double distance, out double _, out double _);
+                return success && distance >= 0
+                    ? ResultFactory.Create(value: (IReadOnlyList<double>)[distance,])
+                    : ResultFactory.Create<IReadOnlyList<double>>(error: E.Spatial.DistanceFailed);
+            }))(),
+            (Curve c, Brep b) => ((Func<Result<IReadOnlyList<double>>>)(() => {
+                Point3d[] pts = Rhino.Geometry.Intersect.Intersection.CurveBrep(c, b, tolerance: 0.001);
+                return pts.Length > 0
+                    ? ResultFactory.Create(value: (IReadOnlyList<double>)[0.0,])
+                    : ResultFactory.Create<IReadOnlyList<double>>(error: E.Spatial.DistanceFailed);
+            }))(),
+            (Brep b, Curve c) => ((Func<Result<IReadOnlyList<double>>>)(() => {
+                Point3d[] pts = Rhino.Geometry.Intersect.Intersection.CurveBrep(c, b, tolerance: 0.001);
+                return pts.Length > 0
+                    ? ResultFactory.Create(value: (IReadOnlyList<double>)[0.0,])
+                    : ResultFactory.Create<IReadOnlyList<double>>(error: E.Spatial.DistanceFailed);
+            }))(),
+            _ => ResultFactory.Create<IReadOnlyList<double>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Types: {geometry1.GetType().Name}, {geometry2.GetType().Name}")),
+        };
 }

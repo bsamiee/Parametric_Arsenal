@@ -172,6 +172,62 @@ public static class Orient {
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Scale<T>(
+        T geometry,
+        double factor,
+        Point3d? center,
+        IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                (factor, center ?? geometry.GetBoundingBox(accurate: false).Center) switch {
+                    (double f, _) when f <= 0.0 || !double.IsFinite(f) => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidScaleFactor),
+                    (double f, Point3d c) => OrientCore.ApplyTransform(item, Transform.Scale(anchor: c, scaleFactor: f)),
+                }),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+            }).Map(r => r[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Scale3D<T>(
+        T geometry,
+        Vector3d factors,
+        Point3d? center,
+        IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                (factors.X, factors.Y, factors.Z, center ?? geometry.GetBoundingBox(accurate: false).Center) switch {
+                    (double x, double y, double z, _) when x <= 0.0 || y <= 0.0 || z <= 0.0 || !double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z) => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidScaleFactor),
+                    (double x, double y, double z, Point3d c) => OrientCore.ApplyTransform(item, Transform.Scale(plane: new Plane(c, Vector3d.ZAxis), xScaleFactor: x, yScaleFactor: y, zScaleFactor: z)),
+                }),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+            }).Map(r => r[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Rotate<T>(
+        T geometry,
+        double angleRadians,
+        Vector3d axis,
+        Point3d? center,
+        IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                (angleRadians, axis, center ?? geometry.GetBoundingBox(accurate: false).Center) switch {
+                    (double a, _, _) when !double.IsFinite(a) => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidRotationAngle),
+                    (_, Vector3d v, _) when v.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidRotationAxis),
+                    (double a, Vector3d v, Point3d c) => OrientCore.ApplyTransform(item, Transform.Rotation(sinAngle: Math.Sin(a), cosAngle: Math.Cos(a), rotationAxis: v, rotationCenter: c)),
+                }),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+            }).Map(r => r[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Apply<T>(T geometry, OrientSpec spec, IGeometryContext context) where T : GeometryBase =>
         (spec.TargetPlane, spec.TargetPoint, spec.TargetVector, spec.TargetCurve, spec.TargetSurface) switch {
             (null, null, null, null, null) => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),

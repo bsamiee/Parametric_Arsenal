@@ -49,6 +49,9 @@ public static class E {
             [2507] = "Invalid curve parameter for orientation",
             [2508] = "Invalid surface UV parameters",
             [2509] = "Frame extraction failed",
+            [2510] = "Scale factor must be positive and non-zero",
+            [2511] = "Rotation angle must be finite",
+            [2512] = "Rotation axis must be non-zero vector",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -73,6 +76,8 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [4005] = "Closest point computation failed",
+            [4006] = "Distance computation failed",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -137,6 +142,9 @@ public static class E {
         public static readonly SystemError InvalidCurveParameter = Get(2507);
         public static readonly SystemError InvalidSurfaceUV = Get(2508);
         public static readonly SystemError FrameExtractionFailed = Get(2509);
+        public static readonly SystemError InvalidScaleFactor = Get(2510);
+        public static readonly SystemError InvalidRotationAngle = Get(2511);
+        public static readonly SystemError InvalidRotationAxis = Get(2512);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
@@ -169,5 +177,7 @@ public static class E {
         public static readonly SystemError InvalidDistance = Get(4002);
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
+        public static readonly SystemError ClosestPointFailed = Get(4005);
+        public static readonly SystemError DistanceFailed = Get(4006);
     }
 }
