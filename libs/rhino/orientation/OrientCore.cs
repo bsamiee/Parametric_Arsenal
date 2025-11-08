@@ -5,8 +5,67 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Core dispatch tables for frame extraction without helper methods - all logic inlined in API.</summary>
+/// <summary>Core dispatch tables for frame and centroid extraction without helper methods - all logic inlined in API.</summary>
 internal static class OrientCore {
+    internal static readonly FrozenDictionary<(Type, bool), Func<object, Result<Point3d>>> CentroidExtractors =
+        new Dictionary<(Type, bool), Func<object, Result<Point3d>>> {
+            [(typeof(Brep), true)] = g => ((Brep)g) switch {
+                Brep b when b.IsSolid => VolumeMassProperties.Compute(b) switch {
+                    VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                Brep b when b.SolidOrientation != BrepSolidOrientation.None => AreaMassProperties.Compute(b) switch {
+                    AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Brep), false)] = g => ((Brep)g).GetBoundingBox(accurate: true) switch {
+                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Extrusion), true)] = g => ((Extrusion)g) switch {
+                Extrusion e when e.IsSolid => VolumeMassProperties.Compute(e) switch {
+                    VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                Extrusion e when e.IsClosed(0) && e.IsClosed(1) => AreaMassProperties.Compute(e) switch {
+                    AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Extrusion), false)] = g => ((Extrusion)g).GetBoundingBox(accurate: true) switch {
+                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Mesh), true)] = g => ((Mesh)g) switch {
+                Mesh m when m.IsClosed => VolumeMassProperties.Compute(m) switch {
+                    VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                Mesh m => AreaMassProperties.Compute(m) switch {
+                    AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+            },
+            [(typeof(Mesh), false)] = g => ((Mesh)g).GetBoundingBox(accurate: true) switch {
+                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Curve), true)] = g => ((Curve)g) switch {
+                Curve c when c.IsClosed => AreaMassProperties.Compute(c) switch {
+                    AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
+                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            [(typeof(Curve), false)] = g => ((Curve)g).GetBoundingBox(accurate: true) switch {
+                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+        }.ToFrozenDictionary();
+
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
             [typeof(Curve)] = g => ((Curve)g).FrameAt(((Curve)g).Domain.Mid, out Plane f) && f.IsValid

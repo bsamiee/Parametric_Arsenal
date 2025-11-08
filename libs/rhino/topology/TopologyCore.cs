@@ -281,7 +281,20 @@ internal static class TopologyCore {
         for (int seed = 0; seed < brep.Faces.Count; seed++) {
             componentCount = componentIds[seed] != -1
                 ? componentCount
-                : TraverseBrepComponent(brep: brep, componentIds: componentIds, seed: seed, componentId: componentCount) + 1;
+                : ((Func<int>)(() => {
+                    Queue<int> queue = new([seed,]);
+                    componentIds[seed] = componentCount;
+                    while (queue.Count > 0) {
+                        int faceIdx = queue.Dequeue();
+                        foreach (int edgeIdx in brep.Faces[faceIdx].AdjacentEdges()) {
+                            foreach (int adjFace in brep.Edges[edgeIdx].AdjacentFaces().Where(f => componentIds[f] == -1)) {
+                                componentIds[adjFace] = componentCount;
+                                queue.Enqueue(adjFace);
+                            }
+                        }
+                    }
+                    return componentCount;
+                }))() + 1;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount)
             .Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, brep.Faces.Count).Where(f => componentIds[f] == c),]),
@@ -308,21 +321,6 @@ internal static class TopologyCore {
         ]);
     }
 
-    private static int TraverseBrepComponent(Brep brep, int[] componentIds, int seed, int componentId) {
-        Queue<int> queue = new([seed,]);
-        componentIds[seed] = componentId;
-        while (queue.Count > 0) {
-            int faceIdx = queue.Dequeue();
-            foreach (int edgeIdx in brep.Faces[faceIdx].AdjacentEdges()) {
-                foreach (int adjFace in brep.Edges[edgeIdx].AdjacentFaces().Where(f => componentIds[f] == -1)) {
-                    componentIds[adjFace] = componentId;
-                    queue.Enqueue(adjFace);
-                }
-            }
-        }
-        return componentId;
-    }
-
     [Pure]
     private static Result<IReadOnlyList<Topology.ConnectivityData>> ExecuteMeshConnectivity(Mesh mesh) {
         int[] componentIds = new int[mesh.Faces.Count];
@@ -331,7 +329,18 @@ internal static class TopologyCore {
         for (int seed = 0; seed < mesh.Faces.Count; seed++) {
             componentCount = componentIds[seed] != -1
                 ? componentCount
-                : TraverseMeshComponent(mesh: mesh, componentIds: componentIds, seed: seed, componentId: componentCount) + 1;
+                : ((Func<int>)(() => {
+                    Queue<int> queue = new([seed,]);
+                    componentIds[seed] = componentCount;
+                    while (queue.Count > 0) {
+                        int faceIdx = queue.Dequeue();
+                        foreach (int adjFace in mesh.Faces.AdjacentFaces(faceIdx).Where(f => f >= 0 && componentIds[f] == -1)) {
+                            componentIds[adjFace] = componentCount;
+                            queue.Enqueue(adjFace);
+                        }
+                    }
+                    return componentCount;
+                }))() + 1;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount)
             .Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, mesh.Faces.Count).Where(f => componentIds[f] == c),]),
@@ -368,27 +377,20 @@ internal static class TopologyCore {
         ]);
     }
 
-    private static int TraverseMeshComponent(Mesh mesh, int[] componentIds, int seed, int componentId) {
-        Queue<int> queue = new([seed,]);
-        componentIds[seed] = componentId;
-        while (queue.Count > 0) {
-            int faceIdx = queue.Dequeue();
-            foreach (int adjFace in mesh.Faces.AdjacentFaces(faceIdx).Where(f => f >= 0 && componentIds[f] == -1)) {
-                componentIds[adjFace] = componentId;
-                queue.Enqueue(adjFace);
-            }
-        }
-        return componentId;
-    }
-
     [Pure]
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ExecuteBrepEdgeClassification(Brep brep, Continuity minContinuity, double angleThreshold) {
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, brep.Edges.Count),];
-        IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => ClassifyBrepEdge(
-            edge: brep.Edges[i],
-            _: brep,
-            minContinuity: minContinuity,
-            angleThreshold: angleThreshold)),
+        IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => brep.Edges[i].Valence switch {
+            EdgeAdjacency.Naked => Topology.EdgeContinuityType.Boundary,
+            EdgeAdjacency.NonManifold => Topology.EdgeContinuityType.NonManifold,
+            EdgeAdjacency.Interior => brep.Edges[i].EdgeCurve switch {
+                Curve crv when crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Curvature,
+                Curve crv when brep.Edges[i].IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Smooth,
+                _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
+                _ => Topology.EdgeContinuityType.Interior,
+            },
+            _ => Topology.EdgeContinuityType.Sharp,
+        }),
         ];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => brep.Edges[i].GetLength()),];
         FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices
@@ -406,20 +408,6 @@ internal static class TopologyCore {
     }
 
     [Pure]
-    private static Topology.EdgeContinuityType ClassifyBrepEdge(BrepEdge edge, Brep _, Continuity minContinuity, double angleThreshold) =>
-        edge.Valence switch {
-            EdgeAdjacency.Naked => Topology.EdgeContinuityType.Boundary,
-            EdgeAdjacency.NonManifold => Topology.EdgeContinuityType.NonManifold,
-            EdgeAdjacency.Interior => edge.EdgeCurve switch {
-                Curve crv when crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Curvature,
-                Curve crv when edge.IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Smooth,
-                _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
-                _ => Topology.EdgeContinuityType.Interior,
-            },
-            _ => Topology.EdgeContinuityType.Sharp,
-        };
-
-    [Pure]
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ExecuteMeshEdgeClassification(Mesh mesh, double angleThreshold) {
         double curvatureThreshold = angleThreshold * 0.1;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
@@ -428,10 +416,17 @@ internal static class TopologyCore {
             return connectedFaces.Length switch {
                 1 => Topology.EdgeContinuityType.Boundary,
                 > 2 => Topology.EdgeContinuityType.NonManifold,
-                2 => CalculateDihedralAngle(mesh: mesh, faceIdx1: connectedFaces[0], faceIdx2: connectedFaces[1]) switch {
-                    double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
-                    double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
-                    _ => Topology.EdgeContinuityType.Sharp,
+                2 => (new Vector3d(mesh.FaceNormals[connectedFaces[0]]), new Vector3d(mesh.FaceNormals[connectedFaces[1]])) switch {
+                    (Vector3d n1, Vector3d n2) when n1.IsValid && n2.IsValid => Vector3d.VectorAngle(n1, n2) switch {
+                        double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
+                        double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
+                        _ => Topology.EdgeContinuityType.Sharp,
+                    },
+                    _ => Math.PI switch {
+                        double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
+                        double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
+                        _ => Topology.EdgeContinuityType.Sharp,
+                    },
                 },
                 _ => Topology.EdgeContinuityType.Sharp,
             };
@@ -454,13 +449,6 @@ internal static class TopologyCore {
                 GroupedByType: grouped,
                 MinimumContinuity: Continuity.C0_continuous),
         ]);
-    }
-
-    [Pure]
-    private static double CalculateDihedralAngle(Mesh mesh, int faceIdx1, int faceIdx2) {
-        Vector3d n1 = mesh.FaceNormals[faceIdx1];
-        Vector3d n2 = mesh.FaceNormals[faceIdx2];
-        return n1.IsValid && n2.IsValid ? Vector3d.VectorAngle(n1, n2) : Math.PI;
     }
 
     [Pure]
