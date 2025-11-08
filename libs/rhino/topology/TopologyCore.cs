@@ -70,27 +70,27 @@ internal static class TopologyCore {
             : ResultFactory.Create<TResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"ResultType: {typeof(TResult).Name}"));
 
     [Pure]
-    internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops, bool _) where T : notnull =>
+    internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops) where T : notnull =>
         Execute<T, Topology.NakedEdgeData>(input, ValueTuple.Create(orderLoops), context);
 
     [Pure]
-    internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance, bool _) where T : notnull =>
+    internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance) where T : notnull =>
         Execute<T, Topology.BoundaryLoopData>(input, ValueTuple.Create(tolerance ?? context.AbsoluteTolerance), context);
 
     [Pure]
-    internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context, bool _) where T : notnull =>
+    internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context) where T : notnull =>
         Execute<T, Topology.NonManifoldData>(input, config: null, context);
 
     [Pure]
-    internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context, bool _) where T : notnull =>
+    internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context) where T : notnull =>
         Execute<T, Topology.ConnectivityData>(input, config: null, context);
 
     [Pure]
-    internal static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(T input, IGeometryContext context, Continuity? minimumContinuity = null, double? angleThreshold = null, bool _ = false) where T : notnull =>
-        Execute<T, Topology.EdgeClassificationData>(input, (minimumContinuity ?? Continuity.G1_continuous, angleThreshold ?? context.AngleToleranceRadians), context);
+    internal static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(T input, IGeometryContext context, Continuity? minimumContinuity = null, double? angleThreshold = null) where T : notnull =>
+        Execute<T, Topology.EdgeClassificationData>(input, ValueTuple.Create(minimumContinuity ?? Continuity.G1_continuous, angleThreshold ?? context.AngleToleranceRadians), context);
 
     [Pure]
-    internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex, bool _) where T : notnull =>
+    internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex) where T : notnull =>
         Execute<T, Topology.AdjacencyData>(input, ValueTuple.Create(edgeIndex), context);
 
     [Pure]
