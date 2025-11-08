@@ -124,12 +124,30 @@ internal static class AnalysisCore {
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation delegates.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
-            [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) => ComputeCurve((Curve)g, ctx, t, order)),
-            [typeof(NurbsCurve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) => ComputeCurve((Curve)g, ctx, t, order)),
-            [typeof(Surface)] = (V.Standard | V.SurfaceContinuity, (g, _, _, uv, _, _, order) => ComputeSurface((Surface)g, uv, order)),
-            [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, _, _, uv, _, _, order) => ComputeSurface((Surface)g, uv, order)),
-            [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) => ComputeBrep((Brep)g, ctx, uv, faceIdx, testPt, order)),
-            [typeof(Mesh)] = (V.MeshSpecific, (g, _, _, _, vertIdx, _, _) => ComputeMesh((Mesh)g, vertIdx)),
+            [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
+                ResultFactory.Create(value: (Curve)g)
+                    .Validate(args: [ctx, V.Standard | V.Degeneracy])
+                    .Bind(cv => ComputeCurve(cv, ctx, t, order))),
+            [typeof(NurbsCurve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
+                ResultFactory.Create(value: (NurbsCurve)g)
+                    .Validate(args: [ctx, V.Standard | V.Degeneracy])
+                    .Bind(cv => ComputeCurve(cv, ctx, t, order))),
+            [typeof(Surface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+                ResultFactory.Create(value: (Surface)g)
+                    .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
+                    .Bind(sf => ComputeSurface(sf, uv, order))),
+            [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+                ResultFactory.Create(value: (NurbsSurface)g)
+                    .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
+                    .Bind(sf => ComputeSurface(sf, uv, order))),
+            [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
+                ResultFactory.Create(value: (Brep)g)
+                    .Validate(args: [ctx, V.Standard | V.Topology | V.MassProperties])
+                    .Bind(brep => ComputeBrep(brep, ctx, uv, faceIdx, testPt, order))),
+            [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
+                ResultFactory.Create(value: (Mesh)g)
+                    .Validate(args: [ctx, V.MeshSpecific])
+                    .Bind(mesh => ComputeMesh(mesh, vertIdx))),
         }.ToFrozenDictionary();
 
     /// <summary>Executes type-driven dispatch with automatic validation and geometry-specific computation.</summary>
@@ -144,12 +162,10 @@ internal static class AnalysisCore {
         int derivativeOrder,
         bool enableDiagnostics = false) =>
         _strategies.TryGetValue(geometry.GetType(), out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)
-            ? ResultFactory.Create(value: geometry)
-                .Validate(args: [context, strategy.mode])
-                .Bind(g => enableDiagnostics
-                    ? strategy.compute(g, context, t, uv, index, testPoint, derivativeOrder)
-                        .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
-                    : strategy.compute(g, context, t, uv, index, testPoint, derivativeOrder))
+            ? (enableDiagnostics
+                ? strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder)
+                    .Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
+                : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
                 .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
             : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometry.GetType().Name));
 }
