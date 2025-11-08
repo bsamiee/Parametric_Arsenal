@@ -28,29 +28,14 @@ public static class ValidationRules {
         public static bool operator !=(CacheKey left, CacheKey right) => !left.Equals(right);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
+        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
+        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
     }
-
-    private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
-    private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
-
-    private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
-        .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
-    private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
-        .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
-    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
-
-    private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
-    private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
-    private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
-    private static readonly ConstantExpression _constantZero = Expression.Constant(0);
-    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
 
     private static readonly FrozenDictionary<V, (string[] Properties, string[] Methods, SystemError Error)> _validationRules =
         new Dictionary<V, (string[], string[], SystemError)> {
@@ -65,6 +50,21 @@ public static class ValidationRules {
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
         }.ToFrozenDictionary();
+
+    private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
+    private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
+
+    private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
+    private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
+    private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
+    private static readonly ConstantExpression _constantZero = Expression.Constant(0);
+    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
+
+    private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
+        .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
+    private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
+        .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
+    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
 
     /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -28,39 +28,6 @@ public sealed record GeometryContext(
     [Pure]
     public double AngleToleranceDegrees => RhinoMath.ToDegrees(this.AngleToleranceRadians);
 
-    /// <summary>Create context with robust defaults for a unit system.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<GeometryContext> CreateWithDefaults(UnitSystem units) =>
-        Create(absoluteTolerance: 0.01, relativeTolerance: 0.0, angleToleranceRadians: RhinoMath.ToRadians(1.0), units: units);
-
-    /// <summary>Create context from RhinoDoc model settings.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
-        ArgumentNullException.ThrowIfNull(doc);
-        return Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
-    }
-
-    /// <summary>Converts a length value to target units with full validation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
-        RhinoMath.IsValidDouble(value) switch {
-            false => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
-            true => this.GetLengthScale(targetUnits).Bind(scale =>
-                RhinoMath.IsValidDouble(value * scale) switch {
-                    true => ResultFactory.Create(value: value * scale),
-                    false => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
-                }),
-        };
-
-    /// <summary>Returns scale factor from Units to target units.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Result<double> GetLengthScale(UnitSystem targetUnits) =>
-        (targetUnits == this.Units, RhinoMath.UnitScale(this.Units, targetUnits)) switch {
-            (true, _) => ResultFactory.Create(value: 1.0),
-            (_, double scale) when RhinoMath.IsValidDouble(scale) && scale > RhinoMath.ZeroTolerance => ResultFactory.Create(value: scale),
-            _ => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
-        };
-
     /// <summary>Validates if value differences are within absolute tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinAbsoluteTolerance(double a, double b) => RhinoMath.EpsilonEquals(a, b, this.AbsoluteTolerance);
@@ -73,6 +40,39 @@ public sealed record GeometryContext(
     /// <summary>Validates if squared distance is within squared absolute tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinSquaredTolerance(double squaredDistance) => squaredDistance <= this.AbsoluteToleranceSquared;
+
+    /// <summary>Create context with robust defaults for a unit system.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<GeometryContext> CreateWithDefaults(UnitSystem units) =>
+        Create(absoluteTolerance: 0.01, relativeTolerance: 0.0, angleToleranceRadians: RhinoMath.ToRadians(1.0), units: units);
+
+    /// <summary>Create context from RhinoDoc model settings.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
+        ArgumentNullException.ThrowIfNull(doc);
+        return Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
+    }
+
+    /// <summary>Returns scale factor from Units to target units.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<double> GetLengthScale(UnitSystem targetUnits) =>
+        (targetUnits == this.Units, RhinoMath.UnitScale(this.Units, targetUnits)) switch {
+            (true, _) => ResultFactory.Create(value: 1.0),
+            (_, double scale) when RhinoMath.IsValidDouble(scale) && scale > RhinoMath.ZeroTolerance => ResultFactory.Create(value: scale),
+            _ => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
+        };
+
+    /// <summary>Converts a length value to target units with full validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
+        RhinoMath.IsValidDouble(value) switch {
+            false => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
+            true => this.GetLengthScale(targetUnits).Bind(scale =>
+                RhinoMath.IsValidDouble(value * scale) switch {
+                    true => ResultFactory.Create(value: value * scale),
+                    false => ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion]),
+                }),
+        };
 
     /// <summary>Create validated context with normalization for robustness.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

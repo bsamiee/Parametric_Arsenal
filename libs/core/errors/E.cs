@@ -72,6 +72,13 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError Get(int code, string? context = null) =>
+        (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}", context) switch {
+            (ErrorDomain domain, string message, null) => new SystemError(domain, code, message),
+            (ErrorDomain domain, string message, string ctx) => new SystemError(domain, code, message).WithContext(ctx),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ErrorDomain GetDomain(int code) => code switch {
         >= 1000 and < 2000 => ErrorDomain.Results,
         >= 2000 and < 3000 => ErrorDomain.Geometry,
@@ -79,13 +86,6 @@ public static class E {
         >= 4000 and < 5000 => ErrorDomain.Spatial,
         _ => ErrorDomain.Unknown,
     };
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) =>
-        (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}", context) switch {
-            (ErrorDomain domain, string message, null) => new SystemError(domain, code, message),
-            (ErrorDomain domain, string message, string ctx) => new SystemError(domain, code, message).WithContext(ctx),
-        };
 
     /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {

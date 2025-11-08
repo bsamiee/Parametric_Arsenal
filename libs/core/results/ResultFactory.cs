@@ -9,6 +9,24 @@ namespace Arsenal.Core.Results;
 
 /// <summary>Factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
+    /// <summary>Checks if type is Geometry without loading Rhino assembly.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsGeometryType(Type type) =>
+        type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
+
+    /// <summary>Accumulates item into Result list using applicative composition.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
+        accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
+
+    /// <summary>Traverses IEnumerable elements with monadic transformation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
+        ArgumentNullException.ThrowIfNull(selector);
+        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
+            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
+    }
+
     /// <summary>Creates Result using polymorphic parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
@@ -89,22 +107,4 @@ public static class ResultFactory {
                 $"{E.Results.InvalidLift.Message}: arity={ar.ToString(CultureInfo.InvariantCulture)}, results={rc.ToString(CultureInfo.InvariantCulture)}, args={a.Length.ToString(CultureInfo.InvariantCulture)}"), nameof(args)),
         };
     }
-
-    /// <summary>Traverses IEnumerable elements with monadic transformation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
-        ArgumentNullException.ThrowIfNull(selector);
-        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
-    }
-
-    /// <summary>Accumulates item into Result list using applicative composition.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
-        accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
-
-    /// <summary>Checks if type is Geometry without loading Rhino assembly.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsGeometryType(Type type) =>
-        type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
 }

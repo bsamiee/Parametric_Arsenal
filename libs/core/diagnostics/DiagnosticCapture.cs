@@ -11,9 +11,42 @@ namespace Arsenal.Core.Diagnostics;
 /// <summary>Diagnostic capture engine with ConditionalWeakTable storage for compile-time tracing.</summary>
 public static class DiagnosticCapture {
 #if DEBUG
-    private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
     private static readonly ActivitySource _activitySource = new("Arsenal.Core", "1.0.0");
+    private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
 #endif
+
+    /// <summary>Compile-time feature detection for diagnostic capability.</summary>
+    [Pure]
+    public static bool IsEnabled =>
+#if DEBUG
+        true;
+#else
+        false;
+#endif
+
+    /// <summary>Retrieves diagnostic metadata for Result instance.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
+#if DEBUG
+        bool found = _metadata.TryGetValue(result, out StrongBox<DiagnosticContext>? box);
+        context = found && box is not null ? box.Value! : default;
+        return found;
+#else
+        _ = result;
+        context = default;
+        return false;
+#endif
+    }
+
+    /// <summary>Clears all diagnostic metadata for memory reclamation.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#pragma warning disable IDE0022 // Use expression body for method
+    public static void Clear() {
+#if DEBUG
+        _metadata.Clear();
+#endif
+    }
+#pragma warning restore IDE0022
 
     /// <summary>Captures operation diagnostics with allocation tracking and Activity tracing.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,37 +81,4 @@ public static class DiagnosticCapture {
         return result;
 #endif
     }
-
-    /// <summary>Retrieves diagnostic metadata for Result instance.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
-#if DEBUG
-        bool found = _metadata.TryGetValue(result, out StrongBox<DiagnosticContext>? box);
-        context = found && box is not null ? box.Value! : default;
-        return found;
-#else
-        _ = result;
-        context = default;
-        return false;
-#endif
-    }
-
-    /// <summary>Clears all diagnostic metadata for memory reclamation.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#pragma warning disable IDE0022 // Use expression body for method
-    public static void Clear() {
-#if DEBUG
-        _metadata.Clear();
-#endif
-    }
-#pragma warning restore IDE0022
-
-    /// <summary>Compile-time feature detection for diagnostic capability.</summary>
-    [Pure]
-    public static bool IsEnabled =>
-#if DEBUG
-        true;
-#else
-        false;
-#endif
 }

@@ -31,13 +31,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
 
     public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,]).ToFrozenSet();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
-    public static V operator |(V left, V right) => new((ushort)(left._flags | right._flags));
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
-    public static V operator &(V left, V right) => new((ushort)(left._flags & right._flags));
+    [Pure] private string DebuggerDisplay => this.ToString();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool operator ==(V left, V right) => left._flags == right._flags;
@@ -46,10 +40,12 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static bool operator !=(V left, V right) => left._flags != right._flags;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Has(V other) =>
-        other._flags == 0
-            ? this._flags == 0
-            : (this._flags & other._flags) == other._flags;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
+    public static V operator |(V left, V right) => new((ushort)(left._flags | right._flags));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Bitwise operations are idiomatic for flag types")]
+    public static V operator &(V left, V right) => new((ushort)(left._flags & right._flags));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA2225:Operator overloads have named alternates", Justification = "Implicit conversions for internal use")]
@@ -60,15 +56,19 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static implicit operator V(ushort flags) => new(flags);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public override int GetHashCode() => this._flags;
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override bool Equals(object? obj) => obj is V other && this._flags == other._flags;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(V other) => this._flags == other._flags;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override int GetHashCode() => this._flags;
-
-    [Pure] private string DebuggerDisplay => this.ToString();
+    public bool Has(V other) =>
+        other._flags == 0
+            ? this._flags == 0
+            : (this._flags & other._flags) == other._flags;
 
     [Pure]
     public override string ToString() => this._flags == All._flags

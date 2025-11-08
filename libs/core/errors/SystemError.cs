@@ -11,10 +11,11 @@ namespace Arsenal.Core.Errors;
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly record struct SystemError(ErrorDomain Domain, int Code, string Message) {
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{this.Domain}:{this.Code.ToString(CultureInfo.InvariantCulture)}] {this.Message}");
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public SystemError WithContext(string context) =>
-        new(this.Domain, this.Code, $"{this.Message} (Context: {context})");
 
     [Pure]
     public override string ToString() => $"[{this.Domain}:{this.Code}] {this.Message}";
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public SystemError WithContext(string context) =>
+        new(this.Domain, this.Code, $"{this.Message} (Context: {context})");
 }
