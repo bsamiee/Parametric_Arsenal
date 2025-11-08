@@ -135,12 +135,13 @@ internal static class TopologyCore {
                                 IsBoundary: valence == EdgeAdjacency.Naked),
                         ]),
                     },
-                    TopologyConfig.AdjacencyAccessor accessor => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}"))),
+                    _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}"))),
                 }
                 : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")));
 
     [Pure]
     private static Result<IReadOnlyList<Topology.ConnectivityData>> ExecuteConnectivityBFS(TopologyConfig.TopologyAccessor accessor) {
+        IReadOnlyList<IReadOnlyList<int>> adjacencies = [.. Enumerable.Range(0, accessor.FaceCount).Select(f => (IReadOnlyList<int>)[.. accessor.GetAdjacentFaces(f),]),];
         int[] componentIds = new int[accessor.FaceCount];
         Array.Fill(componentIds, -1);
         int componentCount = 0;
@@ -150,7 +151,7 @@ internal static class TopologyCore {
                 componentIds[seed] = componentCount;
                 while (queue.Count > 0) {
                     int faceIdx = queue.Dequeue();
-                    foreach (int adjFace in accessor.GetAdjacentFaces(faceIdx).Where(f => componentIds[f] == -1)) {
+                    foreach (int adjFace in adjacencies[faceIdx].Where(f => componentIds[f] == -1)) {
                         componentIds[adjFace] = componentCount;
                         queue.Enqueue(adjFace);
                     }
@@ -160,7 +161,7 @@ internal static class TopologyCore {
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, accessor.FaceCount).Where(f => componentIds[f] == c),]),];
         IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => union.IsValid ? BoundingBox.Union(union, accessor.GetFaceBoundingBox(fIdx)) : accessor.GetFaceBoundingBox(fIdx))),];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, accessor.FaceCount).Select(f => (f, (IReadOnlyList<int>)[.. accessor.GetAdjacentFaces(f).Where(adj => adj != f),])).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, accessor.FaceCount).Select(f => (f, (IReadOnlyList<int>)[.. adjacencies[f].Where(adj => adj != f),])).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
     }
 
     [Pure]

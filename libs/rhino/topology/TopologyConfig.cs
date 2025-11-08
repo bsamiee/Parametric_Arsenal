@@ -63,16 +63,22 @@ internal static class TopologyConfig {
     internal static readonly FrozenDictionary<Type, Func<object, EdgeAccessor>> EdgeAccessors =
         new Dictionary<Type, Func<object, EdgeAccessor>> {
             [typeof(Brep)] = geo => geo is Brep brep
-                ? new EdgeAccessor(
-                    EdgeCount: brep.Edges.Count,
-                    GetNakedEdges: () => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => (brep.Edges[i].DuplicateCurve(), i)),],
-                    GetTotalLength: () => Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Sum(i => brep.Edges[i].GetLength()))
+                ? ((Func<EdgeAccessor>)(() => {
+                    IReadOnlyList<int> nakedIndices = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),];
+                    return new EdgeAccessor(
+                        EdgeCount: brep.Edges.Count,
+                        GetNakedEdges: () => [.. nakedIndices.Select(i => (brep.Edges[i].DuplicateCurve(), i)),],
+                        GetTotalLength: () => nakedIndices.Sum(i => brep.Edges[i].GetLength()));
+                }))()
                 : default,
             [typeof(Mesh)] = geo => geo is Mesh mesh
-                ? new EdgeAccessor(
-                    EdgeCount: mesh.TopologyEdges.Count,
-                    GetNakedEdges: () => [.. (mesh.GetNakedEdges() ?? []).Select((pl, i) => (pl.ToNurbsCurve(), i)),],
-                    GetTotalLength: () => (mesh.GetNakedEdges() ?? []).Sum(pl => pl.Length))
+                ? ((Func<EdgeAccessor>)(() => {
+                    IReadOnlyList<int> nakedIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1),];
+                    return new EdgeAccessor(
+                        EdgeCount: mesh.TopologyEdges.Count,
+                        GetNakedEdges: () => [.. nakedIndices.Select(i => (mesh.TopologyEdges.EdgeLine(i).ToNurbsCurve(), i)),],
+                        GetTotalLength: () => nakedIndices.Sum(i => mesh.TopologyEdges.EdgeLine(i).Length));
+                }))()
                 : default,
         }.ToFrozenDictionary();
 
