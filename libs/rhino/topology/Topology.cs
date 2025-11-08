@@ -182,7 +182,7 @@ public static class Topology {
     public static Result<EdgeClassificationData> ClassifyEdges<T>(
         T geometry,
         IGeometryContext context,
-        Continuity? minimumContinuity = null,
+        Continuity minimumContinuity = Continuity.G1_continuous,
         double? angleThreshold = null,
         bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);

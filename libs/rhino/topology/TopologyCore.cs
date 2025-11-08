@@ -62,13 +62,13 @@ internal static class TopologyCore {
                 Brep brep => ((Func<Result<IReadOnlyList<Topology.NonManifoldData>>>)(() => {
                     int[] nm = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),];
                     IReadOnlyList<int> vals = [.. nm.Select(i => (int)brep.Edges[i].Valence),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(EdgeIndices: [.. nm,], VertexIndices: [], Valences: vals, Locations: [.. nm.Select(i => brep.Edges[i].PointAtStart),], IsManifold: nm.Length == 0, IsOrientable: brep.IsSolid, MaxValence: vals.Count > 0 ? vals.Max() : 0),]);
+                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(EdgeIndices: nm, VertexIndices: [], Valences: vals, Locations: [.. nm.Select(i => brep.Edges[i].PointAtStart),], IsManifold: nm.Length == 0, IsOrientable: brep.IsSolid, MaxValence: vals.Count > 0 ? vals.Max() : 0),]);
                 }))(),
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NonManifoldData>>>)(() => {
                     bool manifold = mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _);
                     int[] nm = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),];
                     IReadOnlyList<int> vals = [.. nm.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(EdgeIndices: [.. nm,], VertexIndices: [], Valences: vals, Locations: [.. nm.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair v => new Point3d((mesh.TopologyVertices[v.I].X + mesh.TopologyVertices[v.J].X) / 2.0, (mesh.TopologyVertices[v.I].Y + mesh.TopologyVertices[v.J].Y) / 2.0, (mesh.TopologyVertices[v.I].Z + mesh.TopologyVertices[v.J].Z) / 2.0) }),], IsManifold: manifold, IsOrientable: oriented, MaxValence: vals.Count > 0 ? vals.Max() : 0),]);
+                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(EdgeIndices: nm, VertexIndices: [], Valences: vals, Locations: [.. nm.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair v => new Point3d((mesh.TopologyVertices[v.I].X + mesh.TopologyVertices[v.J].X) / 2.0, (mesh.TopologyVertices[v.I].Y + mesh.TopologyVertices[v.J].Y) / 2.0, (mesh.TopologyVertices[v.I].Z + mesh.TopologyVertices[v.J].Z) / 2.0) }),], IsManifold: manifold, IsOrientable: oriented, MaxValence: vals.Count > 0 ? vals.Max() : 0),]);
                 }))(),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
