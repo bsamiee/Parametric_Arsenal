@@ -21,8 +21,13 @@ public static class E {
             [2200] = "Intersection method not supported for geometry types",
             [2201] = "Intersection computation failed",
             [2202] = "Projection direction vector is invalid or zero-length",
+            [2203] = "Trim operation failed",
             [2204] = "Ray direction vector is invalid or zero-length",
             [2205] = "Maximum hit count must be positive",
+            [2206] = "Split operation failed",
+            [2207] = "Invalid trim parameter",
+            [2208] = "Invalid split parameter",
+            [2209] = "Trim interval invalid or empty",
             [2300] = "Geometry type not supported for analysis",
             [2310] = "Curve analysis computation failed",
             [2311] = "Surface analysis computation failed",
@@ -109,8 +114,13 @@ public static class E {
         public static readonly SystemError UnsupportedIntersection = Get(2200);
         public static readonly SystemError IntersectionFailed = Get(2201);
         public static readonly SystemError InvalidProjection = Get(2202);
+        public static readonly SystemError TrimFailed = Get(2203);
         public static readonly SystemError InvalidRay = Get(2204);
         public static readonly SystemError InvalidMaxHits = Get(2205);
+        public static readonly SystemError SplitFailed = Get(2206);
+        public static readonly SystemError InvalidTrimParameter = Get(2207);
+        public static readonly SystemError InvalidSplitParameter = Get(2208);
+        public static readonly SystemError InvalidTrimInterval = Get(2209);
         public static readonly SystemError UnsupportedAnalysis = Get(2300);
         public static readonly SystemError CurveAnalysisFailed = Get(2310);
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);

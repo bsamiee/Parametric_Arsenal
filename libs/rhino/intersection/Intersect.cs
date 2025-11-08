@@ -64,9 +64,45 @@ public static class Intersect {
         .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(
             [.. acc.Points, .. curr.Points],
             [.. acc.Curves, .. curr.Curves],
-            [.. acc.ParametersA, .. curr.ParametersA],
+            [.. acc.ParametersA, .. curr.ParametersB],
             [.. acc.ParametersB, .. curr.ParametersB],
             [.. acc.FaceIndices, .. curr.FaceIndices],
             [.. acc.Sections, .. curr.Sections])));
     }
+
+    /// <summary>Trims geometry using interval, parameter, or boundary with polymorphic dispatch.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Trim<T>(
+        T geometry,
+        object trimSpec,
+        IGeometryContext context,
+        bool enableDiagnostics = false) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                IntersectionCore.ExecuteTrim(item, trimSpec, context)),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = IntersectionConfig.GetTrimValidationMode(typeof(T)),
+                OperationName = $"Trim.{typeof(T).Name}",
+                EnableDiagnostics = enableDiagnostics,
+            }).Map(r => r[0]);
+
+    /// <summary>Splits geometry at parameters or with splitting curves/surfaces using polymorphic dispatch.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> Split<T>(
+        T geometry,
+        object splitter,
+        IGeometryContext context,
+        bool enableDiagnostics = false) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                IntersectionCore.ExecuteSplit(item, splitter, context)),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = IntersectionConfig.GetSplitValidationMode(typeof(T)),
+                OperationName = $"Split.{typeof(T).Name}",
+                EnableDiagnostics = enableDiagnostics,
+            }).Map(r => r);
 }

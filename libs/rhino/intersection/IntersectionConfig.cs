@@ -48,4 +48,52 @@ internal static class IntersectionConfig {
             [(typeof(Point3d[]), typeof(Mesh[]))] = V.MeshSpecific,
             [(typeof(Ray3d), typeof(GeometryBase[]))] = V.Standard,
         }.ToFrozenDictionary();
+
+    /// <summary>Validation mode mapping for trim operations by geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, V> TrimValidationModes =
+        new Dictionary<Type, V> {
+            [typeof(Curve)] = V.Standard | V.Degeneracy,
+            [typeof(NurbsCurve)] = V.Standard | V.Degeneracy | V.NurbsGeometry,
+            [typeof(PolyCurve)] = V.Standard | V.Degeneracy | V.PolycurveStructure,
+            [typeof(LineCurve)] = V.Standard | V.Degeneracy,
+            [typeof(ArcCurve)] = V.Standard | V.Degeneracy,
+            [typeof(PolylineCurve)] = V.Standard | V.Degeneracy,
+            [typeof(Surface)] = V.Standard | V.UVDomain,
+            [typeof(NurbsSurface)] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [typeof(BrepFace)] = V.Standard | V.Topology,
+        }.ToFrozenDictionary();
+
+    /// <summary>Validation mode mapping for split operations by geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, V> SplitValidationModes =
+        new Dictionary<Type, V> {
+            [typeof(Curve)] = V.Standard | V.Degeneracy,
+            [typeof(NurbsCurve)] = V.Standard | V.Degeneracy | V.NurbsGeometry,
+            [typeof(PolyCurve)] = V.Standard | V.Degeneracy | V.PolycurveStructure,
+            [typeof(LineCurve)] = V.Standard | V.Degeneracy,
+            [typeof(ArcCurve)] = V.Standard | V.Degeneracy,
+            [typeof(PolylineCurve)] = V.Standard | V.Degeneracy,
+            [typeof(Surface)] = V.Standard | V.UVDomain,
+            [typeof(NurbsSurface)] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [typeof(Brep)] = V.Standard | V.Topology,
+            [typeof(BrepFace)] = V.Standard | V.Topology,
+            [typeof(Extrusion)] = V.Standard | V.ExtrusionGeometry,
+        }.ToFrozenDictionary();
+
+    /// <summary>Retrieves validation mode for trim operations with inheritance fallback.</summary>
+    internal static V GetTrimValidationMode(Type geometryType) =>
+        TrimValidationModes.TryGetValue(geometryType, out V exact) ? exact :
+            TrimValidationModes.Where(kv => kv.Key.IsAssignableFrom(geometryType))
+                .OrderByDescending(kv => kv.Key, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(V.Standard)
+                .First();
+
+    /// <summary>Retrieves validation mode for split operations with inheritance fallback.</summary>
+    internal static V GetSplitValidationMode(Type geometryType) =>
+        SplitValidationModes.TryGetValue(geometryType, out V exact) ? exact :
+            SplitValidationModes.Where(kv => kv.Key.IsAssignableFrom(geometryType))
+                .OrderByDescending(kv => kv.Key, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(V.Standard)
+                .First();
 }
