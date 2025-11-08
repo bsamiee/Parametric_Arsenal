@@ -101,6 +101,41 @@ public static class Orient {
                 },
             }).Map(r => r[0]);
 
+    /// <summary>Orients geometry to best-fit plane computed via PCA, optionally targeting custom plane.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToBestFit<T>(
+        T geometry,
+        IGeometryContext context,
+        Plane? targetPlane = null) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                ((Func<Result<IReadOnlyList<T>>>)(() => {
+                    Point3d[] points = item switch {
+                        PointCloud pc => pc.GetPoints(),
+                        Mesh m => m.Vertices.ToPoint3dArray(),
+                        Curve c => Enumerable.Range(0, 20)
+                            .Select(i => c.PointAt(c.Domain.ParameterAt((double)i / 19.0)))
+                            .ToArray(),
+                        Surface s => Enumerable.Range(0, 100)
+                            .Select(i => s.PointAt(
+                                s.Domain(0).ParameterAt((double)(i % 10) / 9.0),
+                                s.Domain(1).ParameterAt((double)(i / 10) / 9.0)))
+                            .ToArray(),
+                        Brep b => b.Vertices.Select(v => v.Location).ToArray(),
+                        _ => item.GetBoundingBox(accurate: true).GetCorners(),
+                    };
+                    Plane target = targetPlane ?? Plane.WorldXY;
+                    PlaneFitResult fitResult = Plane.FitPlaneToPoints(points, out Plane bestFit);
+                    return fitResult == PlaneFitResult.Success && bestFit.IsValid
+                        ? OrientCore.ApplyTransform(item, Transform.PlaneToPlane(bestFit, target))
+                        : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.FrameExtractionFailed);
+                }))()),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+            }).Map(r => r[0]);
+
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> ToPoint<T>(T geometry, Point3d target, bool useMass, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
@@ -114,20 +149,21 @@ public static class Orient {
                 ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
             }).Map(r => r[0]);
 
+    /// <summary>Rotates geometry to align source vector with target vector around specified anchor point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, IGeometryContext context) where T : GeometryBase =>
+    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, IGeometryContext context, Point3d? anchor = null) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
-                        (new Vector3d(s), new Vector3d(t)) switch {
-                            (Vector3d su, Vector3d tu) when su.Unitize() && tu.Unitize() =>
+                (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target, anchor) switch {
+                    (BoundingBox b, Vector3d s, Vector3d t, Point3d? a) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
+                        (new Vector3d(s), new Vector3d(t), a ?? b.Center) switch {
+                            (Vector3d su, Vector3d tu, Point3d pivot) when su.Unitize() && tu.Unitize() =>
                                 (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold)
                                     ? (Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold)
                                         ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
                                         : OrientCore.ApplyTransform(item, Transform.Identity)
-                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, b.Center)),
+                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, pivot)),
                             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
                         },
                     _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
