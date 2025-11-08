@@ -192,85 +192,36 @@ internal static class TopologyCore {
 
     [Pure]
     private static Result<IReadOnlyList<Topology.BoundaryLoopData>> ExecuteBrepBoundaryLoops(Brep brep, double tol) {
-        Curve[] nakedCurves = [.. Enumerable.Range(0, brep.Edges.Count)
-            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-            .Select(i => brep.Edges[i].DuplicateCurve()),
-        ];
-        Curve[] joined = nakedCurves.Length > 0
-            ? Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false)
-            : [];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[
-            new Topology.BoundaryLoopData(
-                Loops: [.. joined,],
-                EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
-                LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
-                JoinTolerance: tol,
-                FailedJoins: nakedCurves.Length - joined.Length),
-        ]);
+        Curve[] naked = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => brep.Edges[i].DuplicateCurve()),];
+        Curve[] joined = naked.Length > 0 ? Curve.JoinCurves(naked, joinTolerance: tol, preserveDirection: false) : [];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData([.. joined,], [.. joined.Select(_ => EmptyIndices),], [.. joined.Select(c => c.GetLength()),], [.. joined.Select(c => c.IsClosed),], tol, naked.Length - joined.Length),]);
     }
 
     [Pure]
     private static Result<IReadOnlyList<Topology.BoundaryLoopData>> ExecuteMeshBoundaryLoops(Mesh mesh, double tol) {
-        Polyline[] nakedPolylines = mesh.GetNakedEdges() ?? [];
-        Curve[] nakedCurves = [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),];
-        Curve[] joined = nakedCurves.Length > 0
-            ? Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false)
-            : [];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[
-            new Topology.BoundaryLoopData(
-                Loops: [.. joined,],
-                EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
-                LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
-                JoinTolerance: tol,
-                FailedJoins: nakedCurves.Length - joined.Length),
-        ]);
+        Curve[] naked = [.. (mesh.GetNakedEdges() ?? []).Select(pl => pl.ToNurbsCurve()),];
+        Curve[] joined = naked.Length > 0 ? Curve.JoinCurves(naked, joinTolerance: tol, preserveDirection: false) : [];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData([.. joined,], [.. joined.Select(_ => EmptyIndices),], [.. joined.Select(c => c.GetLength()),], [.. joined.Select(c => c.IsClosed),], tol, naked.Length - joined.Length),]);
     }
 
     [Pure]
     private static Result<IReadOnlyList<Topology.NonManifoldData>> ExecuteBrepNonManifold(Brep brep) {
-        IReadOnlyList<int> nonManifoldEdges = [.. Enumerable.Range(0, brep.Edges.Count)
-            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),
-        ];
-        IReadOnlyList<int> valences = [.. nonManifoldEdges.Select(i => (int)brep.Edges[i].Valence),];
-        IReadOnlyList<Point3d> locations = [.. nonManifoldEdges.Select(i => brep.Edges[i].PointAtStart),];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-            new Topology.NonManifoldData(
-                EdgeIndices: nonManifoldEdges,
-                VertexIndices: [],
-                Valences: valences,
-                Locations: locations,
-                IsManifold: nonManifoldEdges.Count == 0,
-                IsOrientable: brep.IsSolid,
-                MaxValence: valences.Count > 0 ? valences.Max() : 0),
-        ]);
+        IReadOnlyList<int> nm = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),];
+        IReadOnlyList<int> vals = [.. nm.Select(i => (int)brep.Edges[i].Valence),];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(nm, [], vals, [.. nm.Select(i => brep.Edges[i].PointAtStart),], nm.Count == 0, brep.IsSolid, vals.Count > 0 ? vals.Max() : 0),]);
     }
 
     [Pure]
     private static Result<IReadOnlyList<Topology.NonManifoldData>> ExecuteMeshNonManifold(Mesh mesh) {
-        bool isManifold = mesh.IsManifold(topologicalTest: true, out bool isOriented, out bool _);
-        IReadOnlyList<int> nonManifoldEdges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
-            .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),
-        ];
-        IReadOnlyList<int> valences = [.. nonManifoldEdges.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-        IReadOnlyList<Point3d> locations = [.. nonManifoldEdges.Select(i => {
-            IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
-            Point3d p1 = mesh.TopologyVertices[verts.I];
-            Point3d p2 = mesh.TopologyVertices[verts.J];
+        bool manifold = mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _);
+        IReadOnlyList<int> nm = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),];
+        IReadOnlyList<int> vals = [.. nm.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(nm, [], vals, [.. nm.Select(i => {
+            IndexPair v = mesh.TopologyEdges.GetTopologyVertices(i);
+            Point3d p1 = mesh.TopologyVertices[v.I];
+            Point3d p2 = mesh.TopologyVertices[v.J];
             return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
-        }),
-        ];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-            new Topology.NonManifoldData(
-                EdgeIndices: nonManifoldEdges,
-                VertexIndices: [],
-                Valences: valences,
-                Locations: locations,
-                IsManifold: isManifold,
-                IsOrientable: isOriented,
-                MaxValence: valences.Count > 0 ? valences.Max() : 0),
-        ]);
+        }),], manifold, oriented, vals.Count > 0 ? vals.Max() : 0),]);
     }
 
     [Pure]
@@ -428,7 +379,11 @@ internal static class TopologyCore {
             return connectedFaces.Length switch {
                 1 => Topology.EdgeContinuityType.Boundary,
                 > 2 => Topology.EdgeContinuityType.NonManifold,
-                2 => CalculateDihedralAngle(mesh: mesh, faceIdx1: connectedFaces[0], faceIdx2: connectedFaces[1]) switch {
+                2 => ((Func<double>)(() => {
+                    Vector3d n1 = mesh.FaceNormals[connectedFaces[0]];
+                    Vector3d n2 = mesh.FaceNormals[connectedFaces[1]];
+                    return n1.IsValid && n2.IsValid ? Vector3d.VectorAngle(n1, n2) : Math.PI;
+                }))() switch {
                     double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
                     double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
                     _ => Topology.EdgeContinuityType.Sharp,
@@ -457,48 +412,17 @@ internal static class TopologyCore {
     }
 
     [Pure]
-    private static double CalculateDihedralAngle(Mesh mesh, int faceIdx1, int faceIdx2) {
-        Vector3d n1 = mesh.FaceNormals[faceIdx1];
-        Vector3d n2 = mesh.FaceNormals[faceIdx2];
-        return n1.IsValid && n2.IsValid ? Vector3d.VectorAngle(n1, n2) : Math.PI;
-    }
-
-    [Pure]
     private static Result<IReadOnlyList<Topology.AdjacencyData>> ExecuteBrepAdjacency(Brep brep, int edgeIndex) {
-        BrepEdge edge = brep.Edges[edgeIndex];
-        IReadOnlyList<int> adjFaces = [.. edge.AdjacentFaces(),];
-        IReadOnlyList<Vector3d> normals = [.. adjFaces.Select(i => {
-            BrepFace face = brep.Faces[i];
-            double uMid = face.Domain(0).Mid;
-            double vMid = face.Domain(1).Mid;
-            return face.NormalAt(uMid, vMid);
-        }),
-        ];
-        double dihedralAngle = normals.Count == 2 ? Vector3d.VectorAngle(normals[0], normals[1]) : 0.0;
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-            new Topology.AdjacencyData(
-                EdgeIndex: edgeIndex,
-                AdjacentFaceIndices: adjFaces,
-                FaceNormals: normals,
-                DihedralAngle: dihedralAngle,
-                IsManifold: edge.Valence == EdgeAdjacency.Interior,
-                IsBoundary: edge.Valence == EdgeAdjacency.Naked),
-        ]);
+        BrepEdge e = brep.Edges[edgeIndex];
+        IReadOnlyList<int> af = [.. e.AdjacentFaces(),];
+        IReadOnlyList<Vector3d> norms = [.. af.Select(i => brep.Faces[i].NormalAt(brep.Faces[i].Domain(0).Mid, brep.Faces[i].Domain(1).Mid)),];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(edgeIndex, af, norms, norms.Count == 2 ? Vector3d.VectorAngle(norms[0], norms[1]) : 0.0, e.Valence == EdgeAdjacency.Interior, e.Valence == EdgeAdjacency.Naked),]);
     }
 
     [Pure]
     private static Result<IReadOnlyList<Topology.AdjacencyData>> ExecuteMeshAdjacency(Mesh mesh, int edgeIndex) {
-        int[] adjFaces = mesh.TopologyEdges.GetConnectedFaces(edgeIndex);
-        IReadOnlyList<Vector3d> normals = [.. adjFaces.Select(i => mesh.FaceNormals[i]),];
-        double dihedralAngle = normals.Count == 2 ? Vector3d.VectorAngle(normals[0], normals[1]) : 0.0;
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-            new Topology.AdjacencyData(
-                EdgeIndex: edgeIndex,
-                AdjacentFaceIndices: [.. adjFaces,],
-                FaceNormals: normals,
-                DihedralAngle: dihedralAngle,
-                IsManifold: adjFaces.Length == 2,
-                IsBoundary: adjFaces.Length == 1),
-        ]);
+        int[] af = mesh.TopologyEdges.GetConnectedFaces(edgeIndex);
+        IReadOnlyList<Vector3d> norms = [.. af.Select(i => mesh.FaceNormals[i]),];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(edgeIndex, [.. af,], norms, norms.Count == 2 ? Vector3d.VectorAngle(norms[0], norms[1]) : 0.0, af.Length == 2, af.Length == 1),]);
     }
 }

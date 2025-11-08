@@ -75,34 +75,13 @@ public static class Orient {
                         _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
                     },
                     (5, _) => item switch {
-                        Brep brep when brep.IsSolid => VolumeMassProperties.Compute(brep) switch {
-                            VolumeMassProperties vmp => ((Func<Result<Transform>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Brep brep when brep.SolidOrientation != BrepSolidOrientation.None => AreaMassProperties.Compute(brep) switch {
-                            AreaMassProperties amp => ((Func<Result<Transform>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Extrusion ext when ext.IsSolid => VolumeMassProperties.Compute(ext) switch {
-                            VolumeMassProperties vmp => ((Func<Result<Transform>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Extrusion ext when ext.IsClosed(0) && ext.IsClosed(1) => AreaMassProperties.Compute(ext) switch {
-                            AreaMassProperties amp => ((Func<Result<Transform>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Mesh mesh when mesh.IsClosed => VolumeMassProperties.Compute(mesh) switch {
-                            VolumeMassProperties vmp => ((Func<Result<Transform>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Mesh mesh => AreaMassProperties.Compute(mesh) switch {
-                            AreaMassProperties amp => ((Func<Result<Transform>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
-                        Curve curve when curve.IsClosed => AreaMassProperties.Compute(curve) switch {
-                            AreaMassProperties amp => ((Func<Result<Transform>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: Transform.Translation(Point3d.Origin - c)); }))(),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                        },
+                        Brep brep when brep.IsSolid => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Brep brep when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Extrusion ext when ext.IsSolid => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Extrusion ext when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Mesh mesh when mesh.IsClosed => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Mesh mesh => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                        Curve curve when curve.IsClosed => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
                         _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
                     },
                     (_, BoundingBox b) when !b.IsValid => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
@@ -129,38 +108,14 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item => {
                 Result<Point3d> centroidResult = (item, useMass) switch {
-                    (Brep brep, true) when brep.IsSolid => VolumeMassProperties.Compute(brep) switch {
-                        VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => AreaMassProperties.Compute(brep) switch {
-                        AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Extrusion ext, true) when ext.IsSolid => VolumeMassProperties.Compute(ext) switch {
-                        VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => AreaMassProperties.Compute(ext) switch {
-                        AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Mesh mesh, true) when mesh.IsClosed => VolumeMassProperties.Compute(mesh) switch {
-                        VolumeMassProperties vmp => ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Mesh mesh, true) => AreaMassProperties.Compute(mesh) switch {
-                        AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (Curve curve, true) when curve.IsClosed => AreaMassProperties.Compute(curve) switch {
-                        AreaMassProperties amp => ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))(),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch {
-                        BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
-                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                    },
+                    (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (Curve curve, true) when curve.IsClosed => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+                    (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch { BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center), _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed), },
                     _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
                 };
                 return centroidResult
