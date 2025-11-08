@@ -66,29 +66,29 @@ internal static class AnalysisCore {
                         : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)))(sf.CurvatureAt(u, v));
         })) switch {
             (var curveLogic, var surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
-                [typeof(Curve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
+                [typeof(Curve)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Curve), V.Standard | V.Degeneracy), (g, ctx, t, _, _, _, order) =>
                     ResultFactory.Create(value: (Curve)g)
-                        .Validate(args: [ctx, V.Standard | V.Degeneracy])
+                        .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Curve), V.Standard | V.Degeneracy)])
                         .Bind(cv => curveLogic(cv, ctx, t, order))),
 
-                [typeof(NurbsCurve)] = (V.Standard | V.Degeneracy, (g, ctx, t, _, _, _, order) =>
+                [typeof(NurbsCurve)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(NurbsCurve), V.Standard | V.Degeneracy), (g, ctx, t, _, _, _, order) =>
                     ResultFactory.Create(value: (NurbsCurve)g)
-                        .Validate(args: [ctx, V.Standard | V.Degeneracy])
+                        .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(NurbsCurve), V.Standard | V.Degeneracy)])
                         .Bind(cv => curveLogic(cv, ctx, t, order))),
 
-                [typeof(Surface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+                [typeof(Surface)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Surface), V.Standard), (g, ctx, _, uv, _, _, order) =>
                     ResultFactory.Create(value: (Surface)g)
-                        .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
+                        .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Surface), V.Standard)])
                         .Bind(sf => surfaceLogic(sf, ctx, uv, order))),
 
-                [typeof(NurbsSurface)] = (V.Standard | V.SurfaceContinuity, (g, ctx, _, uv, _, _, order) =>
+                [typeof(NurbsSurface)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(NurbsSurface), V.Standard), (g, ctx, _, uv, _, _, order) =>
                     ResultFactory.Create(value: (NurbsSurface)g)
-                        .Validate(args: [ctx, V.Standard | V.SurfaceContinuity])
+                        .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(NurbsSurface), V.Standard)])
                         .Bind(sf => surfaceLogic(sf, ctx, uv, order))),
 
-                [typeof(Brep)] = (V.Standard | V.Topology | V.MassProperties, (g, ctx, _, uv, faceIdx, testPt, order) =>
+                [typeof(Brep)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Brep), V.Standard | V.Topology), (g, ctx, _, uv, faceIdx, testPt, order) =>
                 ResultFactory.Create(value: (Brep)g)
-                    .Validate(args: [ctx, V.Standard | V.Topology | V.MassProperties])
+                    .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Brep), V.Standard | V.Topology)])
                     .Bind(brep => {
                         int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
                         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
@@ -126,9 +126,9 @@ internal static class AnalysisCore {
                             : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
                     })),
 
-                [typeof(Mesh)] = (V.MeshSpecific, (g, ctx, _, _, vertIdx, _, _) =>
+                [typeof(Mesh)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Mesh), V.MeshSpecific), (g, ctx, _, _, vertIdx, _, _) =>
                     ResultFactory.Create(value: (Mesh)g)
-                        .Validate(args: [ctx, V.MeshSpecific])
+                        .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Mesh), V.MeshSpecific)])
                         .Bind(mesh => {
                             int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
                             Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;

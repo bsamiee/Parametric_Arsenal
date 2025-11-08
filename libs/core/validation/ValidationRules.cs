@@ -49,10 +49,10 @@ public static class ValidationRules {
             [V.SelfIntersection] = ([], ["SelfIntersections",], E.Validation.SelfIntersecting),
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
-            [V.PolycurveStructure] = (["IsValid",], ["HasGap", "IsContinuous",], E.Validation.PolycurveGaps),
-            [V.NurbsGeometry] = (["IsValid", "IsPeriodic",], ["IsRational", "IsClamped",], E.Validation.NurbsControlPointCount),
-            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed",], ["GetPathPlane",], E.Validation.ExtrusionProfileInvalid),
-            [V.UVDomain] = (["IsValid",], ["IsSingular", "IsAtSingularity", "IsSphere", "IsTorus",], E.Validation.UVDomainSingularity),
+            [V.PolycurveStructure] = (["IsValid", "HasGap",], [], E.Validation.PolycurveGaps),
+            [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational",], [], E.Validation.NurbsControlPointCount),
+            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed",], [], E.Validation.ExtrusionProfileInvalid),
+            [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
