@@ -73,6 +73,7 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [4005] = "Spatial query exceeded buffer capacity",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -169,5 +170,6 @@ public static class E {
         public static readonly SystemError InvalidDistance = Get(4002);
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
+        public static readonly SystemError BufferOverflow = Get(4005);
     }
 }

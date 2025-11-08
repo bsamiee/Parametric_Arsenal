@@ -35,10 +35,13 @@ internal static class SpatialCore {
             [(typeof((Mesh, Mesh)), typeof(double))] = (null, V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
             [(typeof(Curve[]), typeof(Sphere))] = (_curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
             [(typeof(Curve[]), typeof(BoundingBox))] = (_curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
+            [(typeof((Curve[], Curve[])), typeof(double))] = (null, V.Degeneracy, SpatialConfig.LargeBufferSize, MakeOverlapExecutor<Curve>(_curveArrayFactory)),
             [(typeof(Surface[]), typeof(Sphere))] = (_surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
             [(typeof(Surface[]), typeof(BoundingBox))] = (_surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
+            [(typeof((Surface[], Surface[])), typeof(double))] = (null, V.BoundingBox, SpatialConfig.LargeBufferSize, MakeOverlapExecutor<Surface>(_surfaceArrayFactory)),
             [(typeof(Brep[]), typeof(Sphere))] = (_brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
             [(typeof(Brep[]), typeof(BoundingBox))] = (_brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
+            [(typeof((Brep[], Brep[])), typeof(double))] = (null, V.Topology, SpatialConfig.LargeBufferSize, MakeOverlapExecutor<Brep>(_brepArrayFactory)),
         }.ToFrozenDictionary();
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
@@ -56,6 +59,12 @@ internal static class SpatialCore {
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
         (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
             ? GetTree(source: m1, factory: _meshFactory).Bind(t1 => GetTree(source: m2, factory: _meshFactory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
+
+    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeOverlapExecutor<T>(
+        Func<object, RTree> factory) where T : notnull =>
+        (i, q, c, b) => i is (T[] g1, T[] g2) && q is double tolerance
+            ? GetTree(source: g1, factory: factory).Bind(t1 => GetTree(source: g2, factory: factory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
     /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
@@ -78,15 +87,18 @@ internal static class SpatialCore {
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
+        int overflow = 0;
         try {
             Action search = queryShape switch {
-                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
-                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
+                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } else { overflow++; } }),
+                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } else { overflow++; } }),
                 _ => () => { }
                 ,
             };
             search();
-            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+            return overflow > 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.BufferOverflow.WithContext($"Capacity: {buffer.Length}, Dropped: {overflow}"))
+                : ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
@@ -107,20 +119,27 @@ internal static class SpatialCore {
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
-    /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
+    /// <summary>Executes geometry overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
+        int overflow = 0;
         try {
-            return RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
+            bool searchComplete = RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
                 if (count + 2 <= buffer.Length) {
                     buffer[count++] = args.Id;
                     buffer[count++] = args.IdB;
+                } else {
+                    overflow++;
                 }
-            })
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
+            });
+
+            return (searchComplete, overflow) switch {
+                (false, _) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+                (true, > 0) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.BufferOverflow.WithContext($"Capacity: {buffer.Length}, Dropped: {overflow * 2}")),
+                (true, 0) => ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []),
+            };
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
