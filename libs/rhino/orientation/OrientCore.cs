@@ -39,7 +39,6 @@ internal static class OrientCore {
         }.ToFrozenDictionary();
 
     /// <summary>Polymorphic centroid extraction using mass properties or bounding box - dispatches by geometry type and computation mode.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
         (geometry, useMassProperties) switch {
             (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
