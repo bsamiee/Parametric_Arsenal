@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
@@ -55,6 +56,7 @@ internal static class OrientCore {
         };
 
     /// <summary>Applies transformation to geometry with duplication and error handling.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
             T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),

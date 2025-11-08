@@ -126,8 +126,7 @@ internal static class ExtractionCore {
             [(6, typeof(Curve))] = static (g, _, _, _) => g is Curve c
                 ? c.DuplicateSegments() is Curve[] { Length: > 0 } segs
                     ? ((Func<Curve[], Point3d[]>)(segments => {
-                        try { return [.. segments.Select(seg => seg.PointAtNormalizedLength(0.5))]; }
-                        finally { foreach (Curve seg in segments) { seg.Dispose(); } }
+                        try { return [.. segments.Select(seg => seg.PointAtNormalizedLength(0.5))]; } finally { foreach (Curve seg in segments) { seg.Dispose(); } }
                     }))(segs)
                     : c.TryGetPolyline(out Polyline pl)
                         ? [.. pl.GetSegments().Where(static ln => ln.IsValid).Select(static ln => ln.PointAt(0.5))]

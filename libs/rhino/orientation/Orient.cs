@@ -28,6 +28,7 @@ public static class Orient {
     }
 
     /// <summary>Polymorphic orientation target specification with plane, point, vector, or geometry-based references.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct OrientSpec {
         /// <summary>Target plane for plane-to-plane transformation.</summary>
         public Plane? TargetPlane { get; init; }
