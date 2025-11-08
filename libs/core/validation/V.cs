@@ -2,10 +2,12 @@ using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Arsenal.Core.Validation;
 
 /// <summary>Validation mode configuration using bitwise flag operations.</summary>
+[StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct V(ushort flags) : IEquatable<V> {
     private readonly ushort _flags = flags;

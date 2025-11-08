@@ -81,17 +81,11 @@ public static class E {
     };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) {
-        ErrorDomain domain = GetDomain(code);
-        string message = _m.TryGetValue(code, out string? msg)
-            ? msg
-            : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-
-        return context switch {
-            null => new SystemError(domain, code, message),
-            string ctx => new SystemError(domain, code, message).WithContext(ctx),
+    public static SystemError Get(int code, string? context = null) =>
+        (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}", context) switch {
+            (ErrorDomain domain, string message, null) => new SystemError(domain, code, message),
+            (ErrorDomain domain, string message, string ctx) => new SystemError(domain, code, message).WithContext(ctx),
         };
-    }
 
     /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {

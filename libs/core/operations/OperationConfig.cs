@@ -62,14 +62,6 @@ public sealed record OperationConfig<TIn, TOut> {
     public bool EnableDiagnostics { get; init; }
 
     [Pure]
-    private string DebuggerDisplay => (this.EnableCache, this.EnableParallel, this.EnableDiagnostics) switch {
-        (true, true, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [parallel] [diag]"),
-        (true, true, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [parallel]"),
-        (true, false, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached] [diag]"),
-        (true, false, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [cached]"),
-        (false, true, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [parallel] [diag]"),
-        (false, true, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [parallel]"),
-        (false, false, true) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode} [diag]"),
-        (false, false, false) => string.Create(CultureInfo.InvariantCulture, $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode}"),
-    };
+    private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
+        $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode}{(this.EnableCache ? " [cached]" : string.Empty)}{(this.EnableParallel ? " [parallel]" : string.Empty)}{(this.EnableDiagnostics ? " [diag]" : string.Empty)}");
 }

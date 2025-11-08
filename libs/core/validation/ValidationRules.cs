@@ -14,6 +14,7 @@ namespace Arsenal.Core.Validation;
 /// <summary>Validation system using compiled expression trees and cached validators.</summary>
 public static class ValidationRules {
     /// <summary>Cache key structure for validator lookups.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
         public readonly V Mode = mode;
