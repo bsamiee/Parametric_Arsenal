@@ -30,12 +30,12 @@ public interface IGeometryContext {
     /// <summary>Returns the scale factor to convert from Units to target units.</summary>
     [Pure] public Result<double> GetLengthScale(UnitSystem targetUnits);
 
-    /// <summary>Validates if value differences are within absolute tolerance.</summary>
+    /// <summary>True if value differences are within absolute tolerance.</summary>
     [Pure] public bool IsWithinAbsoluteTolerance(double a, double b);
 
-    /// <summary>Validates if angle differences are within angular tolerance.</summary>
+    /// <summary>True if angle differences are within angular tolerance.</summary>
     [Pure] public bool IsWithinAngleTolerance(double angleRadians1, double angleRadians2);
 
-    /// <summary>Validates if squared distance is within squared absolute tolerance.</summary>
+    /// <summary>True if squared distance is within squared absolute tolerance.</summary>
     [Pure] public bool IsWithinSquaredTolerance(double squaredDistance);
 }

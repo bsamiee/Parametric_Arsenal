@@ -10,55 +10,55 @@ namespace Arsenal.Core.Operations;
 /// <summary>Operation configuration for composable transformations and error handling.</summary>
 [DebuggerDisplay("{DebuggerDisplay}")]
 public sealed record OperationConfig<TIn, TOut> {
-    /// <summary>Geometry context providing validation and tolerance contracts.</summary>
+    /// <summary>Geometry context for validation and tolerance.</summary>
     public required IGeometryContext Context { get; init; }
 
-    /// <summary>Validation mode applied before operation execution.</summary>
+    /// <summary>Validation mode flags to apply before execution.</summary>
     public V ValidationMode { get; init; } = V.None;
 
-    /// <summary>Additional validation arguments passed to validation contracts.</summary>
+    /// <summary>Additional validation arguments for ValidationRules.</summary>
     public object[]? ValidationArgs { get; init; }
 
-    /// <summary>Accumulate all errors using applicative functor semantics.</summary>
+    /// <summary>Accumulate all errors vs fail-fast (applicative vs monadic).</summary>
     public bool AccumulateErrors { get; init; }
 
-    /// <summary>Pre-operation transformation applied to inputs.</summary>
+    /// <summary>Transform applied to inputs before operation.</summary>
     public Func<TIn, Result<TIn>>? PreTransform { get; init; }
 
-    /// <summary>Post-operation transformation applied to outputs.</summary>
+    /// <summary>Transform applied to outputs after operation.</summary>
     public Func<TOut, Result<TOut>>? PostTransform { get; init; }
 
-    /// <summary>Input filtering predicate for selective operation execution.</summary>
+    /// <summary>Predicate to filter inputs before operation.</summary>
     public Func<TIn, bool>? InputFilter { get; init; }
 
-    /// <summary>Output filtering predicate for result refinement.</summary>
+    /// <summary>Predicate to filter outputs after operation.</summary>
     public Func<TOut, bool>? OutputFilter { get; init; }
 
-    /// <summary>Enable parallel execution for batch operations.</summary>
+    /// <summary>Enable parallel execution for collections.</summary>
     public bool EnableParallel { get; init; }
 
-    /// <summary>Maximum degree of parallelism for concurrent execution.</summary>
+    /// <summary>Max parallelism (-1 for default).</summary>
     public int MaxDegreeOfParallelism { get; init; } = -1;
 
-    /// <summary>Skip invalid inputs instead of failing operation.</summary>
+    /// <summary>Skip invalid inputs vs fail entire operation.</summary>
     public bool SkipInvalid { get; init; }
 
-    /// <summary>Automatically flatten nested monadic results.</summary>
+    /// <summary>Flatten nested Result&lt;Result&lt;T&gt;&gt; automatically.</summary>
     public bool AutoFlatten { get; init; } = true;
 
-    /// <summary>Short-circuit execution on first error in fail-fast mode.</summary>
+    /// <summary>Stop on first error vs process all.</summary>
     public bool ShortCircuit { get; init; } = true;
 
-    /// <summary>Enable memoization caching for operation results.</summary>
+    /// <summary>Enable memoization caching.</summary>
     public bool EnableCache { get; init; }
 
-    /// <summary>Custom error message prefix for error accumulation.</summary>
+    /// <summary>Prefix for error messages.</summary>
     public string? ErrorPrefix { get; init; }
 
-    /// <summary>Operation name for diagnostic instrumentation.</summary>
+    /// <summary>Operation name for diagnostics.</summary>
     public string? OperationName { get; init; }
 
-    /// <summary>Enable diagnostic capture for allocation and timing instrumentation.</summary>
+    /// <summary>Capture timing and allocation diagnostics (DEBUG only).</summary>
     public bool EnableDiagnostics { get; init; }
 
     [Pure]

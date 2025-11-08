@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>Consolidated error registry with FrozenDictionary dispatch.</summary>
+/// <summary>Centralized error registry using FrozenDictionary for O(1) lookup.</summary>
 public static class E {
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
@@ -72,11 +72,10 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) =>
-        (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}", context) switch {
-            (ErrorDomain domain, string message, null) => new SystemError(domain, code, message),
-            (ErrorDomain domain, string message, string ctx) => new SystemError(domain, code, message).WithContext(ctx),
-        };
+    public static SystemError Get(int code, string? context = null) {
+        (ErrorDomain domain, string message) = (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        return context is null ? new SystemError(domain, code, message) : new SystemError(domain, code, message).WithContext(context);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ErrorDomain GetDomain(int code) => code switch {

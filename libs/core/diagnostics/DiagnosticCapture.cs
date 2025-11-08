@@ -15,7 +15,7 @@ public static class DiagnosticCapture {
     private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
 #endif
 
-    /// <summary>Compile-time feature detection for diagnostic capability.</summary>
+    /// <summary>True if diagnostics enabled (DEBUG builds only).</summary>
     [Pure]
     public static bool IsEnabled =>
 #if DEBUG
@@ -24,7 +24,7 @@ public static class DiagnosticCapture {
         false;
 #endif
 
-    /// <summary>Retrieves diagnostic metadata for Result instance.</summary>
+    /// <summary>Gets diagnostic metadata for Result (DEBUG builds only).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
 #if DEBUG
@@ -38,7 +38,7 @@ public static class DiagnosticCapture {
 #endif
     }
 
-    /// <summary>Clears all diagnostic metadata for memory reclamation.</summary>
+    /// <summary>Clears all diagnostic metadata (DEBUG builds only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #pragma warning disable IDE0022 // Use expression body for method
     public static void Clear() {
@@ -48,7 +48,7 @@ public static class DiagnosticCapture {
     }
 #pragma warning restore IDE0022
 
-    /// <summary>Captures operation diagnostics with allocation tracking and Activity tracing.</summary>
+    /// <summary>Captures operation diagnostics with timing and allocation tracking (DEBUG builds only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Capture<T>(
         this Result<T> result,

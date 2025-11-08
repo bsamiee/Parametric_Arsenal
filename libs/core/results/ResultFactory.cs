@@ -9,17 +9,17 @@ namespace Arsenal.Core.Results;
 
 /// <summary>Factory for creating and manipulating Result instances.</summary>
 public static class ResultFactory {
-    /// <summary>Checks if type is Geometry without loading Rhino assembly.</summary>
+    /// <summary>True if type is Rhino.Geometry.* (no assembly load).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsGeometryType(Type type) =>
         type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
 
-    /// <summary>Accumulates item into Result list using applicative composition.</summary>
+    /// <summary>Adds item to Result list using applicative composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
         accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
 
-    /// <summary>Traverses IEnumerable elements with monadic transformation.</summary>
+    /// <summary>Maps IEnumerable elements through Result-returning function.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);
@@ -27,7 +27,7 @@ public static class ResultFactory {
             (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
     }
 
-    /// <summary>Creates Result using polymorphic parameter detection.</summary>
+    /// <summary>Creates Result via polymorphic dispatch (value/errors/error/deferred/conditionals/nested).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
         T? value = default,
@@ -47,7 +47,7 @@ public static class ResultFactory {
             _ => throw new ArgumentException(E.Results.InvalidCreate.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result using polymorphic parameter detection.</summary>
+    /// <summary>Validates Result via polymorphic dispatch (predicate/validation/validations/args for geometry).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
@@ -63,17 +63,13 @@ public static class ResultFactory {
             (Func<T, bool> p, null, null, _) when error.HasValue => result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
             (Func<T, bool> p, Func<T, Result<T>> v, null, _) => result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure(vs),
-            (null, null, null, [IGeometryContext ctx, V mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
-            }),
-            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), V.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
-                var errs => Create<T>(errors: errs),
-            }),
+            (null, null, null, [IGeometryContext ctx, V mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) is { Length: 0 } ? Create(value: g) : Create<T>(errors: ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx))),
+            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), V.Standard)(g, ctx) is { Length: 0 } ? Create(value: g) : Create<T>(errors: ValidationRules.GetOrCompileValidator(g!.GetType(), V.Standard)(g, ctx))),
             (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),
             _ => result,
         };
 
-    /// <summary>Lifts functions into Result context with partial application.</summary>
+    /// <summary>Lifts function into Result context with partial application support.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Lift<TResult>(Delegate func, params object[] args) {
         ArgumentNullException.ThrowIfNull(func);
