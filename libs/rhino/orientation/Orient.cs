@@ -110,27 +110,8 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                ((Func<Result<IReadOnlyList<T>>>)(() => {
-                    Point3d[] points = item switch {
-                        PointCloud pc => pc.GetPoints(),
-                        Mesh m => m.Vertices.ToPoint3dArray(),
-                        Curve c => Enumerable.Range(0, 20)
-                            .Select(i => c.PointAt(c.Domain.ParameterAt((double)i / 19.0)))
-                            .ToArray(),
-                        Surface s => Enumerable.Range(0, 100)
-                            .Select(i => s.PointAt(
-                                s.Domain(0).ParameterAt((double)(i % 10) / 9.0),
-                                s.Domain(1).ParameterAt((double)(i / 10) / 9.0)))
-                            .ToArray(),
-                        Brep b => b.Vertices.Select(v => v.Location).ToArray(),
-                        _ => item.GetBoundingBox(accurate: true).GetCorners(),
-                    };
-                    Plane target = targetPlane ?? Plane.WorldXY;
-                    PlaneFitResult fitResult = Plane.FitPlaneToPoints(points, out Plane bestFit);
-                    return fitResult == PlaneFitResult.Success && bestFit.IsValid
-                        ? OrientCore.ApplyTransform(item, Transform.PlaneToPlane(bestFit, target))
-                        : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.FrameExtractionFailed);
-                }))()),
+                OrientCore.ExtractBestFitPlane(item)
+                    .Bind(fitted => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(fitted, targetPlane ?? Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,

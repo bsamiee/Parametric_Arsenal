@@ -55,6 +55,30 @@ internal static class OrientCore {
             _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
         };
 
+    /// <summary>Extracts best-fit plane from geometry via PCA using sampled point distribution.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
+        ((Func<Result<Plane>>)(() => {
+            Point3d[] points = geometry switch {
+                PointCloud pc => pc.GetPoints(),
+                Mesh m => m.Vertices.ToPoint3dArray(),
+                Curve c => Enumerable.Range(0, OrientConfig.BestFitCurveSamples)
+                    .Select(i => c.PointAt(c.Domain.ParameterAt((double)i / (OrientConfig.BestFitCurveSamples - 1))))
+                    .ToArray(),
+                Surface s => Enumerable.Range(0, OrientConfig.BestFitSurfaceSamplesU * OrientConfig.BestFitSurfaceSamplesV)
+                    .Select(i => s.PointAt(
+                        s.Domain(0).ParameterAt((double)(i % OrientConfig.BestFitSurfaceSamplesU) / (OrientConfig.BestFitSurfaceSamplesU - 1)),
+                        s.Domain(1).ParameterAt((double)(i / OrientConfig.BestFitSurfaceSamplesU) / (OrientConfig.BestFitSurfaceSamplesV - 1))))
+                    .ToArray(),
+                Brep b => b.Vertices.Select(v => v.Location).ToArray(),
+                _ => geometry.GetBoundingBox(accurate: true).GetCorners(),
+            };
+            PlaneFitResult fitResult = Plane.FitPlaneToPoints(points, out Plane bestFit);
+            return fitResult == PlaneFitResult.Success && bestFit.IsValid
+                ? ResultFactory.Create(value: bestFit)
+                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+        }))();
+
     /// <summary>Applies transformation to geometry with duplication and error handling.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>

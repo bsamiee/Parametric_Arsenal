@@ -29,4 +29,10 @@ internal static class OrientConfig {
     internal const double MinVectorLength = 1e-8;
     /// <summary>Parallel detection: 1e-6 tolerance for vector alignment detection.</summary>
     internal const double ParallelThreshold = 1e-6;
+    /// <summary>Sample count for curve best-fit plane computation.</summary>
+    internal const int BestFitCurveSamples = 20;
+    /// <summary>U-direction sample count for surface best-fit plane computation.</summary>
+    internal const int BestFitSurfaceSamplesU = 10;
+    /// <summary>V-direction sample count for surface best-fit plane computation.</summary>
+    internal const int BestFitSurfaceSamplesV = 10;
 }
