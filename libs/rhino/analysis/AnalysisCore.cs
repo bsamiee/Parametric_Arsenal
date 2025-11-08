@@ -180,22 +180,19 @@ internal static class AnalysisCore {
             .Validate(args: [context, V.Standard | V.Degeneracy])
             .Bind(cv => {
                 Point3d[] points = cv.MaxCurvaturePoints(out double[] parameters);
-                return points is null || parameters is null || points.Length == 0
-                    ? ResultFactory.Create<Analysis.CurvatureExtremaData>(error: E.Geometry.CurvatureExtremaFailed)
-                    : ((Func<double[], Result<Analysis.CurvatureExtremaData>>)(curvatures => {
-                        int maxIdx = curvatures.Select((k, i) => (k, i)).MaxBy(x => x.k).i;
-                        return ResultFactory.Create(value: new Analysis.CurvatureExtremaData(
-                            Location: points.Length > 0 ? points[0] : cv.PointAtStart,
-                            MaxCurvaturePoints: points,
-                            MaxCurvatureParameters: parameters,
-                            MaxCurvatureValues: curvatures,
-                            GlobalMaxCurvature: curvatures[maxIdx],
-                            GlobalMaxLocation: points[maxIdx]));
-                    }))([.. points.Select((p, i) => cv.CurvatureAt(parameters[i]).Length),]);
-            })
-            .Map(result => enableDiagnostics
-                ? result.Tap(onSuccess: _ => {}, onFailure: _ => {})
-                : result);
+                if (points is null || parameters is null || points.Length == 0) {
+                    return ResultFactory.Create<Analysis.CurvatureExtremaData>(error: E.Geometry.CurvatureExtremaFailed);
+                }
+                double[] curvatures = [.. points.Select((_, i) => cv.CurvatureAt(parameters[i]).Length),];
+                int maxIdx = curvatures.Select((k, i) => (k, i)).MaxBy(x => x.k).i;
+                return ResultFactory.Create(value: new Analysis.CurvatureExtremaData(
+                    Location: points[0],
+                    MaxCurvaturePoints: points,
+                    MaxCurvatureParameters: parameters,
+                    MaxCurvatureValues: curvatures,
+                    GlobalMaxCurvature: curvatures[maxIdx],
+                    GlobalMaxLocation: points[maxIdx]));
+            });
 
     /// <summary>Analyzes all faces of brep producing per-face surface data with curvature statistics.</summary>
     [Pure]
@@ -238,16 +235,17 @@ internal static class AnalysisCore {
                             amp.Area,
                             amp.Centroid);
                     }
-                    return successCount == 0
-                        ? ResultFactory.Create<Analysis.MultiFaceBrepData>(error: E.Geometry.MultiFaceBrepFailed)
-                        : ((Func<Analysis.SurfaceData[], Result<Analysis.MultiFaceBrepData>>)(faces =>
-                            ResultFactory.Create(value: new Analysis.MultiFaceBrepData(
-                                Location: b.GetBoundingBox(accurate: false).Center,
-                                FaceAnalyses: faces,
-                                FaceIndices: [.. Enumerable.Range(0, faces.Length),],
-                                TotalFaces: faces.Length,
-                                GaussianRange: (faces.Min(f => f.Gaussian), faces.Max(f => f.Gaussian)),
-                                MeanRange: (faces.Min(f => f.Mean), faces.Max(f => f.Mean))))))([.. faceData[..successCount]]);
+                    if (successCount == 0) {
+                        return ResultFactory.Create<Analysis.MultiFaceBrepData>(error: E.Geometry.MultiFaceBrepFailed);
+                    }
+                    Analysis.SurfaceData[] faces = [.. faceData[..successCount]];
+                    return ResultFactory.Create(value: new Analysis.MultiFaceBrepData(
+                        Location: b.GetBoundingBox(accurate: false).Center,
+                        FaceAnalyses: faces,
+                        FaceIndices: [.. Enumerable.Range(0, faces.Length),],
+                        TotalFaces: faces.Length,
+                        GaussianRange: (faces.Min(f => f.Gaussian), faces.Max(f => f.Gaussian)),
+                        MeanRange: (faces.Min(f => f.Mean), faces.Max(f => f.Mean))));
                 } finally {
                     ArrayPool<Analysis.SurfaceData>.Shared.Return(faceData, clearArray: true);
                 }
@@ -316,12 +314,11 @@ internal static class AnalysisCore {
                 .Validate(args: [context, V.Standard])
                 .Bind(sf => {
                     Analysis.SurfaceData[] results = ArrayPool<Analysis.SurfaceData>.Shared.Rent(uvParameters.Count);
-                    AreaMassProperties? amp = AreaMassProperties.Compute(sf);
-                    if (amp is null) {
-                        ArrayPool<Analysis.SurfaceData>.Shared.Return(results, clearArray: true);
-                        return ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.SurfaceAnalysisFailed);
-                    }
                     try {
+                        AreaMassProperties? amp = AreaMassProperties.Compute(sf);
+                        if (amp is null) {
+                            return ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.SurfaceAnalysisFailed);
+                        }
                         for (int i = 0; i < uvParameters.Count; i++) {
                             (double u, double v) = uvParameters[i];
                             if (!sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame)) {
