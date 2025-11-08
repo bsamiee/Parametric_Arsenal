@@ -43,12 +43,12 @@ internal static class IntersectionCore {
             };
 
         // Consolidated transformer for counted point intersections with optional parameters (parametric over parameter presence)
-        static Result<Intersect.IntersectionOutput> fromCountedPoints(int count, Point3d p1, Point3d p2, double tolerance, double[]? params1 = null, double[]? params2 = null) =>
+        static Result<Intersect.IntersectionOutput> fromCountedPoints(int count, Point3d p1, Point3d p2, double tolerance, double? param1 = null, double? param2 = null) =>
             count switch {
                 > 1 when p1.DistanceTo(p2) > tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [p1, p2], [], params1 ?? [], params2 ?? [], [], [])),
+                    [p1, p2], [], param1.HasValue && param2.HasValue ? [param1.Value, param2.Value] : [], [], [], [])),
                 > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [p1], [], params1?.Length > 0 ? [params1[0]] : [], params2?.Length > 0 ? [params2[0]] : [], [], [])),
+                    [p1], [], param1.HasValue ? [param1.Value] : [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             };
 
@@ -181,7 +181,7 @@ internal static class IntersectionCore {
             (Line la, Cylinder cylb, _) =>
                 fromCountedPoints((int)RhinoIntersect.LineCylinder(la, cylb, out Point3d pc1, out Point3d pc2), pc1, pc2, tolerance),
             (Line la, Circle cb, _) =>
-                fromCountedPoints((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lcp2, tolerance, [lct1], [lct2]),
+                fromCountedPoints((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lcp2, tolerance, lct1, lct2),
             // Plane intersections
             (Plane pa, Plane pb, _) =>
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
