@@ -72,7 +72,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Transforms success values using monadic functor semantics.</summary>
+    /// <summary>Transforms success values using functor semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Map<TOut>(Func<T, TOut> transform) {
         ArgumentNullException.ThrowIfNull(transform);
@@ -84,7 +84,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Chains monadic operations with flatMap semantics.</summary>
+    /// <summary>Chains operations with flatMap semantics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Bind<TOut>(Func<T, Result<TOut>> operation) {
         ArgumentNullException.ThrowIfNull(operation);
@@ -96,7 +96,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Validates values using predicate with error specification and accumulation.</summary>
+    /// <summary>Validates values using predicate with error specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(Func<T, bool> predicate, SystemError error) {
         ArgumentNullException.ThrowIfNull(predicate);
@@ -109,7 +109,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Validates values using multiple predicates with error accumulation.</summary>
+    /// <summary>Validates values using multiple predicates.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(params (Func<T, bool>, SystemError)[] validations) {
         Result<T> self = this;
@@ -122,7 +122,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Pattern matches success and failure cases for result transformation.</summary>
+    /// <summary>Pattern matches success and failure cases.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<SystemError[], TResult> onFailure) {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -131,7 +131,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Executes side effects without changing Result state for observability and debugging.</summary>
+    /// <summary>Executes side effects without changing Result state.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Tap(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
@@ -140,7 +140,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             onFailure: errors => { onFailure?.Invoke(errors); return self; });
     }
 
-    /// <summary>Applicative Apply for parallel validation with error accumulation.</summary>
+    /// <summary>Applicative Apply for parallel validation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Apply<TOut>(Result<Func<T, TOut>> func) {
         Result<T> self = this;
@@ -197,7 +197,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Transforms collection elements to Results with error accumulation using monadic traversal.</summary>
+    /// <summary>Transforms collection elements to Results using monadic traversal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<IReadOnlyList<TOut>> Traverse<TOut>(Func<T, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);

@@ -8,14 +8,14 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Diagnostics;
 
-/// <summary>Polymorphic diagnostic capture engine with ConditionalWeakTable storage and compile-time tracing control.</summary>
+/// <summary>Diagnostic capture engine with ConditionalWeakTable storage for compile-time tracing.</summary>
 public static class DiagnosticCapture {
 #if DEBUG
     private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
     private static readonly ActivitySource _activitySource = new("Arsenal.Core", "1.0.0");
 #endif
 
-    /// <summary>Captures operation diagnostics with allocation tracking and optional Activity tracing when enabled at compile-time.</summary>
+    /// <summary>Captures operation diagnostics with allocation tracking and Activity tracing.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Capture<T>(
         this Result<T> result,
@@ -49,7 +49,7 @@ public static class DiagnosticCapture {
 #endif
     }
 
-    /// <summary>Retrieves diagnostic metadata for Result instance using ConditionalWeakTable lookup with safe null handling.</summary>
+    /// <summary>Retrieves diagnostic metadata for Result instance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
 #if DEBUG
@@ -63,7 +63,7 @@ public static class DiagnosticCapture {
 #endif
     }
 
-    /// <summary>Clears all diagnostic metadata enabling memory reclamation for long-running processes.</summary>
+    /// <summary>Clears all diagnostic metadata for memory reclamation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #pragma warning disable IDE0022 // Use expression body for method
     public static void Clear() {
@@ -73,7 +73,7 @@ public static class DiagnosticCapture {
     }
 #pragma warning restore IDE0022
 
-    /// <summary>Compile-time feature detection for diagnostic capability presence in binary.</summary>
+    /// <summary>Compile-time feature detection for diagnostic capability.</summary>
     [Pure]
     public static bool IsEnabled =>
 #if DEBUG

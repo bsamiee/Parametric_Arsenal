@@ -4,9 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>
-/// Consolidated error registry with FrozenDictionary dispatch for zero-allocation error retrieval.
-/// </summary>
+/// <summary>Consolidated error registry with FrozenDictionary dispatch.</summary>
 public static class E {
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
@@ -95,7 +93,7 @@ public static class E {
         };
     }
 
-    /// <summary>Results system errors (1000-1999)</summary>
+    /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {
         public static readonly SystemError NoValueProvided = Get(1001);
         public static readonly SystemError InvalidCreate = Get(1002);
@@ -104,7 +102,7 @@ public static class E {
         public static readonly SystemError InvalidAccess = Get(1100);
     }
 
-    /// <summary>Geometry errors (2000-2999) - all geometry operations</summary>
+    /// <summary>Geometry errors (2000-2999).</summary>
     public static class Geometry {
         public static readonly SystemError InvalidExtraction = Get(2000);
         public static readonly SystemError InsufficientParameters = Get(2001);
@@ -144,7 +142,7 @@ public static class E {
         public static readonly SystemError FrameExtractionFailed = Get(2509);
     }
 
-    /// <summary>Validation errors (3000-3999)</summary>
+    /// <summary>Validation errors (3000-3999).</summary>
     public static class Validation {
         public static readonly SystemError GeometryInvalid = Get(3000);
         public static readonly SystemError CurveNotClosedOrPlanar = Get(3100);
@@ -164,7 +162,7 @@ public static class E {
         public static readonly SystemError InputFiltered = Get(3931);
     }
 
-    /// <summary>Spatial indexing errors (4000-4099)</summary>
+    /// <summary>Spatial indexing errors (4000-4999).</summary>
     public static class Spatial {
         public static readonly SystemError InvalidK = Get(4001);
         public static readonly SystemError InvalidDistance = Get(4002);

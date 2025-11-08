@@ -20,7 +20,7 @@ public sealed record GeometryContext(
     UnitSystem Units) : IGeometryContext {
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Abs={this.AbsoluteTolerance:g6}, Rel={this.RelativeTolerance:g6}, AngRad={this.AngleToleranceRadians:g6}, Units={this.Units}");
 
-    /// <summary>Squared absolute distance tolerance for fast radius/knn checks without sqrt.</summary>
+    /// <summary>Squared absolute distance tolerance for fast distance checks.</summary>
     [Pure]
     public double AbsoluteToleranceSquared => this.AbsoluteTolerance * this.AbsoluteTolerance;
 
@@ -37,7 +37,7 @@ public sealed record GeometryContext(
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
         ArgumentNullException.ThrowIfNull(doc);
-        return Create(doc.ModelAbsoluteTolerance, doc.ModelRelativeTolerance, doc.ModelAngleToleranceRadians, doc.ModelUnitSystem);
+        return Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
     }
 
     /// <summary>Converts a length value to target units with full validation.</summary>
@@ -70,7 +70,7 @@ public sealed record GeometryContext(
     public bool IsWithinAngleTolerance(double angleRadians1, double angleRadians2) =>
         RhinoMath.EpsilonEquals(angleRadians1, angleRadians2, this.AngleToleranceRadians);
 
-    /// <summary>Validates if squared distance is within squared absolute tolerance (faster for distance checks).</summary>
+    /// <summary>Validates if squared distance is within squared absolute tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinSquaredTolerance(double squaredDistance) => squaredDistance <= this.AbsoluteToleranceSquared;
 

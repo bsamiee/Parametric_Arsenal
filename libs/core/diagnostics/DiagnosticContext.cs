@@ -7,7 +7,7 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Diagnostics;
 
-/// <summary>Zero-allocation observability infrastructure with compile-time toggleable tracing and DebuggerDisplay integration.</summary>
+/// <summary>Zero-allocation observability context with compile-time toggleable tracing.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct DiagnosticContext(

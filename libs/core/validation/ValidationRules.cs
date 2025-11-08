@@ -11,9 +11,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Polymorphic validation system using compiled expression trees and cached validators.</summary>
+/// <summary>Validation system using compiled expression trees and cached validators.</summary>
 public static class ValidationRules {
-    /// <summary>Cache key structure for validator lookups with type, mode, and member discrimination.</summary>
+    /// <summary>Cache key structure for validator lookups.</summary>
     private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
         public readonly V Mode = mode;
@@ -70,7 +70,7 @@ public static class ValidationRules {
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, V mode) =>
         _validatorCache.GetOrAdd(new CacheKey(runtimeType, mode), static k => CompileValidator(k.Type, k.Mode));
 
-    /// <summary>Generates validation errors for tolerance values using polymorphic parameter detection.</summary>
+    /// <summary>Generates validation errors for tolerance values.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
@@ -85,7 +85,7 @@ public static class ValidationRules {
             _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for runtime type and validation mode using reflection-based rule application.</summary>
+    /// <summary>Compiles expression tree validator for runtime type and validation mode.</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));

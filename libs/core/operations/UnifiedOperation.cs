@@ -8,11 +8,11 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Operations;
 
-/// <summary>Polymorphic operation execution engine with unified dispatch and embedded caching.</summary>
+/// <summary>Operation execution engine with unified dispatch and embedded caching.</summary>
 public static class UnifiedOperation {
     private static readonly ThreadLocal<ConcurrentDictionary<(object, Type), object>> _threadCache = new(() => new());
 
-    /// <summary>Executes polymorphic operations with automatic type detection, validation, and caching.</summary>
+    /// <summary>Executes operations with automatic type detection, validation, and caching.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> Apply<TIn, TOut>(
         TIn input,
