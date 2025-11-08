@@ -11,7 +11,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Ultra-dense computation strategies with FrozenDictionary type dispatch and embedded validation.</summary>
+/// <summary>Differential geometry computation with ArrayPool buffers and FrozenDictionary dispatch.</summary>
 internal static class AnalysisCore {
     /// <summary>Type-driven strategy lookup mapping geometry types to validation modes and computation functions.</summary>
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =

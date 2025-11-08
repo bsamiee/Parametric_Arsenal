@@ -10,7 +10,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Internal spatial computation algorithms with RTree-backed operations and type-based dispatch.</summary>
+/// <summary>RTree construction and spatial query execution with zero-allocation pooled buffers.</summary>
 internal static class SpatialCore {
     private static readonly Func<object, RTree> _pointArrayFactory = s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree();
     private static readonly Func<object, RTree> _pointCloudFactory = s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree();

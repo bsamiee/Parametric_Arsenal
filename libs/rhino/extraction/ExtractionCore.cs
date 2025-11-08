@@ -10,7 +10,7 @@ using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Internal extraction algorithms with Rhino SDK geometry processing.</summary>
+/// <summary>Point extraction dispatch with FrozenDictionary handlers and geometry normalization.</summary>
 internal static class ExtractionCore {
     /// <summary>Extraction algorithm handlers mapped by (kind, geometry type) for O(1) dispatch.</summary>
     private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> _handlers =

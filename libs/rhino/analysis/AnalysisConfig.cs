@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Configuration constants and validation dispatch for analysis operations.</summary>
+/// <summary>Differential geometry analysis validation modes and computation constants.</summary>
 internal static class AnalysisConfig {
     /// <summary>Validation mode mapping for analysis geometry types.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =

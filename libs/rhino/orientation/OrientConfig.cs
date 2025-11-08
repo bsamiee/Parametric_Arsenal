@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Configuration constants and validation dispatch for orientation operations.</summary>
+/// <summary>Orientation transformation validation modes and vector/alignment thresholds.</summary>
 internal static class OrientConfig {
     /// <summary>Validation mode mapping for orientation geometry types.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
