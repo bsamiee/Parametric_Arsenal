@@ -50,12 +50,8 @@ public static class Orient {
                         .DefaultIfEmpty(ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
                         .First())
                 .Bind(src => target.IsValid
-                    ? ResultFactory.Create(value: Transform.PlaneToPlane(src, target))
-                    : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationPlane))
-                .Bind(xform => (T)item.Duplicate() switch {
-                    T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                })),
+                    ? OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target))
+                    : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
@@ -65,38 +61,20 @@ public static class Orient {
     public static Result<T> ToCanonical<T>(T geometry, Canonical mode, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => {
-                Result<Transform> xformResult = (mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (1, BoundingBox b) when b.IsValid => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox b) when b.IsValid => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox b) when b.IsValid => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, _) => (item, item.GetBoundingBox(accurate: true)) switch {
-                        (GeometryBase g, BoundingBox b) when b.IsValid => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - b.Center)),
-                        _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (5, _) => item switch {
-                        Brep brep when brep.IsSolid => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Brep brep when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Extrusion ext when ext.IsSolid => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Extrusion ext when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Mesh mesh when mesh.IsClosed => ((Func<Result<Transform>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - vmp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Mesh mesh => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        Curve curve when curve.IsClosed => ((Func<Result<Transform>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: Transform.Translation(Point3d.Origin - amp.Centroid)) : ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                        _ => ResultFactory.Create<Transform>(error: E.Geometry.CentroidExtractionFailed),
-                    },
-                    (_, BoundingBox b) when !b.IsValid => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
-                };
-                return xformResult.Bind(xform => (T)item.Duplicate() switch {
-                    T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                });
-            }),
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                (mode.Mode, item.GetBoundingBox(accurate: true)) switch {
+                    (1, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)).Bind(x => OrientCore.ApplyTransform(item, x)),
+                    (_, BoundingBox b) when !b.IsValid => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
+                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationMode),
+                }),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = mode.Mode switch {
-                    1 or 2 or 3 => V.Standard | V.BoundingBox,
-                    4 => V.Standard | V.BoundingBox,
+                    1 or 2 or 3 or 4 => V.Standard | V.BoundingBox,
                     5 => V.Standard | V.MassProperties,
                     _ => V.Standard,
                 },
@@ -106,25 +84,10 @@ public static class Orient {
     public static Result<T> ToPoint<T>(T geometry, Point3d target, bool useMass, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => {
-                Result<Point3d> centroidResult = (item, useMass) switch {
-                    (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (Curve curve, true) when curve.IsClosed => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-                    (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch { BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center), _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed), },
-                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-                };
-                return centroidResult
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                OrientCore.ExtractCentroid(item, useMassProperties: useMass)
                     .Map(c => Transform.Translation(target - c))
-                    .Bind(xform => (T)item.Duplicate() switch {
-                        T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-                        _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                    });
-            }),
+                    .Bind(x => OrientCore.ApplyTransform(item, x))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
@@ -134,25 +97,20 @@ public static class Orient {
     public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => {
-                Result<Transform> xformResult = (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
                         (new Vector3d(s), new Vector3d(t)) switch {
                             (Vector3d su, Vector3d tu) when su.Unitize() && tu.Unitize() =>
                                 (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold)
                                     ? (Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold)
-                                        ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
-                                        : ResultFactory.Create(value: Transform.Identity)
-                                    : ResultFactory.Create(value: Transform.Rotation(su, tu, b.Center)),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
+                                        ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
+                                        : OrientCore.ApplyTransform(item, Transform.Identity)
+                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, b.Center)),
+                            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
                         },
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
-                };
-                return xformResult.Bind(xform => (T)item.Duplicate() switch {
-                    T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                });
-            }),
+                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
+                }),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -164,11 +122,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 plane.IsValid
-                    ? ResultFactory.Create(value: Transform.Mirror(plane))
-                        .Bind(xform => (T)item.Duplicate() switch {
-                            T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-                            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                        })
+                    ? OrientCore.ApplyTransform(item, Transform.Mirror(plane))
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,

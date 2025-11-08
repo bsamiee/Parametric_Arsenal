@@ -68,7 +68,22 @@ internal static class TopologyCore {
                     bool manifold = mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _);
                     int[] nm = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),];
                     IReadOnlyList<int> vals = [.. nm.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[new Topology.NonManifoldData(EdgeIndices: nm, VertexIndices: [], Valences: vals, Locations: [.. nm.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair v => new Point3d((mesh.TopologyVertices[v.I].X + mesh.TopologyVertices[v.J].X) / 2.0, (mesh.TopologyVertices[v.I].Y + mesh.TopologyVertices[v.J].Y) / 2.0, (mesh.TopologyVertices[v.I].Z + mesh.TopologyVertices[v.J].Z) / 2.0) }),], IsManifold: manifold, IsOrientable: oriented, MaxValence: vals.Count > 0 ? vals.Max() : 0),]);
+                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
+                        new Topology.NonManifoldData(
+                            EdgeIndices: nm,
+                            VertexIndices: [],
+                            Valences: vals,
+                            Locations: [.. nm.Select(i => {
+                                IndexPair v = mesh.TopologyEdges.GetTopologyVertices(i);
+                                Point3d p1 = mesh.TopologyVertices[v.I];
+                                Point3d p2 = mesh.TopologyVertices[v.J];
+                                return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
+                            }),
+                            ],
+                            IsManifold: manifold,
+                            IsOrientable: oriented,
+                            MaxValence: vals.Count > 0 ? vals.Max() : 0),
+                    ]);
                 }))(),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
@@ -135,9 +150,14 @@ internal static class TopologyCore {
                 return componentCount;
             }))() + 1;
         }
-        IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
-        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => union.IsValid ? BoundingBox.Union(union, getBounds(fIdx)) : getBounds(fIdx))),];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, faceCount).Select(f => (f, getAdjacentForGraph(f))).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
+        IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, mesh.Faces.Count).Where(f => componentIds[f] == c),]),];
+        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => {
+            MeshFace face = mesh.Faces[fIdx];
+            BoundingBox fBox = face.IsQuad ? new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C], mesh.Vertices[face.D],]) : new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C],]);
+            return union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
+        })),
+        ];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, mesh.Faces.Count).Select(f => (f, (IReadOnlyList<int>)[.. mesh.Faces.AdjacentFaces(f).Where(adj => adj >= 0),])).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
     }
 
     [Pure]
@@ -153,7 +173,8 @@ internal static class TopologyCore {
                 _ => Topology.EdgeContinuityType.Interior,
             },
             _ => Topology.EdgeContinuityType.Sharp,
-        }),];
+        }),
+        ];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => brep.Edges[i].GetLength()),];
         FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
         return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: minContinuity),]);
@@ -172,7 +193,8 @@ internal static class TopologyCore {
                 _ => Topology.EdgeContinuityType.Sharp,
             },
             _ => Topology.EdgeContinuityType.Sharp,
-        }),];
+        }),
+        ];
         IReadOnlyList<double> measures = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair verts => mesh.TopologyVertices[verts.I].DistanceTo(mesh.TopologyVertices[verts.J]) }),];
         FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
         return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: Continuity.C0_continuous),]);
