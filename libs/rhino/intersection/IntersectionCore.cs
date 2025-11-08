@@ -211,10 +211,10 @@ internal static class IntersectionCore {
                 ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
                     #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [psc.Center], [], [], [], [], [])),
+                        [], [new ArcCurve(psc)], [], [], [], [])),
                     #pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [], [new ArcCurve(psc)], [], [], [], [])),
+                        [psc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Plane pa, BoundingBox boxb, _) =>
@@ -226,10 +226,10 @@ internal static class IntersectionCore {
                 ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
                     #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [ssc.Center], [], [], [], [], [])),
+                        [], [new ArcCurve(ssc)], [], [], [], [])),
                     #pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [], [new ArcCurve(ssc)], [], [], [], [])),
+                        [ssc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Circle ca, Circle cb, _) =>
