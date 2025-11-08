@@ -12,95 +12,44 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Internal spatial computation algorithms with RTree-backed operations and type-based dispatch.</summary>
 internal static class SpatialCore {
-    /// <summary>RTree factory configuration mapping source types to construction strategies for optimal tree structure.</summary>
-    internal static readonly FrozenDictionary<Type, Func<object, RTree>> TreeFactories =
-        new Dictionary<Type, Func<object, RTree>> {
-            [typeof(Point3d[])] = s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
-            [typeof(PointCloud)] = s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
-            [typeof(Mesh)] = s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [typeof(Curve[])] = s => BuildGeometryArrayTree((Curve[])s),
-            [typeof(Surface[])] = s => BuildGeometryArrayTree((Surface[])s),
-            [typeof(Brep[])] = s => BuildGeometryArrayTree((Brep[])s),
+    /// <summary>Unified configuration mapping input/query type pairs to tree factory, validation mode, buffer size, and execution strategy.</summary>
+    internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
+        new Dictionary<(Type, Type), (Func<object, RTree>?, V, int, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>>)> {
+            [(typeof(Point3d[]), typeof(Sphere))] = (s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(), V.None, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Point3d[])i, s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Point3d[]), typeof(BoundingBox))] = (s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(), V.None, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Point3d[])i, s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(), V.None, SpatialConfig.DefaultBufferSize,
+                (i, q, _, _) => q is ValueTuple<Point3d[], int> t ? ExecuteProximitySearch((Point3d[])i, t.Item1, t.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints) : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo)),
+            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(), V.None, SpatialConfig.DefaultBufferSize,
+                (i, q, _, _) => q is ValueTuple<Point3d[], double> t ? ExecuteProximitySearch((Point3d[])i, t.Item1, t.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints) : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo)),
+            [(typeof(PointCloud), typeof(Sphere))] = (s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((PointCloud)i, s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(PointCloud), typeof(BoundingBox))] = (s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((PointCloud)i, s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(PointCloud), typeof((Point3d[], int)))] = (s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, _) => q is ValueTuple<Point3d[], int> t ? ExecuteProximitySearch((PointCloud)i, t.Item1, t.Item2, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints) : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo)),
+            [(typeof(PointCloud), typeof((Point3d[], double)))] = (s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, _) => q is ValueTuple<Point3d[], double> t ? ExecuteProximitySearch((PointCloud)i, t.Item1, t.Item2, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints) : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo)),
+            [(typeof(Mesh), typeof(Sphere))] = (s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(), V.MeshSpecific, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Mesh)i, s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Mesh), typeof(BoundingBox))] = (s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(), V.MeshSpecific, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Mesh)i, s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree()).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (null, V.MeshSpecific, SpatialConfig.LargeBufferSize,
+                (i, q, c, b) => i is ValueTuple<Mesh, Mesh> m && q is double tolerance ? GetTree(m.Item1, s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree()).Bind(t1 => GetTree(m.Item2, s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree()).Bind(t2 => ExecuteOverlapSearch(t1, t2, c.AbsoluteTolerance + tolerance, b))) : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo)),
+            [(typeof(Curve[]), typeof(Sphere))] = (s => BuildGeometryArrayTree((Curve[])s), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Curve[])i, s => BuildGeometryArrayTree((Curve[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Curve[]), typeof(BoundingBox))] = (s => BuildGeometryArrayTree((Curve[])s), V.Degeneracy, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Curve[])i, s => BuildGeometryArrayTree((Curve[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Surface[]), typeof(Sphere))] = (s => BuildGeometryArrayTree((Surface[])s), V.BoundingBox, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Surface[])i, s => BuildGeometryArrayTree((Surface[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Surface[]), typeof(BoundingBox))] = (s => BuildGeometryArrayTree((Surface[])s), V.BoundingBox, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Surface[])i, s => BuildGeometryArrayTree((Surface[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Brep[]), typeof(Sphere))] = (s => BuildGeometryArrayTree((Brep[])s), V.Topology, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Brep[])i, s => BuildGeometryArrayTree((Brep[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
+            [(typeof(Brep[]), typeof(BoundingBox))] = (s => BuildGeometryArrayTree((Brep[])s), V.Topology, SpatialConfig.DefaultBufferSize,
+                (i, q, _, b) => GetTree((Brep[])i, s => BuildGeometryArrayTree((Brep[])s)).Bind(tree => ExecuteRangeSearch(tree, q, b))),
         }.ToFrozenDictionary();
-
-    /// <summary>Algorithm configuration mapping input/query type pairs to validation modes and buffer strategies.</summary>
-    internal static readonly FrozenDictionary<(Type Input, Type Query), (V Mode, int BufferSize)> AlgorithmConfig =
-        new Dictionary<(Type, Type), (V, int)> {
-            [(typeof(Point3d[]), typeof(Sphere))] = (V.None, SpatialConfig.DefaultBufferSize),
-            [(typeof(Point3d[]), typeof(BoundingBox))] = (V.None, SpatialConfig.DefaultBufferSize),
-            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (V.None, SpatialConfig.DefaultBufferSize),
-            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (V.None, SpatialConfig.DefaultBufferSize),
-            [(typeof(PointCloud), typeof(Sphere))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(PointCloud), typeof(BoundingBox))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(PointCloud), typeof((Point3d[], int)))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(PointCloud), typeof((Point3d[], double)))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(Mesh), typeof(Sphere))] = (V.MeshSpecific, SpatialConfig.DefaultBufferSize),
-            [(typeof(Mesh), typeof(BoundingBox))] = (V.MeshSpecific, SpatialConfig.DefaultBufferSize),
-            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (V.MeshSpecific, SpatialConfig.LargeBufferSize),
-            [(typeof(Curve[]), typeof(Sphere))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(Curve[]), typeof(BoundingBox))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize),
-            [(typeof(Surface[]), typeof(Sphere))] = (V.BoundingBox, SpatialConfig.DefaultBufferSize),
-            [(typeof(Surface[]), typeof(BoundingBox))] = (V.BoundingBox, SpatialConfig.DefaultBufferSize),
-            [(typeof(Brep[]), typeof(Sphere))] = (V.Topology, SpatialConfig.DefaultBufferSize),
-            [(typeof(Brep[]), typeof(BoundingBox))] = (V.Topology, SpatialConfig.DefaultBufferSize),
-        }.ToFrozenDictionary();
-
-    /// <summary>Executes spatial algorithm based on input/query type patterns with RTree-backed operations.</summary>
-    [Pure]
-    internal static Result<IReadOnlyList<int>> ExecuteAlgorithm<TInput, TQuery>(
-        TInput input,
-        TQuery query,
-        IGeometryContext context,
-        int bufferSize) where TInput : notnull where TQuery : notnull =>
-        (input, query) switch {
-            // Point array range queries
-            (Point3d[] pts, Sphere sphere) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (Point3d[] pts, BoundingBox box) => GetTree(pts).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            // Point array proximity queries
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], int> tuple1 => GetTree(pts).Bind(_ =>
-                ExecuteProximitySearch(pts, tuple1.Item1, tuple1.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
-            (Point3d[] pts, object q) when q is ValueTuple<Point3d[], double> tuple2 => GetTree(pts).Bind(_ =>
-                ExecuteProximitySearch(pts, tuple2.Item1, tuple2.Item2, RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
-            // PointCloud range queries
-            (PointCloud cloud, Sphere sphere) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (PointCloud cloud, BoundingBox box) => GetTree(cloud).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            // PointCloud proximity queries
-            (PointCloud cloud, ValueTuple<Point3d[], int>(var needles, var k)) =>
-                ExecuteProximitySearch(cloud, needles, k, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
-            (PointCloud cloud, ValueTuple<Point3d[], double>(var needles, var distance)) =>
-                ExecuteProximitySearch(cloud, needles, distance, RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints),
-            // Mesh range queries
-            (Mesh mesh, Sphere sphere) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (Mesh mesh, BoundingBox box) => GetTree(mesh).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            // Mesh overlap detection
-            (ValueTuple<Mesh, Mesh>(var mesh1, var mesh2), double tolerance) => GetTree(mesh1).Bind(t1 =>
-                GetTree(mesh2).Bind(t2 =>
-                    ExecuteOverlapSearch(t1, t2, context.AbsoluteTolerance + tolerance, bufferSize))),
-            // Curve array range queries
-            (Curve[] curves, Sphere sphere) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (Curve[] curves, BoundingBox box) => GetTree(curves).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            // Surface array range queries
-            (Surface[] surfaces, Sphere sphere) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (Surface[] surfaces, BoundingBox box) => GetTree(surfaces).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            // Brep array range queries
-            (Brep[] breps, Sphere sphere) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, sphere, bufferSize)),
-            (Brep[] breps, BoundingBox box) => GetTree(breps).Bind(tree =>
-                ExecuteRangeSearch(tree, box, bufferSize)),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(
-                error: E.Spatial.UnsupportedTypeCombo.WithContext(
-                    $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
-        };
 
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
     [Pure]
@@ -165,11 +114,8 @@ internal static class SpatialCore {
 
     /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<RTree> GetTree<T>(T source) where T : notnull =>
-        TreeFactories.TryGetValue(typeof(T), out Func<object, RTree>? factory) switch {
-            true => ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!))),
-            false => ResultFactory.Create<RTree>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Type: {typeof(T).Name}")),
-        };
+    private static Result<RTree> GetTree<T>(T source, Func<object, RTree> factory) where T : notnull =>
+        ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
 
     /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
     [Pure]
