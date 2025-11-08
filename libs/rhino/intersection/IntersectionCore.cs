@@ -17,7 +17,7 @@ internal static class IntersectionCore {
 #pragma warning restore MA0051
         // Consolidated transformer for CurveIntersections with optional overlap extraction
         static Result<Intersect.IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
-#pragma warning disable IDISP007
+#pragma warning disable IDISP007 // Dispose CurveIntersections here as this method assumes ownership for result transformation
             using (results) {
 #pragma warning restore IDISP007
                 return results switch {
