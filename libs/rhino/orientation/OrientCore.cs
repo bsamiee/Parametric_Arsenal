@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
@@ -38,6 +39,7 @@ internal static class OrientCore {
         }.ToFrozenDictionary();
 
     /// <summary>Polymorphic centroid extraction using mass properties or bounding box - dispatches by geometry type and computation mode.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
         (geometry, useMassProperties) switch {
             (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
@@ -55,6 +57,7 @@ internal static class OrientCore {
         };
 
     /// <summary>Applies transformation to geometry with duplication and error handling.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
             T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),

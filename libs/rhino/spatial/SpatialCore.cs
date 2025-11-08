@@ -64,7 +64,7 @@ internal static class SpatialCore {
         ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
 
     /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
         for (int i = 0; i < geometries.Length; i++) {
@@ -74,7 +74,7 @@ internal static class SpatialCore {
     }
 
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
@@ -92,14 +92,14 @@ internal static class SpatialCore {
     }
 
     /// <summary>Executes k-nearest or distance-limited proximity search using RTree algorithms.</summary>
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
-            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),])
+            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results && results.Length > 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                 : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),])
+            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results && results.Length > 0
+                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                 : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
             double => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
@@ -107,7 +107,7 @@ internal static class SpatialCore {
         };
 
     /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;

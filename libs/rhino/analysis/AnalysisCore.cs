@@ -17,8 +17,7 @@ internal static class AnalysisCore {
     private static readonly FrozenDictionary<Type, (V Mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> Compute)> _strategies =
         ((Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>>)((cv, ctx, t, order) => {
             double param = t ?? cv.Domain.Mid;
-            ArrayPool<double> pool = ArrayPool<double>.Shared;
-            double[] buffer = pool.Rent(AnalysisConfig.MaxDiscontinuities);
+            double[] buffer = ArrayPool<double>.Shared.Rent(AnalysisConfig.MaxDiscontinuities);
             try {
                 (int discCount, double s) = (0, cv.Domain.Min);
                 while (discCount < AnalysisConfig.MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
@@ -40,7 +39,7 @@ internal static class AnalysisCore {
                         amp.Centroid))
                     : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
             } finally {
-                pool.Return(buffer, clearArray: true);
+                ArrayPool<double>.Shared.Return(buffer, clearArray: true);
             }
         }), (Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>>)((sf, _, uv, order) => {
             (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);

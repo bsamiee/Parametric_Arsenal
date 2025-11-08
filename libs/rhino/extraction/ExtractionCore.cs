@@ -36,7 +36,7 @@ internal static class ExtractionCore {
             : ExecuteWithNormalization(geometry, kind, param, includeEnds, context);
     }
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Point3d>> ExecuteWithNormalization(
         GeometryBase geometry,
         byte kind,
@@ -61,7 +61,7 @@ internal static class ExtractionCore {
         }
     }
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] DispatchExtraction(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) =>
         _handlers.TryGetValue(key: (kind, geometry.GetType()), value: out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
             ? handler(geometry, param, includeEnds, context)
@@ -71,7 +71,7 @@ internal static class ExtractionCore {
                 .DefaultIfEmpty(defaultValue: static (_, _, _, _) => [])
                 .First()(geometry, param, includeEnds, context);
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> BuildHandlerRegistry() =>
         new Dictionary<(byte, Type), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> {
             [(1, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? VolumeMassProperties.Compute(b) switch {
