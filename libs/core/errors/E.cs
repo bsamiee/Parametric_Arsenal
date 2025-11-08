@@ -62,6 +62,10 @@ public static class E {
             [3901] = "Relative tolerance must be in range [0,1)",
             [3902] = "Angle tolerance must be in range (0, 2π]",
             [3903] = "Geometry exceeds tolerance threshold",
+            [3904] = "Polycurve has segment gaps exceeding tolerance",
+            [3905] = "NURBS control point count below minimum",
+            [3906] = "Extrusion profile curve invalid",
+            [3907] = "Surface UV domain has singularity",
             [3920] = "Invalid unit conversion scale",
             [3930] = "Unsupported operation type",
             [3931] = "Input filtered by predicate",
@@ -150,6 +154,10 @@ public static class E {
         public static readonly SystemError ToleranceRelativeInvalid = Get(3901);
         public static readonly SystemError ToleranceAngleInvalid = Get(3902);
         public static readonly SystemError ToleranceExceeded = Get(3903);
+        public static readonly SystemError PolycurveGaps = Get(3904);
+        public static readonly SystemError NurbsControlPointCount = Get(3905);
+        public static readonly SystemError ExtrusionProfileInvalid = Get(3906);
+        public static readonly SystemError UVDomainSingularity = Get(3907);
         public static readonly SystemError InvalidUnitConversion = Get(3920);
         public static readonly SystemError UnsupportedOperationType = Get(3930);
         public static readonly SystemError InputFiltered = Get(3931);

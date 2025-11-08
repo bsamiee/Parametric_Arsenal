@@ -23,13 +23,18 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static readonly V SelfIntersection = new(128);
     public static readonly V MeshSpecific = new(256);
     public static readonly V SurfaceContinuity = new(512);
+    public static readonly V PolycurveStructure = new(1024);
+    public static readonly V NurbsGeometry = new(2048);
+    public static readonly V ExtrusionGeometry = new(4096);
+    public static readonly V UVDomain = new(8192);
     public static readonly V All = new((ushort)(
         Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
         Topology._flags | Degeneracy._flags | Tolerance._flags | SelfIntersection._flags |
-        MeshSpecific._flags | SurfaceContinuity._flags
+        MeshSpecific._flags | SurfaceContinuity._flags | PolycurveStructure._flags |
+        NurbsGeometry._flags | ExtrusionGeometry._flags | UVDomain._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity,]).ToFrozenSet();
+    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain,]).ToFrozenSet();
 
     [Pure] private string DebuggerDisplay => this.ToString();
 
@@ -85,6 +90,10 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             128 => nameof(SelfIntersection),
             256 => nameof(MeshSpecific),
             512 => nameof(SurfaceContinuity),
+            1024 => nameof(PolycurveStructure),
+            2048 => nameof(NurbsGeometry),
+            4096 => nameof(ExtrusionGeometry),
+            8192 => nameof(UVDomain),
             _ => $"Combined({this._flags})",
         };
 }
