@@ -1,10 +1,10 @@
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Configuration constants for spatial indexing operations.</summary>
+/// <summary>RTree buffer size constants for spatial query allocation strategies.</summary>
 internal static class SpatialConfig {
-    /// <summary>Default buffer size for RTree search operations.</summary>
+    /// <summary>Standard buffer: 2048 elements for basic sphere/box queries.</summary>
     internal const int DefaultBufferSize = 2048;
 
-    /// <summary>Large buffer size for mesh overlap and complex proximity queries.</summary>
+    /// <summary>Extended buffer: 4096 elements for mesh overlap and proximity queries.</summary>
     internal const int LargeBufferSize = 4096;
 }

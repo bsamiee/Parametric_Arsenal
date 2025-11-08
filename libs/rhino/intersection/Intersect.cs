@@ -10,7 +10,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Polymorphic intersection engine with automatic type-based method detection.</summary>
 public static class Intersect {
-    /// <summary>Type-safe optional parameters for intersection operations.</summary>
+    /// <summary>Configuration parameters for intersection computation: tolerance, projection, output format.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionOptions(
         double? Tolerance = null,
@@ -19,7 +19,7 @@ public static class Intersect {
         bool WithIndices = false,
         bool Sorted = false);
 
-    /// <summary>Unified intersection output with zero nullable fields.</summary>
+    /// <summary>Polymorphic intersection result containing points, curves, parameters, and topology indices.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionOutput(
         IReadOnlyList<Point3d> Points,
@@ -28,6 +28,7 @@ public static class Intersect {
         IReadOnlyList<double> ParametersB,
         IReadOnlyList<int> FaceIndices,
         IReadOnlyList<Polyline> Sections) {
+        /// <summary>Empty intersection result with zero-length collections.</summary>
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
     }
     /// <summary>Performs intersection with automatic type detection, validation, and collection handling.</summary>

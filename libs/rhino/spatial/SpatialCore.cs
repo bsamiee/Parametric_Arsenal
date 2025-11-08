@@ -25,15 +25,15 @@ internal static class SpatialCore {
     ) where TInput : notnull =>
         proximityFuncs.HasValue
             ? (i, q, _, _) => q switch {
-                ValueTuple<Point3d[], int>(Point3d[] needles, int k) => ExecuteProximitySearch((TInput)i, needles, k, proximityFuncs.Value.kNearest!, proximityFuncs.Value.distLimited!),
-                ValueTuple<Point3d[], double>(Point3d[] needles, double distance) => ExecuteProximitySearch((TInput)i, needles, distance, proximityFuncs.Value.kNearest!, proximityFuncs.Value.distLimited!),
+                (Point3d[] needles, int k) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: k, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
+                (Point3d[] needles, double distance) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distance, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
             }
-            : (i, q, _, b) => GetTree((TInput)i, factory).Bind(tree => ExecuteRangeSearch(tree, q, b));
+            : (i, q, _, b) => GetTree(source: (TInput)i, factory: factory).Bind(tree => ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b));
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
         (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
-            ? GetTree(m1, _meshFactory).Bind(t1 => GetTree(m2, _meshFactory).Bind(t2 => ExecuteOverlapSearch(t1, t2, c.AbsoluteTolerance + tolerance, b)))
+            ? GetTree(source: m1, factory: _meshFactory).Bind(t1 => GetTree(source: m2, factory: _meshFactory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
     /// <summary>Unified configuration mapping input/query type pairs to tree factory, validation mode, buffer size, and execution strategy.</summary>
@@ -67,8 +67,7 @@ internal static class SpatialCore {
             Action search = queryShape switch {
                 Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
                 BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
-                _ => () => { }
-                ,
+                _ => () => { },
             };
             search();
             return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
@@ -81,14 +80,12 @@ internal static class SpatialCore {
     [Pure]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
-            int k when k > 0 => kNearest(source, needles, k).ToArray() switch {
-                int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            },
-            double d when d > 0 => distLimited(source, needles, d).ToArray() switch {
-                int[][] results => ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),]),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            },
+            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results
+                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),])
+                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
+                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(indices => indices),])
+                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
             double => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
@@ -96,24 +93,18 @@ internal static class SpatialCore {
 
     /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
     [Pure]
-    private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(
-        RTree tree1,
-        RTree tree2,
-        double tolerance,
-        int bufferSize) {
+    private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            bool success = RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
+            return RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
                 if (count + 1 < buffer.Length) {
                     buffer[count++] = args.Id;
                     buffer[count++] = args.IdB;
                 }
-            });
-            return success switch {
-                true => ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []),
-                false => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            };
+            })
+                ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
+                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }

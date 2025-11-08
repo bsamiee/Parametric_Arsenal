@@ -25,6 +25,8 @@ internal static class OrientConfig {
             [typeof(PointCloud)] = V.None,
         }.ToFrozenDictionary();
 
+    /// <summary>Minimum vector magnitude: 1e-8 for non-degenerate direction vectors.</summary>
     internal const double MinVectorLength = 1e-8;
+    /// <summary>Parallel detection: 1e-6 tolerance for vector alignment detection.</summary>
     internal const double ParallelThreshold = 1e-6;
 }

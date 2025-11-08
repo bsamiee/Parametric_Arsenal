@@ -23,12 +23,12 @@ internal static class AnalysisConfig {
             [typeof(Mesh)] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
-    /// <summary>Maximum number of discontinuities to track in curve analysis.</summary>
+    /// <summary>Discontinuity buffer limit: 20 C1/C2 breaks per curve analysis.</summary>
     internal const int MaxDiscontinuities = 20;
 
-    /// <summary>Default derivative order for analysis operations.</summary>
+    /// <summary>Standard derivative order: 2 for position, tangent, curvature computation.</summary>
     internal const int DefaultDerivativeOrder = 2;
 
-    /// <summary>Curve frame sample count for perpendicular frame extraction.</summary>
+    /// <summary>Frame sampling: 5 perpendicular planes at 0%, 25%, 50%, 75%, 100% curve domain.</summary>
     internal const int CurveFrameSampleCount = 5;
 }

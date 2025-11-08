@@ -16,21 +16,22 @@ public static class Topology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface pattern for polymorphic result dispatch")]
     public interface IResult;
 
-    /// <summary>Edge continuity classification using struct pattern instead of enum.</summary>
+    /// <summary>Type-safe edge continuity classifier for geometric and topological edge analysis.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct EdgeContinuityType(byte value) : IEquatable<EdgeContinuityType> {
         internal readonly byte Value = value;
 
-        /// <summary>G0 discontinuous or below minimum continuity threshold.</summary>
+        /// <summary>G0 discontinuous: sharp edge below continuity threshold.</summary>
         public static readonly EdgeContinuityType Sharp = new(0);
-        /// <summary>G1 continuous (tangent continuity).</summary>
+        /// <summary>G1 continuous: tangent continuity at edge.</summary>
         public static readonly EdgeContinuityType Smooth = new(1);
-        /// <summary>G2 continuous (curvature continuity).</summary>
+        /// <summary>G2 continuous: curvature continuity at edge.</summary>
         public static readonly EdgeContinuityType Curvature = new(2);
-        /// <summary>Interior manifold edge (valence=2, meets continuity requirement).</summary>
+        /// <summary>Interior manifold edge: valence 2 with required continuity.</summary>
         public static readonly EdgeContinuityType Interior = new(3);
-        /// <summary>Boundary naked edge (valence=1).</summary>
+        /// <summary>Boundary naked edge: valence 1.</summary>
         public static readonly EdgeContinuityType Boundary = new(4);
-        /// <summary>Non-manifold edge (valence>2).</summary>
+        /// <summary>Non-manifold edge: valence greater than 2.</summary>
         public static readonly EdgeContinuityType NonManifold = new(5);
 
         /// <summary>Equality comparison by value.</summary>

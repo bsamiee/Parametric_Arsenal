@@ -50,10 +50,10 @@ internal static class ExtractionCore {
         };
 
         try {
-            V mode = ExtractionConfig.GetValidationMode(kind, normalized.GetType());
+            V mode = ExtractionConfig.GetValidationMode(kind: kind, geometryType: normalized.GetType());
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode == V.None ? null : [context, mode])
-                .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)DispatchExtraction(g, kind, param, includeEnds, context).AsReadOnly()));
+                .Validate(args: mode == V.None ? null : [context, mode,])
+                .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)DispatchExtraction(geometry: g, kind: kind, param: param, includeEnds: includeEnds, context: context).AsReadOnly()));
         } finally {
             if (shouldDispose) {
                 (normalized as IDisposable)?.Dispose();
@@ -63,12 +63,12 @@ internal static class ExtractionCore {
 
     [Pure]
     private static Point3d[] DispatchExtraction(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) =>
-        _handlers.TryGetValue((kind, geometry.GetType()), out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
+        _handlers.TryGetValue(key: (kind, geometry.GetType()), value: out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
             ? handler(geometry, param, includeEnds, context)
             : _handlers.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(static (_, _, _, _) => [])
+                .OrderByDescending(keySelector: kv => kv.Key.GeometryType, comparer: Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
+                .Select(selector: kv => kv.Value)
+                .DefaultIfEmpty(defaultValue: static (_, _, _, _) => [])
                 .First()(geometry, param, includeEnds, context);
 
     [Pure]
