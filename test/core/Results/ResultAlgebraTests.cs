@@ -108,7 +108,6 @@ public sealed class ResultAlgebraTests {
             Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(args: [(Func<int, bool>)(x => x > 0), Errors.E1]).IsSuccess)), 50));
 
     /// <summary>Verifies Lift applicative functor with partial application, arity detection, and error accumulation.</summary>
-    /// <summary>Verifies Lift applicative functor with partial application, arity detection, and error accumulation.</summary>
     [Fact]
     public void LiftApplicativeFunctor() {
         Func<int, int, int> add = static (x, y) => unchecked(x + y);

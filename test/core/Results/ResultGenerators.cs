@@ -82,7 +82,7 @@ public static class ResultGenerators {
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
-                        succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: val + offset)
+                        succeeds && double.TryParse(s, CultureInfo.InvariantCulture, out double val) ? ResultFactory.Create(value: unchecked(val + offset))
                                                                                                        : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9003, "Parse failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
@@ -95,13 +95,13 @@ public static class ResultGenerators {
     public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
         (typeof(T), typeof(TResult)) switch {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
-                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, string>(x => (x + offset).ToString(CultureInfo.InvariantCulture))),
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, string>(x => unchecked(x + offset).ToString(CultureInfo.InvariantCulture))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
-                Gen.Double.Select(static multiplier => (Func<T, TResult>)(object)new Func<int, double>(x => x * multiplier)),
+                Gen.Double.Select(static multiplier => (Func<T, TResult>)(object)new Func<int, double>(x => unchecked(x * multiplier))),
             (Type t, Type r) when t == typeof(int) && r == typeof(int) =>
-                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, int>(x => x + offset)),
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<int, int>(x => unchecked(x + offset))),
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
-                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<string, int>(s => s.Length + offset)),
+                Gen.Int.Select(static offset => (Func<T, TResult>)(object)new Func<string, int>(s => unchecked(s.Length + offset))),
             _ => throw new NotSupportedException(string.Create(CultureInfo.InvariantCulture, $"Pure function generation not supported for {typeof(T)} -> {typeof(TResult)}")),
         };
 
@@ -113,7 +113,7 @@ public static class ResultGenerators {
 
     /// <summary>Generates binary operations using static function set.</summary>
     public static Gen<Func<int, int, int>> BinaryFunctionGen => Gen.OneOf(
-        Gen.Const<Func<int, int, int>>(static (a, b) => a + b),
-        Gen.Const<Func<int, int, int>>(static (a, b) => a * b),
-        Gen.Const<Func<int, int, int>>(static (a, b) => a - b));
+        Gen.Const<Func<int, int, int>>(static (a, b) => unchecked(a + b)),
+        Gen.Const<Func<int, int, int>>(static (a, b) => unchecked(a * b)),
+        Gen.Const<Func<int, int, int>>(static (a, b) => unchecked(a - b)));
 }
