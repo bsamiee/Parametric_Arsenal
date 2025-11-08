@@ -63,12 +63,10 @@ public static class ResultFactory {
             (Func<T, bool> p, null, null, _) when error.HasValue => result.Ensure(unless is true ? x => !p(x) : conclusion is not null ? x => !p(x) || conclusion(x) : p, error.Value),
             (Func<T, bool> p, Func<T, Result<T>> v, null, _) => result.Bind(value => (unless is true ? !p(value) : p(value)) ? v(value) : Create(value: value)),
             (null, null, (Func<T, bool>, SystemError)[] vs, _) when vs?.Length > 0 => result.Ensure(vs),
-            (null, null, null, [IGeometryContext ctx, V mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch {
-                { Length: 0 } => Create(value: g),
+            (null, null, null, [IGeometryContext ctx, V mode]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), mode)(g, ctx) switch { { Length: 0 } => Create(value: g),
                 var errs => Create<T>(errors: errs),
             }),
-            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), V.Standard)(g, ctx) switch {
-                { Length: 0 } => Create(value: g),
+            (null, null, null, [IGeometryContext ctx]) when IsGeometryType(typeof(T)) => result.Bind(g => ValidationRules.GetOrCompileValidator(g!.GetType(), V.Standard)(g, ctx) switch { { Length: 0 } => Create(value: g),
                 var errs => Create<T>(errors: errs),
             }),
             (null, null, null, [Func<T, bool> p, SystemError e]) => result.Ensure(p, e),

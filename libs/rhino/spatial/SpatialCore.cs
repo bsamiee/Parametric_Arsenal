@@ -82,7 +82,8 @@ internal static class SpatialCore {
             Action search = queryShape switch {
                 Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
                 BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
-                _ => () => { },
+                _ => () => { }
+                ,
             };
             search();
             return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);

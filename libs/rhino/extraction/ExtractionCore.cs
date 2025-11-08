@@ -74,20 +74,17 @@ internal static class ExtractionCore {
     [Pure]
     private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> BuildHandlerRegistry() =>
         new Dictionary<(byte, Type), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> {
-            [(1, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? VolumeMassProperties.Compute(b) switch {
-                { Centroid: { IsValid: true } ct } => [ct, .. b.Vertices.Select(v => v.Location)],
+            [(1, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? VolumeMassProperties.Compute(b) switch { { Centroid: { IsValid: true } ct } => [ct, .. b.Vertices.Select(v => v.Location)],
                 _ => [.. b.Vertices.Select(v => v.Location)],
             } : [],
-            [(1, typeof(Curve))] = static (g, _, _, _) => g is Curve c ? AreaMassProperties.Compute(c) switch {
-                { Centroid: { IsValid: true } ct } => [ct, c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd],
+            [(1, typeof(Curve))] = static (g, _, _, _) => g is Curve c ? AreaMassProperties.Compute(c) switch { { Centroid: { IsValid: true } ct } => [ct, c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd],
                 _ => [c.PointAtStart, c.PointAt(c.Domain.ParameterAt(0.5)), c.PointAtEnd],
             } : [],
             [(1, typeof(Surface))] = static (g, _, _, _) => g is Surface s ? (AreaMassProperties.Compute(s), s.Domain(0), s.Domain(1)) switch {
                 ( { Centroid: { IsValid: true } ct }, Interval u, Interval v) => [ct, s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)],
                 (_, Interval u, Interval v) => [s.PointAt(u.Min, v.Min), s.PointAt(u.Max, v.Min), s.PointAt(u.Max, v.Max), s.PointAt(u.Min, v.Max)],
             } : [],
-            [(1, typeof(Mesh))] = static (g, _, _, _) => g is Mesh m ? VolumeMassProperties.Compute(m) switch {
-                { Centroid: { IsValid: true } ct } => [ct, .. m.Vertices.ToPoint3dArray()],
+            [(1, typeof(Mesh))] = static (g, _, _, _) => g is Mesh m ? VolumeMassProperties.Compute(m) switch { { Centroid: { IsValid: true } ct } => [ct, .. m.Vertices.ToPoint3dArray()],
                 _ => m.Vertices.ToPoint3dArray(),
             } : [],
             [(1, typeof(PointCloud))] = static (g, _, _, _) => g is PointCloud pc && pc.GetPoints() is Point3d[] pts && pts.Length > 0 ? [pts.Aggregate(Point3d.Origin, static (s, p) => s + p) / pts.Length, .. pts] : [],
@@ -99,7 +96,8 @@ internal static class ExtractionCore {
                 ? [.. from u in Enumerable.Range(0, pts.CountU)
                       from v in Enumerable.Range(0, pts.CountV)
                       let gp = pts.GetGrevillePoint(u, v)
-                      select ns.PointAt(gp.X, gp.Y),]
+                      select ns.PointAt(gp.X, gp.Y),
+                ]
                 : [],
             [(3, typeof(Curve))] = static (g, _, _, _) => g is Curve c && c.ToNurbsCurve() is NurbsCurve nc ? ((Func<NurbsCurve, Point3d[]>)(n => { try { return [.. n.GrevillePoints()]; } finally { n.Dispose(); } }))(nc) : [],
             [(3, typeof(Surface))] = static (g, _, _, _) => g is Surface s && s.ToNurbsSurface() is NurbsSurface ns && ns.Points is not null
@@ -108,7 +106,8 @@ internal static class ExtractionCore {
                         return [.. from u in Enumerable.Range(0, n.Points.CountU)
                                    from v in Enumerable.Range(0, n.Points.CountV)
                                    let gp = n.Points.GetGrevillePoint(u, v)
-                                   select n.PointAt(gp.X, gp.Y),];
+                                   select n.PointAt(gp.X, gp.Y),
+                        ];
                     } finally { n.Dispose(); }
                 }))(ns)
                 : [],
@@ -135,7 +134,8 @@ internal static class ExtractionCore {
             [(7, typeof(Brep))] = static (g, _, _, _) => g is Brep b ? [.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
                 Brep dup => ((Func<Brep, Point3d>)(d => { try { return AreaMassProperties.Compute(d)?.Centroid ?? Point3d.Unset; } finally { d.Dispose(); } }))(dup),
                 _ => Point3d.Unset,
-            }).Where(static p => p != Point3d.Unset),] : [],
+            }).Where(static p => p != Point3d.Unset),
+            ] : [],
             [(7, typeof(Mesh))] = static (g, _, _, _) => g is Mesh m ? [.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static pt => pt.IsValid),] : [],
             [(10, typeof(Curve))] = static (g, p, ends, _) => g is Curve c && p is int count ? c.DivideByCount(count, ends) switch { double[] ts => [.. ts.Select(c.PointAt)], _ => [] } : [],
             [(10, typeof(Surface))] = static (g, p, ends, _) => g is Surface s && p is int d
@@ -144,7 +144,8 @@ internal static class ExtractionCore {
                                                     from vi in Enumerable.Range(0, d)
                                                     let up = d == 1 ? 0.5 : ends ? ui / (double)(d - 1) : (ui + 0.5) / d
                                                     let vp = d == 1 ? 0.5 : ends ? vi / (double)(d - 1) : (vi + 0.5) / d
-                                                    select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),],
+                                                    select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),
+                    ],
                 }
                 : [],
             [(11, typeof(Curve))] = static (g, p, ends, _) => g is Curve c && p is double length ? c.DivideByLength(length, ends) switch { double[] ts => [.. ts.Select(c.PointAt)], _ => [] } : [],

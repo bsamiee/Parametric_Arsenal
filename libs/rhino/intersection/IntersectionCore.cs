@@ -1,5 +1,4 @@
 using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
