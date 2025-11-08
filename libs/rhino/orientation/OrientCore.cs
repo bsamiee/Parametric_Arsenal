@@ -62,4 +62,17 @@ internal static class OrientCore {
             T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
         };
+
+    /// <summary>Extracts best-fit plane from point cloud or mesh using PCA or normal averaging.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
+        geometry switch {
+            PointCloud pc when pc.Count > 0 => Plane.FitPlaneToPoints(pc.GetPoints(), out Plane plane) == PlaneFitResult.Success
+                ? ResultFactory.Create(value: plane)
+                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            Mesh m when m.Vertices.Count > 0 => Plane.FitPlaneToPoints(m.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
+                ? ResultFactory.Create(value: plane)
+                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
+        };
 }

@@ -26,10 +26,10 @@ internal static class SpatialCore {
             [(typeof(Point3d[]), typeof(BoundingBox))] = (_pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
             [(typeof(Point3d[]), typeof((Point3d[], int)))] = (_pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
             [(typeof(Point3d[]), typeof((Point3d[], double)))] = (_pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
-            [(typeof(PointCloud), typeof(Sphere))] = (_pointCloudFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            [(typeof(PointCloud), typeof(BoundingBox))] = (_pointCloudFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            [(typeof(PointCloud), typeof((Point3d[], int)))] = (_pointCloudFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
-            [(typeof(PointCloud), typeof((Point3d[], double)))] = (_pointCloudFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
+            [(typeof(PointCloud), typeof(Sphere))] = (_pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
+            [(typeof(PointCloud), typeof(BoundingBox))] = (_pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
+            [(typeof(PointCloud), typeof((Point3d[], int)))] = (_pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
+            [(typeof(PointCloud), typeof((Point3d[], double)))] = (_pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
             [(typeof(Mesh), typeof(Sphere))] = (_meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
             [(typeof(Mesh), typeof(BoundingBox))] = (_meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
             [(typeof((Mesh, Mesh)), typeof(double))] = (null, V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
@@ -76,6 +76,9 @@ internal static class SpatialCore {
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
+        if (bufferSize <= 0) {
+            return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidBufferSize.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"BufferSize: {bufferSize}")));
+        }
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {

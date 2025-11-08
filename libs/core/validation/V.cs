@@ -20,21 +20,20 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static readonly V Topology = new(16);
     public static readonly V Degeneracy = new(32);
     public static readonly V Tolerance = new(64);
-    public static readonly V SelfIntersection = new(128);
-    public static readonly V MeshSpecific = new(256);
-    public static readonly V SurfaceContinuity = new(512);
-    public static readonly V PolycurveStructure = new(1024);
-    public static readonly V NurbsGeometry = new(2048);
-    public static readonly V ExtrusionGeometry = new(4096);
-    public static readonly V UVDomain = new(8192);
+    public static readonly V MeshSpecific = new(128);
+    public static readonly V SurfaceContinuity = new(256);
+    public static readonly V PolycurveStructure = new(512);
+    public static readonly V NurbsGeometry = new(1024);
+    public static readonly V ExtrusionGeometry = new(2048);
+    public static readonly V UVDomain = new(4096);
     public static readonly V All = new((ushort)(
         Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
-        Topology._flags | Degeneracy._flags | Tolerance._flags | SelfIntersection._flags |
+        Topology._flags | Degeneracy._flags | Tolerance._flags |
         MeshSpecific._flags | SurfaceContinuity._flags | PolycurveStructure._flags |
         NurbsGeometry._flags | ExtrusionGeometry._flags | UVDomain._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, SelfIntersection, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain,]).ToFrozenSet();
+    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain,]).ToFrozenSet();
 
     [Pure] private string DebuggerDisplay => this.ToString();
 
@@ -87,13 +86,12 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             16 => nameof(Topology),
             32 => nameof(Degeneracy),
             64 => nameof(Tolerance),
-            128 => nameof(SelfIntersection),
-            256 => nameof(MeshSpecific),
-            512 => nameof(SurfaceContinuity),
-            1024 => nameof(PolycurveStructure),
-            2048 => nameof(NurbsGeometry),
-            4096 => nameof(ExtrusionGeometry),
-            8192 => nameof(UVDomain),
+            128 => nameof(MeshSpecific),
+            256 => nameof(SurfaceContinuity),
+            512 => nameof(PolycurveStructure),
+            1024 => nameof(NurbsGeometry),
+            2048 => nameof(ExtrusionGeometry),
+            4096 => nameof(UVDomain),
             _ => $"Combined({this._flags})",
         };
 }

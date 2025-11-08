@@ -37,23 +37,43 @@ public static class Extract {
         /// <summary>Topology face centroids via area mass properties.</summary>
         public static readonly Semantic FaceCentroids = new(7);
     }
+
+    /// <summary>Type-safe parametric extraction mode specifier for uniform and directional sampling.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly struct Parametric(object spec) {
+        /// <summary>Uniform count-based sampling: divides by count with optional endpoint inclusion.</summary>
+        public static Parametric UniformCount(int count, bool includeEnds = true) => new((count, includeEnds));
+
+        /// <summary>Uniform length-based sampling: divides by length with optional endpoint inclusion.</summary>
+        public static Parametric UniformLength(double length, bool includeEnds = true) => new((length, includeEnds));
+
+        /// <summary>Directional extrema sampling: extracts points at min/max projection along vector.</summary>
+        public static Parametric Directional(Vector3d direction) => new(direction);
+
+        /// <summary>Discontinuity sampling: extracts points at parametric discontinuities.</summary>
+        public static Parametric Discontinuities(Continuity continuity) => new(continuity);
+
+        internal object Spec { get; } = spec;
+    }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
-        spec switch {
-            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
-            Semantic sem => UnifiedOperation.Apply(
-                input,
-                (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(sem.Kind, typeof(T)) }),
-            int or double or (int, bool) or (double, bool) or Vector3d or Continuity =>
-                UnifiedOperation.Apply(
-                    input,
-                    (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard }),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
-        };
+        PointsMultiple(input: [input,], spec: spec, context: context, accumulateErrors: false, enableParallel: false)
+            .Map(results => results[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(
+        IReadOnlyList<T> input,
+        object spec,
+        IGeometryContext context,
+        bool accumulateErrors = false,
+        bool enableParallel = false) where T : GeometryBase {
+        Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? input.AsParallel() : input.AsEnumerable()).Select(item => Points(item, spec, context)),];
+        return accumulateErrors
+            ? results.All(r => r.IsSuccess)
+                ? ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),])
+                : ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors).ToArray(),])
+            : results.FirstOrDefault(r => !r.IsSuccess) is Result<IReadOnlyList<Point3d>> failure
+                ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,])
+                : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]);
+    }
 }
