@@ -96,10 +96,10 @@ internal static class SpatialCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
-            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results && results.Length > 0
+            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results
                 ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                 : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results && results.Length > 0
+            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
                 ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                 : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
