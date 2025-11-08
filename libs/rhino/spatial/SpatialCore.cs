@@ -31,6 +31,11 @@ internal static class SpatialCore {
             }
             : (i, q, _, b) => GetTree((TInput)i, factory).Bind(tree => ExecuteRangeSearch(tree, q, b));
 
+    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
+        (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
+            ? GetTree(m1, _meshFactory).Bind(t1 => GetTree(m2, _meshFactory).Bind(t2 => ExecuteOverlapSearch(t1, t2, c.AbsoluteTolerance + tolerance, b)))
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
+
     /// <summary>Unified configuration mapping input/query type pairs to tree factory, validation mode, buffer size, and execution strategy.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
         new Dictionary<(Type, Type), (Func<object, RTree>?, V, int, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>>)> {
@@ -44,11 +49,7 @@ internal static class SpatialCore {
             [(typeof(PointCloud), typeof((Point3d[], double)))] = (_pointCloudFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
             [(typeof(Mesh), typeof(Sphere))] = (_meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
             [(typeof(Mesh), typeof(BoundingBox))] = (_meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
-            [(typeof(ValueTuple<Mesh, Mesh>), typeof(double))] = (null, V.MeshSpecific, SpatialConfig.LargeBufferSize,
-                (i, q, c, b) => (i, q) switch {
-                    (ValueTuple<Mesh, Mesh>(Mesh m1, Mesh m2), double tolerance) => GetTree(m1, _meshFactory).Bind(t1 => GetTree(m2, _meshFactory).Bind(t2 => ExecuteOverlapSearch(t1, t2, c.AbsoluteTolerance + tolerance, b))),
-                    _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
-                }),
+            [(typeof((Mesh, Mesh)), typeof(double))] = (null, V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
             [(typeof(Curve[]), typeof(Sphere))] = (_curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
             [(typeof(Curve[]), typeof(BoundingBox))] = (_curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
             [(typeof(Surface[]), typeof(Sphere))] = (_surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
