@@ -46,7 +46,7 @@ public static class Topology {
         public static bool operator !=(EdgeContinuityType left, EdgeContinuityType right) => !left.Equals(right);
     }
 
-    /// <summary>Naked edge analysis result containing edge curves and indices with topology metadata.</summary>
+    /// <summary>Boundary edge extraction: naked edge curves, indices, valences, ordering state.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NakedEdgeData(
         IReadOnlyList<Curve> EdgeCurves,
@@ -61,7 +61,7 @@ public static class Topology {
             $"NakedEdges: {this.EdgeCurves.Count}/{this.TotalEdgeCount} | L={this.TotalLength:F3} | Ordered={this.IsOrdered}");
     }
 
-    /// <summary>Boundary loop analysis result with closed loop curves and join diagnostics.</summary>
+    /// <summary>Boundary loop construction: joined naked edges with closure state and join diagnostics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BoundaryLoopData(
         IReadOnlyList<Curve> Loops,
@@ -76,7 +76,7 @@ public static class Topology {
             $"BoundaryLoops: {this.Loops.Count} | FailedJoins={this.FailedJoins} | Tol={this.JoinTolerance:E2}");
     }
 
-    /// <summary>Non-manifold topology analysis result with diagnostic data for irregular vertices and edges.</summary>
+    /// <summary>Manifold detection: non-manifold vertices/edges with valences and spatial locations.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NonManifoldData(
         IReadOnlyList<int> EdgeIndices,
@@ -94,7 +94,7 @@ public static class Topology {
                 $"NonManifold: Edges={this.EdgeIndices.Count} | Verts={this.VertexIndices.Count} | MaxVal={this.MaxValence}");
     }
 
-    /// <summary>Connected component analysis result with adjacency graph and spatial bounds.</summary>
+    /// <summary>Connected components: face groups with adjacency graph and bounding boxes.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ConnectivityData(
         IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
@@ -111,7 +111,7 @@ public static class Topology {
                 $"Connectivity: {this.TotalComponents} components | Largest={this.ComponentSizes.Max()}");
     }
 
-    /// <summary>Edge classification result by continuity type with geometric measures.</summary>
+    /// <summary>Edge continuity classification: G0/G1/G2 types with geometric measures per edge.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record EdgeClassificationData(
         IReadOnlyList<int> EdgeIndices,
@@ -125,7 +125,7 @@ public static class Topology {
             $"EdgeClassification: Total={this.EdgeIndices.Count} | Sharp={this.GroupedByType.GetValueOrDefault(EdgeContinuityType.Sharp, []).Count}");
     }
 
-    /// <summary>Face adjacency query result with neighbor data and dihedral angle computation.</summary>
+    /// <summary>Edge adjacency: neighboring faces with normals, dihedral angles, manifold state.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record AdjacencyData(
         int EdgeIndex,
