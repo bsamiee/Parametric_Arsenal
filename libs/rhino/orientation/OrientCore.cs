@@ -5,7 +5,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Core dispatch tables for frame extraction without helper methods - all logic inlined in API.</summary>
+/// <summary>Core dispatch tables for frame and centroid extraction without helper methods - all logic inlined in API.</summary>
 internal static class OrientCore {
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
@@ -36,4 +36,28 @@ internal static class OrientCore {
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
         }.ToFrozenDictionary();
+
+    /// <summary>Polymorphic centroid extraction using mass properties or bounding box - dispatches by geometry type and computation mode.</summary>
+    internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
+        (geometry, useMassProperties) switch {
+            (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (Curve curve, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
+            (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch {
+                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            },
+            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+        };
+
+    /// <summary>Applies transformation to geometry with duplication and error handling.</summary>
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
+        (T)geometry.Duplicate() switch {
+            T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
+        };
 }
