@@ -19,23 +19,6 @@ internal static class SpatialCore {
     private static readonly Func<object, RTree> _surfaceArrayFactory = s => BuildGeometryArrayTree((Surface[])s);
     private static readonly Func<object, RTree> _brepArrayFactory = s => BuildGeometryArrayTree((Brep[])s);
 
-    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
-        Func<object, RTree> factory,
-        (Func<TInput, Point3d[], int, IEnumerable<int[]>>? kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>>? distLimited)? proximityFuncs = null
-    ) where TInput : notnull =>
-        proximityFuncs.HasValue
-            ? (i, q, _, _) => q switch {
-                (Point3d[] needles, int k) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: k, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
-                (Point3d[] needles, double distance) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distance, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
-            }
-            : (i, q, _, b) => GetTree(source: (TInput)i, factory: factory).Bind(tree => ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b));
-
-    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
-        (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
-            ? GetTree(source: m1, factory: _meshFactory).Bind(t1 => GetTree(source: m2, factory: _meshFactory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
-            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
-
     /// <summary>Unified configuration mapping input/query type pairs to tree factory, validation mode, buffer size, and execution strategy.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
         new Dictionary<(Type, Type), (Func<object, RTree>?, V, int, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>>)> {
@@ -57,6 +40,38 @@ internal static class SpatialCore {
             [(typeof(Brep[]), typeof(Sphere))] = (_brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
             [(typeof(Brep[]), typeof(BoundingBox))] = (_brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
         }.ToFrozenDictionary();
+
+    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
+        Func<object, RTree> factory,
+        (Func<TInput, Point3d[], int, IEnumerable<int[]>>? kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>>? distLimited)? proximityFuncs = null
+    ) where TInput : notnull =>
+        proximityFuncs.HasValue
+            ? (i, q, _, _) => q switch {
+                (Point3d[] needles, int k) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: k, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
+                (Point3d[] needles, double distance) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distance, kNearest: proximityFuncs.Value.kNearest!, distLimited: proximityFuncs.Value.distLimited!),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
+            }
+            : (i, q, _, b) => GetTree(source: (TInput)i, factory: factory).Bind(tree => ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b));
+
+    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
+        (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
+            ? GetTree(source: m1, factory: _meshFactory).Bind(t1 => GetTree(source: m2, factory: _meshFactory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
+
+    /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<RTree> GetTree<T>(T source, Func<object, RTree> factory) where T : notnull =>
+        ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
+
+    /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
+    [Pure]
+    private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
+        RTree tree = new();
+        for (int i = 0; i < geometries.Length; i++) {
+            _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
+        }
+        return tree;
+    }
 
     /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
     [Pure]
@@ -108,20 +123,5 @@ internal static class SpatialCore {
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
-    }
-
-    /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<RTree> GetTree<T>(T source, Func<object, RTree> factory) where T : notnull =>
-        ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
-
-    /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
-    [Pure]
-    private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
-        RTree tree = new();
-        for (int i = 0; i < geometries.Length; i++) {
-            _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
-        }
-        return tree;
     }
 }
