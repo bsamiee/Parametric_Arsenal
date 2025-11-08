@@ -109,13 +109,7 @@ public sealed class ResultAlgebraTests {
 
     /// <summary>Verifies Lift applicative functor with partial application, arity detection, and error accumulation.</summary>
     /// <summary>Verifies Lift applicative functor with partial application, arity detection, and error accumulation.</summary>
-    /// <remarks>
-    /// KNOWN ISSUE: Lift has a covariance bug when using all-Result arguments (Result&lt;T&gt; can't cast to Result&lt;object&gt;).
-    /// This affects lines 86-89 in ResultFactory.Lift where it tries to use a.Cast&lt;Result&lt;object&gt;&gt;().
-    /// The test is currently skipped until this core library bug is fixed.
-    /// See: libs/core/results/ResultFactory.cs line 87
-    /// </remarks>
-    [Fact(Skip = "Lift has a covariance bug with all-Result arguments - needs core library fix")]
+    [Fact]
     public void LiftApplicativeFunctor() {
         Func<int, int, int> add = static (x, y) => unchecked(x + y);
         TestGen.RunAll(

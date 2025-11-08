@@ -84,8 +84,17 @@ public static class ResultFactory {
             (var ar, 0, var nrc, var a) when ar > a.Length && nrc == a.Length =>
                 Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
             (var ar, var rc, 0, var a) when ar == a.Length && rc == ar =>
-                a.Cast<Result<object>>().Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
-                    (acc, curr) => acc.Accumulate(curr))
+                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                    (acc, arg) => {
+                        Type argType = arg.GetType();
+                        return argType is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
+                            (bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)! switch {
+                                true when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg)!,]),
+                                false when acc.IsSuccess => Create<IReadOnlyList<object>>(errors: [.. (IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!,]),
+                                false => Create<IReadOnlyList<object>>(errors: [.. acc.Errors, .. (IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!,]),
+                                _ => acc,
+                            } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]);
+                    })
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
             (var ar, var rc, 0, var a) when rc == a.Length && ar >= 3 && ar > a.Length =>
                 a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
