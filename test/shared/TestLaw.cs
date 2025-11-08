@@ -21,14 +21,29 @@ public static class TestLaw {
     /// <summary>Verifies category theory laws using FrozenDictionary O(1) dispatch with polymorphic arity.</summary>
     public static void Verify<T>(string law, params object[] args) where T : notnull {
         switch (law, args) {
+            case ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", [Gen<Result<T>> gen,]):
+                ((Action<Gen<Result<object>>, int>)_laws[law])(gen.Select(static r => r.Map(static x => (object)x!)), 100);
+                break;
             case ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", [Gen<Result<T>> gen, int iter,]):
                 ((Action<Gen<Result<object>>, int>)_laws[law])(gen.Select(static r => r.Map(static x => (object)x!)), iter);
+                break;
+            case ("EqualitySymmetric", [Gen<Result<T>> gen1, Gen<Result<T>> gen2,]):
+                ((Action<Gen<Result<object>>, Gen<Result<object>>, int>)_laws[law])(
+                    gen1.Select(static r => r.Map(static x => (object)x!)),
+                    gen2.Select(static r => r.Map(static x => (object)x!)),
+                    100);
                 break;
             case ("EqualitySymmetric", [Gen<Result<T>> gen1, Gen<Result<T>> gen2, int iter,]):
                 ((Action<Gen<Result<object>>, Gen<Result<object>>, int>)_laws[law])(
                     gen1.Select(static r => r.Map(static x => (object)x!)),
                     gen2.Select(static r => r.Map(static x => (object)x!)),
                     iter);
+                break;
+            case ("HashConsistent", [Gen<T> gen, Func<T, Result<T>> toResult,]):
+                ((Action<Gen<object>, Func<object, Result<object>>, int>)_laws[law])(
+                    gen.Select(static x => (object)x!),
+                    v => toResult((T)v).Map(static x => (object)x!),
+                    100);
                 break;
             case ("HashConsistent", [Gen<T> gen, Func<T, Result<T>> toResult, int iter,]):
                 ((Action<Gen<object>, Func<object, Result<object>>, int>)_laws[law])(

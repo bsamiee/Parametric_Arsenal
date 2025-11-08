@@ -73,12 +73,12 @@ public static class ResultGenerators {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<string>>(x =>
-                        succeeds ? ResultFactory.Create(value: (x + offset).ToString(CultureInfo.InvariantCulture))
+                        succeeds ? ResultFactory.Create(value: unchecked(x + offset).ToString(CultureInfo.InvariantCulture))
                                  : ResultFactory.Create<string>(error: new SystemError(ErrorDomain.Results, 9001, string.Create(CultureInfo.InvariantCulture, $"Failed at {x}"))))),
             (Type t, Type r) when t == typeof(int) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (multiplier, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<int, Result<double>>(x =>
-                        succeeds ? ResultFactory.Create(value: x * multiplier) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
+                        succeeds ? ResultFactory.Create(value: unchecked(x * multiplier)) : ResultFactory.Create<double>(error: new SystemError(ErrorDomain.Results, 9002, "Transform failed")))),
             (Type t, Type r) when t == typeof(string) && r == typeof(double) =>
                 Gen.Double.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<double>>(s =>
@@ -87,7 +87,7 @@ public static class ResultGenerators {
             (Type t, Type r) when t == typeof(string) && r == typeof(int) =>
                 Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
                     (Func<T, Result<TResult>>)(object)new Func<string, Result<int>>(s =>
-                        succeeds ? ResultFactory.Create(value: s.Length + offset) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
+                        succeeds ? ResultFactory.Create(value: unchecked(s.Length + offset)) : ResultFactory.Create<int>(error: new SystemError(ErrorDomain.Results, 9004, "Length calc failed")))),
             _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
         };
 
