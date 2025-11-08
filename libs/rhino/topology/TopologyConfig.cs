@@ -93,4 +93,41 @@ internal static class TopologyConfig {
                     })
                 : default,
         }.ToFrozenDictionary();
+
+    /// <summary>Non-manifold detection accessor for topology analysis.</summary>
+    internal readonly record struct NonManifoldAccessor(
+        Func<IReadOnlyList<int>> GetNonManifoldEdgeIndices,
+        Func<IReadOnlyList<int>, IReadOnlyList<int>> GetValences,
+        Func<IReadOnlyList<int>, IReadOnlyList<Point3d>> GetLocations,
+        bool IsManifold,
+        bool IsOrientable);
+
+    /// <summary>Non-manifold accessor dispatch for manifold detection.</summary>
+    internal static readonly FrozenDictionary<Type, Func<object, NonManifoldAccessor>> NonManifoldAccessors =
+        new Dictionary<Type, Func<object, NonManifoldAccessor>> {
+            [typeof(Brep)] = geo => geo is Brep brep
+                ? new NonManifoldAccessor(
+                    GetNonManifoldEdgeIndices: () => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),],
+                    GetValences: indices => [.. indices.Select(i => (int)brep.Edges[i].Valence),],
+                    GetLocations: indices => [.. indices.Select(i => brep.Edges[i].PointAtStart),],
+                    IsManifold: !brep.Edges.Cast<BrepEdge>().Any(e => e.Valence == EdgeAdjacency.NonManifold),
+                    IsOrientable: brep.IsSolid)
+                : default,
+            [typeof(Mesh)] = geo => geo is Mesh mesh
+                ? ((Func<NonManifoldAccessor>)(() => {
+                    bool manifold = mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _);
+                    return new NonManifoldAccessor(
+                        GetNonManifoldEdgeIndices: () => [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),],
+                        GetValences: indices => [.. indices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),],
+                        GetLocations: indices => [.. indices.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch {
+                            IndexPair v => new Point3d(
+                                (mesh.TopologyVertices[v.I].X + mesh.TopologyVertices[v.J].X) / 2.0,
+                                (mesh.TopologyVertices[v.I].Y + mesh.TopologyVertices[v.J].Y) / 2.0,
+                                (mesh.TopologyVertices[v.I].Z + mesh.TopologyVertices[v.J].Z) / 2.0),
+                        }),],
+                        IsManifold: manifold,
+                        IsOrientable: oriented);
+                }))()
+                : default,
+        }.ToFrozenDictionary();
 }

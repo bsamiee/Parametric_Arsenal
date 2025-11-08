@@ -84,43 +84,24 @@ internal static class TopologyCore {
     [Pure]
     internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context, bool enableDiagnostics) where T : notnull =>
         Execute(input: input, context: context, opType: OperationType.NonManifold, enableDiagnostics: enableDiagnostics,
-            operation: g => g switch {
-                Brep brep => ((Func<Result<IReadOnlyList<Topology.NonManifoldData>>>)(() => {
-                    IReadOnlyList<int> nm = [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.NonManifold),];
-                    IReadOnlyList<int> vals = [.. nm.Select(i => (int)brep.Edges[i].Valence),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-                        new Topology.NonManifoldData(
-                            EdgeIndices: nm,
-                            VertexIndices: [],
-                            Valences: vals,
-                            Locations: [.. nm.Select(i => brep.Edges[i].PointAtStart),],
-                            IsManifold: nm.Count == 0,
-                            IsOrientable: brep.IsSolid,
-                            MaxValence: vals.Count > 0 ? vals.Max() : 0),
-                    ]);
-                }))(),
-                Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NonManifoldData>>>)(() => {
-                    bool manifold = mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _);
-                    IReadOnlyList<int> nm = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length > 2),];
-                    IReadOnlyList<int> vals = [.. nm.Select(i => mesh.TopologyEdges.GetConnectedFaces(i).Length),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-                        new Topology.NonManifoldData(
-                            EdgeIndices: nm,
-                            VertexIndices: [],
-                            Valences: vals,
-                            Locations: [.. nm.Select(i => {
-                                IndexPair v = mesh.TopologyEdges.GetTopologyVertices(i);
-                                Point3d p1 = mesh.TopologyVertices[v.I];
-                                Point3d p2 = mesh.TopologyVertices[v.J];
-                                return new Point3d((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0, (p1.Z + p2.Z) / 2.0);
-                            }),],
-                            IsManifold: manifold,
-                            IsOrientable: oriented,
-                            MaxValence: vals.Count > 0 ? vals.Max() : 0),
-                    ]);
-                }))(),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            });
+            operation: g => TopologyConfig.NonManifoldAccessors.TryGetValue(g!.GetType(), out Func<object, TopologyConfig.NonManifoldAccessor>? accessorFactory)
+                ? accessorFactory(g) switch {
+                    TopologyConfig.NonManifoldAccessor accessor => ((Func<Result<IReadOnlyList<Topology.NonManifoldData>>>)(() => {
+                        IReadOnlyList<int> nm = accessor.GetNonManifoldEdgeIndices();
+                        IReadOnlyList<int> vals = accessor.GetValences(nm);
+                        return ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
+                            new Topology.NonManifoldData(
+                                EdgeIndices: nm,
+                                VertexIndices: [],
+                                Valences: vals,
+                                Locations: accessor.GetLocations(nm),
+                                IsManifold: accessor.IsManifold,
+                                IsOrientable: accessor.IsOrientable,
+                                MaxValence: vals.Count > 0 ? vals.Max() : 0),
+                        ]);
+                    }))(),
+                }
+                : ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")));
 
     [Pure]
     internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context, bool enableDiagnostics) where T : notnull =>
