@@ -22,27 +22,46 @@ public static class TestGen {
 
     /// <summary>Executes property-based test with polymorphic delegate dispatch for Func, Action, and tuple patterns.</summary>
     public static void Run<T>(this Gen<T> gen, Delegate assertion, int iter = 100) {
-        switch (typeof(T), assertion) {
-            case (Type, Func<T, bool> prop):
-                gen.Sample(prop, iter: iter);
-                break;
-            case (Type, Action<T> act):
-                gen.Sample(v => { act(v); return true; }, iter: iter);
-                break;
-            case (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,>):
-                gen.Sample(v => {
-                    object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v!.GetType().GetField("Item2")!.GetValue(v)!,];
-                    return d.DynamicInvoke(args) switch { bool b => b, _ => true, };
-                }, iter: iter);
-                break;
-            case (Type { IsGenericType: true } t, Delegate d) when t.GetGenericTypeDefinition() == typeof(ValueTuple<,,>):
-                gen.Sample(v => {
-                    object[] args = [v!.GetType().GetField("Item1")!.GetValue(v)!, v!.GetType().GetField("Item2")!.GetValue(v)!, v!.GetType().GetField("Item3")!.GetValue(v)!,];
-                    return d.DynamicInvoke(args) switch { bool b => b, _ => true, };
-                }, iter: iter);
-                break;
-            default:
-                throw new ArgumentException($"Unsupported assertion: {typeof(T)}, {assertion.GetType()}", nameof(assertion));
+        _ = (typeof(T), typeof(T).IsGenericType ? typeof(T).GetGenericTypeDefinition() : null, assertion) switch {
+            (_, _, Func<T, bool> prop) => RunAction(() => ExecuteFunc(gen, prop, iter)),
+            (_, _, Action<T> act) => RunAction(() => ExecuteAction(gen, act, iter)),
+            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,>) => RunAction(() => ExecuteTuple2(gen, gt, assertion, iter)),
+            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,,>) => RunAction(() => ExecuteTuple3(gen, gt, assertion, iter)),
+            (Type gt, _, _) => throw new ArgumentException($"Unsupported assertion: {gt}, {assertion.GetType()}", nameof(assertion)),
+        };
+    }
+
+    private static int RunAction(Action action) { action(); return 0; }
+
+    private static void ExecuteFunc<T>(Gen<T> gen, Func<T, bool> prop, int iter) => gen.Sample(prop, iter: iter);
+
+    private static void ExecuteAction<T>(Gen<T> gen, Action<T> act, int iter) => gen.Sample(v => { act(v); return true; }, iter: iter);
+
+    private static void ExecuteTuple2<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
+        Type[] typeArgs = genType.GetGenericArguments();
+        Type action2Type = typeof(Action<,>).MakeGenericType(typeArgs);
+        bool isAction = assertion.GetType() == action2Type;
+        Func<T, bool> runner = isAction
+            ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),]); return true; }
+            : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),])!;
+        gen.Sample(runner, iter: iter);
+    }
+
+    private static void ExecuteTuple3<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
+        Type[] typeArgs = genType.GetGenericArguments();
+        Type action3Type = typeof(Action<,,>).MakeGenericType(typeArgs);
+        bool isAction = assertion.GetType() == action3Type;
+        Func<T, bool> runner = isAction
+            ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),]); return true; }
+            : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),])!;
+        gen.Sample(runner, iter: iter);
+    }
+
+    private static object? SafeInvoke(Delegate del, object?[] args) {
+        try {
+            return del.DynamicInvoke(args);
+        } catch (System.Reflection.TargetInvocationException tie) {
+            throw tie.InnerException ?? tie;
         }
     }
 
