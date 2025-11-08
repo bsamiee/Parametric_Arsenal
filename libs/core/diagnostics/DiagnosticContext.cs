@@ -7,7 +7,7 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Diagnostics;
 
-/// <summary>Zero-allocation observability infrastructure with compile-time toggleable tracing and DebuggerDisplay integration.</summary>
+/// <summary>Zero-allocation observability context with compile-time toggleable tracing.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct DiagnosticContext(
@@ -35,10 +35,10 @@ public readonly struct DiagnosticContext(
     public static bool operator !=(DiagnosticContext left, DiagnosticContext right) => !left.Equals(right);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override bool Equals(object? obj) => obj is DiagnosticContext other && this.Equals(other);
+    public override int GetHashCode() => HashCode.Combine(this.Operation, this.Elapsed, this.Allocations, this.ValidationApplied, this.CacheHit, this.ErrorCount);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override int GetHashCode() => HashCode.Combine(this.Operation, this.Elapsed, this.Allocations, this.ValidationApplied, this.CacheHit, this.ErrorCount);
+    public override bool Equals(object? obj) => obj is DiagnosticContext other && this.Equals(other);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(DiagnosticContext other) =>

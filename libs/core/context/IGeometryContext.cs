@@ -9,10 +9,10 @@ public interface IGeometryContext {
     /// <summary>Absolute distance tolerance in current Units.</summary>
     public double AbsoluteTolerance { get; }
 
-    /// <summary>Squared absolute distance tolerance for fast radius/kNN without sqrt.</summary>
+    /// <summary>Squared absolute distance tolerance for fast distance checks.</summary>
     public double AbsoluteToleranceSquared { get; }
 
-    /// <summary>Relative tolerance for size-dependent checks (rarely used in modern Rhino).</summary>
+    /// <summary>Relative tolerance for size-dependent checks.</summary>
     public double RelativeTolerance { get; }
 
     /// <summary>Angular tolerance in radians for computation.</summary>

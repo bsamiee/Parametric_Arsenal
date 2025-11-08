@@ -4,9 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>
-/// Consolidated error registry with FrozenDictionary dispatch for zero-allocation error retrieval.
-/// </summary>
+/// <summary>Consolidated error registry with FrozenDictionary dispatch.</summary>
 public static class E {
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
@@ -74,6 +72,13 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static SystemError Get(int code, string? context = null) =>
+        (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}", context) switch {
+            (ErrorDomain domain, string message, null) => new SystemError(domain, code, message),
+            (ErrorDomain domain, string message, string ctx) => new SystemError(domain, code, message).WithContext(ctx),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ErrorDomain GetDomain(int code) => code switch {
         >= 1000 and < 2000 => ErrorDomain.Results,
         >= 2000 and < 3000 => ErrorDomain.Geometry,
@@ -82,20 +87,7 @@ public static class E {
         _ => ErrorDomain.Unknown,
     };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) {
-        ErrorDomain domain = GetDomain(code);
-        string message = _m.TryGetValue(code, out string? msg)
-            ? msg
-            : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-
-        return context switch {
-            null => new SystemError(domain, code, message),
-            string ctx => new SystemError(domain, code, message).WithContext(ctx),
-        };
-    }
-
-    /// <summary>Results system errors (1000-1999)</summary>
+    /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {
         public static readonly SystemError NoValueProvided = Get(1001);
         public static readonly SystemError InvalidCreate = Get(1002);
@@ -104,7 +96,7 @@ public static class E {
         public static readonly SystemError InvalidAccess = Get(1100);
     }
 
-    /// <summary>Geometry errors (2000-2999) - all geometry operations</summary>
+    /// <summary>Geometry errors (2000-2999).</summary>
     public static class Geometry {
         public static readonly SystemError InvalidExtraction = Get(2000);
         public static readonly SystemError InsufficientParameters = Get(2001);
@@ -144,7 +136,7 @@ public static class E {
         public static readonly SystemError FrameExtractionFailed = Get(2509);
     }
 
-    /// <summary>Validation errors (3000-3999)</summary>
+    /// <summary>Validation errors (3000-3999).</summary>
     public static class Validation {
         public static readonly SystemError GeometryInvalid = Get(3000);
         public static readonly SystemError CurveNotClosedOrPlanar = Get(3100);
@@ -164,7 +156,7 @@ public static class E {
         public static readonly SystemError InputFiltered = Get(3931);
     }
 
-    /// <summary>Spatial indexing errors (4000-4099)</summary>
+    /// <summary>Spatial indexing errors (4000-4999).</summary>
     public static class Spatial {
         public static readonly SystemError InvalidK = Get(4001);
         public static readonly SystemError InvalidDistance = Get(4002);

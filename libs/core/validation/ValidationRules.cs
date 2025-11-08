@@ -11,9 +11,10 @@ using Rhino.Geometry;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Polymorphic validation system using compiled expression trees and cached validators.</summary>
+/// <summary>Validation system using compiled expression trees and cached validators.</summary>
 public static class ValidationRules {
-    /// <summary>Cache key structure for validator lookups with type, mode, and member discrimination.</summary>
+    /// <summary>Cache key structure for validator lookups.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
         public readonly V Mode = mode;
@@ -27,29 +28,14 @@ public static class ValidationRules {
         public static bool operator !=(CacheKey left, CacheKey right) => !left.Equals(right);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
+        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
+        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
 
         [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
     }
-
-    private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
-    private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
-
-    private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
-        .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
-    private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
-        .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
-    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
-
-    private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
-    private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
-    private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
-    private static readonly ConstantExpression _constantZero = Expression.Constant(0);
-    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
 
     private static readonly FrozenDictionary<V, (string[] Properties, string[] Methods, SystemError Error)> _validationRules =
         new Dictionary<V, (string[], string[], SystemError)> {
@@ -65,12 +51,27 @@ public static class ValidationRules {
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
         }.ToFrozenDictionary();
 
+    private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
+    private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
+
+    private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
+    private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
+    private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
+    private static readonly ConstantExpression _constantZero = Expression.Constant(0);
+    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
+
+    private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
+        .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
+    private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
+        .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
+    private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
+
     /// <summary>Gets or compiles cached validator function for runtime type and validation mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, V mode) =>
         _validatorCache.GetOrAdd(new CacheKey(runtimeType, mode), static k => CompileValidator(k.Type, k.Mode));
 
-    /// <summary>Generates validation errors for tolerance values using polymorphic parameter detection.</summary>
+    /// <summary>Generates validation errors for tolerance values.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
@@ -85,7 +86,7 @@ public static class ValidationRules {
             _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for runtime type and validation mode using reflection-based rule application.</summary>
+    /// <summary>Compiles expression tree validator for runtime type and validation mode.</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
