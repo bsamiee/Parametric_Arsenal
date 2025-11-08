@@ -38,9 +38,7 @@ public static class TestGen {
     private static void ExecuteAction<T>(Gen<T> gen, Action<T> act, int iter) => gen.Sample(v => { act(v); return true; }, iter: iter);
 
     private static void ExecuteTuple2<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
-        Type[] typeArgs = genType.GetGenericArguments();
-        Type action2Type = typeof(Action<,>).MakeGenericType(typeArgs);
-        bool isAction = assertion.GetType() == action2Type;
+        bool isAction = assertion.GetType() == typeof(Action<,>).MakeGenericType(genType.GetGenericArguments());
         Func<T, bool> runner = isAction
             ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),]); return true; }
             : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),])!;
@@ -48,9 +46,7 @@ public static class TestGen {
     }
 
     private static void ExecuteTuple3<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
-        Type[] typeArgs = genType.GetGenericArguments();
-        Type action3Type = typeof(Action<,,>).MakeGenericType(typeArgs);
-        bool isAction = assertion.GetType() == action3Type;
+        bool isAction = assertion.GetType() == typeof(Action<,,>).MakeGenericType(genType.GetGenericArguments());
         Func<T, bool> runner = isAction
             ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),]); return true; }
             : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),])!;

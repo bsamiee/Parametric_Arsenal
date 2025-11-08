@@ -9,18 +9,14 @@ namespace Arsenal.Core.Tests.Diagnostics;
 public sealed class DebuggerDisplayTests {
     [Fact]
     public void ResultSuccessDebuggerDisplayShowsValue() {
-        Result<int> result = ResultFactory.Create(value: 42);
-        string display = GetDebuggerDisplay(result);
-
+        string display = GetDebuggerDisplay(ResultFactory.Create(value: 42));
         Assert.Contains("Success", display, StringComparison.Ordinal);
         Assert.Contains("42", display, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ResultErrorDebuggerDisplayShowsError() {
-        Result<int> result = ResultFactory.Create<int>(error: E.Validation.GeometryInvalid);
-        string display = GetDebuggerDisplay(result);
-
+        string display = GetDebuggerDisplay(ResultFactory.Create<int>(error: E.Validation.GeometryInvalid));
         Assert.Contains("Error", display, StringComparison.Ordinal);
         Assert.Contains("Validation", display, StringComparison.Ordinal);
     }
@@ -28,52 +24,36 @@ public sealed class DebuggerDisplayTests {
     [Fact]
     public void ResultDeferredDebuggerDisplayShowsDeferred() {
         Result<int> result = ResultFactory.Create(deferred: () => ResultFactory.Create(value: 42));
-        string display = GetDebuggerDisplay(result);
-
-        Assert.Contains("Deferred", display, StringComparison.Ordinal);
+        Assert.Contains("Deferred", GetDebuggerDisplay(result), StringComparison.Ordinal);
         Assert.True(result.IsDeferred);
     }
 
     [Fact]
     public void ResultMultipleErrorsDebuggerDisplayShowsCount() {
-        Result<int> result = ResultFactory.Create<int>(errors: [
+        string display = GetDebuggerDisplay(ResultFactory.Create<int>(errors: [
             E.Validation.GeometryInvalid,
             E.Validation.ToleranceAbsoluteInvalid,
-        ]);
-        string display = GetDebuggerDisplay(result);
-
+        ]));
         Assert.Contains("Errors", display, StringComparison.Ordinal);
         Assert.Contains("2", display, StringComparison.Ordinal);
     }
 
     [Fact]
     public void SystemErrorDebuggerDisplayShowsDomainCodeMessage() {
-        SystemError error = E.Validation.GeometryInvalid;
-        string display = GetDebuggerDisplay(error);
-
+        string display = GetDebuggerDisplay(E.Validation.GeometryInvalid);
         Assert.Contains("Validation", display, StringComparison.Ordinal);
         Assert.Contains("3000", display, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ValidationModeDebuggerDisplayShowsMode() {
-        V mode = V.Standard | V.Topology;
-        string display = GetDebuggerDisplay(mode);
-
-        Assert.Contains("Combined", display, StringComparison.Ordinal);
-    }
+    public void ValidationModeDebuggerDisplayShowsMode() =>
+        Assert.Contains("Combined", GetDebuggerDisplay(V.Standard | V.Topology), StringComparison.Ordinal);
 
     [Fact]
     public void DeferredResultDebuggerDisplayDoesNotEvaluate() {
         int callCount = 0;
-        Result<int> result = ResultFactory.Create(deferred: () => {
-            callCount++;
-            return ResultFactory.Create(value: 42);
-        });
-
-        // Get debugger display should not evaluate the deferred result
+        Result<int> result = ResultFactory.Create(deferred: () => { callCount++; return ResultFactory.Create(value: 42); });
         _ = GetDebuggerDisplay(result);
-
         Assert.Equal(0, callCount);
         Assert.True(result.IsDeferred);
     }

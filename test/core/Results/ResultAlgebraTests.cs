@@ -170,12 +170,12 @@ public sealed class ResultAlgebraTests {
     [Fact]
     public void MatchReductionSemantics() => TestGen.RunAll(
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((value, seed) =>
-            Assert.Equal(seed + value, ResultFactory.Create(value: value).Match(v => seed + v, _ => seed)))),
+            Assert.Equal(unchecked(seed + value), ResultFactory.Create(value: value).Match(v => unchecked(seed + v), _ => seed)))),
         () => ResultGenerators.SystemErrorArrayGen.Select(Gen.Int).Run((Action<SystemError[], int>)((errors, seed) =>
-            Assert.Equal(seed + errors.Length,
-                ResultFactory.Create<int>(errors: errors).Match(_ => seed, errs => seed + errs.Length)))),
+            Assert.Equal(unchecked(seed + errors.Length),
+                ResultFactory.Create<int>(errors: errors).Match(_ => seed, errs => unchecked(seed + errs.Length))))),
         () => Gen.Int.Run((Action<int>)(seed =>
-            Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Match(v => seed + v, _ => seed)))));
+            Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Match(v => unchecked(seed + v), _ => seed)))));
 
     /// <summary>Verifies Ensure predicate validation with single and multiple validation patterns.</summary>
     [Fact]
