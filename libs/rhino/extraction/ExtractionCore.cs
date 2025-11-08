@@ -61,7 +61,7 @@ internal static class ExtractionCore {
         }
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Point3d[] DispatchExtraction(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) =>
         _handlers.TryGetValue(key: (kind, geometry.GetType()), value: out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
             ? handler(geometry, param, includeEnds, context)
