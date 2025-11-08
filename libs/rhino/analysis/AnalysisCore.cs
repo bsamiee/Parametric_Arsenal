@@ -169,4 +169,187 @@ internal static class AnalysisCore {
                 : strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
                 .Map(r => (IReadOnlyList<Analysis.IResult>)[r])
             : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometry.GetType().Name));
+
+    /// <summary>Computes curvature extrema using Curve.MaxCurvaturePoints SDK method.</summary>
+    [Pure]
+    internal static Result<Analysis.CurvatureExtremaData> ExecuteCurvatureExtrema(
+        Curve curve,
+        IGeometryContext context,
+        bool enableDiagnostics) =>
+        ResultFactory.Create(value: curve)
+            .Validate(args: [context, V.Standard | V.Degeneracy])
+            .Bind(cv => {
+                Point3d[] points = cv.MaxCurvaturePoints(out double[] parameters);
+                return points is null || parameters is null || points.Length == 0
+                    ? ResultFactory.Create<Analysis.CurvatureExtremaData>(error: E.Geometry.CurvatureExtremaFailed)
+                    : ((Func<double[], Result<Analysis.CurvatureExtremaData>>)(curvatures => {
+                        int maxIdx = curvatures.Select((k, i) => (k, i)).MaxBy(x => x.k).i;
+                        return ResultFactory.Create(value: new Analysis.CurvatureExtremaData(
+                            Location: points.Length > 0 ? points[0] : cv.PointAtStart,
+                            MaxCurvaturePoints: points,
+                            MaxCurvatureParameters: parameters,
+                            MaxCurvatureValues: curvatures,
+                            GlobalMaxCurvature: curvatures[maxIdx],
+                            GlobalMaxLocation: points[maxIdx]));
+                    }))([.. points.Select((p, i) => cv.CurvatureAt(parameters[i]).Length),]);
+            })
+            .Map(result => enableDiagnostics
+                ? result.Tap(onSuccess: _ => {}, onFailure: _ => {})
+                : result);
+
+    /// <summary>Analyzes all faces of brep producing per-face surface data with curvature statistics.</summary>
+    [Pure]
+    internal static Result<Analysis.MultiFaceBrepData> ExecuteMultiFaceBrep(
+        Brep brep,
+        IGeometryContext context,
+        (double u, double v)? uvParameter,
+        int derivativeOrder,
+        bool enableDiagnostics) =>
+        ResultFactory.Create(value: brep)
+            .Validate(args: [context, V.Standard | V.Topology])
+            .Bind(b => {
+                Analysis.SurfaceData[] faceData = ArrayPool<Analysis.SurfaceData>.Shared.Rent(b.Faces.Count);
+                try {
+                    int successCount = 0;
+                    for (int i = 0; i < b.Faces.Count; i++) {
+                        using Surface sf = b.Faces[i].UnderlyingSurface();
+                        (double u, double v) = uvParameter ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
+                        AreaMassProperties? amp = AreaMassProperties.Compute(sf);
+                        if (amp is null || !sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame)) {
+                            continue;
+                        }
+                        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+                        if (double.IsNaN(sc.Gaussian) || double.IsInfinity(sc.Gaussian)) {
+                            continue;
+                        }
+                        faceData[successCount++] = new Analysis.SurfaceData(
+                            sf.PointAt(u, v),
+                            derivs,
+                            sc.Gaussian,
+                            sc.Mean,
+                            sc.Kappa(0),
+                            sc.Kappa(1),
+                            sc.Direction(0),
+                            sc.Direction(1),
+                            frame,
+                            frame.Normal,
+                            sf.IsAtSeam(u, v) != 0,
+                            sf.IsAtSingularity(u, v, exact: true),
+                            amp.Area,
+                            amp.Centroid);
+                    }
+                    return successCount == 0
+                        ? ResultFactory.Create<Analysis.MultiFaceBrepData>(error: E.Geometry.MultiFaceBrepFailed)
+                        : ((Func<Analysis.SurfaceData[], Result<Analysis.MultiFaceBrepData>>)(faces =>
+                            ResultFactory.Create(value: new Analysis.MultiFaceBrepData(
+                                Location: b.GetBoundingBox(accurate: false).Center,
+                                FaceAnalyses: faces,
+                                FaceIndices: [.. Enumerable.Range(0, faces.Length),],
+                                TotalFaces: faces.Length,
+                                GaussianRange: (faces.Min(f => f.Gaussian), faces.Max(f => f.Gaussian)),
+                                MeanRange: (faces.Min(f => f.Mean), faces.Max(f => f.Mean))))))([.. faceData[..successCount]]);
+                } finally {
+                    ArrayPool<Analysis.SurfaceData>.Shared.Return(faceData, clearArray: true);
+                }
+            });
+
+    /// <summary>Analyzes curve at multiple parameters producing batch results with single validation.</summary>
+    [Pure]
+    internal static Result<IReadOnlyList<Analysis.CurveData>> ExecuteBatchCurve(
+        Curve curve,
+        IGeometryContext context,
+        IReadOnlyList<double> parameters,
+        int derivativeOrder,
+        bool enableDiagnostics) =>
+        parameters.Count == 0
+            ? ResultFactory.Create<IReadOnlyList<Analysis.CurveData>>(error: E.Geometry.EmptyParameterList)
+            : ResultFactory.Create(value: curve)
+                .Validate(args: [context, V.Standard | V.Degeneracy])
+                .Bind(cv => {
+                    double[] buffer = ArrayPool<double>.Shared.Rent(AnalysisConfig.MaxDiscontinuities);
+                    Analysis.CurveData[] results = ArrayPool<Analysis.CurveData>.Shared.Rent(parameters.Count);
+                    try {
+                        (int discCount, double s) = (0, cv.Domain.Min);
+                        while (discCount < AnalysisConfig.MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
+                            buffer[discCount++] = td;
+                            s = td + context.AbsoluteTolerance;
+                        }
+                        AreaMassProperties amp = AreaMassProperties.Compute(cv);
+                        if (amp is null) {
+                            return ResultFactory.Create<IReadOnlyList<Analysis.CurveData>>(error: E.Geometry.CurveAnalysisFailed);
+                        }
+                        for (int i = 0; i < parameters.Count; i++) {
+                            double param = parameters[i];
+                            if (!cv.FrameAt(param, out Plane frame)) {
+                                return ResultFactory.Create<IReadOnlyList<Analysis.CurveData>>(error: E.Geometry.CurveAnalysisFailed);
+                            }
+                            results[i] = new Analysis.CurveData(
+                                cv.PointAt(param),
+                                cv.DerivativeAt(param, derivativeOrder) ?? [],
+                                cv.CurvatureAt(param).Length,
+                                frame,
+                                cv.GetPerpendicularFrames([.. Enumerable.Range(0, 5).Select(j => cv.Domain.ParameterAt(j * 0.25)),]) ?? [],
+                                cv.IsClosed ? cv.TorsionAt(param) : 0,
+                                [.. buffer[..discCount]],
+                                [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                                cv.GetLength(),
+                                amp.Centroid);
+                        }
+                        return ResultFactory.Create(value: (IReadOnlyList<Analysis.CurveData>)[.. results[..parameters.Count]]);
+                    } finally {
+                        ArrayPool<double>.Shared.Return(buffer, clearArray: true);
+                        ArrayPool<Analysis.CurveData>.Shared.Return(results, clearArray: true);
+                    }
+                });
+
+    /// <summary>Analyzes surface at multiple UV parameters producing batch results with single validation.</summary>
+    [Pure]
+    internal static Result<IReadOnlyList<Analysis.SurfaceData>> ExecuteBatchSurface(
+        Surface surface,
+        IGeometryContext context,
+        IReadOnlyList<(double u, double v)> uvParameters,
+        int derivativeOrder,
+        bool enableDiagnostics) =>
+        uvParameters.Count == 0
+            ? ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.EmptyParameterList)
+            : ResultFactory.Create(value: surface)
+                .Validate(args: [context, V.Standard])
+                .Bind(sf => {
+                    Analysis.SurfaceData[] results = ArrayPool<Analysis.SurfaceData>.Shared.Rent(uvParameters.Count);
+                    AreaMassProperties? amp = AreaMassProperties.Compute(sf);
+                    if (amp is null) {
+                        ArrayPool<Analysis.SurfaceData>.Shared.Return(results, clearArray: true);
+                        return ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.SurfaceAnalysisFailed);
+                    }
+                    try {
+                        for (int i = 0; i < uvParameters.Count; i++) {
+                            (double u, double v) = uvParameters[i];
+                            if (!sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !sf.FrameAt(u, v, out Plane frame)) {
+                                return ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.SurfaceAnalysisFailed);
+                            }
+                            SurfaceCurvature sc = sf.CurvatureAt(u, v);
+                            if (double.IsNaN(sc.Gaussian) || double.IsInfinity(sc.Gaussian)) {
+                                return ResultFactory.Create<IReadOnlyList<Analysis.SurfaceData>>(error: E.Geometry.SurfaceAnalysisFailed);
+                            }
+                            results[i] = new Analysis.SurfaceData(
+                                sf.PointAt(u, v),
+                                derivs,
+                                sc.Gaussian,
+                                sc.Mean,
+                                sc.Kappa(0),
+                                sc.Kappa(1),
+                                sc.Direction(0),
+                                sc.Direction(1),
+                                frame,
+                                frame.Normal,
+                                sf.IsAtSeam(u, v) != 0,
+                                sf.IsAtSingularity(u, v, exact: true),
+                                amp.Area,
+                                amp.Centroid);
+                        }
+                        return ResultFactory.Create(value: (IReadOnlyList<Analysis.SurfaceData>)[.. results[..uvParameters.Count]]);
+                    } finally {
+                        ArrayPool<Analysis.SurfaceData>.Shared.Return(results, clearArray: true);
+                    }
+                });
 }

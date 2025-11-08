@@ -113,6 +113,36 @@ public static class Analysis {
                     : string.Create(CultureInfo.InvariantCulture, $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}");
     }
 
+    /// <summary>Curve curvature extrema: maximum curvature points, parameters, and global extremum location.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record CurvatureExtremaData(
+        Point3d Location,
+        Point3d[] MaxCurvaturePoints,
+        double[] MaxCurvatureParameters,
+        double[] MaxCurvatureValues,
+        double GlobalMaxCurvature,
+        Point3d GlobalMaxLocation) : IResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"CurvatureExtrema: {this.MaxCurvaturePoints.Length} points | κ_max={this.GlobalMaxCurvature:F3} @ {this.GlobalMaxLocation}");
+    }
+
+    /// <summary>Multi-face brep analysis: per-face surface data with curvature statistics across all faces.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MultiFaceBrepData(
+        Point3d Location,
+        IReadOnlyList<SurfaceData> FaceAnalyses,
+        IReadOnlyList<int> FaceIndices,
+        int TotalFaces,
+        (double Min, double Max) GaussianRange,
+        (double Min, double Max) MeanRange) : IResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MultiFaceBrep: {this.TotalFaces} faces | K∈[{this.GaussianRange.Min:F3}, {this.GaussianRange.Max:F3}] | H∈[{this.MeanRange.Min:F3}, {this.MeanRange.Max:F3}]");
+    }
+
     /// <summary>Analyzes curve geometry producing comprehensive derivative, curvature, frame, and discontinuity data.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<CurveData> Analyze(
@@ -181,4 +211,42 @@ public static class Analysis {
                 OperationName = "Analysis.Multiple",
                 EnableDiagnostics = enableDiagnostics,
             });
+
+    /// <summary>Analyzes curve curvature extrema producing maximum curvature locations and values.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<CurvatureExtremaData> AnalyzeCurvatureExtrema(
+        Curve curve,
+        IGeometryContext context,
+        bool enableDiagnostics = false) =>
+        AnalysisCore.ExecuteCurvatureExtrema(curve: curve, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes all faces of brep producing per-face surface data with curvature statistics.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<MultiFaceBrepData> AnalyzeAllFaces(
+        Brep brep,
+        IGeometryContext context,
+        (double u, double v)? uvParameter = null,
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCore.ExecuteMultiFaceBrep(brep: brep, context: context, uvParameter: uvParameter, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes curve geometry at multiple parameters producing batch derivative, curvature, and frame data.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<CurveData>> AnalyzeAt(
+        Curve curve,
+        IGeometryContext context,
+        IReadOnlyList<double> parameters,
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCore.ExecuteBatchCurve(curve: curve, context: context, parameters: parameters, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes surface geometry at multiple UV parameters producing batch derivative and curvature data.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<SurfaceData>> AnalyzeAt(
+        Surface surface,
+        IGeometryContext context,
+        IReadOnlyList<(double u, double v)> uvParameters,
+        int derivativeOrder = 2,
+        bool enableDiagnostics = false) =>
+        AnalysisCore.ExecuteBatchSurface(surface: surface, context: context, uvParameters: uvParameters, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics);
 }
