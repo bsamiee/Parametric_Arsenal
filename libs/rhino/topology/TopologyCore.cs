@@ -74,6 +74,31 @@ internal static class TopologyCore {
             },
         }.ToFrozenDictionary();
 
+    /// <summary>Geometry-specific adjacency extractors for Brep and Mesh edge adjacency analysis.</summary>
+    private static readonly FrozenDictionary<Type, Func<object, int, (IReadOnlyList<int> Faces, IReadOnlyList<Vector3d> Normals, bool IsManifold, bool IsBoundary)>> _adjacencyExtractors =
+        new Dictionary<Type, Func<object, int, (IReadOnlyList<int>, IReadOnlyList<Vector3d>, bool, bool)>> {
+            [typeof(Brep)] = (g, edgeIndex) => ((Brep)g).Edges[edgeIndex] switch {
+                BrepEdge edge => (IReadOnlyList<int>)[.. edge.AdjacentFaces(),] switch {
+                    IReadOnlyList<int> adjFaces => (
+                        adjFaces,
+                        [.. adjFaces.Select(i => {
+                            BrepFace face = ((Brep)g).Faces[i];
+                            return face.NormalAt(face.Domain(0).Mid, face.Domain(1).Mid);
+                        }),
+                        ],
+                        edge.Valence == EdgeAdjacency.Interior,
+                        edge.Valence == EdgeAdjacency.Naked),
+                },
+            },
+            [typeof(Mesh)] = (g, edgeIndex) => ((Mesh)g).TopologyEdges.GetConnectedFaces(edgeIndex) switch {
+                int[] adjFaces => (
+                    [.. adjFaces,],
+                    [.. adjFaces.Select(i => ((Mesh)g).FaceNormals[i]),],
+                    adjFaces.Length == 2,
+                    adjFaces.Length == 1),
+            },
+        }.ToFrozenDictionary();
+
     [Pure]
     internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(
         T input,
@@ -255,18 +280,33 @@ internal static class TopologyCore {
         bool enableDiagnostics) where T : notnull =>
         UnifiedOperation.Apply(
             input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.AdjacencyData>>>)(g => g switch {
-                Brep brep => edgeIndex >= 0 && edgeIndex < brep.Edges.Count
-                    ? ExecuteBrepAdjacency(brep: brep, edgeIndex: edgeIndex)
-                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                Mesh mesh => edgeIndex >= 0 && edgeIndex < mesh.TopologyEdges.Count
-                    ? ExecuteMeshAdjacency(mesh: mesh, edgeIndex: edgeIndex)
-                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
+            operation: (Func<T, Result<IReadOnlyList<Topology.AdjacencyData>>>)(g =>
+                _adjacencyExtractors.TryGetValue(g.GetType(), out Func<object, int, (IReadOnlyList<int>, IReadOnlyList<Vector3d>, bool, bool)>? extractor) switch {
+                    true => extractor(g, edgeIndex) switch {
+                        (IReadOnlyList<int> faces, IReadOnlyList<Vector3d> normals, bool isManifold, bool isBoundary) =>
+                            normals.Count == 2
+                                ? ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                    new Topology.AdjacencyData(
+                                        EdgeIndex: edgeIndex,
+                                        AdjacentFaceIndices: faces,
+                                        FaceNormals: normals,
+                                        DihedralAngle: Vector3d.VectorAngle(normals[0], normals[1]),
+                                        IsManifold: isManifold,
+                                        IsBoundary: isBoundary),
+                                ])
+                                : ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                    new Topology.AdjacencyData(
+                                        EdgeIndex: edgeIndex,
+                                        AdjacentFaceIndices: faces,
+                                        FaceNormals: normals,
+                                        DihedralAngle: 0.0,
+                                        IsManifold: isManifold,
+                                        IsBoundary: isBoundary),
+                                ]),
+                    },
+                    false => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
+                        error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
+                }),
             config: new OperationConfig<T, Topology.AdjacencyData> {
                 Context = context,
                 ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
@@ -463,44 +503,5 @@ internal static class TopologyCore {
         Vector3d n1 = mesh.FaceNormals[faceIdx1];
         Vector3d n2 = mesh.FaceNormals[faceIdx2];
         return n1.IsValid && n2.IsValid ? Vector3d.VectorAngle(n1, n2) : Math.PI;
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.AdjacencyData>> ExecuteBrepAdjacency(Brep brep, int edgeIndex) {
-        BrepEdge edge = brep.Edges[edgeIndex];
-        IReadOnlyList<int> adjFaces = [.. edge.AdjacentFaces(),];
-        IReadOnlyList<Vector3d> normals = [.. adjFaces.Select(i => {
-            BrepFace face = brep.Faces[i];
-            double uMid = face.Domain(0).Mid;
-            double vMid = face.Domain(1).Mid;
-            return face.NormalAt(uMid, vMid);
-        }),
-        ];
-        double dihedralAngle = normals.Count == 2 ? Vector3d.VectorAngle(normals[0], normals[1]) : 0.0;
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-            new Topology.AdjacencyData(
-                EdgeIndex: edgeIndex,
-                AdjacentFaceIndices: adjFaces,
-                FaceNormals: normals,
-                DihedralAngle: dihedralAngle,
-                IsManifold: edge.Valence == EdgeAdjacency.Interior,
-                IsBoundary: edge.Valence == EdgeAdjacency.Naked),
-        ]);
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.AdjacencyData>> ExecuteMeshAdjacency(Mesh mesh, int edgeIndex) {
-        int[] adjFaces = mesh.TopologyEdges.GetConnectedFaces(edgeIndex);
-        IReadOnlyList<Vector3d> normals = [.. adjFaces.Select(i => mesh.FaceNormals[i]),];
-        double dihedralAngle = normals.Count == 2 ? Vector3d.VectorAngle(normals[0], normals[1]) : 0.0;
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-            new Topology.AdjacencyData(
-                EdgeIndex: edgeIndex,
-                AdjacentFaceIndices: [.. adjFaces,],
-                FaceNormals: normals,
-                DihedralAngle: dihedralAngle,
-                IsManifold: adjFaces.Length == 2,
-                IsBoundary: adjFaces.Length == 1),
-        ]);
     }
 }
