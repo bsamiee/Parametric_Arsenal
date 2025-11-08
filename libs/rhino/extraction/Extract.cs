@@ -56,4 +56,63 @@ public static class Extract {
                     new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
+
+    /// <summary>Evaluates curve at specified parameter returning Point3d location.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<Point3d> At(Curve curve, double t, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: curve,
+            operation: (Func<Curve, Result<IReadOnlyList<Point3d>>>)(c =>
+                c.Domain.IncludesParameter(t)
+                    ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[c.PointAt(t),])
+                    : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidParameter)),
+            config: new OperationConfig<Curve, Point3d> { Context = context, ValidationMode = V.Standard, })
+        .Map(results => results[0]);
+
+    /// <summary>Evaluates surface at specified UV parameter returning Point3d location.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<Point3d> At(Surface surface, (double u, double v) uv, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: surface,
+            operation: (Func<Surface, Result<IReadOnlyList<Point3d>>>)(s =>
+                s.Domain(0).IncludesParameter(uv.u) && s.Domain(1).IncludesParameter(uv.v)
+                    ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[s.PointAt(uv.u, uv.v),])
+                    : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidParameter)),
+            config: new OperationConfig<Surface, Point3d> { Context = context, ValidationMode = V.Standard, })
+        .Map(results => results[0]);
+
+    /// <summary>Evaluates curve at multiple parameters returning Point3d locations.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<Point3d>> At(Curve curve, double[] parameters, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: curve,
+            operation: (Func<Curve, Result<IReadOnlyList<Point3d>>>)(c =>
+                ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. parameters
+                    .Where(t => c.Domain.IncludesParameter(t))
+                    .Select(t => c.PointAt(t)),])),
+            config: new OperationConfig<Curve, Point3d> { Context = context, ValidationMode = V.Standard, });
+
+    /// <summary>Computes closest point on curve to test point returning location and parameter.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d Point, double Parameter)> Closest(Curve curve, Point3d test, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: curve,
+            operation: (Func<Curve, Result<IReadOnlyList<(Point3d, double)>>>)(c =>
+                c.ClosestPoint(testPoint: test, t: out double t)
+                    ? ResultFactory.Create(value: (IReadOnlyList<(Point3d, double)>)[(c.PointAt(t), t),])
+                    : ResultFactory.Create<IReadOnlyList<(Point3d, double)>>(error: E.Geometry.ClosestPointFailed)),
+            config: new OperationConfig<Curve, (Point3d, double)> { Context = context, ValidationMode = V.Standard, })
+        .Map(results => results[0]);
+
+    /// <summary>Computes closest point on surface to test point returning location and UV parameters.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d Point, double U, double V)> Closest(Surface surface, Point3d test, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: surface,
+            operation: (Func<Surface, Result<IReadOnlyList<(Point3d, double, double)>>>)(s =>
+                s.ClosestPoint(testPoint: test, u: out double u, v: out double v)
+                    ? ResultFactory.Create(value: (IReadOnlyList<(Point3d, double, double)>)[(s.PointAt(u, v), u, v),])
+                    : ResultFactory.Create<IReadOnlyList<(Point3d, double, double)>>(error: E.Geometry.ClosestPointFailed)),
+            config: new OperationConfig<Surface, (Point3d, double, double)> { Context = context, ValidationMode = V.Standard, })
+        .Map(results => results[0]);
 }

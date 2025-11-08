@@ -186,4 +186,82 @@ public static class Orient {
                 : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
         };
+
+    /// <summary>Scales geometry uniformly from origin point.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Scale<T>(T geometry, double factor, Point3d? origin, IGeometryContext context) where T : GeometryBase =>
+        factor > context.AbsoluteTolerance
+            ? UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    OrientCore.ApplyTransform(item, Transform.Scale(origin ?? Point3d.Origin, factor))),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                }).Map(r => r[0])
+            : ResultFactory.Create<T>(error: E.Geometry.TransformFailed.WithContext("Scale factor must be positive"));
+
+    /// <summary>Scales geometry non-uniformly from plane with independent X/Y/Z factors.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Scale<T>(T geometry, double xFactor, double yFactor, double zFactor, Plane? plane, IGeometryContext context) where T : GeometryBase =>
+        xFactor > context.AbsoluteTolerance && yFactor > context.AbsoluteTolerance && zFactor > context.AbsoluteTolerance
+            ? UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    OrientCore.ApplyTransform(item, Transform.Scale(plane ?? Plane.WorldXY, xFactor, yFactor, zFactor))),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                }).Map(r => r[0])
+            : ResultFactory.Create<T>(error: E.Geometry.TransformFailed.WithContext("Scale factors must be positive"));
+
+    /// <summary>Shears geometry along plane direction by specified angle.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Shear<T>(T geometry, Plane plane, Vector3d shearX, Vector3d shearY, Vector3d shearZ, IGeometryContext context) where T : GeometryBase =>
+        plane.IsValid && shearX.Length > context.AbsoluteTolerance
+            ? UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    OrientCore.ApplyTransform(item, Transform.Shear(plane, shearX, shearY, shearZ))),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                }).Map(r => r[0])
+            : ResultFactory.Create<T>(error: E.Geometry.TransformFailed.WithContext("Invalid plane or shear vectors"));
+
+    /// <summary>Creates linear array of geometry instances translated by direction vector.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> ArrayLinear<T>(T geometry, Vector3d direction, int count, IGeometryContext context) where T : GeometryBase =>
+        count > 0 && direction.Length > context.AbsoluteTolerance
+            ? UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    ResultFactory.Create(value: (IReadOnlyList<T>)[.. Enumerable.Range(0, count)
+                        .Select(_ => (T)item.Duplicate())
+                        .Select((g, idx) => (g, idx))
+                        .Where(pair => pair.g.Transform(Transform.Translation(direction * pair.idx)))
+                        .Select(pair => pair.g),])),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                })
+            : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext("Count must be positive and direction non-zero"));
+
+    /// <summary>Creates polar array of geometry instances rotated around axis.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> ArrayPolar<T>(T geometry, Point3d center, Vector3d axis, double angleRadians, int count, IGeometryContext context) where T : GeometryBase =>
+        count > 0 && axis.Length > context.AbsoluteTolerance
+            ? UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    ResultFactory.Create(value: (IReadOnlyList<T>)[.. Enumerable.Range(0, count)
+                        .Select(_ => (T)item.Duplicate())
+                        .Select((g, idx) => (g, idx))
+                        .Where(pair => pair.g.Transform(Transform.Rotation(angleRadians * pair.idx, axis, center)))
+                        .Select(pair => pair.g),])),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                })
+            : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed.WithContext("Count must be positive and axis non-zero"));
 }
