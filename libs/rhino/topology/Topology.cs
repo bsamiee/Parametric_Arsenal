@@ -150,7 +150,7 @@ public static class Topology {
         IGeometryContext context,
         bool orderLoops = false,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, _: enableDiagnostics);
 
     /// <summary>Extracts naked (boundary) edges from Mesh geometry with topological edge classification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -159,7 +159,7 @@ public static class Topology {
         IGeometryContext context,
         bool orderLoops = false,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, _: enableDiagnostics);
 
     /// <summary>Constructs closed boundary loops from Brep naked edges using curve joining algorithms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -168,7 +168,7 @@ public static class Topology {
         IGeometryContext context,
         double? tolerance = null,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, _: enableDiagnostics);
 
     /// <summary>Constructs closed boundary loops from Mesh naked edges using polyline joining algorithms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -177,7 +177,7 @@ public static class Topology {
         IGeometryContext context,
         double? tolerance = null,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, _: enableDiagnostics);
 
     /// <summary>Detects non-manifold vertices and edges in Brep geometry with valence>2 classification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -185,7 +185,7 @@ public static class Topology {
         Brep geometry,
         IGeometryContext context,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteNonManifold(input: geometry, context: context, _: enableDiagnostics);
 
     /// <summary>Detects non-manifold vertices and edges in Mesh geometry with topological manifold analysis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -193,7 +193,7 @@ public static class Topology {
         Mesh geometry,
         IGeometryContext context,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteNonManifold(input: geometry, context: context, _: enableDiagnostics);
 
     /// <summary>Analyzes connected components and builds adjacency graph for Brep geometry using BFS traversal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -201,7 +201,7 @@ public static class Topology {
         Brep geometry,
         IGeometryContext context,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteConnectivity(input: geometry, context: context, _: enableDiagnostics);
 
     /// <summary>Analyzes connected components and builds adjacency graph for Mesh geometry using BFS traversal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -209,7 +209,7 @@ public static class Topology {
         Mesh geometry,
         IGeometryContext context,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteConnectivity(input: geometry, context: context, _: enableDiagnostics);
 
     /// <summary>Classifies Brep edges by continuity type (G0/G1/G2) with geometric continuity analysis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -218,7 +218,7 @@ public static class Topology {
         IGeometryContext context,
         Continuity minimumContinuity = Continuity.G1_continuous,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, _: enableDiagnostics);
 
     /// <summary>Classifies Mesh edges by dihedral angle with sharp/smooth discrimination.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -227,7 +227,7 @@ public static class Topology {
         IGeometryContext context,
         double? angleThreshold = null,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, angleThreshold: angleThreshold, _: enableDiagnostics);
 
     /// <summary>Queries face adjacency data for specific Brep edge with dihedral angle computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -236,7 +236,7 @@ public static class Topology {
         IGeometryContext context,
         int edgeIndex,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, _: enableDiagnostics);
 
     /// <summary>Queries face adjacency data for specific Mesh edge with dihedral angle computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -245,5 +245,5 @@ public static class Topology {
         IGeometryContext context,
         int edgeIndex,
         bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
+        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, _: enableDiagnostics);
 }

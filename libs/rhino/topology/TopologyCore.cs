@@ -15,180 +15,124 @@ namespace Arsenal.Rhino.Topology;
 internal static class TopologyCore {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 
+    /// <summary>Operation registry mapping operation types to their implementation dispatchers.</summary>
+    private static readonly FrozenDictionary<Type, Func<object, object, IGeometryContext, Result<object>>> Operations =
+        new Dictionary<Type, Func<object, object, IGeometryContext, Result<object>>> {
+            [typeof(Topology.NakedEdgeData)] = (input, config, _) => ((input, config) switch {
+                (Brep brep, ValueTuple<bool>(var orderLoops)) => ComputeNakedEdges(brep, orderLoops),
+                (Mesh mesh, ValueTuple<bool>(var orderLoops)) => ComputeNakedEdges(mesh, orderLoops),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            }).Map(r => (object)r),
+            [typeof(Topology.BoundaryLoopData)] = (input, config, _) => ((input, config) switch {
+                (Brep brep, ValueTuple<double>(var tol)) => ExecuteBrepBoundaryLoops(brep, tol),
+                (Mesh mesh, ValueTuple<double>(var tol)) => ExecuteMeshBoundaryLoops(mesh, tol),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.BoundaryLoopData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            }).Map(r => (object)r),
+            [typeof(Topology.NonManifoldData)] = (input, _, __) => input switch {
+                Brep brep => ExecuteBrepNonManifold(brep).Map(r => (object)r),
+                Mesh mesh => ExecuteMeshNonManifold(mesh).Map(r => (object)r),
+                _ => ResultFactory.Create<object>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            },
+            [typeof(Topology.ConnectivityData)] = (input, _, __) => input switch {
+                Brep brep => ExecuteBrepConnectivity(brep).Map(r => (object)r),
+                Mesh mesh => ExecuteMeshConnectivity(mesh).Map(r => (object)r),
+                _ => ResultFactory.Create<object>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            },
+            [typeof(Topology.EdgeClassificationData)] = (input, config, _) => ((input, config) switch {
+                (Brep brep, ValueTuple<Continuity, double>(var minCont, var angleThresh)) => ExecuteBrepEdgeClassification(brep, minCont, angleThresh),
+                (Mesh mesh, ValueTuple<Continuity, double>(_, var angleThresh)) => ExecuteMeshEdgeClassification(mesh, angleThresh),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.EdgeClassificationData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            }).Map(r => (object)r),
+            [typeof(Topology.AdjacencyData)] = (input, config, _) => ((input, config) switch {
+                (Brep brep, ValueTuple<int>(var edgeIdx)) => edgeIdx >= 0 && edgeIdx < brep.Edges.Count
+                    ? ExecuteBrepAdjacency(brep, edgeIdx)
+                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIdx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
+                (Mesh mesh, ValueTuple<int>(var edgeIdx)) => edgeIdx >= 0 && edgeIdx < mesh.TopologyEdges.Count
+                    ? ExecuteMeshAdjacency(mesh, edgeIdx)
+                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIdx.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {input.GetType().Name}")),
+            }).Map(r => (object)r),
+        }.ToFrozenDictionary();
+
+    /// <summary>Unified execution engine for all topology operations using type-based dispatch.</summary>
     [Pure]
-    internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(
+    internal static Result<TResult> Execute<T, TResult>(
         T input,
-        IGeometryContext context,
-        bool orderLoops,
-        bool enableDiagnostics) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.NakedEdgeData>>>)(g => g switch {
-                Brep brep => brep.Edges.Count switch {
-                    0 => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+        object? config,
+        IGeometryContext context) where T : notnull where TResult : Topology.IResult =>
+        Operations.TryGetValue(typeof(TResult), out Func<object, object, IGeometryContext, Result<object>>? dispatcher)
+            ? ResultFactory.Create(value: input)
+                .Validate(args: TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) && vm != V.None
+                    ? [context, vm,]
+                    : null)
+                .Bind(_ => dispatcher(input, config ?? new object(), context))
+                .Map(r => ((IReadOnlyList<TResult>)r)[0])
+            : ResultFactory.Create<TResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"ResultType: {typeof(TResult).Name}"));
+
+    [Pure]
+    internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops, bool _) where T : notnull =>
+        Execute<T, Topology.NakedEdgeData>(input, ValueTuple.Create(orderLoops), context);
+
+    [Pure]
+    internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance, bool _) where T : notnull =>
+        Execute<T, Topology.BoundaryLoopData>(input, ValueTuple.Create(tolerance ?? context.AbsoluteTolerance), context);
+
+    [Pure]
+    internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context, bool _) where T : notnull =>
+        Execute<T, Topology.NonManifoldData>(input, config: null, context);
+
+    [Pure]
+    internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context, bool _) where T : notnull =>
+        Execute<T, Topology.ConnectivityData>(input, config: null, context);
+
+    [Pure]
+    internal static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(T input, IGeometryContext context, Continuity? minimumContinuity = null, double? angleThreshold = null, bool _ = false) where T : notnull =>
+        Execute<T, Topology.EdgeClassificationData>(input, (minimumContinuity ?? Continuity.G1_continuous, angleThreshold ?? context.AngleToleranceRadians), context);
+
+    [Pure]
+    internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex, bool _) where T : notnull =>
+        Execute<T, Topology.AdjacencyData>(input, ValueTuple.Create(edgeIndex), context);
+
+    [Pure]
+    private static Result<IReadOnlyList<Topology.NakedEdgeData>> ComputeNakedEdges(Brep brep, bool orderLoops) =>
+        brep.Edges.Count switch {
+            0 => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+                new Topology.NakedEdgeData(
+                    EdgeCurves: [],
+                    EdgeIndices: [],
+                    Valences: [],
+                    IsOrdered: orderLoops,
+                    TotalEdgeCount: 0,
+                    TotalLength: 0.0),
+            ]),
+            _ => Enumerable.Range(0, brep.Edges.Count)
+                .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
+                .ToArray() switch {
+                    int[] nakedIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
                         new Topology.NakedEdgeData(
-                            EdgeCurves: [],
-                            EdgeIndices: [],
-                            Valences: [],
+                            EdgeCurves: [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),],
+                            EdgeIndices: [.. nakedIndices,],
+                            Valences: [.. Enumerable.Repeat(1, nakedIndices.Length),],
                             IsOrdered: orderLoops,
-                            TotalEdgeCount: 0,
-                            TotalLength: 0.0),
-                    ]),
-                    _ => Enumerable.Range(0, brep.Edges.Count)
-                        .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-                        .ToArray() switch {
-                            int[] nakedIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
-                                new Topology.NakedEdgeData(
-                                    EdgeCurves: [.. nakedIndices.Select(i => brep.Edges[i].DuplicateCurve()),],
-                                    EdgeIndices: [.. nakedIndices,],
-                                    Valences: [.. Enumerable.Repeat(1, nakedIndices.Length),],
-                                    IsOrdered: orderLoops,
-                                    TotalEdgeCount: brep.Edges.Count,
-                                    TotalLength: nakedIndices.Sum(i => brep.Edges[i].GetLength())),
-                            ]),
-                        },
-                },
-                Mesh mesh => (mesh.GetNakedEdges() ?? []) switch {
-                    Polyline[] nakedPolylines => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
-                        new Topology.NakedEdgeData(
-                            EdgeCurves: [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),],
-                            EdgeIndices: [.. Enumerable.Range(0, nakedPolylines.Length),],
-                            Valences: [.. Enumerable.Repeat(1, nakedPolylines.Length),],
-                            IsOrdered: orderLoops,
-                            TotalEdgeCount: mesh.TopologyEdges.Count,
-                            TotalLength: nakedPolylines.Sum(pl => pl.Length)),
+                            TotalEdgeCount: brep.Edges.Count,
+                            TotalLength: nakedIndices.Sum(i => brep.Edges[i].GetLength())),
                     ]),
                 },
-                _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.NakedEdgeData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.GetNakedEdges.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
+        };
 
     [Pure]
-    internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(
-        T input,
-        IGeometryContext context,
-        double? tolerance,
-        bool enableDiagnostics) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(g => g switch {
-                Brep brep => ExecuteBrepBoundaryLoops(brep: brep, tol: tolerance ?? context.AbsoluteTolerance),
-                Mesh mesh => ExecuteMeshBoundaryLoops(mesh: mesh, tol: tolerance ?? context.AbsoluteTolerance),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.BoundaryLoopData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.BoundaryLoopData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.GetBoundaryLoops.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
-
-    [Pure]
-    internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(
-        T input,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.NonManifoldData>>>)(g => g switch {
-                Brep brep => ExecuteBrepNonManifold(brep: brep),
-                Mesh mesh => ExecuteMeshNonManifold(mesh: mesh),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.NonManifoldData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.GetNonManifold.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
-
-    [Pure]
-    internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(
-        T input,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.ConnectivityData>>>)(g => g switch {
-                Brep brep => ExecuteBrepConnectivity(brep: brep),
-                Mesh mesh => ExecuteMeshConnectivity(mesh: mesh),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.ConnectivityData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.ConnectivityData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.GetConnectivity.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
-
-    [Pure]
-    internal static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(
-        T input,
-        IGeometryContext context,
-        Continuity? minimumContinuity = null,
-        double? angleThreshold = null,
-        bool enableDiagnostics = false) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.EdgeClassificationData>>>)(g => g switch {
-                Brep brep => ExecuteBrepEdgeClassification(
-                    brep: brep,
-                    minContinuity: minimumContinuity ?? Continuity.G1_continuous,
-                    angleThreshold: angleThreshold ?? context.AngleToleranceRadians),
-                Mesh mesh => ExecuteMeshEdgeClassification(
-                    mesh: mesh,
-                    angleThreshold: angleThreshold ?? context.AngleToleranceRadians),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.EdgeClassificationData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.EdgeClassificationData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.ClassifyEdges.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
-
-    [Pure]
-    internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(
-        T input,
-        IGeometryContext context,
-        int edgeIndex,
-        bool enableDiagnostics) where T : notnull =>
-        UnifiedOperation.Apply(
-            input: input,
-            operation: (Func<T, Result<IReadOnlyList<Topology.AdjacencyData>>>)(g => g switch {
-                Brep brep => edgeIndex >= 0 && edgeIndex < brep.Edges.Count
-                    ? ExecuteBrepAdjacency(brep: brep, edgeIndex: edgeIndex)
-                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                Mesh mesh => edgeIndex >= 0 && edgeIndex < mesh.TopologyEdges.Count
-                    ? ExecuteMeshAdjacency(mesh: mesh, edgeIndex: edgeIndex)
-                    : ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                        error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {edgeIndex.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
-            }),
-            config: new OperationConfig<T, Topology.AdjacencyData> {
-                Context = context,
-                ValidationMode = TopologyConfig.ValidationModes.TryGetValue(input.GetType(), out V vm) ? vm : V.None,
-                OperationName = $"Topology.GetAdjacency.{typeof(T).Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
-            .Map(results => results[0]);
+    private static Result<IReadOnlyList<Topology.NakedEdgeData>> ComputeNakedEdges(Mesh mesh, bool orderLoops) =>
+        (mesh.GetNakedEdges() ?? []) switch {
+            Polyline[] nakedPolylines => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+                new Topology.NakedEdgeData(
+                    EdgeCurves: [.. nakedPolylines.Select(pl => pl.ToNurbsCurve()),],
+                    EdgeIndices: [.. Enumerable.Range(0, nakedPolylines.Length),],
+                    Valences: [.. Enumerable.Repeat(1, nakedPolylines.Length),],
+                    IsOrdered: orderLoops,
+                    TotalEdgeCount: mesh.TopologyEdges.Count,
+                    TotalLength: nakedPolylines.Sum(pl => pl.Length)),
+            ]),
+        };
 
     [Pure]
     private static Result<IReadOnlyList<Topology.BoundaryLoopData>> ExecuteBrepBoundaryLoops(Brep brep, double tol) {
