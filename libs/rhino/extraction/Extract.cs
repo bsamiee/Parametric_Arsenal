@@ -67,30 +67,12 @@ public static class Extract {
     }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
-        spec switch {
-            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
-            Parametric { Kind: 10, Param: int c } when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            Parametric { Kind: 11, Param: double l } when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            Parametric { Kind: 12, Param: Vector3d dir } when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
-            Semantic sem => UnifiedOperation.Apply(
-                input,
-                (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(sem.Kind, typeof(T)) }),
-            Parametric para => UnifiedOperation.Apply(
-                input,
-                (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(para.Kind, typeof(T)) }),
-            int or double or (int, bool) or (double, bool) or Vector3d or Continuity =>
-                UnifiedOperation.Apply(
-                    input,
-                    (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)),
-                    new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard }),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
-        };
+        PointsMultiple(geometries: [input], spec: spec, context: context, accumulateErrors: false, enableParallel: false, enableDiagnostics: false)
+            .Map(lists => lists.Count switch {
+                0 => (IReadOnlyList<Point3d>)[],
+                1 => lists[0],
+                _ => (IReadOnlyList<Point3d>)[.. lists.SelectMany(static x => x)],
+            });
 
     /// <summary>Extracts points from heterogeneous geometry collections with unified error accumulation and parallel execution support.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
