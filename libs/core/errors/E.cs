@@ -49,6 +49,11 @@ public static class E {
             [2507] = "Invalid curve parameter for orientation",
             [2508] = "Invalid surface UV parameters",
             [2509] = "Frame extraction failed",
+            [2510] = "Invalid scale factor - must be positive and greater than tolerance",
+            [2511] = "Invalid scale center point",
+            [2512] = "Invalid rotation axis - must be non-zero vector",
+            [2513] = "Invalid rotation center point",
+            [2514] = "Invalid rotation parameters - angle or axis invalid",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -73,6 +78,9 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [4005] = "Point containment test failed",
+            [4006] = "Closest point projection failed",
+            [3908] = "Mesh is not closed or has invalid solid orientation",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -137,6 +145,11 @@ public static class E {
         public static readonly SystemError InvalidCurveParameter = Get(2507);
         public static readonly SystemError InvalidSurfaceUV = Get(2508);
         public static readonly SystemError FrameExtractionFailed = Get(2509);
+        public static readonly SystemError InvalidScaleFactor = Get(2510);
+        public static readonly SystemError InvalidScaleCenter = Get(2511);
+        public static readonly SystemError InvalidRotationAxis = Get(2512);
+        public static readonly SystemError InvalidRotationCenter = Get(2513);
+        public static readonly SystemError InvalidRotationParameters = Get(2514);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
