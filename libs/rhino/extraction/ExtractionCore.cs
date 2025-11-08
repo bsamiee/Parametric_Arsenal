@@ -36,7 +36,7 @@ internal static class ExtractionCore {
             : ExecuteWithNormalization(geometry, kind, param, includeEnds, context);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Point3d>> ExecuteWithNormalization(
         GeometryBase geometry,
         byte kind,
