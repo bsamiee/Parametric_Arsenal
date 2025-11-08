@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
@@ -130,4 +131,20 @@ internal static class TopologyConfig {
                 }))()
                 : default,
         }.ToFrozenDictionary();
+
+    /// <summary>Edge classification accessor parameterizing classification algorithm and measure computation.</summary>
+    internal readonly record struct EdgeClassificationAccessor(
+        int EdgeCount,
+        Func<int, Topology.EdgeContinuityType> ClassifyEdge,
+        Func<int, double> GetEdgeMeasure,
+        Continuity MinimumContinuity);
+
+    /// <summary>Creates edge classification result from accessor with shared grouping logic.</summary>
+    internal static Result<IReadOnlyList<Topology.EdgeClassificationData>> CreateEdgeClassificationResult(EdgeClassificationAccessor accessor) {
+        IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, accessor.EdgeCount),];
+        IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(accessor.ClassifyEdge),];
+        IReadOnlyList<double> measures = [.. edgeIndices.Select(accessor.GetEdgeMeasure),];
+        FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: accessor.MinimumContinuity),]);
+    }
 }
