@@ -160,7 +160,7 @@ internal static class TopologyCore {
         return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, faceCount).Select(f => (f, getAdjacentForGraph(f))).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyBrepEdges(Brep brep, Continuity minContinuity, double angleThreshold) {
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, brep.Edges.Count),];
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => brep.Edges[i].Valence switch {
