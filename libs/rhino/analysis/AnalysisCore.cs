@@ -32,7 +32,7 @@ internal static class AnalysisCore {
                     cv.DerivativeAt(param, order) ?? [],
                     cv.CurvatureAt(param).Length,
                     frame,
-                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
+                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * (1.0 / (AnalysisConfig.CurveFrameSampleCount - 1)))),]) ?? [],
                     cv.IsClosed ? cv.TorsionAt(param) : 0,
                     [.. buffer[..discCount]],
                     [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
