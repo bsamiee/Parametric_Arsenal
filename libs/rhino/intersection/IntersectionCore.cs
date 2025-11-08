@@ -12,7 +12,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>RhinoCommon intersection dispatch with 40+ type combinations and result normalization.</summary>
 internal static class IntersectionCore {
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
 #pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction
     internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, Intersect.IntersectionOptions opts) where T1 : notnull where T2 : notnull {
 #pragma warning restore MA0051
