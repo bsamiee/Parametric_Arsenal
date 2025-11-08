@@ -143,107 +143,56 @@ public static class Topology {
                 : string.Create(CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: NonManifold (valence={this.AdjacentFaceIndices.Count})");
     }
 
-    /// <summary>Extracts naked (boundary) edges from Brep geometry with valence=1 classification.</summary>
+    /// <summary>Extracts naked (boundary) edges from geometry with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<NakedEdgeData> GetNakedEdges(
-        Brep geometry,
+    public static Result<NakedEdgeData> GetNakedEdges<T>(
+        T geometry,
         IGeometryContext context,
         bool orderLoops = false,
-        bool enableDiagnostics = false) =>
+        bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Extracts naked (boundary) edges from Mesh geometry with topological edge classification.</summary>
+    /// <summary>Constructs closed boundary loops from naked edges with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<NakedEdgeData> GetNakedEdges(
-        Mesh geometry,
-        IGeometryContext context,
-        bool orderLoops = false,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Constructs closed boundary loops from Brep naked edges using curve joining algorithms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<BoundaryLoopData> GetBoundaryLoops(
-        Brep geometry,
+    public static Result<BoundaryLoopData> GetBoundaryLoops<T>(
+        T geometry,
         IGeometryContext context,
         double? tolerance = null,
-        bool enableDiagnostics = false) =>
+        bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Constructs closed boundary loops from Mesh naked edges using polyline joining algorithms.</summary>
+    /// <summary>Detects non-manifold vertices and edges with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<BoundaryLoopData> GetBoundaryLoops(
-        Mesh geometry,
+    public static Result<NonManifoldData> GetNonManifoldData<T>(
+        T geometry,
         IGeometryContext context,
-        double? tolerance = null,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Detects non-manifold vertices and edges in Brep geometry with valence>2 classification.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<NonManifoldData> GetNonManifoldData(
-        Brep geometry,
-        IGeometryContext context,
-        bool enableDiagnostics = false) =>
+        bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Detects non-manifold vertices and edges in Mesh geometry with topological manifold analysis.</summary>
+    /// <summary>Analyzes connected components and builds adjacency graph with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<NonManifoldData> GetNonManifoldData(
-        Mesh geometry,
+    public static Result<ConnectivityData> GetConnectivity<T>(
+        T geometry,
         IGeometryContext context,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Analyzes connected components and builds adjacency graph for Brep geometry using BFS traversal.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<ConnectivityData> GetConnectivity(
-        Brep geometry,
-        IGeometryContext context,
-        bool enableDiagnostics = false) =>
+        bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Analyzes connected components and builds adjacency graph for Mesh geometry using BFS traversal.</summary>
+    /// <summary>Classifies edges by continuity type with polymorphic type dispatch and parameter detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<ConnectivityData> GetConnectivity(
-        Mesh geometry,
+    public static Result<EdgeClassificationData> ClassifyEdges<T>(
+        T geometry,
         IGeometryContext context,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Classifies Brep edges by continuity type (G0/G1/G2) with geometric continuity analysis.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<EdgeClassificationData> ClassifyEdges(
-        Brep geometry,
-        IGeometryContext context,
-        Continuity minimumContinuity = Continuity.G1_continuous,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Classifies Mesh edges by dihedral angle with sharp/smooth discrimination.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<EdgeClassificationData> ClassifyEdges(
-        Mesh geometry,
-        IGeometryContext context,
+        Continuity? minimumContinuity = null,
         double? angleThreshold = null,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);
+        bool enableDiagnostics = false) where T : notnull =>
+        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Queries face adjacency data for specific Brep edge with dihedral angle computation.</summary>
+    /// <summary>Queries face adjacency data for specific edge with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<AdjacencyData> GetAdjacency(
-        Brep geometry,
+    public static Result<AdjacencyData> GetAdjacency<T>(
+        T geometry,
         IGeometryContext context,
         int edgeIndex,
-        bool enableDiagnostics = false) =>
-        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Queries face adjacency data for specific Mesh edge with dihedral angle computation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<AdjacencyData> GetAdjacency(
-        Mesh geometry,
-        IGeometryContext context,
-        int edgeIndex,
-        bool enableDiagnostics = false) =>
+        bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
 }
