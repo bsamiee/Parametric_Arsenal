@@ -34,15 +34,15 @@ public static class Topology {
         /// <summary>Non-manifold edge: valence greater than 2.</summary>
         public static readonly EdgeContinuityType NonManifold = new(5);
 
-        /// <summary>Equality comparison by value.</summary>
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(EdgeContinuityType other) => this.Value == other.Value;
-        /// <summary>Hash code based on value.</summary>
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode() => this.Value;
-        /// <summary>Equality comparison with object.</summary>
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Equals(object? obj) => obj is EdgeContinuityType other && this.Equals(other);
-        /// <summary>Equality operator.</summary>
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(EdgeContinuityType left, EdgeContinuityType right) => left.Equals(right);
-        /// <summary>Inequality operator.</summary>
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator !=(EdgeContinuityType left, EdgeContinuityType right) => !left.Equals(right);
     }
 

@@ -31,4 +31,9 @@ internal static class TopologyConfig {
 
     /// <summary>G2 curvature threshold: 10% of angle tolerance for smooth-to-curvature edge classification.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
+
+    /// <summary>Creates index validation error with formatted context.</summary>
+    [System.Diagnostics.Contracts.Pure]
+    internal static Arsenal.Core.Errors.SystemError IndexError(Arsenal.Core.Errors.SystemError baseError, string indexName, int index, int maxIndex) =>
+        baseError.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{indexName}: {index.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Max: {maxIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
 }
