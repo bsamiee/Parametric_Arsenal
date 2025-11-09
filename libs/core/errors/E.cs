@@ -23,6 +23,11 @@ public static class E {
             [2202] = "Projection direction vector is invalid or zero-length",
             [2204] = "Ray direction vector is invalid or zero-length",
             [2205] = "Maximum hit count must be positive",
+            [2210] = "Intersection classification failed",
+            [2211] = "Insufficient intersection data for classification",
+            [2220] = "Near-miss search failed",
+            [2221] = "Invalid search radius for near-miss detection",
+            [2230] = "Intersection stability analysis failed",
             [2300] = "Geometry type not supported for analysis",
             [2310] = "Curve analysis computation failed",
             [2311] = "Surface analysis computation failed",
@@ -120,6 +125,11 @@ public static class E {
         public static readonly SystemError InvalidProjection = Get(2202);
         public static readonly SystemError InvalidRay = Get(2204);
         public static readonly SystemError InvalidMaxHits = Get(2205);
+        public static readonly SystemError ClassificationFailed = Get(2210);
+        public static readonly SystemError InsufficientIntersectionData = Get(2211);
+        public static readonly SystemError NearMissSearchFailed = Get(2220);
+        public static readonly SystemError InvalidSearchRadius = Get(2221);
+        public static readonly SystemError StabilityAnalysisFailed = Get(2230);
         public static readonly SystemError UnsupportedAnalysis = Get(2300);
         public static readonly SystemError CurveAnalysisFailed = Get(2310);
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
