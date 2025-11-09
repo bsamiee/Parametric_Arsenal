@@ -6,7 +6,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Plane/centroid extraction and transformation dispatch with mass property computation.</summary>
+/// <summary>Plane/centroid extraction and transformation with mass properties.</summary>
 internal static class OrientCore {
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
@@ -38,7 +38,7 @@ internal static class OrientCore {
             },
         }.ToFrozenDictionary();
 
-    /// <summary>Polymorphic centroid extraction using mass properties or bounding box - dispatches by geometry type and computation mode.</summary>
+    /// <summary>Centroid extraction with mass properties or bounding box.</summary>
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
         (geometry, useMassProperties) switch {
             (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
@@ -55,7 +55,7 @@ internal static class OrientCore {
             _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
         };
 
-    /// <summary>Applies transformation to geometry with duplication and error handling.</summary>
+    /// <summary>Transform application with duplication and error handling.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
@@ -63,7 +63,7 @@ internal static class OrientCore {
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
         };
 
-    /// <summary>Extracts best-fit plane from point cloud or mesh using PCA or normal averaging.</summary>
+    /// <summary>Best-fit plane from point cloud or mesh using PCA.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {

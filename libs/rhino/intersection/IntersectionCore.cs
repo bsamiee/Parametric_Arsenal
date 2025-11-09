@@ -10,9 +10,9 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>RhinoCommon intersection dispatch with FrozenDictionary-based type resolution and inline result transformation.</summary>
+/// <summary>RhinoCommon intersection dispatch with FrozenDictionary resolution.</summary>
 internal static class IntersectionCore {
-    /// <summary>Builds result from bool/arrays tuple with automatic empty/partial/full discrimination.</summary>
+    /// <summary>Result builder for bool/arrays tuple with empty/partial/full discrimination.</summary>
     private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersect.IntersectionOutput>> ArrayResultBuilder = t => t switch {
         (true, { Length: > 0 } c, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
         (true, { Length: > 0 } c, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
@@ -20,7 +20,7 @@ internal static class IntersectionCore {
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
 
-    /// <summary>Processes CurveIntersections into standardized output with points and parameters.</summary>
+    /// <summary>CurveIntersections processor with points and parameters.</summary>
     private static readonly Func<CurveIntersections?, Curve, Result<Intersect.IntersectionOutput>> IntersectionProcessor
         = (r, curve) => r switch { { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
         [.. from e in r select e.PointA],
@@ -31,26 +31,26 @@ internal static class IntersectionCore {
             _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
         };
 
-    /// <summary>Handles two-point intersection results with distance threshold validation.</summary>
+    /// <summary>Two-point handler with distance threshold validation.</summary>
     private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersect.IntersectionOutput>> TwoPointHandler = (count, p1, p2, tol, parameters) =>
         count > 1 && p1.DistanceTo(p2) > tol ? ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], parameters ?? [], [], [], [])) :
         count > 0 ? ResultFactory.Create(value: new Intersect.IntersectionOutput([p1], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])) :
         ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
 
-    /// <summary>Handles circle intersection results with type discrimination for curve vs point output.</summary>
+    /// <summary>Circle handler with curve/point type discrimination.</summary>
     private static readonly Func<int, Circle, Result<Intersect.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
         (1, Circle c) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(c)], [], [], [], [])),
         (2, Circle c) => ResultFactory.Create(value: new Intersect.IntersectionOutput([c.Center], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
 
-    /// <summary>Processes polyline arrays with automatic flattening and section preservation.</summary>
+    /// <summary>Polyline processor with flattening and section preservation.</summary>
     private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = pl => pl switch { { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from p in pl from pt in p select pt], [], [], [], [], [.. pl])),
         null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
 
-    /// <summary>Handles mesh intersection with sorted/unsorted dispatch for points and indices.</summary>
+    /// <summary>Mesh handler with sorted/unsorted dispatch.</summary>
     private static readonly Func<Mesh, object, bool, (Func<Point3d[]?, int[]?, Result<Intersect.IntersectionOutput>>, Func<Point3d[]?, Result<Intersect.IntersectionOutput>>), Result<Intersect.IntersectionOutput>> MeshIntersectionHandler =
         (mesh, target, sorted, handlers) => sorted switch {
             true => target switch {
@@ -66,7 +66,7 @@ internal static class IntersectionCore {
             },
         };
 
-    /// <summary>Unified point projection with direction validation and index extraction.</summary>
+    /// <summary>Point projection handler with direction validation.</summary>
     private static readonly Func<Point3d[], object, Vector3d, bool, double, Result<Intersect.IntersectionOutput>> ProjectionHandler = (points, targets, dir, withIndices, tol) =>
         !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance ? ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection) :
         (targets, withIndices) switch {

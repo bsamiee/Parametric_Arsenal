@@ -4,9 +4,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Differential geometry analysis validation modes and computation constants.</summary>
+/// <summary>Validation modes and computation constants for differential geometry.</summary>
 internal static class AnalysisConfig {
-    /// <summary>Validation mode mapping for analysis geometry types.</summary>
+    /// <summary>Type-to-validation mode mapping for geometry analysis.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
@@ -23,12 +23,12 @@ internal static class AnalysisConfig {
             [typeof(Mesh)] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
-    /// <summary>Discontinuity buffer limit: 20 C1/C2 breaks per curve analysis.</summary>
+    /// <summary>Maximum 20 C1/C2 discontinuities per curve.</summary>
     internal const int MaxDiscontinuities = 20;
 
-    /// <summary>Standard derivative order: 2 for position, tangent, curvature computation.</summary>
+    /// <summary>Default derivative order 2 for position/tangent/curvature.</summary>
     internal const int DefaultDerivativeOrder = 2;
 
-    /// <summary>Frame sampling: 5 perpendicular planes at 0%, 25%, 50%, 75%, 100% curve domain.</summary>
+    /// <summary>Sample 5 perpendicular frames along curve domain.</summary>
     internal const int CurveFrameSampleCount = 5;
 }

@@ -4,9 +4,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Type-pair validation mode mapping for 40+ intersection combinations.</summary>
+/// <summary>Validation modes for 40+ intersection type pair combinations.</summary>
 internal static class IntersectionConfig {
-    /// <summary>Validation mode mapping for intersection type pairs.</summary>
+    /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(Type, Type), V> ValidationModes =
         new Dictionary<(Type, Type), V> {
             [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,

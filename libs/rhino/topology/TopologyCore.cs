@@ -11,7 +11,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Topology analysis execution with BFS connectivity, edge classification, and adjacency queries.</summary>
+/// <summary>Topology execution with BFS connectivity and edge classification.</summary>
 internal static class TopologyCore {
     private static readonly IReadOnlyList<int> EmptyIndices = [];
 
