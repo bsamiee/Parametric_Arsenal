@@ -17,15 +17,23 @@ internal static class IntersectionCore {
 #pragma warning restore MA0051
         double tolerance = opts.Tolerance ?? ctx.AbsoluteTolerance;
 
-        Result<Intersect.IntersectionOutput> curveIntx(CurveIntersections? r) => r switch {
-            { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-        };
+        Result<Intersect.IntersectionOutput> curveIntx(CurveIntersections? r) {
+            using (r) {
+                return r switch {
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                };
+            }
+        }
 
-        Result<Intersect.IntersectionOutput> curveIntxOverlap(CurveIntersections? r, Curve ov) => r switch {
-            { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from e in r select e.PointA], [.. from e in r where e.IsOverlap let c = ov.Trim(e.OverlapA) where c is not null select c], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-        };
+        Result<Intersect.IntersectionOutput> curveIntxOverlap(CurveIntersections? r, Curve ov) {
+            using (r) {
+                return r switch {
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from e in r select e.PointA], [.. from e in r where e.IsOverlap let c = ov.Trim(e.OverlapA) where c is not null select c], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                };
+            }
+        }
 
         Result<Intersect.IntersectionOutput> brepIntx(bool success, Curve[] curves, Point3d[] points) => (success, curves, points) switch {
             (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. points], [.. curves], [], [], [], [])),
@@ -62,11 +70,14 @@ internal static class IntersectionCore {
                 ? ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], paramsA ?? [], [], [], []))
                 : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
 
-        Result<Intersect.IntersectionOutput> circleIntx(int count, Circle circle, Func<Circle, Curve> createCurve) => count switch {
-            1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [createCurve(circle)], [], [], [], [])),
-            2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
-            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-        };
+        Result<Intersect.IntersectionOutput> circleIntx(int count, Circle circle, Func<Circle, Curve> createCurve) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via IntersectionOutput.Curves
+            count switch {
+                1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [createCurve(circle)], [], [], [], [])),
+                2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            };
+#pragma warning restore IDISP004
 
         return (a, b, opts) switch {
             (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
@@ -98,27 +109,17 @@ internal static class IntersectionCore {
                     [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
                     [], [], [], [], [])),
             (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
-#pragma warning disable IDISP004, IDISP007 // Don't ignore/dispose injected - CurveIntersections owned by this method
                 curveIntx(RhinoIntersect.CurveSelf(ca, tolerance)),
-#pragma warning restore IDISP004, IDISP007
             (Curve ca, Curve cb, _) =>
-#pragma warning disable IDISP004, IDISP007 // Don't ignore/dispose injected - CurveIntersections owned by this method
                 curveIntxOverlap(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
-#pragma warning restore IDISP004, IDISP007
             (Curve ca, BrepFace bf, _) =>
                 brepIntx(RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2),
             (Curve ca, Surface sb, _) =>
-#pragma warning disable IDISP004, IDISP007 // Don't ignore/dispose injected - CurveIntersections owned by this method
                 curveIntx(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance)),
-#pragma warning restore IDISP004, IDISP007
             (Curve ca, Plane pb, _) =>
-#pragma warning disable IDISP004, IDISP007 // Don't ignore/dispose injected - CurveIntersections owned by this method
                 curveIntx(RhinoIntersect.CurvePlane(ca, pb, tolerance)),
-#pragma warning restore IDISP004, IDISP007
             (Curve ca, Line lb, _) =>
-#pragma warning disable IDISP004, IDISP007 // Don't ignore/dispose injected - CurveIntersections owned by this method
                 curveIntx(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance)),
-#pragma warning restore IDISP004, IDISP007
             (Curve ca, Brep bb, _) =>
                 brepIntx(RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1),
             (Brep ba, Brep bb, _) =>
@@ -179,11 +180,11 @@ internal static class IntersectionCore {
             (Line la, Circle cb, _) =>
                 countedPtsParams((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lct1, lcp2, lct2),
             (Plane pa, Plane pb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via IntersectionOutput.Curves
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
-#pragma warning restore IDISP004
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+#pragma warning restore IDISP004
             (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
                 singlePt(RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point), point),
             (Plane pa, Circle cb, _) =>
@@ -195,9 +196,7 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Plane pa, Sphere sb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                 circleIntx((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc), psc, c => new ArcCurve(c)),
-#pragma warning restore IDISP004
             (Plane pa, BoundingBox boxb, _) =>
                 RhinoIntersect.PlaneBoundingBox(pa, boxb, out Polyline poly) && poly?.Count > 0
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
