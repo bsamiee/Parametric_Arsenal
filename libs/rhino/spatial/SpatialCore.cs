@@ -12,6 +12,9 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>RTree construction and spatial query execution with zero-allocation pooled buffers.</summary>
 internal static class SpatialCore {
+    private const int DefaultBufferSize = 2048;
+    private const int LargeBufferSize = 4096;
+
     private static readonly Func<object, RTree> _pointArrayFactory = s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree();
     private static readonly Func<object, RTree> _pointCloudFactory = s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree();
     private static readonly Func<object, RTree> _meshFactory = s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree();
@@ -22,23 +25,23 @@ internal static class SpatialCore {
     /// <summary>Unified configuration mapping input/query type pairs to validation mode, buffer size, and execution strategy.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
         new Dictionary<(Type, Type), (V, int, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>>)> {
-            [(typeof(Point3d[]), typeof(Sphere))] = (V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
-            [(typeof(Point3d[]), typeof(BoundingBox))] = (V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
-            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
-            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
-            [(typeof(PointCloud), typeof(Sphere))] = (V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            [(typeof(PointCloud), typeof(BoundingBox))] = (V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            [(typeof(PointCloud), typeof((Point3d[], int)))] = (V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
-            [(typeof(PointCloud), typeof((Point3d[], double)))] = (V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
-            [(typeof(Mesh), typeof(Sphere))] = (V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
-            [(typeof(Mesh), typeof(BoundingBox))] = (V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
-            [(typeof((Mesh, Mesh)), typeof(double))] = (V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
-            [(typeof(Curve[]), typeof(Sphere))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
-            [(typeof(Curve[]), typeof(BoundingBox))] = (V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
-            [(typeof(Surface[]), typeof(Sphere))] = (V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
-            [(typeof(Surface[]), typeof(BoundingBox))] = (V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
-            [(typeof(Brep[]), typeof(Sphere))] = (V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
-            [(typeof(Brep[]), typeof(BoundingBox))] = (V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
+            [(typeof(Point3d[]), typeof(Sphere))] = (V.None, DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
+            [(typeof(Point3d[]), typeof(BoundingBox))] = (V.None, DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
+            [(typeof(Point3d[]), typeof((Point3d[], int)))] = (V.None, DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
+            [(typeof(Point3d[]), typeof((Point3d[], double)))] = (V.None, DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
+            [(typeof(PointCloud), typeof(Sphere))] = (V.Standard, DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
+            [(typeof(PointCloud), typeof(BoundingBox))] = (V.Standard, DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
+            [(typeof(PointCloud), typeof((Point3d[], int)))] = (V.Standard, DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
+            [(typeof(PointCloud), typeof((Point3d[], double)))] = (V.Standard, DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
+            [(typeof(Mesh), typeof(Sphere))] = (V.MeshSpecific, DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
+            [(typeof(Mesh), typeof(BoundingBox))] = (V.MeshSpecific, DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
+            [(typeof((Mesh, Mesh)), typeof(double))] = (V.MeshSpecific, LargeBufferSize, MakeMeshOverlapExecutor()),
+            [(typeof(Curve[]), typeof(Sphere))] = (V.Degeneracy, DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
+            [(typeof(Curve[]), typeof(BoundingBox))] = (V.Degeneracy, DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
+            [(typeof(Surface[]), typeof(Sphere))] = (V.BoundingBox, DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
+            [(typeof(Surface[]), typeof(BoundingBox))] = (V.BoundingBox, DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
+            [(typeof(Brep[]), typeof(Sphere))] = (V.Topology, DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
+            [(typeof(Brep[]), typeof(BoundingBox))] = (V.Topology, DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
         }.ToFrozenDictionary();
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
