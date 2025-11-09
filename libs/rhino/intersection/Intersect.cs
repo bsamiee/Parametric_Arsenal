@@ -41,8 +41,8 @@ public static class Intersect {
         bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new();
         (Type t1, Type t2) = (typeof(T1), typeof(T2));
-        Type elem = t1 is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ? t.GetGenericArguments()[0] : t1;
-        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1, t2), out V m1) ? m1 : IntersectionConfig.ValidationModes.TryGetValue((elem, t2), out V m2) ? m2 : V.None;
+        Type elem = t1 is { IsGenericType: true } generic && generic.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ? generic.GetGenericArguments()[0] : t1;
+        V mode = IntersectionConfig.ValidationModes.GetValueOrDefault((t1, t2), IntersectionConfig.ValidationModes.GetValueOrDefault((elem, t2), V.None));
 
         return UnifiedOperation.Apply(
             geometryA,
