@@ -23,18 +23,11 @@ internal static class SpatialConfig {
                     c[i] = pts[idx < pts.Length ? idx : pts.Length - 1];
                 }
                 int[] a = new int[pts.Length];
-                for (int iter = 0; iter < 100; iter++) {
-                    for (int i = 0; i < pts.Length; i++) {
-                        a[i] = Enumerable.Range(0, k).OrderBy(j => pts[i].DistanceTo(c[j])).First();
-                    }
-                    Point3d[] nc = Enumerable.Range(0, k).Select(j => {
-                        IEnumerable<int> m = Enumerable.Range(0, pts.Length).Where(i => a[i] == j);
-                        return m.Any() ? new Point3d(m.Average(i => pts[i].X), m.Average(i => pts[i].Y), m.Average(i => pts[i].Z)) : c[j];
-                    }).ToArray();
-                    if (Enumerable.Range(0, k).Max(j => c[j].DistanceTo(nc[j])) < tol) {
-                        break;
-                    }
-                    c = nc;
+                for (int iter = 0; iter < 100 && (Enumerable.Range(0, pts.Length).Select(i => a[i] = Enumerable.Range(0, k).OrderBy(j => pts[i].DistanceTo(c[j])).First()).Count() | 1) > 0; iter++) {
+                    Point3d[] nc = Enumerable.Range(0, k).Select(j => Enumerable.Range(0, pts.Length).Where(i => a[i] == j) is IEnumerable<int> m && m.Any() ? new Point3d(m.Average(i => pts[i].X), m.Average(i => pts[i].Y), m.Average(i => pts[i].Z)) : c[j]).ToArray();
+                    (bool done, Point3d[] next) = (Enumerable.Range(0, k).Max(j => c[j].DistanceTo(nc[j])) < tol, nc);
+                    c = done ? c : next;
+                    iter = done ? 100 : iter;
                 }
                 return a;
             },
@@ -43,29 +36,15 @@ internal static class SpatialConfig {
                 bool[] v = new bool[pts.Length];
                 int cid = 0;
                 for (int i = 0; i < pts.Length; i++) {
-                    if (v[i]) {
-                        continue;
-                    }
+                    (bool skip, int[] n) = (v[i], v[i] ? [] : Enumerable.Range(0, pts.Length).Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps).ToArray());
                     v[i] = true;
-                    int[] n = Enumerable.Range(0, pts.Length).Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps).ToArray();
-                    if (n.Length < 4) {
-                        continue;
+                    (a[i], Queue<int> q, int _cid) = n.Length < 4 ? (a[i], new Queue<int>(), cid) : (cid, new(n), cid + 1);
+                    while (q.Count > 0 && q.Dequeue() is int cur) {
+                        v[cur] = v[cur] || true;
+                        _ = v[cur] && !v[cur] ? [] : Enumerable.Range(0, pts.Length).Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps && !q.Contains(j) && a[j] is -1).Select(nb => { q.Enqueue(nb); return nb; }).ToArray();
+                        a[cur] = a[cur] is -1 ? _cid - 1 : a[cur];
                     }
-                    a[i] = cid;
-                    Queue<int> q = new(n);
-                    while (q.Count > 0) {
-                        int cur = q.Dequeue();
-                        if (!v[cur]) {
-                            v[cur] = true;
-                            foreach (int nb in Enumerable.Range(0, pts.Length).Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps && !q.Contains(j) && a[j] is -1)) {
-                                q.Enqueue(nb);
-                            }
-                        }
-                        if (a[cur] is -1) {
-                            a[cur] = cid;
-                        }
-                    }
-                    cid++;
+                    cid = _cid;
                 }
                 return a;
             },
