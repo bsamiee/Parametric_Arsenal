@@ -112,15 +112,22 @@ public static class Orient {
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
-                        (new Vector3d(s), new Vector3d(t), anchor ?? box.Center) switch {
-                            (Vector3d su, Vector3d tu, Point3d pt) when su.Unitize() && tu.Unitize() =>
-                                Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
-                                    ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
-                                        ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
-                                        : ResultFactory.Create(value: Transform.Identity)
-                                    : ResultFactory.Create(value: Transform.Rotation(su, tu, pt)),
-                            _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
-                        },
+                        ((Func<Result<Transform>>)(() => {
+                            Vector3d su = new Vector3d(s);
+                            Vector3d tu = new Vector3d(t);
+                            // The outer 'when' clause guarantees Unitize will succeed.
+                            su.Unitize();
+                            tu.Unitize();
+                            Point3d pt = anchor ?? box.Center;
+
+                            if (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold) {
+                                return Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
+                                    ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
+                                    : ResultFactory.Create(value: Transform.Identity);
+                            }
+
+                            return ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
+                        }))(),
                     _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
@@ -134,7 +141,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractBestFitPlane(item)
-                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY))),
+                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -189,4 +196,3 @@ public static class Orient {
                 : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
         };
-}
