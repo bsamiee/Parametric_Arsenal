@@ -75,6 +75,13 @@ public static class E {
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
             [4005] = "Spatial query exceeded buffer capacity",
+            [4100] = "Spatial clustering operation failed",
+            [4101] = "K-means k parameter must be positive",
+            [4102] = "DBSCAN epsilon parameter must be positive",
+            [4200] = "Medial axis computation failed",
+            [4201] = "Non-planar medial axis not supported",
+            [4300] = "Proximity field computation failed",
+            [4301] = "Proximity field direction vector is invalid",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -173,5 +180,12 @@ public static class E {
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
         public static readonly SystemError BufferOverflow = Get(4005);
+        public static readonly SystemError ClusteringFailed = Get(4100);
+        public static readonly SystemError InvalidClusterK = Get(4101);
+        public static readonly SystemError InvalidEpsilon = Get(4102);
+        public static readonly SystemError MedialAxisFailed = Get(4200);
+        public static readonly SystemError NonPlanarNotSupported = Get(4201);
+        public static readonly SystemError ProximityFieldFailed = Get(4300);
+        public static readonly SystemError InvalidDirection = Get(4301);
     }
 }
