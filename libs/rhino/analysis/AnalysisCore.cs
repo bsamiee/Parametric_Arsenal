@@ -60,7 +60,7 @@ internal static class AnalysisCore {
                 : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed);
         })) switch {
             (Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>> curveLogic,
-             Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>> surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
+            Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>> surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
                 [typeof(Curve)] = (AnalysisConfig.ValidationModes[typeof(Curve)], (g, ctx, t, _, _, _, order) =>
                     ValidateAndCompute<Curve>(g, ctx, AnalysisConfig.ValidationModes[typeof(Curve)], cv => curveLogic(cv, ctx, t, order))),
                 [typeof(NurbsCurve)] = (AnalysisConfig.ValidationModes[typeof(NurbsCurve)], (g, ctx, t, _, _, _, order) =>
