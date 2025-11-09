@@ -124,67 +124,60 @@ internal static class TopologyCore {
         Array.Fill(componentIds, -1);
         int componentCount = 0;
         for (int seed = 0; seed < faceCount; seed++) {
-            componentCount = componentIds[seed] != -1 ? componentCount : ((Func<int>)(() => {
+            componentCount = componentIds[seed] != -1 ? componentCount : (componentCount, new Func<int>(() => {
                 Queue<int> queue = new([seed,]);
                 componentIds[seed] = componentCount;
                 while (queue.Count > 0) {
-                    int faceIdx = queue.Dequeue();
-                    foreach (int adjFace in getAdjacent(faceIdx).Where(f => componentIds[f] == -1)) {
+                    foreach (int adjFace in getAdjacent(queue.Dequeue()).Where(f => componentIds[f] == -1)) {
                         componentIds[adjFace] = componentCount;
                         queue.Enqueue(adjFace);
                     }
                 }
                 return componentCount;
-            }))() + 1;
+            })()).Item2 + 1;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
-        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => {
-            BoundingBox fBox = getBounds(fIdx);
-            return union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
-        })),
-        ];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, faceCount).Select(f => (f, getAdjacentForGraph(f))).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (u, f) => getBounds(f) switch { BoundingBox box => u.IsValid ? BoundingBox.Union(u, box) : box })),], TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, faceCount).Select(f => (f, getAdjacentForGraph(f))).ToFrozenDictionary(x => x.f, x => x.Item2)),]);
     }
 
     [Pure]
-    private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyBrepEdges(Brep brep, Continuity minContinuity, double angleThreshold) {
-        IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, brep.Edges.Count),];
-        IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => brep.Edges[i].Valence switch {
-            EdgeAdjacency.Naked => Topology.EdgeContinuityType.Boundary,
-            EdgeAdjacency.NonManifold => Topology.EdgeContinuityType.NonManifold,
-            EdgeAdjacency.Interior => brep.Edges[i].EdgeCurve switch {
-                Curve crv when crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Curvature,
-                Curve crv when brep.Edges[i].IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Smooth,
-                _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
-                _ => Topology.EdgeContinuityType.Interior,
-            },
-            _ => Topology.EdgeContinuityType.Sharp,
-        }),
-        ];
-        IReadOnlyList<double> measures = [.. edgeIndices.Select(i => brep.Edges[i].GetLength()),];
-        FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: minContinuity),]);
-    }
-
-    [Pure]
-    private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyMeshEdges(Mesh mesh, double angleThreshold) {
-        double curvatureThreshold = angleThreshold * TopologyConfig.CurvatureThresholdRatio;
-        IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
-        IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i) switch {
-            int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
-            int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
-            int[] cf when cf.Length == 2 => (mesh.FaceNormals[cf[0]].IsValid && mesh.FaceNormals[cf[1]].IsValid ? Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]]) : Math.PI) switch {
-                double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
-                double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
+    private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyBrepEdges(Brep brep, Continuity minContinuity, double angleThreshold) =>
+        Enumerable.Range(0, brep.Edges.Count).Select(i => (
+            Index: i,
+            Type: brep.Edges[i].Valence switch {
+                EdgeAdjacency.Naked => Topology.EdgeContinuityType.Boundary,
+                EdgeAdjacency.NonManifold => Topology.EdgeContinuityType.NonManifold,
+                EdgeAdjacency.Interior => brep.Edges[i].EdgeCurve switch {
+                    Curve crv when crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Curvature,
+                    Curve crv when brep.Edges[i].IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) || crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid) => Topology.EdgeContinuityType.Smooth,
+                    _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
+                    _ => Topology.EdgeContinuityType.Interior,
+                },
                 _ => Topology.EdgeContinuityType.Sharp,
             },
-            _ => Topology.EdgeContinuityType.Sharp,
-        }),
-        ];
-        IReadOnlyList<double> measures = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair verts => mesh.TopologyVertices[verts.I].DistanceTo(mesh.TopologyVertices[verts.J]) }),];
-        FrozenDictionary<Topology.EdgeContinuityType, IReadOnlyList<int>> grouped = edgeIndices.Select((idx, pos) => (idx, type: classifications[pos])).GroupBy(x => x.type, x => x.idx).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]);
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: Continuity.C0_continuous),]);
-    }
+            Measure: brep.Edges[i].GetLength()
+        )).ToArray() switch {
+            (int Index, Topology.EdgeContinuityType Type, double Measure)[] data => ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: [.. data.Select(d => d.Index),], Classifications: [.. data.Select(d => d.Type),], ContinuityMeasures: [.. data.Select(d => d.Measure),], GroupedByType: data.GroupBy(d => d.Type, d => d.Index).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]), MinimumContinuity: minContinuity),]),
+        };
+
+    [Pure]
+    private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyMeshEdges(Mesh mesh, double angleThreshold) =>
+        Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (
+            Index: i,
+            Type: mesh.TopologyEdges.GetConnectedFaces(i) switch {
+                int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
+                int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
+                int[] cf when cf.Length == 2 => (mesh.FaceNormals[cf[0]].IsValid && mesh.FaceNormals[cf[1]].IsValid ? Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]]) : Math.PI) switch {
+                    double angle when Math.Abs(angle) < angleThreshold * TopologyConfig.CurvatureThresholdRatio => Topology.EdgeContinuityType.Curvature,
+                    double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
+                    _ => Topology.EdgeContinuityType.Sharp,
+                },
+                _ => Topology.EdgeContinuityType.Sharp,
+            },
+            Measure: mesh.TopologyEdges.GetTopologyVertices(i) switch { IndexPair verts => mesh.TopologyVertices[verts.I].DistanceTo(mesh.TopologyVertices[verts.J]) }
+        )).ToArray() switch {
+            (int Index, Topology.EdgeContinuityType Type, double Measure)[] data => ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: [.. data.Select(d => d.Index),], Classifications: [.. data.Select(d => d.Type),], ContinuityMeasures: [.. data.Select(d => d.Measure),], GroupedByType: data.GroupBy(d => d.Type, d => d.Index).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<int>)[.. g,]), MinimumContinuity: Continuity.C0_continuous),]),
+        };
 
     [Pure]
     internal static Result<Topology.VertexData> ExecuteVertexData<T>(T input, IGeometryContext context, int vertexIndex, bool enableDiagnostics) where T : notnull =>
@@ -206,19 +199,16 @@ internal static class TopologyCore {
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology, enableDiagnostics: enableDiagnostics,
             operation: g => g switch {
                 Mesh mesh when mesh.Ngons.Count == 0 => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(NgonIndices: [], FaceIndicesPerNgon: [], BoundaryEdgesPerNgon: [], NgonCenters: [], EdgeCountPerNgon: [], TotalNgons: 0, TotalFaces: mesh.Faces.Count),]),
-                Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NgonTopologyData>>>)(() => {
-                    IReadOnlyList<int> ngonIndices = [.. Enumerable.Range(0, mesh.Ngons.Count),];
-#pragma warning disable IDE0004 // Cast is necessary for type safety
-                    IReadOnlyList<IReadOnlyList<int>> faceIndices = [.. ngonIndices.Select(i => {
-                        MeshNgon ngon = mesh.Ngons[i];
-                        return (IReadOnlyList<int>)[.. Enumerable.Range(0, (int)ngon.FaceCount).Select(f => (int)ngon.FaceIndexList()[f]),];
-                    }),];
+                Mesh mesh => Enumerable.Range(0, mesh.Ngons.Count).Select(i => (
+                    Index: i,
+#pragma warning disable IDE0004
+                    Faces: (IReadOnlyList<int>)[.. Enumerable.Range(0, (int)mesh.Ngons[i].FaceCount).Select(f => (int)mesh.Ngons[i].FaceIndexList()[f]),],
 #pragma warning restore IDE0004
-                    IReadOnlyList<IReadOnlyList<int>> boundaryEdges = [.. ngonIndices.Select(i => (IReadOnlyList<int>)[.. mesh.Ngons.GetNgonBoundary([i]) ?? [],]),];
-                    IReadOnlyList<Point3d> centers = [.. ngonIndices.Select(i => mesh.Ngons.GetNgonCenter(i) switch { Point3d pt when pt.IsValid => pt, _ => Point3d.Origin }),];
-                    IReadOnlyList<int> edgeCounts = [.. boundaryEdges.Select(static edges => edges.Count),];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(NgonIndices: ngonIndices, FaceIndicesPerNgon: faceIndices, BoundaryEdgesPerNgon: boundaryEdges, NgonCenters: centers, EdgeCountPerNgon: edgeCounts, TotalNgons: mesh.Ngons.Count, TotalFaces: mesh.Faces.Count),]);
-                }))(),
+                    Boundary: (IReadOnlyList<int>)[.. mesh.Ngons.GetNgonBoundary([i]) ?? [],],
+                    Center: mesh.Ngons.GetNgonCenter(i) switch { Point3d pt when pt.IsValid => pt, _ => Point3d.Origin }
+                )).ToArray() switch {
+                    (int Index, IReadOnlyList<int> Faces, IReadOnlyList<int> Boundary, Point3d Center)[] data => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(NgonIndices: [.. data.Select(d => d.Index),], FaceIndicesPerNgon: [.. data.Select(d => d.Faces),], BoundaryEdgesPerNgon: [.. data.Select(d => d.Boundary),], NgonCenters: [.. data.Select(d => d.Center),], EdgeCountPerNgon: [.. data.Select(d => d.Boundary.Count),], TotalNgons: mesh.Ngons.Count, TotalFaces: mesh.Faces.Count),]),
+                },
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 }
