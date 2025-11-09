@@ -247,4 +247,26 @@ public static class Topology {
         IGeometryContext context,
         bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteNgonTopology(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Diagnose topology problems with edge gaps, near-misses, repair suggestions.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> DiagnoseTopology(
+        Brep brep,
+        IGeometryContext context) =>
+        TopologyCompute.Diagnose(brep: brep, context: context);
+
+    /// <summary>Progressive topology healing with automatic rollback.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Brep Healed, byte Strategy, bool Success)> HealTopology(
+        Brep brep,
+        byte maxStrategy,
+        IGeometryContext context) =>
+        TopologyCompute.Heal(brep: brep, maxStrategy: maxStrategy, context: context);
+
+    /// <summary>Extract topological features: genus, holes, handles, solid classification.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractTopologicalFeatures(
+        Brep brep,
+        IGeometryContext context) =>
+        TopologyCompute.ExtractFeatures(brep: brep, context: context);
 }

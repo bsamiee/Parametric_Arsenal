@@ -100,6 +100,11 @@ public static class E {
             [4201] = "Non-planar medial axis not supported",
             [4300] = "Proximity field computation failed",
             [4301] = "Proximity field direction vector is invalid",
+            [5001] = "Topology diagnosis failed",
+            [5002] = "Topology is too complex for diagnosis",
+            [5010] = "Topology healing failed",
+            [5011] = "Topology healing made geometry worse",
+            [5020] = "Topological feature extraction failed",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -114,6 +119,7 @@ public static class E {
         >= 2000 and < 3000 => ErrorDomain.Geometry,
         >= 3000 and < 4000 => ErrorDomain.Validation,
         >= 4000 and < 5000 => ErrorDomain.Spatial,
+        >= 5000 and < 6000 => ErrorDomain.Topology,
         _ => ErrorDomain.Unknown,
     };
 
@@ -223,5 +229,14 @@ public static class E {
         public static readonly SystemError NonPlanarNotSupported = Get(4201);
         public static readonly SystemError ProximityFieldFailed = Get(4300);
         public static readonly SystemError InvalidDirection = Get(4301);
+    }
+
+    /// <summary>Topology analysis errors (5000-5999).</summary>
+    public static class Topology {
+        public static readonly SystemError DiagnosisFailed = Get(5001);
+        public static readonly SystemError TopologyTooComplex = Get(5002);
+        public static readonly SystemError HealingFailed = Get(5010);
+        public static readonly SystemError HealingMadeWorse = Get(5011);
+        public static readonly SystemError FeatureExtractionFailed = Get(5020);
     }
 }

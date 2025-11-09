@@ -8,4 +8,5 @@ public enum ErrorDomain : byte {
     Geometry = 20,
     Validation = 30,
     Spatial = 40,
+    Topology = 50,
 }
