@@ -15,6 +15,31 @@ internal static class OrientCore {
         return mass is not null ? ResultFactory.Create(value: extract(mass)) : ResultFactory.Create<T>(error: E.Geometry.FrameExtractionFailed);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Point3d> ExtractCentroid<T>(T item, bool useMass, BoundingBox bbox) where T : GeometryBase =>
+        (item, useMass) switch {
+            (Brep b, true) when b.IsSolid => ComputeMass(() => VolumeMassProperties.Compute(b), vmp => vmp.Centroid),
+            (Brep b, true) when b.SolidOrientation != BrepSolidOrientation.None => ComputeMass(() => AreaMassProperties.Compute(b), amp => amp.Centroid),
+            (Extrusion e, true) when e.IsSolid => ComputeMass(() => VolumeMassProperties.Compute(e), vmp => vmp.Centroid),
+            (Extrusion e, true) when e.IsClosed(0) && e.IsClosed(1) => ComputeMass(() => AreaMassProperties.Compute(e), amp => amp.Centroid),
+            (Mesh m, true) when m.IsClosed => ComputeMass(() => VolumeMassProperties.Compute(m), vmp => vmp.Centroid),
+            (Mesh m, true) => ComputeMass(() => AreaMassProperties.Compute(m), amp => amp.Centroid),
+            (Curve c, true) => ComputeMass(() => AreaMassProperties.Compute(c), amp => amp.Centroid),
+            (GeometryBase, false) when bbox.IsValid => ResultFactory.Create(value: bbox.Center),
+            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T item, Transform xform) where T : GeometryBase =>
+        item.Duplicate() switch {
+            T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static V GetValidationMode(Type type) =>
+        OrientConfig.ValidationModes.TryGetValue(type, out V mode) ? mode : V.Standard;
+
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
             [typeof(Curve)] = g => ((Curve)g) switch {
