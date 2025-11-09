@@ -113,20 +113,18 @@ public static class Orient {
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
                         ((Func<Result<Transform>>)(() => {
-                            Vector3d su = new Vector3d(s);
-                            Vector3d tu = new Vector3d(t);
+                            Vector3d su = new(s);
+                            Vector3d tu = new(t);
                             // The outer 'when' clause guarantees Unitize will succeed.
-                            su.Unitize();
-                            tu.Unitize();
+                            _ = su.Unitize();
+                            _ = tu.Unitize();
                             Point3d pt = anchor ?? box.Center;
 
-                            if (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold) {
-                                return Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
+                            return Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
+                                ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
                                     ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
-                                    : ResultFactory.Create(value: Transform.Identity);
-                            }
-
-                            return ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
+                                    : ResultFactory.Create(value: Transform.Identity)
+                                : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
                         }))(),
                     _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
@@ -196,3 +194,4 @@ public static class Orient {
                 : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
         };
+}
