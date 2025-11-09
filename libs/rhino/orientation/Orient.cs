@@ -62,20 +62,15 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? ex)
-                    ? ex(item)
-                    : OrientCore.PlaneExtractors
-                        .Where(kv => kv.Key.IsInstanceOfType(item))
-                        .OrderByDescending(kv => kv.Key, Comparer<Type>.Create((a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
-                        .Select(kv => kv.Value(item))
-                        .DefaultIfEmpty(ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
-                        .First())
-                .Bind(src => target.IsValid
-                    ? OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target))
-                    : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane))),
+                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? extractor) ? extractor(item)
+                    : OrientCore.PlaneExtractors.FirstOrDefault(kv => kv.Key.IsInstanceOfType(item)).Value?.Invoke(item)
+                    ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
+                .Bind(src => !target.IsValid
+                    ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
+                    : OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target)))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,21 +79,17 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 (mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (1, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)).Bind(x => OrientCore.ApplyTransform(item, x)),
-                    (_, BoundingBox b) when !b.IsValid => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
+                    (_, BoundingBox b) when !b.IsValid && mode.Mode != 5 => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
+                    (1, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Bind(c => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - c))),
                     _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationMode),
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = mode.Mode switch {
-                    1 or 2 or 3 or 4 => V.Standard | V.BoundingBox,
-                    5 => V.Standard | V.MassProperties,
-                    _ => V.Standard,
-                },
+                ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -123,8 +114,8 @@ public static class Orient {
                     (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
                         (new Vector3d(s), new Vector3d(t), anchor ?? b.Center) switch {
                             (Vector3d su, Vector3d tu, Point3d pt) when su.Unitize() && tu.Unitize() =>
-                                (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold)
-                                    ? (Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold)
+                                Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
+                                    ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
                                         ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
                                         : OrientCore.ApplyTransform(item, Transform.Identity)
                                     : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, pt)),
@@ -159,7 +150,7 @@ public static class Orient {
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -180,7 +171,7 @@ public static class Orient {
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

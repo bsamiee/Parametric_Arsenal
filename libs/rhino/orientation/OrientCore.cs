@@ -32,7 +32,7 @@ internal static class OrientCore {
                 Mesh m => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(m); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, m.Normals.Count > 0 ? m.Normals[0] : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
             },
             [typeof(Point3d)] = g => ResultFactory.Create(value: new Plane((Point3d)g, Vector3d.ZAxis)),
-            [typeof(PointCloud)] = g => ((PointCloud)g) switch {
+            [typeof(PointCloud)] = g => (PointCloud)g switch {
                 PointCloud pc when pc.Count > 0 => ResultFactory.Create(value: new Plane(pc[0].Location, Vector3d.ZAxis)),
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             },
