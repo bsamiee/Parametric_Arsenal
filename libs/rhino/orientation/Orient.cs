@@ -203,7 +203,7 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: brep,
             operation: (Func<Brep, Result<IReadOnlyList<(Transform, double, byte[])>>>)(item =>
-                OrientCompute.OptimizeOrientation(item, criteria, context.Tolerance)
+                OrientCompute.OptimizeOrientation(item, criteria, context.AbsoluteTolerance)
                     .Map(r => (IReadOnlyList<(Transform, double, byte[])>)[r,])),
             config: new OperationConfig<Brep, (Transform, double, byte[])> {
                 Context = context,
@@ -215,12 +215,12 @@ public static class Orient {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        OrientCompute.ComputeRelative(geometryA, geometryB, context.Tolerance);
+        OrientCompute.ComputeRelative(geometryA, geometryB, context.AbsoluteTolerance);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
         GeometryBase[] geometries,
         IGeometryContext context) =>
-        OrientCompute.DetectPattern(geometries, context.Tolerance);
+        OrientCompute.DetectPattern(geometries, context.AbsoluteTolerance);
 }
 

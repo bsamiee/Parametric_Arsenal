@@ -40,12 +40,12 @@ internal static class TopologyCompute {
         Enumerable.Range(0, Math.Min(maxStrategy + 1, 3))
             .Select(s => (Strategy: (byte)s, Brep: brep.DuplicateBrep()))
             .Select(t => (t.Strategy, Healed: t.Strategy switch {
-                0 => t.Brep.Repair(TopologyConfig.HealingToleranceMultipliers[0]),
-                1 => t.Brep.Edges.JoinEdges(TopologyConfig.HealingToleranceMultipliers[1]),
-                _ => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2]),
-            } ? t.Brep : null))
+                0 => t.Brep.Repair(TopologyConfig.HealingToleranceMultipliers[0]) ? t.Brep : null,
+                1 => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1]) ? t.Brep : null,
+                _ => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2]) ? t.Brep : null,
+            }))
             .FirstOrDefault(r => r.Healed is not null && r.Healed.IsValidTopology) switch {
-                (byte strat, Brep? healed) when healed is not null =>
+                (byte strat, Brep healed) when healed is not null =>
                     ResultFactory.Create(value: (healed, strat, true)),
                 _ => ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed),
             };
