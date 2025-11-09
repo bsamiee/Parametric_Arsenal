@@ -35,44 +35,122 @@ internal static class SpatialCompute {
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
             : ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon);
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) =>
-        Enumerable.Range(1, k - 1).Aggregate(
-            (Rng: new Random(SpatialConfig.KMeansSeed), Centroids: new[] { pts[new Random(SpatialConfig.KMeansSeed).Next(pts.Length)] }.Concat(Enumerable.Repeat(Point3d.Origin, k - 1)).ToArray()),
-            (state, i) => pts.Select(p => Enumerable.Range(0, i).Min(j => p.DistanceTo(state.Centroids[j]))).Select(d => d * d).ToArray() is double[] d2
-                ? d2.Sum() is double sum && state.Rng.NextDouble() * sum is double target
-                    ? state.Centroids.Select((c, idx) => idx == i ? pts[Enumerable.Range(0, pts.Length).Aggregate((Cumul: 0.0, Sel: pts.Length - 1), (s, j) => (s.Cumul + d2[j] >= target && s.Sel == pts.Length - 1) ? (s.Cumul + d2[j], j) : (s.Cumul + d2[j], s.Sel)).Sel] : c).ToArray() is Point3d[] newCentroids ? (state.Rng, newCentroids) : state
-                    : state
-                : state) is (Random _, Point3d[] init)
-            ? Enumerable.Range(0, maxIter).Aggregate(
-                (Centroids: init, Assignments: new int[pts.Length], MaxShift: double.MaxValue),
-                (s, _) => s.MaxShift < tol ? s
-                    : Enumerable.Range(0, pts.Length).Select(i => Enumerable.Range(0, k).OrderBy(j => pts[i].DistanceTo(s.Centroids[j])).First()).ToArray() is int[] assignments
-                        ? Enumerable.Range(0, k).Select(j => Centroid(Enumerable.Range(0, pts.Length).Where(i => assignments[i] == j), pts)).ToArray() is Point3d[] newCentroids
-                            ? (newCentroids, assignments, Enumerable.Range(0, k).Max(j => s.Centroids[j].DistanceTo(newCentroids[j])))
-                            : s
-                        : s).Assignments
-            : new int[pts.Length];
+    private static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
+        int[] assignments = new int[pts.Length];
+        Point3d[] centroids = new Point3d[k];
+        Random rng = new(SpatialConfig.KMeansSeed);
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) =>
-        Enumerable.Range(0, pts.Length).Aggregate(
-            (Assignments: Enumerable.Repeat(-1, pts.Length).ToArray(), Visited: new bool[pts.Length], ClusterId: 0),
-            (state, i) => state.Visited[i] switch {
-                true => state,
-                false => (state.Visited[i] = true) is bool && Enumerable.Range(0, pts.Length).Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps).ToArray() is int[] neighbors
-                    ? neighbors.Length < minPts ? state
-                        : (state.Assignments[i] = state.ClusterId) is int && Enumerable.Range(0, neighbors.Length).Aggregate((State: state, Queue: new Queue<int>(neighbors)), (ctx, _) => ctx.Queue.Count is 0 ? ctx
-                            : ctx.Queue.Dequeue() is int cur && ctx.State.Visited[cur] switch {
-                                true => (ctx.State, ctx.Queue),
-                                false => (ctx.State.Visited[cur] = true) is bool && Enumerable.Range(0, pts.Length).Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps).ToArray() is int[] curNbrs
-                                    ? curNbrs.Length >= minPts ? curNbrs.Where(nb => ctx.State.Assignments[nb] is -1).Aggregate(ctx, (c, nb) => (c.State, c.Queue.Enqueue(nb) is ValueTuple ? c.Queue : c.Queue)) : ctx
-                                    : ctx
-                            } is (State: (int[] a, bool[] v, int cid), Queue: Queue<int> q) && (a, v, ((a[cur] = a[cur] is -1 ? cid : a[cur]) is int && cid))) is ((int[] finalA, bool[] finalV, int finalCid), Queue<int> _)
-                            ? (finalA, finalV, finalCid + 1)
-                            : state
-                    : state,
-            }).Assignments;
+        // K-means++ initialization with squared distances
+        centroids[0] = pts[rng.Next(pts.Length)];
+        for (int i = 1; i < k; i++) {
+            double[] distSq = new double[pts.Length];
+            for (int j = 0; j < pts.Length; j++) {
+                double minDist = double.MaxValue;
+                for (int c = 0; c < i; c++) {
+                    double d = pts[j].DistanceTo(centroids[c]);
+                    minDist = d < minDist ? d : minDist;
+                }
+                distSq[j] = minDist * minDist;
+            }
+
+            double sum = distSq.Sum();
+            double target = rng.NextDouble() * sum;
+            double cumulative = 0;
+            for (int j = 0; j < pts.Length; j++) {
+                cumulative += distSq[j];
+                if (cumulative >= target) {
+                    centroids[i] = pts[j];
+                    break;
+                }
+            }
+        }
+
+        // Lloyd's algorithm
+        for (int iter = 0; iter < maxIter; iter++) {
+            // Assign to nearest centroid
+            for (int i = 0; i < pts.Length; i++) {
+                double minDist = double.MaxValue;
+                for (int j = 0; j < k; j++) {
+                    double d = pts[i].DistanceTo(centroids[j]);
+                    if (d < minDist) {
+                        minDist = d;
+                        assignments[i] = j;
+                    }
+                }
+            }
+
+            // Recompute centroids and check convergence
+            Point3d[] newCentroids = new Point3d[k];
+            int[] counts = new int[k];
+            for (int i = 0; i < pts.Length; i++) {
+                newCentroids[assignments[i]] += pts[i];
+                counts[assignments[i]]++;
+            }
+
+            double maxShift = 0;
+            for (int i = 0; i < k; i++) {
+                newCentroids[i] = counts[i] > 0 ? newCentroids[i] / counts[i] : centroids[i];
+                double shift = centroids[i].DistanceTo(newCentroids[i]);
+                maxShift = shift > maxShift ? shift : maxShift;
+                centroids[i] = newCentroids[i];
+            }
+
+            if (maxShift <= tol) break;
+        }
+
+        return assignments;
+    }
+
+    private static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) {
+        int[] assignments = Enumerable.Repeat(-1, pts.Length).ToArray();
+        bool[] visited = new bool[pts.Length];
+        int clusterId = 0;
+
+        for (int i = 0; i < pts.Length; i++) {
+            if (visited[i]) continue;
+            visited[i] = true;
+
+            // Find epsilon-neighborhood
+            int[] neighbors = Enumerable.Range(0, pts.Length)
+                .Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps)
+                .ToArray();
+
+            if (neighbors.Length < minPts) continue;
+
+            // Start new cluster
+            assignments[i] = clusterId;
+            Queue<int> queue = new(neighbors);
+
+            while (queue.Count > 0) {
+                int cur = queue.Dequeue();
+                if (visited[cur]) continue;
+                visited[cur] = true;
+
+                // Find cur's neighbors
+                int[] curNeighbors = Enumerable.Range(0, pts.Length)
+                    .Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps)
+                    .ToArray();
+
+                // If core point, expand cluster
+                if (curNeighbors.Length >= minPts) {
+                    foreach (int nb in curNeighbors) {
+                        if (assignments[nb] == -1) {
+                            queue.Enqueue(nb);
+                        }
+                    }
+                }
+
+                // Assign to cluster if unassigned
+                if (assignments[cur] == -1) {
+                    assignments[cur] = clusterId;
+                }
+            }
+
+            clusterId++;
+        }
+
+        return assignments;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int[] HierarchicalAssign(Point3d[] pts, int k) =>
@@ -87,17 +165,40 @@ internal static class SpatialCompute {
             _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
-        Enumerable.Range(0, geometry.Length).Aggregate((Tree: new RTree(), Bounds: BoundingBox.Empty), (state, i) => geometry[i].GetBoundingBox(accurate: true) is BoundingBox bbox
-            ? (state.Tree.Insert(bbox, i) is bool && state.Tree, state.Bounds.Union(bbox) is BoundingBox && state.Bounds.Union(bbox))
-            : state) is (RTree tree, BoundingBox bounds) && (direction / direction.Length, bounds, new List<(int, double, double)>()) is (Vector3d dir, BoundingBox searchBounds, List<(int, double, double)> results)
-                ? searchBounds.Inflate(maxDist) is BoundingBox inflated && tree.Search(inflated, (_, args) => {
-                    Vector3d toGeom = geometry[args.Id].GetBoundingBox(accurate: false).Center - Point3d.Origin;
-                    double dist = toGeom.Length;
-                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-                    double weightedDist = dist * (1.0 + (angleWeight * angle));
-                    return weightedDist <= maxDist ? (results.Add((args.Id, dist, angle)), false).Item2 : false;
-                }) is bool && ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray())
-                : ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ProximityFieldFailed);
+    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
+        RTree tree = new();
+        BoundingBox bounds = BoundingBox.Empty;
+
+        // Build RTree with proper bounds calculation
+        for (int i = 0; i < geometry.Length; i++) {
+            BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
+            tree.Insert(bbox, i);
+            bounds.Union(bbox);
+        }
+
+        Vector3d dir = direction / direction.Length;
+        BoundingBox searchBox = bounds;
+        searchBox.Inflate(maxDist);
+
+        List<(int, double, double)> results = [];
+        tree.Search(searchBox, (_, args) => {
+            Point3d center = geometry[args.Id].GetBoundingBox(accurate: false).Center;
+            Vector3d toGeom = center - Point3d.Origin;
+            double dist = toGeom.Length;
+
+            if (dist <= maxDist) {
+                double angle = dist > context.AbsoluteTolerance
+                    ? Vector3d.VectorAngle(dir, toGeom / dist)
+                    : 0.0;
+                double weightedDist = dist * (1.0 + (angleWeight * angle));
+
+                if (weightedDist <= maxDist) {
+                    results.Add((args.Id, dist, angle));
+                }
+            }
+            return false;
+        });
+
+        return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
+    }
 }
