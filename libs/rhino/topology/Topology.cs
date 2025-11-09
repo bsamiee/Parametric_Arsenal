@@ -268,5 +268,5 @@ public static class Topology {
     public static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractTopologicalFeatures(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.ExtractFeatures(brep: brep, context: context);
+        TopologyCompute.ExtractFeatures(brep: brep);
 }

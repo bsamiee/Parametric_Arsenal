@@ -12,9 +12,9 @@ internal static class TopologyCompute {
     internal static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> Diagnose(
         Brep brep,
         IGeometryContext context) =>
-        brep.IsValidTopology switch {
-            false => ResultFactory.Create<(double[], (int, int, double)[], byte[])>(error: E.Topology.TopologyTooComplex),
-            true => (
+        brep.IsValidTopology == false
+            ? ResultFactory.Create<(double[], (int, int, double)[], byte[])>(error: E.Topology.TopologyDiagnosisFailed)
+            : (
                 gaps: Enumerable.Range(0, brep.Edges.Count)
                     .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
                     .Select(i => Math.Min(
@@ -23,26 +23,25 @@ internal static class TopologyCompute {
                     .ToArray(),
                 nearMisses: (from i in Enumerable.Range(0, brep.Edges.Count)
                              from j in Enumerable.Range(i + 1, brep.Edges.Count - i - 1)
-                             let dist = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d _, out Point3d _) ? brep.Edges[i].EdgeCurve.PointAtStart.DistanceTo(brep.Edges[j].EdgeCurve.PointAtStart) : double.MaxValue
+                             let dist = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d ptA, out Point3d ptB) ? ptA.DistanceTo(ptB) : double.MaxValue
                              where dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
                              select (i, j, dist)).ToArray(),
-                repairs: [0, 1, 2, 3,]) switch {
+                repairs: new byte[] { 0, 1, 2, 3 }) switch {
                 (double[] gaps, (int, int, double)[] nm, byte[] r) =>
                     ResultFactory.Create(value: (gaps, nm, r)),
-            },
-        };
+            };
 
     [Pure]
     internal static Result<(Brep Healed, byte Strategy, bool Success)> Heal(
         Brep brep,
         byte maxStrategy,
-        IGeometryContext _) =>
+        IGeometryContext context) =>
         Enumerable.Range(0, Math.Min(maxStrategy + 1, 3))
             .Select(s => (Strategy: (byte)s, Brep: brep.DuplicateBrep()))
             .Select(t => (t.Strategy, Healed: t.Strategy switch {
-                0 => t.Brep.Repair(TopologyConfig.HealingToleranceMultipliers[0]) ? t.Brep : null,
-                1 => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1]) ? t.Brep : null,
-                _ => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2]) ? t.Brep : null,
+                0 => t.Brep.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) ? t.Brep : null,
+                1 => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0 ? t.Brep : null,
+                _ => t.Brep.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0 ? t.Brep : null,
             }))
             .FirstOrDefault(r => r.Healed is not null && r.Healed.IsValidTopology) switch {
                 (byte strat, Brep healed) when healed is not null =>

@@ -11,7 +11,7 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.Any() ? new Point3d(indices.Average(i => pts[i].X), indices.Average(i => pts[i].Y), indices.Average(i => pts[i].Z)) : Point3d.Origin;
+        indices.ToArray() is int[] arr && arr.Length > 0 ? new Point3d(arr.Average(i => pts[i].X), arr.Average(i => pts[i].Y), arr.Average(i => pts[i].Z)) : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d ExtractCentroid(GeometryBase g) => g switch {
@@ -24,17 +24,16 @@ internal static class SpatialCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        SpatialConfig.ClusterParams.TryGetValue(algorithm, out (int maxIter, int minPts) config) && ((algorithm is 0 or 2 && k > 0) || (algorithm is 1 && epsilon > 0)) switch {
-            true => geometry.Select(ExtractCentroid).ToArray() is Point3d[] pts && algorithm switch {
+        SpatialConfig.ClusterParams.TryGetValue(algorithm, out (int maxIter, int minPts) config) && ((algorithm is 0 or 2 && k > 0) || (algorithm is 1 && epsilon > 0))
+            ? geometry.Select(ExtractCentroid).ToArray() is Point3d[] pts && algorithm switch {
                 0 => KMeansAssign(pts, k, context.AbsoluteTolerance, config.maxIter),
                 1 => DBSCANAssign(pts, epsilon, config.minPts),
                 2 => HierarchicalAssign(pts, k),
                 _ => [],
             } is int[] assigns && (algorithm is 1 ? assigns.Max() + 1 : k) is int nc && nc > 0
-                ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c) is IEnumerable<int> m ? (Centroid(m, pts), m.Select(i => pts[i].DistanceTo(Centroid(m, pts))).ToArray()) : (Point3d.Origin, [])).ToArray())
-                : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed),
-            false => ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon),
-        };
+                ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is int[] m && m.Length > 0 ? (Centroid(m, pts), m.Select(i => pts[i].DistanceTo(Centroid(m, pts))).ToArray()) : (Point3d.Origin, Array.Empty<double>())).ToArray())
+                : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
+            : ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) =>
@@ -93,10 +92,12 @@ internal static class SpatialCompute {
         Enumerable.Range(0, geometry.Length).Aggregate((Tree: new RTree(), Bounds: BoundingBox.Empty), (state, i) => geometry[i].GetBoundingBox(accurate: true) is BoundingBox bbox
             ? (state.Tree.Insert(bbox, i) is bool && state.Tree, state.Bounds.Union(bbox) is BoundingBox && state.Bounds.Union(bbox))
             : state) is (RTree tree, BoundingBox bounds) && (direction / direction.Length, bounds, new List<(int, double, double)>()) is (Vector3d dir, BoundingBox searchBounds, List<(int, double, double)> results)
-                ? searchBounds.Inflate(maxDist) is BoundingBox && tree.Search(searchBounds, (_, args) => geometry[args.Id].GetBoundingBox(accurate: false).Center - Point3d.Origin is Vector3d toGeom
-                    ? toGeom.Length is double dist && (dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0) is double angle && dist * (1.0 + (angleWeight * angle)) is double weightedDist
-                        ? weightedDist <= maxDist ? results.Add((args.Id, dist, angle)) is ValueTuple && false : false
-                        : false
-                    : false) is bool && ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray())
+                ? searchBounds.Inflate(maxDist) is BoundingBox inflated && tree.Search(inflated, (_, args) => {
+                    Vector3d toGeom = geometry[args.Id].GetBoundingBox(accurate: false).Center - Point3d.Origin;
+                    double dist = toGeom.Length;
+                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
+                    double weightedDist = dist * (1.0 + (angleWeight * angle));
+                    return weightedDist <= maxDist ? (results.Add((args.Id, dist, angle)), false).Item2 : false;
+                }) is bool && ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray())
                 : ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ProximityFieldFailed);
 }

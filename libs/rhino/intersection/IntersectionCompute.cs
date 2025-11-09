@@ -31,27 +31,26 @@ internal static class IntersectionCompute {
         (geomA, geomB) switch {
             (Curve ca, Curve cb) => Enumerable.Range(0, Math.Max(2, (int)(ca.GetLength() / searchRadius))).Select(i => ca.Domain.ParameterAt(i / (double)Math.Max(1, (int)(ca.GetLength() / searchRadius) - 1))).Select(t => (ca.PointAt(t), cb.ClosestPoint(ca.PointAt(t), out double tb) ? (cb.PointAt(tb), ca.PointAt(t).DistanceTo(cb.PointAt(tb))) : (Point3d.Unset, double.MaxValue))).Where(pair => pair.Item2.Item2 < searchRadius && pair.Item2.Item2 > context.AbsoluteTolerance).ToArray() is (Point3d, (Point3d, double))[] pairs && pairs.Length > 0
                 ? ResultFactory.Create(value: (pairs.Select(p => p.Item1).ToArray(), pairs.Select(p => p.Item2.Item1).ToArray(), pairs.Select(p => p.Item2.Item2).ToArray()))
-                : ResultFactory.Create(value: ([], [], [])),
-            (Curve c, Surface s) => Enumerable.Range(0, Math.Max(2, (int)(c.GetLength() / searchRadius))).Select(i => c.Domain.ParameterAt(i / (double)Math.Max(1, (int)(c.GetLength() / searchRadius) - 1))).Select(t => (c.PointAt(t), s.ClosestPoint(c.PointAt(t), out double su, out double sv) is bool && (su, sv) is (double u, double v) ? (s.PointAt(u, v), c.PointAt(t).DistanceTo(s.PointAt(u, v))) : (Point3d.Unset, double.MaxValue))).Where(pair => pair.Item2.Item2 < searchRadius && pair.Item2.Item2 > context.AbsoluteTolerance).ToArray() is (Point3d, (Point3d, double))[] pairs2 && pairs2.Length > 0
+                : ResultFactory.Create(value: (Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
+            (Curve c, Surface s) => Enumerable.Range(0, Math.Max(2, (int)(c.GetLength() / searchRadius))).Select(i => c.Domain.ParameterAt(i / (double)Math.Max(1, (int)(c.GetLength() / searchRadius) - 1))).Select(t => (c.PointAt(t), s.ClosestPoint(c.PointAt(t), out double su, out double sv) && (su, sv) is (double u, double v) ? (s.PointAt(u, v), c.PointAt(t).DistanceTo(s.PointAt(u, v))) : (Point3d.Unset, double.MaxValue))).Where(pair => pair.Item2.Item2 < searchRadius && pair.Item2.Item2 > context.AbsoluteTolerance).ToArray() is (Point3d, (Point3d, double))[] pairs2 && pairs2.Length > 0
                 ? ResultFactory.Create(value: (pairs2.Select(p => p.Item1).ToArray(), pairs2.Select(p => p.Item2.Item1).ToArray(), pairs2.Select(p => p.Item2.Item2).ToArray()))
-                : ResultFactory.Create(value: ([], [], [])),
+                : ResultFactory.Create(value: (Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
             _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
-            0 => ResultFactory.Create(value: (1.0, 0.0, [])),
+            0 => ResultFactory.Create(value: (1.0, 0.0, Array.Empty<bool>())),
             int n => (geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor, Enumerable.Range(0, IntersectionConfig.StabilitySampleCount).Select(i => new Vector3d(Math.Cos(2 * Math.PI * i / IntersectionConfig.StabilitySampleCount), Math.Sin(2 * Math.PI * i / IntersectionConfig.StabilitySampleCount), 0)).ToArray()) switch {
                 (double perturbDist, Vector3d[] directions) => directions.Select(dir => geomA switch {
-                    Curve ca when ca.DuplicateCurve() is Curve caCopy && caCopy.Translate(dir * perturbDist) is bool => IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()).IsSuccess switch {
-                        true => (Math.Abs(IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()).Value.Points.Count - n), caCopy),
-                        false => (0.0, caCopy),
-                    },
-                    _ => (0.0, null),
+                    Curve ca when ca.DuplicateCurve() is Curve caCopy && caCopy.Translate(dir * perturbDist) => IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()).IsSuccess
+                        ? (Math.Abs(IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()).Value.Points.Count - n), (Curve?)caCopy)
+                        : (0.0, (Curve?)caCopy),
+                    _ => (0.0, (Curve?)null),
                 }).Where(pair => pair.Item2 is not null).ToArray() is (double, Curve?)[] perturbResults && perturbResults.Length > 0 && perturbResults.Select(p => { p.Item2?.Dispose(); return p.Item1; }).ToArray() is double[] deltas
                     ? ResultFactory.Create(value: (1.0 / (1.0 + deltas.Average()), deltas.Max() / n, Enumerable.Range(0, n).Select(_ => deltas.Any(d => d > 1.0)).ToArray()))
-                    : ResultFactory.Create(value: (1.0, 0.0, [])),
+                    : ResultFactory.Create(value: (1.0, 0.0, Array.Empty<bool>())),
             },
         };
 }
