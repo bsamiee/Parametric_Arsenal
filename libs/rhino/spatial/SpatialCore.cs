@@ -61,7 +61,7 @@ internal static class SpatialCore {
     /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<RTree> GetTree<T>(T source, Func<object, RTree> factory) where T : notnull =>
-        ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
+        ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source)));
 
     /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -79,13 +79,11 @@ internal static class SpatialCore {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            Action search = queryShape switch {
-                Sphere sphere => () => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
-                BoundingBox box => () => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
-                _ => () => { }
-                ,
+            _ = queryShape switch {
+                Sphere sphere => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
+                BoundingBox box => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }),
+                _ => false,
             };
-            search();
             return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
@@ -96,12 +94,8 @@ internal static class SpatialCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
-            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+            int k when k > 0 => ResultFactory.Create<IReadOnlyList<int>>(value: [.. kNearest(source, needles, k).SelectMany(static indices => indices),]),
+            double d when d > 0 => ResultFactory.Create<IReadOnlyList<int>>(value: [.. distLimited(source, needles, d).SelectMany(static indices => indices),]),
             int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
             double => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
