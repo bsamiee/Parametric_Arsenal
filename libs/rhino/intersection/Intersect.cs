@@ -40,25 +40,18 @@ public static class Intersect {
         IntersectionOptions? options = null,
         bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new();
-        Type t1Type = typeof(T1);
-        Type t2Type = typeof(T2);
-        Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
-            ? t.GetGenericArguments()[0]
-            : t1Type;
-        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1Type, t2Type), out V m1) ? m1
-            : IntersectionConfig.ValidationModes.TryGetValue((elementType, t2Type), out V m2) ? m2
-            : V.None;
+        (Type t1, Type t2) = (typeof(T1), typeof(T2));
+        Type elem = t1 is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ? t.GetGenericArguments()[0] : t1;
+        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1, t2), out V m1) ? m1 : IntersectionConfig.ValidationModes.TryGetValue((elem, t2), out V m2) ? m2 : V.None;
 
         return UnifiedOperation.Apply(
             geometryA,
-            (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item =>
-                IntersectionCore.ExecutePair(item, geometryB, context, opts)
-                    .Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
+            (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item => IntersectionCore.ExecutePair(item, geometryB, context, opts).Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
             new OperationConfig<object, IntersectionOutput> {
                 Context = context,
                 ValidationMode = mode,
                 AccumulateErrors = true,
-                OperationName = $"Intersect.{t1Type.Name}.{t2Type.Name}",
+                OperationName = $"Intersect.{t1.Name}.{t2.Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
         .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(

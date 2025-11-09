@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -9,56 +10,204 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>RhinoCommon intersection dispatch with 40+ type combinations and result normalization.</summary>
+/// <summary>RhinoCommon intersection dispatch with FrozenDictionary-based type resolution and inline result transformation.</summary>
 internal static class IntersectionCore {
-    [Pure]
-#pragma warning disable MA0051 // Method too long - Large pattern matching switch with 30+ intersection type combinations cannot be meaningfully reduced without extraction
-    internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, Intersect.IntersectionOptions opts) where T1 : notnull where T2 : notnull {
-#pragma warning restore MA0051
-        static Result<Intersect.IntersectionOutput> fromCurveIntersections(CurveIntersections? results, Curve? overlapSource) {
-#pragma warning disable IDISP007 // Don't dispose injected - CurveIntersections created by caller and owned by this method
-            using (results) {
-#pragma warning restore IDISP007
-                return results switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty), { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                                                                                                 [.. from e in r select e.PointA],
-                                                                                                 overlapSource is not null ? [.. from e in r where e.IsOverlap let c = overlapSource.Trim(e.OverlapA) where c is not null select c] : [],
-                                                                                                 [.. from e in r select e.ParameterA],
-                                                                                                 [.. from e in r select e.ParameterB],
-                                                                                                 [], [])),
+    private static readonly FrozenDictionary<(string, string), Func<object, object, double, Intersect.IntersectionOptions, Result<Intersect.IntersectionOutput>>> _dispatch =
+        new Dictionary<(string, string), Func<object, object, double, Intersect.IntersectionOptions, Result<Intersect.IntersectionOutput>>> {
+            [("Curve", "Curve")] = (a, b, tol, _) => {
+                (Curve ca, Curve cb) = ((Curve)a, (Curve)b);
+                using CurveIntersections? r = ReferenceEquals(ca, cb) ? RhinoIntersect.CurveSelf(ca, tol) : RhinoIntersect.CurveCurve(ca, cb, tol, tol);
+                return r switch {
+                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                        [.. from e in r select e.PointA],
+                        [.. from e in r where e.IsOverlap let c = ca.Trim(e.OverlapA) where c is not null select c],
+                        [.. from e in r select e.ParameterA],
+                        [.. from e in r select e.ParameterB],
+                        [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 };
-            }
-        }
-
-        static Result<Intersect.IntersectionOutput> fromBrepIntersection((bool success, Curve[] curves, Point3d[] points) result) =>
-            result.success switch {
-                true when result.curves.Length > 0 && result.points.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. result.points], [.. result.curves], [], [], [], [])),
-                true when result.curves.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [.. result.curves], [], [], [], [])),
-                true when result.points.Length > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. result.points], [], [], [], [], [])),
+            },
+            [("Curve", "BrepFace")] = (a, b, tol, _) => (RhinoIntersect.CurveBrepFace((Curve)a, (BrepFace)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            };
-
-        static Result<Intersect.IntersectionOutput> fromCountedPoints((int count, Point3d p1, Point3d p2, double tolerance) data) =>
-            data.count switch {
-                > 1 when data.p1.DistanceTo(data.p2) > data.tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1, data.p2], [], [], [], [], [])),
-                > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1], [], [], [], [], [])),
+            },
+            [("Curve", "Surface")] = (a, b, tol, _) => {
+                using CurveIntersections? r = RhinoIntersect.CurveSurface((Curve)a, (Surface)b, tol, overlapTolerance: tol);
+                return r switch {
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                        [.. from e in r select e.PointA],
+                        [],
+                        [.. from e in r select e.ParameterA],
+                        [.. from e in r select e.ParameterB],
+                        [], [])),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                };
+            },
+            [("Curve", "Plane")] = (a, b, tol, _) => {
+                using CurveIntersections? r = RhinoIntersect.CurvePlane((Curve)a, (Plane)b, tol);
+                return r switch {
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                        [.. from e in r select e.PointA],
+                        [],
+                        [.. from e in r select e.ParameterA],
+                        [.. from e in r select e.ParameterB],
+                        [], [])),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                };
+            },
+            [("Curve", "Line")] = (a, b, tol, _) => {
+                using CurveIntersections? r = RhinoIntersect.CurveLine((Curve)a, (Line)b, tol, overlapTolerance: tol);
+                return r switch {
+                    { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                        [.. from e in r select e.PointA],
+                        [],
+                        [.. from e in r select e.ParameterA],
+                        [.. from e in r select e.ParameterB],
+                        [], [])),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                };
+            },
+            [("Curve", "Brep")] = (a, b, tol, _) => (RhinoIntersect.CurveBrep((Curve)a, (Brep)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            };
-
-        static Result<Intersect.IntersectionOutput> fromCountedPointsWithParams((int count, Point3d p1, double t1, Point3d p2, double t2, double tolerance) data) =>
-            data.count switch {
-                > 1 when data.p1.DistanceTo(data.p2) > data.tolerance => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1, data.p2], [], [data.t1, data.t2], [], [], [])),
-                > 0 => ResultFactory.Create(value: new Intersect.IntersectionOutput([data.p1], [], [data.t1], [], [], [])),
+            },
+            [("Brep", "Brep")] = (a, b, tol, _) => (RhinoIntersect.BrepBrep((Brep)a, (Brep)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            };
-
-        static Result<Intersect.IntersectionOutput> fromPolylines(Polyline[]? sections) =>
-            sections switch { { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from pl in sections from pt in pl select pt], [], [], [], [], [.. sections])),
+            },
+            [("Brep", "Plane")] = (a, b, tol, _) => (RhinoIntersect.BrepPlane((Brep)a, (Plane)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Brep", "Surface")] = (a, b, tol, _) => (RhinoIntersect.BrepSurface((Brep)a, (Surface)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
+                _ => ResultFactory.Create(value: new Intersect.IntersectionOutput.Empty),
+            },
+            [("Surface", "Surface")] = (a, b, tol, _) => (RhinoIntersect.SurfaceSurface((Surface)a, (Surface)b, tol, out Curve[] c, out Point3d[] p), c, p) switch {
+                (true, { Length: > 0 }, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
+                (true, { Length: > 0 }, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
+                (true, _, { Length: > 0 }) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Mesh", "Mesh")] = (a, b, _, opts) => opts.Sorted switch {
+                true => RhinoIntersect.MeshMeshAccurate((Mesh)a, (Mesh)b, opts.Tolerance ?? RhinoMath.SqrtEpsilon) switch {
+                    Polyline[] { Length: > 0 } pl => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from p in pl from pt in p select pt], [], [], [], [], [.. pl])),
+                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                },
+                false => RhinoIntersect.MeshMeshFast((Mesh)a, (Mesh)b) switch {
+                    Line[] { Length: > 0 } lines => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from l in lines select l.From, .. from l in lines select l.To], [], [], [], [], [])),
+                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                },
+            },
+            [("Mesh", "Ray3d")] = (a, b, _, _) => RhinoIntersect.MeshRay((Mesh)a, (Ray3d)b) switch {
+                double d when d >= 0d => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Ray3d)b).PointAt(d)], [], [d], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Mesh", "Plane")] = (a, b, _, _) => RhinoIntersect.MeshPlane((Mesh)a, (Plane)b) switch {
+                Polyline[] { Length: > 0 } pl => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from p in pl from pt in p select pt], [], [], [], [], [.. pl])),
                 null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            };
+            },
+            [("Mesh", "Line")] = (a, b, _, opts) => opts.Sorted switch {
+                true => (RhinoIntersect.MeshLineSorted((Mesh)a, (Line)b, out int[] ids), ids) switch {
+                    (Point3d[] { Length: > 0 } pts, int[] indices) => ResultFactory.Create(value: new Intersect.IntersectionOutput(pts, [], [], [], indices, [])),
+                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                },
+                false => RhinoIntersect.MeshLine((Mesh)a, (Line)b) switch {
+                    Point3d[] { Length: > 0 } pts => ResultFactory.Create(value: new Intersect.IntersectionOutput(pts, [], [], [], [], [])),
+                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                },
+            },
+            [("Mesh", "PolylineCurve")] = (a, b, _, opts) => opts.Sorted switch {
+                true => (RhinoIntersect.MeshPolylineSorted((Mesh)a, (PolylineCurve)b, out int[] ids), ids) switch {
+                    (Point3d[] { Length: > 0 } pts, int[] indices) => ResultFactory.Create(value: new Intersect.IntersectionOutput(pts, [], [], [], indices, [])),
+                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                },
+                false => (RhinoIntersect.MeshPolyline((Mesh)a, (PolylineCurve)b, out int[] ids), ids) switch {
+                    (Point3d[] { Length: > 0 } pts, int[] indices) => ResultFactory.Create(value: new Intersect.IntersectionOutput(pts, [], [], [], indices, [])),
+                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                },
+            },
+            [("Line", "Line")] = (a, b, tol, _) => RhinoIntersect.LineLine((Line)a, (Line)b, out double pa, out double pb, tol, finiteSegments: false)
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)a).PointAt(pa)], [], [pa], [pb], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            [("Line", "BoundingBox")] = (a, b, tol, _) => RhinoIntersect.LineBox((Line)a, (BoundingBox)b, tol, out Interval interval)
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)a).PointAt(interval.Min), ((Line)a).PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            [("Line", "Plane")] = (a, b, _, _) => RhinoIntersect.LinePlane((Line)a, (Plane)b, out double param)
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)a).PointAt(param)], [], [param], [], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            [("Line", "Sphere")] = (a, b, tol, _) => ((int)RhinoIntersect.LineSphere((Line)a, (Sphere)b, out Point3d p1, out Point3d p2), p1, p2, tol) switch {
+                (> 1, var pt1, var pt2, double t) when pt1.DistanceTo(pt2) > t => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1, pt2], [], [], [], [], [])),
+                (> 0, var pt1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Line", "Cylinder")] = (a, b, tol, _) => ((int)RhinoIntersect.LineCylinder((Line)a, (Cylinder)b, out Point3d p1, out Point3d p2), p1, p2, tol) switch {
+                (> 1, var pt1, var pt2, double t) when pt1.DistanceTo(pt2) > t => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1, pt2], [], [], [], [], [])),
+                (> 0, var pt1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Line", "Circle")] = (a, b, tol, _) => ((int)RhinoIntersect.LineCircle((Line)a, (Circle)b, out double t1, out Point3d p1, out double t2, out Point3d p2), p1, t1, p2, t2, tol) switch {
+                (> 1, var pt1, double ta, var pt2, double tb, double t) when pt1.DistanceTo(pt2) > t => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1, pt2], [], [ta, tb], [], [], [])),
+                (> 0, var pt1, double ta, _, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1], [], [ta], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Plane", "Plane")] = (a, b, _, _) => RhinoIntersect.PlanePlane((Plane)a, (Plane)b, out Line line)
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            [("ValueTuple`2", "Plane")] = (a, b, _, _) => {
+                ValueTuple<Plane, Plane> planes = (ValueTuple<Plane, Plane>)a;
+                return RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, (Plane)b, out Point3d point)
+                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([point], [], [], [], [], []))
+                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
+            },
+            [("Plane", "Circle")] = (a, b, _, _) => RhinoIntersect.PlaneCircle((Plane)a, (Circle)b, out double t1, out double t2) switch {
+                PlaneCircleIntersection.Tangent => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Circle)b).PointAt(t1)], [], [], [t1], [], [])),
+                PlaneCircleIntersection.Secant => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Circle)b).PointAt(t1), ((Circle)b).PointAt(t2)], [], [], [t1, t2], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Plane", "Sphere")] = (a, b, _, _) => ((int)RhinoIntersect.PlaneSphere((Plane)a, (Sphere)b, out Circle c), c) switch {
+                (1, Circle circle) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(circle)], [], [], [], [])),
+                (2, Circle circle) => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Plane", "BoundingBox")] = (a, b, _, _) => (RhinoIntersect.PlaneBoundingBox((Plane)a, (BoundingBox)b, out Polyline poly), poly) switch {
+                (true, Polyline { Count: > 0 } pl) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from pt in pl select pt], [], [], [], [], [pl])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Sphere", "Sphere")] = (a, b, _, _) => ((int)RhinoIntersect.SphereSphere((Sphere)a, (Sphere)b, out Circle c), c) switch {
+                (1, Circle circle) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(circle)], [], [], [], [])),
+                (2, Circle circle) => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Circle", "Circle")] = (a, b, tol, _) => ((int)RhinoIntersect.CircleCircle((Circle)a, (Circle)b, out Point3d p1, out Point3d p2), p1, p2, tol) switch {
+                (> 1, var pt1, var pt2, double t) when pt1.DistanceTo(pt2) > t => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1, pt2], [], [], [], [], [])),
+                (> 0, var pt1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+            [("Arc", "Arc")] = (a, b, tol, _) => ((int)RhinoIntersect.ArcArc((Arc)a, (Arc)b, out Point3d p1, out Point3d p2), p1, p2, tol) switch {
+                (> 1, var pt1, var pt2, double t) when pt1.DistanceTo(pt2) > t => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1, pt2], [], [], [], [], [])),
+                (> 0, var pt1, _, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([pt1], [], [], [], [], [])),
+                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            },
+        }.ToFrozenDictionary();
 
+    [Pure]
+    internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 a, T2 b, IGeometryContext ctx, Intersect.IntersectionOptions opts) where T1 : notnull where T2 : notnull {
         double tolerance = opts.Tolerance ?? ctx.AbsoluteTolerance;
 
         return (a, b, opts) switch {
@@ -66,21 +215,21 @@ internal static class IntersectionCore {
                 ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection),
             (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [.. RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, ctx.AbsoluteTolerance, out int[] ids1)],
-                    [], [], [], ids1.Length > 0 ? [.. ids1] : [], [])),
+                    RhinoIntersect.ProjectPointsToBrepsEx(breps, pts, dir, tolerance, out int[] ids1),
+                    [], [], [], ids1, [])),
             (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [.. RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, ctx.AbsoluteTolerance)],
+                    RhinoIntersect.ProjectPointsToBreps(breps, pts, dir, tolerance),
                     [], [], [], [], [])),
             (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
                 ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection),
             (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir, WithIndices: true }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [.. RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, ctx.AbsoluteTolerance, out int[] ids2)],
-                    [], [], [], ids2.Length > 0 ? [.. ids2] : [], [])),
+                    RhinoIntersect.ProjectPointsToMeshesEx(meshes, pts, dir, tolerance, out int[] ids2),
+                    [], [], [], ids2, [])),
             (Point3d[] pts, Mesh[] meshes, { ProjectionDirection: Vector3d dir }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [.. RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, ctx.AbsoluteTolerance)],
+                    RhinoIntersect.ProjectPointsToMeshes(meshes, pts, dir, tolerance),
                     [], [], [], [], [])),
             (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) when ray.Direction.Length <= RhinoMath.ZeroTolerance =>
                 ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidRay),
@@ -88,155 +237,11 @@ internal static class IntersectionCore {
                 ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits),
             (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                    [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
+                    RhinoIntersect.RayShoot(ray, geoms, hits),
                     [], [], [], [], [])),
-            (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurveSelf(ca, tolerance), overlapSource: null),
-#pragma warning restore IDISP004
-            (Curve ca, Curve cb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
-#pragma warning restore IDISP004
-            (Curve ca, BrepFace bf, _) =>
-                fromBrepIntersection((RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] c2, out Point3d[] p2), c2, p2)),
-            (Curve ca, Surface sb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance), overlapSource: null),
-#pragma warning restore IDISP004
-            (Curve ca, Plane pb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurvePlane(ca, pb, tolerance), overlapSource: null),
-#pragma warning restore IDISP004
-            (Curve ca, Line lb, _) =>
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
-                fromCurveIntersections(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance), overlapSource: null),
-#pragma warning restore IDISP004
-            (Curve ca, Brep bb, _) =>
-                fromBrepIntersection((RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] c1, out Point3d[] p1), c1, p1)),
-            (Brep ba, Brep bb, _) =>
-                fromBrepIntersection((RhinoIntersect.BrepBrep(ba, bb, tolerance, out Curve[] c3, out Point3d[] p3), c3, p3)),
-            (Brep ba, Plane pb, _) =>
-                fromBrepIntersection((RhinoIntersect.BrepPlane(ba, pb, tolerance, out Curve[] c4, out Point3d[] p4), c4, p4)),
-            (Brep ba, Surface sb, _) =>
-                fromBrepIntersection((RhinoIntersect.BrepSurface(ba, sb, tolerance, out Curve[] c5, out Point3d[] p5), c5, p5)),
-            (Surface sa, Surface sb, _) =>
-                fromBrepIntersection((RhinoIntersect.SurfaceSurface(sa, sb, tolerance, out Curve[] c6, out Point3d[] p6), c6, p6)),
-            (Mesh ma, Mesh mb, _) when !opts.Sorted =>
-                RhinoIntersect.MeshMeshFast(ma, mb) switch {
-                    Line[] { Length: > 0 } lines => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from l in lines select l.From, .. from l in lines select l.To],
-                        [], [], [], [], [])),
-                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Mesh ma, Mesh mb, { Sorted: true }) =>
-                fromPolylines(RhinoIntersect.MeshMeshAccurate(ma, mb, tolerance)),
-            (Mesh ma, Ray3d rb, _) =>
-                RhinoIntersect.MeshRay(ma, rb) switch {
-                    double d when d >= 0d => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [rb.PointAt(d)], [], [d], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Mesh ma, Plane pb, _) =>
-                fromPolylines(RhinoIntersect.MeshPlane(ma, pb)),
-            (Mesh ma, Line lb, _) when !opts.Sorted =>
-                RhinoIntersect.MeshLine(ma, lb) switch {
-                    Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. points], [], [], [], [], [])),
-                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Mesh ma, Line lb, { Sorted: true }) =>
-                RhinoIntersect.MeshLineSorted(ma, lb, out int[] ids3) switch {
-                    Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. points], [], [], [], ids3.Length > 0 ? [.. ids3] : [], [])),
-                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                },
-            (Mesh ma, PolylineCurve pc, { Sorted: false }) =>
-                RhinoIntersect.MeshPolyline(ma, pc, out int[] ids4) switch {
-                    Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. points], [], [], [], ids4.Length > 0 ? [.. ids4] : [], [])),
-                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                },
-            (Mesh ma, PolylineCurve pc, { Sorted: true }) =>
-                RhinoIntersect.MeshPolylineSorted(ma, pc, out int[] ids5) switch {
-                    Point3d[] { Length: > 0 } points => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. points], [], [], [], ids5.Length > 0 ? [.. ids5] : [], [])),
-                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                },
-            (Line la, Line lb, _) =>
-                RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [la.PointAt(pa)], [], [pa], [pb], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            (Line la, BoundingBox boxb, _) =>
-                RhinoIntersect.LineBox(la, boxb, tolerance, out Interval interval)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [la.PointAt(interval.Min), la.PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            (Line la, Plane pb, _) =>
-                RhinoIntersect.LinePlane(la, pb, out double param)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [la.PointAt(param)], [], [param], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            (Line la, Sphere sb, _) =>
-                fromCountedPoints(((int)RhinoIntersect.LineSphere(la, sb, out Point3d ps1, out Point3d ps2), ps1, ps2, tolerance)),
-            (Line la, Cylinder cylb, _) =>
-                fromCountedPoints(((int)RhinoIntersect.LineCylinder(la, cylb, out Point3d pc1, out Point3d pc2), pc1, pc2, tolerance)),
-            (Line la, Circle cb, _) =>
-                fromCountedPointsWithParams(((int)RhinoIntersect.LineCircle(la, cb, out double lct1, out Point3d lcp1, out double lct2, out Point3d lcp2), lcp1, lct1, lcp2, lct2, tolerance)),
-            (Plane pa, Plane pb, _) =>
-                RhinoIntersect.PlanePlane(pa, pb, out Line line)
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [], [new LineCurve(line)], [], [], [], []))
-#pragma warning restore IDISP004
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
-                RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point) switch {
-                    true => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [point], [], [], [], [], [])),
-                    false => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Plane pa, Circle cb, _) =>
-                RhinoIntersect.PlaneCircle(pa, cb, out double pct1, out double pct2) switch {
-                    PlaneCircleIntersection.Tangent => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [cb.PointAt(pct1)], [], [], [pct1], [], [])),
-                    PlaneCircleIntersection.Secant => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [cb.PointAt(pct1), cb.PointAt(pct2)], [], [], [pct1, pct2], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Plane pa, Sphere sb, _) =>
-                ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
-                    1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [], [new ArcCurve(psc)], [], [], [], [])),
-#pragma warning restore IDISP004
-                    2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [psc.Center], [], [], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Plane pa, BoundingBox boxb, _) =>
-                RhinoIntersect.PlaneBoundingBox(pa, boxb, out Polyline poly) && poly?.Count > 0
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from pt in poly select pt], [], [], [], [], [poly]))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-            (Sphere sa, Sphere sb, _) =>
-                ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
-                    1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [], [new ArcCurve(ssc)], [], [], [], [])),
-#pragma warning restore IDISP004
-                    2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [ssc.Center], [], [], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            (Circle ca, Circle cb, _) =>
-                fromCountedPoints(((int)RhinoIntersect.CircleCircle(ca, cb, out Point3d ccp1, out Point3d ccp2), ccp1, ccp2, tolerance)),
-            (Arc aa, Arc ab, _) =>
-                fromCountedPoints(((int)RhinoIntersect.ArcArc(aa, ab, out Point3d aap1, out Point3d aap2), aap1, aap2, tolerance)),
-            _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.UnsupportedIntersection),
+            _ => _dispatch.TryGetValue((a.GetType().Name, b.GetType().Name), out Func<object, object, double, Intersect.IntersectionOptions, Result<Intersect.IntersectionOutput>>? dispatcher)
+                ? dispatcher(a, b, tolerance, opts)
+                : ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.UnsupportedIntersection.WithContext($"{a.GetType().Name} × {b.GetType().Name}")),
         };
     }
 }
