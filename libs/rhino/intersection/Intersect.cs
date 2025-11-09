@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
@@ -54,12 +55,15 @@ public static class Intersect {
                 OperationName = $"Intersect.{t1.Name}.{t2.Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
-        .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(
-            [.. acc.Points, .. curr.Points],
-            [.. acc.Curves, .. curr.Curves],
-            [.. acc.ParametersA, .. curr.ParametersA],
-            [.. acc.ParametersB, .. curr.ParametersB],
-            [.. acc.FaceIndices, .. curr.FaceIndices],
-            [.. acc.Sections, .. curr.Sections])));
+        .Map(outputs => outputs.Count switch {
+            0 => IntersectionOutput.Empty,
+            _ => new IntersectionOutput(
+                [.. outputs.SelectMany(output => output.Points)],
+                [.. outputs.SelectMany(output => output.Curves)],
+                [.. outputs.SelectMany(output => output.ParametersA)],
+                [.. outputs.SelectMany(output => output.ParametersB)],
+                [.. outputs.SelectMany(output => output.FaceIndices)],
+                [.. outputs.SelectMany(output => output.Sections)]),
+        });
     }
 }

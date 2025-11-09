@@ -170,8 +170,8 @@ internal static class IntersectionCore {
                 ? ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
                 : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = (a, b, _, _) => {
-                ValueTuple<Plane, Plane> planes = (ValueTuple<Plane, Plane>)a;
-                return RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, (Plane)b, out Point3d point)
+                (Plane planeA, Plane planeB) = (ValueTuple<Plane, Plane>)a;
+                return RhinoIntersect.PlanePlanePlane(planeA, planeB, (Plane)b, out Point3d point)
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput([point], [], [], [], [], []))
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
             },
@@ -210,11 +210,11 @@ internal static class IntersectionCore {
         (Type, Type) key = (t1, t2);
         return _dispatch.TryGetValue(key, out Func<object, object, double, Intersect.IntersectionOptions, Result<Intersect.IntersectionOutput>>? dispatcher)
             ? dispatcher
-            : t1.BaseType is not null && t1.BaseType != typeof(object)
-                ? FindDispatcher(t1.BaseType, t2)
-                : t2.BaseType is not null && t2.BaseType != typeof(object)
-                    ? FindDispatcher(t1, t2.BaseType)
-                    : null;
+            : (t1.BaseType, t2.BaseType) switch {
+                (Type base1, _) when base1 != typeof(object) => FindDispatcher(base1, t2),
+                (_, Type base2) when base2 != typeof(object) => FindDispatcher(t1, base2),
+                _ => null,
+            };
     }
 
     [Pure]
