@@ -37,4 +37,30 @@ public static class Spatial {
                 error: E.Spatial.UnsupportedTypeCombo.WithContext(
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
+
+    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
+        T[] geometry,
+        (byte Algorithm, int K, double Epsilon) parameters,
+        IGeometryContext context) where T : GeometryBase =>
+        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+
+    /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(
+        Brep brep,
+        double tolerance,
+        IGeometryContext context) =>
+        SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
+
+    /// <summary>Compute directional proximity field: (direction, maxDistance, angleWeight) → (index, distance, angle)[].</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
+        GeometryBase[] geometry,
+        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
+        IGeometryContext context) =>
+        parameters.Direction.Length > context.AbsoluteTolerance
+            ? SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context)
+            : ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection);
 }

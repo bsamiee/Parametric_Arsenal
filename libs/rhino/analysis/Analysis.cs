@@ -170,4 +170,25 @@ public static class Analysis {
                 OperationName = "Analysis.Multiple",
                 EnableDiagnostics = enableDiagnostics,
             });
+
+    /// <summary>Surface quality: curvature distribution, singularities, manufacturing score.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(double[] GaussianCurvatures, double[] MeanCurvatures, (double U, double V)[] SingularityLocations, double ManufacturingRating)> AnalyzeSurfaceQuality(
+        Surface surface,
+        IGeometryContext context) =>
+        AnalysisCompute.SurfaceQuality(surface: surface);
+
+    /// <summary>Curve fairness: smoothness score, curvature samples, inflection points, energy.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(double SmoothnessScore, double[] CurvatureValues, (double Parameter, bool IsSharp)[] InflectionPoints, double BendingEnergy)> AnalyzeCurveFairness(
+        Curve curve,
+        IGeometryContext context) =>
+        AnalysisCompute.CurveFairness(curve: curve);
+
+    /// <summary>Mesh FEA quality: aspect ratios, skewness, Jacobians, problematic elements.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaceIndices, (int WarningCount, int CriticalCount) QualityFlags)> AnalyzeMeshForFEA(
+        Mesh mesh,
+        IGeometryContext context) =>
+        AnalysisCompute.MeshForFEA(mesh: mesh, context: context);
 }

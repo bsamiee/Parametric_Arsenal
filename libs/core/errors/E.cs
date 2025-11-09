@@ -23,11 +23,19 @@ public static class E {
             [2202] = "Projection direction vector is invalid or zero-length",
             [2204] = "Ray direction vector is invalid or zero-length",
             [2205] = "Maximum hit count must be positive",
+            [2210] = "Intersection classification failed",
+            [2211] = "Insufficient intersection data for classification",
+            [2220] = "Near-miss search failed",
+            [2221] = "Invalid search radius for near-miss detection",
+            [2230] = "Intersection stability analysis failed",
             [2300] = "Geometry type not supported for analysis",
             [2310] = "Curve analysis computation failed",
             [2311] = "Surface analysis computation failed",
             [2312] = "Brep analysis computation failed",
             [2313] = "Mesh analysis computation failed",
+            [2320] = "Surface quality analysis failed",
+            [2321] = "Curve fairness analysis failed",
+            [2322] = "Mesh FEA quality analysis failed",
             [2400] = "Naked edge extraction failed",
             [2401] = "Boundary loop construction failed",
             [2402] = "Non-manifold edge detected",
@@ -50,6 +58,16 @@ public static class E {
             [2507] = "Invalid curve parameter for orientation",
             [2508] = "Invalid surface UV parameters",
             [2509] = "Frame extraction failed",
+            [2520] = "Relative orientation computation failed",
+            [2521] = "Geometries too dissimilar for orientation",
+            [2530] = "Pattern detection failed",
+            [2531] = "No recognizable pattern found",
+            [2600] = "Feature extraction failed",
+            [2601] = "Feature classification failed",
+            [2610] = "Primitive decomposition failed",
+            [2611] = "No primitives detected in geometry",
+            [2620] = "Pattern extraction failed",
+            [2621] = "No pattern detected in geometry collection",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -75,6 +93,18 @@ public static class E {
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
             [4005] = "Spatial query exceeded buffer capacity",
+            [4100] = "Spatial clustering operation failed",
+            [4101] = "K-means k parameter must be positive",
+            [4102] = "DBSCAN epsilon parameter must be positive",
+            [4200] = "Medial axis computation failed",
+            [4201] = "Non-planar medial axis not supported",
+            [4300] = "Proximity field computation failed",
+            [4301] = "Proximity field direction vector is invalid",
+            [5001] = "Topology diagnosis failed",
+            [5002] = "Topology is too complex for diagnosis",
+            [5010] = "Topology healing failed",
+            [5011] = "Topology healing made geometry worse",
+            [5020] = "Topological feature extraction failed",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -89,6 +119,7 @@ public static class E {
         >= 2000 and < 3000 => ErrorDomain.Geometry,
         >= 3000 and < 4000 => ErrorDomain.Validation,
         >= 4000 and < 5000 => ErrorDomain.Spatial,
+        >= 5000 and < 6000 => ErrorDomain.Topology,
         _ => ErrorDomain.Unknown,
     };
 
@@ -113,11 +144,19 @@ public static class E {
         public static readonly SystemError InvalidProjection = Get(2202);
         public static readonly SystemError InvalidRay = Get(2204);
         public static readonly SystemError InvalidMaxHits = Get(2205);
+        public static readonly SystemError ClassificationFailed = Get(2210);
+        public static readonly SystemError InsufficientIntersectionData = Get(2211);
+        public static readonly SystemError NearMissSearchFailed = Get(2220);
+        public static readonly SystemError InvalidSearchRadius = Get(2221);
+        public static readonly SystemError StabilityAnalysisFailed = Get(2230);
         public static readonly SystemError UnsupportedAnalysis = Get(2300);
         public static readonly SystemError CurveAnalysisFailed = Get(2310);
         public static readonly SystemError SurfaceAnalysisFailed = Get(2311);
         public static readonly SystemError BrepAnalysisFailed = Get(2312);
         public static readonly SystemError MeshAnalysisFailed = Get(2313);
+        public static readonly SystemError SurfaceQualityFailed = Get(2320);
+        public static readonly SystemError CurveFairnessFailed = Get(2321);
+        public static readonly SystemError MeshFEAAnalysisFailed = Get(2322);
         public static readonly SystemError NakedEdgeFailed = Get(2400);
         public static readonly SystemError BoundaryLoopFailed = Get(2401);
         public static readonly SystemError NonManifoldEdge = Get(2402);
@@ -140,6 +179,16 @@ public static class E {
         public static readonly SystemError InvalidCurveParameter = Get(2507);
         public static readonly SystemError InvalidSurfaceUV = Get(2508);
         public static readonly SystemError FrameExtractionFailed = Get(2509);
+        public static readonly SystemError OrientationFailed = Get(2520);
+        public static readonly SystemError GeometriesTooDissimilar = Get(2521);
+        public static readonly SystemError PatternDetectionFailed = Get(2530);
+        public static readonly SystemError NoPatternFound = Get(2531);
+        public static readonly SystemError FeatureExtractionFailed = Get(2600);
+        public static readonly SystemError FeatureClassificationFailed = Get(2601);
+        public static readonly SystemError DecompositionFailed = Get(2610);
+        public static readonly SystemError NoPrimitivesDetected = Get(2611);
+        public static readonly SystemError PatternExtractionFailed = Get(2620);
+        public static readonly SystemError NoPatternDetected = Get(2621);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
@@ -173,5 +222,21 @@ public static class E {
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
         public static readonly SystemError BufferOverflow = Get(4005);
+        public static readonly SystemError ClusteringFailed = Get(4100);
+        public static readonly SystemError InvalidClusterK = Get(4101);
+        public static readonly SystemError InvalidEpsilon = Get(4102);
+        public static readonly SystemError MedialAxisFailed = Get(4200);
+        public static readonly SystemError NonPlanarNotSupported = Get(4201);
+        public static readonly SystemError ProximityFieldFailed = Get(4300);
+        public static readonly SystemError InvalidDirection = Get(4301);
+    }
+
+    /// <summary>Topology analysis errors (5000-5999).</summary>
+    public static class Topology {
+        public static readonly SystemError DiagnosisFailed = Get(5001);
+        public static readonly SystemError TopologyTooComplex = Get(5002);
+        public static readonly SystemError HealingFailed = Get(5010);
+        public static readonly SystemError HealingMadeWorse = Get(5011);
+        public static readonly SystemError FeatureExtractionFailed = Get(5020);
     }
 }

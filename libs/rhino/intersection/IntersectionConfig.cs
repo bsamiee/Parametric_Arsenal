@@ -4,8 +4,23 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Validation modes for 40+ intersection type pair combinations.</summary>
+/// <summary>Validation modes and algorithm parameters for intersection operations.</summary>
 internal static class IntersectionConfig {
+    /// <summary>Tangent angle threshold 5° for classification.</summary>
+    internal const double TangentAngleThreshold = 0.087266;
+
+    /// <summary>Grazing angle threshold 15° for crossing vs grazing.</summary>
+    internal const double GrazingAngleThreshold = 0.261799;
+
+    /// <summary>Near-miss tolerance multiplier 10× context tolerance.</summary>
+    internal const double NearMissToleranceMultiplier = 10.0;
+
+    /// <summary>Stability perturbation distance 0.1% of geometry size.</summary>
+    internal const double StabilityPerturbationFactor = 0.001;
+
+    /// <summary>Stability sample count 8 directions for perturbation testing.</summary>
+    internal const int StabilitySampleCount = 8;
+
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(Type, Type), V> ValidationModes =
         new Dictionary<(Type, Type), V> {

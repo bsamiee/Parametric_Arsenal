@@ -65,4 +65,31 @@ public static class Intersect {
                 [.. outputs.SelectMany(output => output.Sections)]),
         });
     }
+
+    /// <summary>Classify intersection: 0=tangent, 1=transverse, 2=unknown with approach angles.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> ClassifyIntersection(
+        IntersectionOutput output,
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        IGeometryContext context) =>
+        IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB, context: context);
+
+    /// <summary>Find near-misses within tolerance band: (pointsA[], pointsB[], distances[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] LocationsA, Point3d[] LocationsB, double[] Distances)> FindNearMisses(
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        double searchRadius,
+        IGeometryContext context) =>
+        IntersectionCompute.FindNearMisses(geomA: geometryA, geomB: geometryB, searchRadius: searchRadius, context: context);
+
+    /// <summary>Analyze stability via perturbation: (score, sensitivity, unstable flags[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(double StabilityScore, double PerturbationSensitivity, bool[] UnstableFlags)> AnalyzeStability(
+        IntersectionOutput baseIntersection,
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        IGeometryContext context) =>
+        IntersectionCompute.AnalyzeStability(geomA: geometryA, geomB: geometryB, baseOutput: baseIntersection, context: context);
 }

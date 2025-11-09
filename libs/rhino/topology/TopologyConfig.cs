@@ -31,4 +31,16 @@ internal static class TopologyConfig {
 
     /// <summary>G2 curvature threshold ratio: 10% of angle tolerance.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
+
+    /// <summary>Edge gap tolerance multiplier for diagnosis.</summary>
+    internal const double EdgeGapTolerance = 1e-2;
+
+    /// <summary>Near-miss proximity multiplier: 100× tolerance.</summary>
+    internal const double NearMissMultiplier = 100.0;
+
+    /// <summary>Minimum loop length for hole detection.</summary>
+    internal const double MinLoopLength = 1e-6;
+
+    /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
+    internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];
 }
