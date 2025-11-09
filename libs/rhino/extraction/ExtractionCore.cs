@@ -27,7 +27,6 @@ internal static class ExtractionCore {
             Vector3d dir => ((byte)12, (object)dir, true),
             Continuity cont => ((byte)13, (object)cont, true),
             Extract.Semantic { Kind: byte k } => (k, (object?)null, true),
-            Extract.Parametric { Kind: byte k, Param: object p, IncludeEnds: bool e } => (k, p, e),
             _ => ((byte)0, (object?)null, false),
         };
 #pragma warning restore IDE0004
