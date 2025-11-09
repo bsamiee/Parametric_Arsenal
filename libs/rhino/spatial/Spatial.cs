@@ -19,7 +19,7 @@ public static class Spatial {
     }
 
     /// <summary>Clustering strategy for proximity-based grouping algorithms.</summary>
-    public enum ClusteringStrategy : byte {
+    public enum ClusteringStrategy {
         /// <summary>K-means clustering with iterative centroid refinement.</summary>
         KMeans = 0,
         /// <summary>DBSCAN density-based clustering with epsilon parameter.</summary>
@@ -110,9 +110,9 @@ public static class Spatial {
         double epsilon = 1.0,
         bool enableDiagnostics = false) where T : GeometryBase =>
         strategy switch {
-            ClusteringStrategy.KMeans when k > 0 => SpatialCore.ClusterKMeans(geometry: geometry, k: k, context: context, enableDiagnostics: enableDiagnostics),
-            ClusteringStrategy.DBSCAN when epsilon > 0 => SpatialCore.ClusterDBSCAN(geometry: geometry, epsilon: epsilon, context: context, enableDiagnostics: enableDiagnostics),
-            ClusteringStrategy.Hierarchical when k > 0 => SpatialCore.ClusterHierarchical(geometry: geometry, k: k, context: context, enableDiagnostics: enableDiagnostics),
+            ClusteringStrategy.KMeans when k > 0 => SpatialCompute.ClusterKMeans(geometry: geometry, k: k, context: context, enableDiagnostics: enableDiagnostics),
+            ClusteringStrategy.DBSCAN when epsilon > 0 => SpatialCompute.ClusterDBSCAN(geometry: geometry, epsilon: epsilon, context: context, enableDiagnostics: enableDiagnostics),
+            ClusteringStrategy.Hierarchical when k > 0 => SpatialCompute.ClusterHierarchical(geometry: geometry, k: k, context: context, enableDiagnostics: enableDiagnostics),
             ClusteringStrategy.KMeans or ClusteringStrategy.Hierarchical => ResultFactory.Create<IReadOnlyList<SpatialCluster>>(error: E.Spatial.InvalidClusterK),
             ClusteringStrategy.DBSCAN => ResultFactory.Create<IReadOnlyList<SpatialCluster>>(error: E.Spatial.InvalidEpsilon),
             _ => ResultFactory.Create<IReadOnlyList<SpatialCluster>>(error: E.Spatial.ClusteringFailed),
@@ -125,7 +125,7 @@ public static class Spatial {
         MedialAxisOptions options,
         IGeometryContext context,
         bool enableDiagnostics = false) =>
-        SpatialCore.ComputeMedialAxisInternal(brep: brep, options: options, context: context, enableDiagnostics: enableDiagnostics);
+        SpatialCompute.ComputeMedialAxisInternal(brep: brep, options: options, context: context, enableDiagnostics: enableDiagnostics);
 
     /// <summary>Compute directional proximity field with angle-weighted distance queries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -136,6 +136,6 @@ public static class Spatial {
         IGeometryContext context,
         bool enableDiagnostics = false) =>
         direction.Length > context.AbsoluteTolerance
-            ? SpatialCore.ComputeProximityFieldInternal(geometry: geometry, direction: direction, options: options, context: context, enableDiagnostics: enableDiagnostics)
+            ? SpatialCompute.ComputeProximityFieldInternal(geometry: geometry, direction: direction, options: options, context: context, enableDiagnostics: enableDiagnostics)
             : ResultFactory.Create<ProximityField>(error: E.Spatial.InvalidDirection);
 }
