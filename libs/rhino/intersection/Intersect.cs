@@ -30,6 +30,29 @@ public static class Intersect {
         IReadOnlyList<Polyline> Sections) {
         /// <summary>Empty intersection result with zero-length collections.</summary>
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
+
+        /// <summary>Creates output with only points.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntersectionOutput FromPoints(IReadOnlyList<Point3d> points) => new(points, [], [], [], [], []);
+
+        /// <summary>Creates output with only points and parameters.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntersectionOutput FromPoints(IReadOnlyList<Point3d> points, IReadOnlyList<double> paramsA, IReadOnlyList<double> paramsB = null!) =>
+            new(points, [], paramsA, paramsB ?? [], [], []);
+
+        /// <summary>Creates output with points and topology indices.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntersectionOutput FromPointsWithIndices(IReadOnlyList<Point3d> points, IReadOnlyList<int> indices) =>
+            new(points, [], [], [], indices, []);
+
+        /// <summary>Creates output with only curves.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntersectionOutput FromCurves(IReadOnlyList<Curve> curves) => new([], curves, [], [], [], []);
+
+        /// <summary>Creates output with points and curves.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IntersectionOutput FromGeometry(IReadOnlyList<Point3d> points, IReadOnlyList<Curve> curves) =>
+            new(points, curves, [], [], [], []);
     }
     /// <summary>Performs intersection with automatic type detection, validation, and collection handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
