@@ -45,9 +45,7 @@ public static class Intersect {
         Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
             ? t.GetGenericArguments()[0]
             : t1Type;
-        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1Type, t2Type), out V m1) ? m1
-            : IntersectionConfig.ValidationModes.TryGetValue((elementType, t2Type), out V m2) ? m2
-            : V.None;
+        V mode = IntersectionConfig.GetValidationMode(t1Type, elementType, t2Type);
 
         return UnifiedOperation.Apply(
             geometryA,
@@ -61,12 +59,9 @@ public static class Intersect {
                 OperationName = $"Intersect.{t1Type.Name}.{t2Type.Name}",
                 EnableDiagnostics = enableDiagnostics,
             })
-        .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(
-            [.. acc.Points, .. curr.Points],
-            [.. acc.Curves, .. curr.Curves],
-            [.. acc.ParametersA, .. curr.ParametersA],
-            [.. acc.ParametersB, .. curr.ParametersB],
-            [.. acc.FaceIndices, .. curr.FaceIndices],
-            [.. acc.Sections, .. curr.Sections])));
+        .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (a, c) => new IntersectionOutput(
+            [.. a.Points, .. c.Points], [.. a.Curves, .. c.Curves],
+            [.. a.ParametersA, .. c.ParametersA], [.. a.ParametersB, .. c.ParametersB],
+            [.. a.FaceIndices, .. c.FaceIndices], [.. a.Sections, .. c.Sections])));
     }
 }

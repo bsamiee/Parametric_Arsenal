@@ -6,7 +6,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Type-pair validation mode mapping for 40+ intersection combinations.</summary>
 internal static class IntersectionConfig {
-    /// <summary>Validation mode mapping for intersection type pairs.</summary>
+    /// <summary>Validation mode mapping for intersection type pairs with optimized lookup.</summary>
     internal static readonly FrozenDictionary<(Type, Type), V> ValidationModes =
         new Dictionary<(Type, Type), V> {
             [(typeof(Curve), typeof(Curve))] = V.Standard | V.Degeneracy,
@@ -48,4 +48,11 @@ internal static class IntersectionConfig {
             [(typeof(Point3d[]), typeof(Mesh[]))] = V.MeshSpecific,
             [(typeof(Ray3d), typeof(GeometryBase[]))] = V.Standard,
         }.ToFrozenDictionary();
+
+    /// <summary>Optimized validation mode lookup with fallback for collection element types.</summary>
+    [System.Diagnostics.Contracts.Pure, System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    internal static V GetValidationMode(Type primaryType, Type elementType, Type secondaryType) =>
+        ValidationModes.TryGetValue((primaryType, secondaryType), out V mode) ? mode
+            : primaryType != elementType && ValidationModes.TryGetValue((elementType, secondaryType), out mode) ? mode
+            : V.None;
 }
