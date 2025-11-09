@@ -33,19 +33,16 @@ internal static class AnalysisCore {
                     buffer[discCount++] = td;
                     s = td + ctx.AbsoluteTolerance;
                 }
-                AreaMassProperties amp = AreaMassProperties.Compute(cv);
-                return amp is not null && cv.FrameAt(param, out Plane frame)
-                    ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
-                        cv.PointAt(param),
-                        cv.DerivativeAt(param, order) ?? [],
-                        cv.CurvatureAt(param).Length,
-                        frame,
-                        cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
-                        cv.IsClosed ? cv.TorsionAt(param) : 0,
-                        [.. buffer[..discCount]],
-                        [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
-                        cv.GetLength(),
-                        amp.Centroid))
+                return cv.FrameAt(param, out Plane frame)
+                    ? ((Func<AreaMassProperties?, Result<Analysis.IResult>>)(amp => amp is not null
+                        ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
+                            cv.PointAt(param), cv.DerivativeAt(param, order) ?? [], cv.CurvatureAt(param).Length, frame,
+                            cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
+                            cv.IsClosed ? cv.TorsionAt(param) : 0,
+                            [.. buffer[..discCount]],
+                            [.. buffer[..discCount].Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                            cv.GetLength(), amp.Centroid))
+                        : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed)))(AreaMassProperties.Compute(cv))
                     : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
             } finally {
                 ArrayPool<double>.Shared.Return(buffer, clearArray: true);
@@ -77,8 +74,9 @@ internal static class AnalysisCore {
                         int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
                         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
                         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
+                        Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
                         return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame) &&
-                            brep.ClosestPoint(testPt ?? brep.GetBoundingBox(accurate: false).Center, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
+                            brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
                             ? ((Func<AreaMassProperties?, VolumeMassProperties?, SurfaceCurvature, Result<Analysis.IResult>>)((amp, vmp, sc) =>
                                 amp is not null && vmp is not null && IsValidCurvature(sc)
                                     ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
@@ -86,7 +84,7 @@ internal static class AnalysisCore {
                                         sc.Direction(0), sc.Direction(1), frame, frame.Normal,
                                         [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
                                         [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
-                                        brep.IsManifold, brep.IsSolid, cp, (testPt ?? brep.GetBoundingBox(accurate: false).Center).DistanceTo(cp),
+                                        brep.IsManifold, brep.IsSolid, cp, testPoint.DistanceTo(cp),
                                         ci, (uOut, vOut), amp.Area, vmp.Volume, vmp.Centroid))
                                     : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed)))(AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep), sf.CurvatureAt(u, v))
                             : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
@@ -94,11 +92,11 @@ internal static class AnalysisCore {
                 [typeof(Mesh)] = (AnalysisConfig.ValidationModes[typeof(Mesh)], (g, ctx, _, _, vertIdx, _, _) =>
                     ValidateAndCompute<Mesh>(g, ctx, AnalysisConfig.ValidationModes[typeof(Mesh)], mesh => {
                         int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
+                        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
                         return ((Func<AreaMassProperties?, VolumeMassProperties?, Result<Analysis.IResult>>)((amp, vmp) =>
                             amp is not null && vmp is not null
                                 ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
-                                    mesh.Vertices[vIdx], new Plane(mesh.Vertices[vIdx], mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis),
-                                    mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis,
+                                    mesh.Vertices[vIdx], new Plane(mesh.Vertices[vIdx], normal), normal,
                                     [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
                                     [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
                                     mesh.IsManifold(topologicalTest: true, out bool _, out bool _), mesh.IsClosed, amp.Area, vmp.Volume))
