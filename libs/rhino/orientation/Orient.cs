@@ -79,21 +79,17 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 (mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (1, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox b) when b.IsValid => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)).Bind(x => OrientCore.ApplyTransform(item, x)),
-                    (_, BoundingBox b) when !b.IsValid => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
+                    (_, BoundingBox b) when !b.IsValid && mode.Mode != 5 => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
+                    (1, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Bind(c => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - c))),
                     _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationMode),
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = mode.Mode switch {
-                    1 or 2 or 3 or 4 => V.Standard | V.BoundingBox,
-                    5 => V.Standard | V.MassProperties,
-                    _ => V.Standard,
-                },
+                ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
