@@ -58,6 +58,10 @@ public static class E {
             [2507] = "Invalid curve parameter for orientation",
             [2508] = "Invalid surface UV parameters",
             [2509] = "Frame extraction failed",
+            [2520] = "Relative orientation computation failed",
+            [2521] = "Geometries too dissimilar for orientation",
+            [2530] = "Pattern detection failed",
+            [2531] = "No recognizable pattern found",
             [2600] = "Feature extraction failed",
             [2601] = "Feature classification failed",
             [2610] = "Primitive decomposition failed",
@@ -169,6 +173,10 @@ public static class E {
         public static readonly SystemError InvalidCurveParameter = Get(2507);
         public static readonly SystemError InvalidSurfaceUV = Get(2508);
         public static readonly SystemError FrameExtractionFailed = Get(2509);
+        public static readonly SystemError OrientationFailed = Get(2520);
+        public static readonly SystemError GeometriesTooDissimilar = Get(2521);
+        public static readonly SystemError PatternDetectionFailed = Get(2530);
+        public static readonly SystemError NoPatternFound = Get(2531);
         public static readonly SystemError FeatureExtractionFailed = Get(2600);
         public static readonly SystemError FeatureClassificationFailed = Get(2601);
         public static readonly SystemError DecompositionFailed = Get(2610);
