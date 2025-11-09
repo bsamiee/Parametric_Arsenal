@@ -134,7 +134,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractBestFitPlane(item)
-                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
+                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
