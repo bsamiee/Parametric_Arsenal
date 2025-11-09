@@ -78,15 +78,15 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (_, BoundingBox b) when !b.IsValid && mode.Mode != 5 => ResultFactory.Create<IReadOnlyList<T>>(error: E.Validation.BoundingBoxInvalid),
-                    (1, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(new Plane(b.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox b) => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - b.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Bind(c => OrientCore.ApplyTransform(item, Transform.Translation(Point3d.Origin - c))),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationMode),
-                }),
+                ((mode.Mode, item.GetBoundingBox(accurate: true)) switch {
+                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
+                    (1, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox box) => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)),
+                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
+                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
@@ -110,19 +110,19 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
-                        (new Vector3d(s), new Vector3d(t), anchor ?? b.Center) switch {
+                ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
+                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
+                        (new Vector3d(s), new Vector3d(t), anchor ?? box.Center) switch {
                             (Vector3d su, Vector3d tu, Point3d pt) when su.Unitize() && tu.Unitize() =>
                                 Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
                                     ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
-                                        ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
-                                        : OrientCore.ApplyTransform(item, Transform.Identity)
-                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, pt)),
-                            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
+                                        ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
+                                        : ResultFactory.Create(value: Transform.Identity)
+                                    : ResultFactory.Create(value: Transform.Rotation(su, tu, pt)),
+                            _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
                         },
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
-                }),
+                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
+                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
