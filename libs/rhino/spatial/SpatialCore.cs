@@ -46,16 +46,14 @@ internal static class SpatialCore {
         (Func<TInput, Point3d[], int, IEnumerable<int[]>>? kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>>? distLimited)? proximityFuncs = null
     ) where TInput : notnull =>
         proximityFuncs.HasValue
-            ? (i, q, _, _) => q switch {
-                (Point3d[] needles, int k) when k > 0 => proximityFuncs.Value.kNearest!((TInput)i, needles, k).ToArray() is int[][] results
-                    ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-                (Point3d[] needles, double d) when d > 0 => proximityFuncs.Value.distLimited!((TInput)i, needles, d).ToArray() is int[][] results
-                    ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-                (Point3d[], int) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
-                (Point3d[], double) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
+            ? (i, q, _, _) => (q, proximityFuncs.Value) switch {
+                ((Point3d[] needles, int k), var (kn, _)) when k > 0 && kn!((TInput)i, needles, k).ToArray() is int[][] r1 =>
+                    ResultFactory.Create<IReadOnlyList<int>>(value: [.. r1.SelectMany(static indices => indices),]),
+                ((Point3d[] needles, double d), var (_, dl)) when d > 0 && dl!((TInput)i, needles, d).ToArray() is int[][] r2 =>
+                    ResultFactory.Create<IReadOnlyList<int>>(value: [.. r2.SelectMany(static indices => indices),]),
+                ((Point3d[], int), _) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
+                ((Point3d[], double), _) => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
+                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
             }
             : (i, q, _, b) => ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: (TInput)i, createValueCallback: _ => factory(i))).Bind(tree => ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b));
 
@@ -70,9 +68,7 @@ internal static class SpatialCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
-        for (int i = 0; i < geometries.Length; i++) {
-            _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
-        }
+        for (int i = 0; i < geometries.Length; i++) { _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i); }
         return tree;
     }
 
@@ -82,11 +78,13 @@ internal static class SpatialCore {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            return queryShape switch {
-                Sphere sphere => tree.Search(sphere, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }) ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []) : ResultFactory.Create<IReadOnlyList<int>>(value: []),
-                BoundingBox box => tree.Search(box, (_, args) => { if (count < buffer.Length) { buffer[count++] = args.Id; } }) ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []) : ResultFactory.Create<IReadOnlyList<int>>(value: []),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(value: []),
+            void Callback(object? _, RTreeEventArgs args) { if (count < buffer.Length) { buffer[count++] = args.Id; } }
+            _ = queryShape switch {
+                Sphere s => tree.Search(s, Callback),
+                BoundingBox b => tree.Search(b, Callback),
+                _ => false,
             };
+            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
         } finally {
             ArrayPool<int>.Shared.Return(buffer, clearArray: true);
         }
