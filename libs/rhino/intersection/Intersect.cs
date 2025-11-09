@@ -40,11 +40,10 @@ public static class Intersect {
         IntersectionOptions? options = null,
         bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new();
-        Type t1Type = typeof(T1);
-        Type t2Type = typeof(T2);
-        Type elementType = t1Type is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
-            ? t.GetGenericArguments()[0]
-            : t1Type;
+        (Type t1Type, Type t2Type, Type elementType) = (typeof(T1), typeof(T2),
+            typeof(T1) is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)
+                ? t.GetGenericArguments()[0]
+                : typeof(T1));
         V mode = IntersectionConfig.ValidationModes.TryGetValue((t1Type, t2Type), out V m1) ? m1
             : IntersectionConfig.ValidationModes.TryGetValue((elementType, t2Type), out V m2) ? m2
             : V.None;
@@ -52,8 +51,7 @@ public static class Intersect {
         return UnifiedOperation.Apply(
             geometryA,
             (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item =>
-                IntersectionCore.ExecutePair(item, geometryB, context, opts)
-                    .Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
+                IntersectionCore.ExecutePair(item, geometryB, context, opts).Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
             new OperationConfig<object, IntersectionOutput> {
                 Context = context,
                 ValidationMode = mode,
@@ -62,11 +60,11 @@ public static class Intersect {
                 EnableDiagnostics = enableDiagnostics,
             })
         .Map(outputs => outputs.Aggregate(IntersectionOutput.Empty, (acc, curr) => new IntersectionOutput(
-            [.. acc.Points, .. curr.Points],
-            [.. acc.Curves, .. curr.Curves],
-            [.. acc.ParametersA, .. curr.ParametersA],
-            [.. acc.ParametersB, .. curr.ParametersB],
-            [.. acc.FaceIndices, .. curr.FaceIndices],
-            [.. acc.Sections, .. curr.Sections])));
+            [.. acc.Points, .. curr.Points,],
+            [.. acc.Curves, .. curr.Curves,],
+            [.. acc.ParametersA, .. curr.ParametersA,],
+            [.. acc.ParametersB, .. curr.ParametersB,],
+            [.. acc.FaceIndices, .. curr.FaceIndices,],
+            [.. acc.Sections, .. curr.Sections,])));
     }
 }
