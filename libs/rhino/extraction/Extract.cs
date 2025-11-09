@@ -40,13 +40,11 @@ public static class Extract {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
         spec switch {
-            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
+            int <= 0 or ValueTuple<int, bool> { Item1: <= 0 } => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
+            double <= 0 or ValueTuple<double, bool> { Item1: <= 0 } => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
             Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
             Semantic sem => UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(sem.Kind, typeof(T)), }),
-            int or double or (int, bool) or (double, bool) or Vector3d or Continuity => UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard, }),
+            int or double or (int, _) or (double, _) or Vector3d or Continuity => UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard, }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
 

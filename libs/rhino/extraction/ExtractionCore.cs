@@ -56,13 +56,12 @@ internal static class ExtractionCore {
 
     [Pure]
     private static Point3d[] DispatchExtraction(GeometryBase geometry, byte kind, object? param, bool includeEnds, IGeometryContext context) =>
-        _handlers.TryGetValue((kind, geometry.GetType()), out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
-            ? handler(geometry, param, includeEnds, context)
+        (_handlers.TryGetValue((kind, geometry.GetType()), out Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>? handler)
+            ? handler
             : _handlers.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
                 .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(static (_, _, _, _) => [])
-                .First()(geometry, param, includeEnds, context);
+                .Select(static kv => kv.Value)
+                .FirstOrDefault() ?? static (_, _, _, _) => [])(geometry, param, includeEnds, context);
 
     [Pure]
     private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, object?, bool, IGeometryContext, Point3d[]>> BuildHandlerRegistry() =>
