@@ -23,7 +23,7 @@ public static class Spatial {
         IGeometryContext context,
         int? bufferSize = null,
         bool enableDiagnostics = false) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.OperationRegistry.TryGetValue((typeof(TInput), typeof(TQuery)), out (Func<object, RTree>? _, V mode, int bufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> execute) config) switch {
+        SpatialCore.OperationRegistry.TryGetValue((typeof(TInput), typeof(TQuery)), out (V mode, int bufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> execute) config) switch {
             true => UnifiedOperation.Apply(
                 input: input,
                 operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => config.execute(item, query, context, bufferSize ?? config.bufferSize)),
