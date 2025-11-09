@@ -65,7 +65,8 @@ internal static class AnalysisCore {
                             amp.Centroid))
                         : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.SurfaceAnalysisFailed)))(sf.CurvatureAt(u, v));
         })) switch {
-            (var curveLogic, var surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
+            (Func<Curve, IGeometryContext, double?, int, Result<Analysis.IResult>> curveLogic,
+             Func<Surface, IGeometryContext, (double, double)?, int, Result<Analysis.IResult>> surfaceLogic) => new Dictionary<Type, (V, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>>)> {
                 [typeof(Curve)] = (AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Curve), V.Standard | V.Degeneracy), (g, ctx, t, _, _, _, order) =>
                     ResultFactory.Create(value: (Curve)g)
                         .Validate(args: [ctx, AnalysisConfig.ValidationModes.GetValueOrDefault(typeof(Curve), V.Standard | V.Degeneracy)])

@@ -39,6 +39,7 @@ public static class E {
             [2408] = "Boundary loop join failed",
             [2409] = "Invalid edge topology",
             [2410] = "Adjacency query failed",
+            [2411] = "Invalid vertex index",
             [2500] = "Unsupported orientation geometry type",
             [2501] = "Invalid orientation plane",
             [2502] = "Geometry transformation failed",
@@ -73,6 +74,7 @@ public static class E {
             [4002] = "Distance limit must be positive",
             [4003] = "Input and query type combination not supported",
             [4004] = "Proximity search operation failed",
+            [4005] = "Spatial query exceeded buffer capacity",
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -127,6 +129,7 @@ public static class E {
         public static readonly SystemError BoundaryLoopJoinFailed = Get(2408);
         public static readonly SystemError InvalidEdge = Get(2409);
         public static readonly SystemError AdjacencyFailed = Get(2410);
+        public static readonly SystemError InvalidVertexIndex = Get(2411);
         public static readonly SystemError UnsupportedOrientationType = Get(2500);
         public static readonly SystemError InvalidOrientationPlane = Get(2501);
         public static readonly SystemError TransformFailed = Get(2502);
@@ -169,5 +172,6 @@ public static class E {
         public static readonly SystemError InvalidDistance = Get(4002);
         public static readonly SystemError UnsupportedTypeCombo = Get(4003);
         public static readonly SystemError ProximityFailed = Get(4004);
+        public static readonly SystemError BufferOverflow = Get(4005);
     }
 }

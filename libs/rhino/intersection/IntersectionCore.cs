@@ -90,6 +90,10 @@ internal static class IntersectionCore {
                 ResultFactory.Create(value: new Intersect.IntersectionOutput(
                     [.. RhinoIntersect.RayShoot(ray, geoms, hits)],
                     [], [], [], [], [])),
+            (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
+                fromCurveIntersections(RhinoIntersect.CurveSelf(ca, tolerance), overlapSource: null),
+#pragma warning restore IDISP004
             (Curve ca, Curve cb, _) =>
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - disposed in fromCurveIntersections
                 fromCurveIntersections(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
@@ -205,10 +209,10 @@ internal static class IntersectionCore {
                 },
             (Plane pa, Sphere sb, _) =>
                 ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
+                    #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(psc)], [], [], [], [])),
-#pragma warning restore IDISP004
+                    #pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [psc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
@@ -220,10 +224,10 @@ internal static class IntersectionCore {
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (Sphere sa, Sphere sb, _) =>
                 ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
-#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
+                    #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [], [new ArcCurve(ssc)], [], [], [], [])),
-#pragma warning restore IDISP004
+                    #pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [ssc.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),

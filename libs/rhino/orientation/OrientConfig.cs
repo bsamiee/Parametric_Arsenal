@@ -29,4 +29,8 @@ internal static class OrientConfig {
     internal const double MinVectorLength = 1e-8;
     /// <summary>Parallel detection: 1e-6 tolerance for vector alignment detection.</summary>
     internal const double ParallelThreshold = 1e-6;
+    /// <summary>Minimum point count for best-fit plane: 3 points required.</summary>
+    internal const int BestFitMinPoints = 3;
+    /// <summary>Best-fit residual threshold: 1e-3 maximum allowed deviation.</summary>
+    internal const double BestFitResidualThreshold = 1e-3;
 }

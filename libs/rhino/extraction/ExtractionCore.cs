@@ -44,8 +44,8 @@ internal static class ExtractionCore {
         bool includeEnds,
         IGeometryContext context) {
         (GeometryBase normalized, bool shouldDispose) = geometry switch {
-            Extrusion ext when kind is 1 or 6 => (ext.ToBrep(splitKinkyFaces: true), true),
-            SubD sd when kind is 1 or 6 => (sd.ToBrep(), true),
+            Extrusion ext when kind is 1 or 6 or 7 => (ext.ToBrep(splitKinkyFaces: true), true),
+            SubD sd when kind is 1 or 6 or 7 => (sd.ToBrep(), true),
             _ => (geometry, false),
         };
 

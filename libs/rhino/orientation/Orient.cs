@@ -115,23 +115,35 @@ public static class Orient {
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, IGeometryContext context) where T : GeometryBase =>
+    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, Point3d? anchor, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 (item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
-                        (new Vector3d(s), new Vector3d(t)) switch {
-                            (Vector3d su, Vector3d tu) when su.Unitize() && tu.Unitize() =>
+                        (new Vector3d(s), new Vector3d(t), anchor ?? b.Center) switch {
+                            (Vector3d su, Vector3d tu, Point3d pt) when su.Unitize() && tu.Unitize() =>
                                 (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold)
                                     ? (Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold)
                                         ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
                                         : OrientCore.ApplyTransform(item, Transform.Identity)
-                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, b.Center)),
+                                    : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, pt)),
                             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
                         },
                     _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationVectors),
                 }),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = V.Standard,
+            }).Map(r => r[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToBestFit<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                OrientCore.ExtractBestFitPlane(item)
+                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -177,7 +189,7 @@ public static class Orient {
             (null, null, null, null, null) => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
             (Plane p, null, null, null, null) when p != default => ToPlane(geometry, p, context),
             (null, Point3d pt, null, null, null) when pt != default => ToPoint(geometry, pt, useMass: false, context),
-            (null, null, Vector3d v, null, null) when v != default => ToVector(geometry, v, source: null, context),
+            (null, null, Vector3d v, null, null) when v != default => ToVector(geometry, v, source: null, anchor: null, context),
             (null, null, null, Curve c, null) => c.FrameAt(spec.CurveParameter, out Plane f) && f.IsValid
                 ? ToPlane(geometry, f, context)
                 : ResultFactory.Create<T>(error: E.Geometry.InvalidCurveParameter),

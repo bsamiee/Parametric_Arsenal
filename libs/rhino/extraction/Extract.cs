@@ -56,4 +56,22 @@ public static class Extract {
                     new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard }),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
+
+    /// <summary>Extracts points from heterogeneous geometry collections with unified error accumulation and parallel execution support.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(
+        IReadOnlyList<T> geometries,
+        object spec,
+        IGeometryContext context,
+        bool accumulateErrors = true,
+        bool enableParallel = false) where T : GeometryBase {
+        Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];
+        return accumulateErrors switch {
+            true when results.All(r => r.IsSuccess) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
+            true => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
+            false => results.FirstOrDefault(r => !r.IsSuccess) is Result<IReadOnlyList<Point3d>> failure
+                ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,])
+                : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
+        };
+    }
 }

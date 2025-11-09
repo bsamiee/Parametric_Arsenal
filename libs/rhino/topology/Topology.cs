@@ -144,6 +144,40 @@ public static class Topology {
                 : string.Create(CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: NonManifold (valence={this.AdjacentFaceIndices.Count})");
     }
 
+    /// <summary>Vertex topology: connected edges/faces, valence, boundary/manifold status at vertex.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record VertexData(
+        int VertexIndex,
+        Point3d Location,
+        IReadOnlyList<int> ConnectedEdgeIndices,
+        IReadOnlyList<int> ConnectedFaceIndices,
+        int Valence,
+        bool IsBoundary,
+        bool IsManifold) : IResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"Vertex[{this.VertexIndex}]: Valence={this.Valence} | {(this.IsBoundary ? "Boundary" : "Interior")} | {(this.IsManifold ? "Manifold" : "NonManifold")}");
+    }
+
+    /// <summary>Ngon topology: ngon membership, boundaries, centroids for quad-dominant meshes.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record NgonTopologyData(
+        IReadOnlyList<int> NgonIndices,
+        IReadOnlyList<IReadOnlyList<int>> FaceIndicesPerNgon,
+        IReadOnlyList<IReadOnlyList<int>> BoundaryEdgesPerNgon,
+        IReadOnlyList<Point3d> NgonCenters,
+        IReadOnlyList<int> EdgeCountPerNgon,
+        int TotalNgons,
+        int TotalFaces) : IResult {
+        [Pure]
+        private string DebuggerDisplay => this.TotalNgons == 0
+            ? "NgonTopology: No ngons detected"
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"NgonTopology: {this.TotalNgons} ngons | {this.TotalFaces} faces | AvgValence={this.EdgeCountPerNgon.Average():F1}");
+    }
+
     /// <summary>Extracts naked (boundary) edges from geometry with polymorphic type dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NakedEdgeData> GetNakedEdges<T>(
@@ -196,4 +230,21 @@ public static class Topology {
         int edgeIndex,
         bool enableDiagnostics = false) where T : notnull =>
         TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Queries vertex topology: connected edges/faces, valence, boundary/manifold status.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<VertexData> GetVertexData<T>(
+        T geometry,
+        IGeometryContext context,
+        int vertexIndex,
+        bool enableDiagnostics = false) where T : notnull =>
+        TopologyCore.ExecuteVertexData(input: geometry, context: context, vertexIndex: vertexIndex, enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Analyzes ngon topology for quad-dominant meshes (mesh-only operation).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<NgonTopologyData> GetNgonTopology<T>(
+        T geometry,
+        IGeometryContext context,
+        bool enableDiagnostics = false) where T : notnull =>
+        TopologyCore.ExecuteNgonTopology(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
 }
