@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
@@ -69,37 +68,37 @@ internal static class AnalysisCore {
             [typeof(Surface)] = (Modes[typeof(Surface)], (g, ctx, _, uv, _, _, order) => ValidateAndCompute<Surface>(g, ctx, Modes[typeof(Surface)], sf => SurfaceLogic(sf, ctx, uv, order))),
             [typeof(NurbsSurface)] = (Modes[typeof(NurbsSurface)], (g, ctx, _, uv, _, _, order) => ValidateAndCompute<NurbsSurface>(g, ctx, Modes[typeof(NurbsSurface)], sf => SurfaceLogic(sf, ctx, uv, order))),
             [typeof(Brep)] = (Modes[typeof(Brep)], (g, ctx, _, uv, faceIdx, testPt, order) => ValidateAndCompute<Brep>(g, ctx, Modes[typeof(Brep)], brep => {
-                        int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
-                        using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
-                        (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
-                        Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
-                        return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame) &&
-                            brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
-                            ? ((Func<AreaMassProperties?, VolumeMassProperties?, SurfaceCurvature, Result<Analysis.IResult>>)((amp, vmp, sc) =>
-                                amp is not null && vmp is not null && IsValidCurvature(sc)
-                                    ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
-                                        sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
-                                        sc.Direction(0), sc.Direction(1), frame, frame.Normal,
-                                        [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
-                                        [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
-                                        brep.IsManifold, brep.IsSolid, cp, testPoint.DistanceTo(cp),
-                                        ci, (uOut, vOut), amp.Area, vmp.Volume, vmp.Centroid))
-                                    : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed))(
-                                        AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep), sf.CurvatureAt(u, v))
-                            : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
-                    })),
+                int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
+                using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
+                (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
+                Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
+                return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame) &&
+                    brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
+                    ? ((Func<AreaMassProperties?, VolumeMassProperties?, SurfaceCurvature, Result<Analysis.IResult>>)((amp, vmp, sc) =>
+                        amp is not null && vmp is not null && IsValidCurvature(sc)
+                            ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
+                                sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
+                                sc.Direction(0), sc.Direction(1), frame, frame.Normal,
+                                [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
+                                [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
+                                brep.IsManifold, brep.IsSolid, cp, testPoint.DistanceTo(cp),
+                                ci, (uOut, vOut), amp.Area, vmp.Volume, vmp.Centroid))
+                            : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed)))(
+                                AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep), sf.CurvatureAt(u, v))
+                    : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
+            })),
             [typeof(Mesh)] = (Modes[typeof(Mesh)], (g, ctx, _, _, vertIdx, _, _) => ValidateAndCompute<Mesh>(g, ctx, Modes[typeof(Mesh)], mesh => {
-                        int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
-                        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
-                        return ((Func<AreaMassProperties?, VolumeMassProperties?, Result<Analysis.IResult>>)((amp, vmp) =>
-                            amp is not null && vmp is not null
-                                ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
-                                    mesh.Vertices[vIdx], new Plane(mesh.Vertices[vIdx], normal), normal,
-                                    [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
-                                    [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
-                                    mesh.IsManifold(topologicalTest: true, out bool _, out bool _), mesh.IsClosed, amp.Area, vmp.Volume))
-                                : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)))(AreaMassProperties.Compute(mesh), VolumeMassProperties.Compute(mesh));
-                    })),
+                int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
+                Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
+                return ((Func<AreaMassProperties?, VolumeMassProperties?, Result<Analysis.IResult>>)((amp, vmp) =>
+                    amp is not null && vmp is not null
+                        ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.MeshData(
+                            mesh.Vertices[vIdx], new Plane(mesh.Vertices[vIdx], normal), normal,
+                            [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
+                            [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
+                            mesh.IsManifold(topologicalTest: true, out bool _, out bool _), mesh.IsClosed, amp.Area, vmp.Volume))
+                        : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)))(AreaMassProperties.Compute(mesh), VolumeMassProperties.Compute(mesh));
+            })),
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -111,15 +110,12 @@ internal static class AnalysisCore {
         int? index,
         Point3d? testPoint,
         int derivativeOrder,
-        bool enableDiagnostics = false) {
-        Type geometryType = geometry.GetType();
-        if (!_strategies.TryGetValue(geometryType, out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)) {
-            return ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometryType.Name));
-        }
-
-        Result<Analysis.IResult> computation = strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder);
-        return (enableDiagnostics
-            ? computation.Capture($"Analysis.{geometryType.Name}", validationApplied: strategy.mode, cacheHit: false)
-            : computation).Map(r => (IReadOnlyList<Analysis.IResult>)[r]);
-    }
+        bool enableDiagnostics = false) =>
+        _strategies.TryGetValue(geometry.GetType(), out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)
+            ? ((Func<Result<Analysis.IResult>, Result<IReadOnlyList<Analysis.IResult>>>)(computation =>
+                (enableDiagnostics
+                    ? computation.Capture($"Analysis.{geometry.GetType().Name}", validationApplied: strategy.mode, cacheHit: false)
+                    : computation).Map(r => (IReadOnlyList<Analysis.IResult>)[r])
+              ))(strategy.compute(geometry, context, t, uv, index, testPoint, derivativeOrder))
+            : ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext(geometry.GetType().Name));
 }
