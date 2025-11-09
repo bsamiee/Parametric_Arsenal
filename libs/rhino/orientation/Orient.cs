@@ -33,8 +33,8 @@ public static class Orient {
         internal readonly (double, double) Parameters;
 
         private OrientSpec(object? target, (double, double) parameters) {
-            this.Target = target;
-            this.Parameters = parameters;
+            Target = target;
+            Parameters = parameters;
         }
 
         /// <summary>Creates plane-to-plane orientation specification.</summary>
