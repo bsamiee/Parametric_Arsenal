@@ -52,6 +52,22 @@ internal static class IntersectionCore {
             _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
         };
 
+        Result<Intersect.IntersectionOutput> singlePt(bool success, Point3d pt, double[]? paramsA = null, double[]? paramsB = null) =>
+            success
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([pt], [], paramsA ?? [], paramsB ?? [], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
+
+        Result<Intersect.IntersectionOutput> doublePt(bool success, Point3d p1, Point3d p2, double[]? paramsA = null) =>
+            success
+                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([p1, p2], [], paramsA ?? [], [], [], []))
+                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
+
+        Result<Intersect.IntersectionOutput> circleIntx(int count, Circle circle, Func<Circle, Curve> createCurve) => count switch {
+            1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [createCurve(circle)], [], [], [], [])),
+            2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
+            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+        };
+
         return (a, b, opts) switch {
             (Point3d[] pts, Brep[] breps, { ProjectionDirection: Vector3d dir }) when !dir.IsValid || dir.Length <= RhinoMath.ZeroTolerance =>
                 ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection),
@@ -151,17 +167,11 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                 },
             (Line la, Line lb, _) =>
-                RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([la.PointAt(pa)], [], [pa], [pb], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                singlePt(RhinoIntersect.LineLine(la, lb, out double pa, out double pb, tolerance, finiteSegments: false), la.PointAt(pa), paramsA: [pa], paramsB: [pb]),
             (Line la, BoundingBox boxb, _) =>
-                RhinoIntersect.LineBox(la, boxb, tolerance, out Interval interval)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([la.PointAt(interval.Min), la.PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                doublePt(RhinoIntersect.LineBox(la, boxb, tolerance, out Interval interval), la.PointAt(interval.Min), la.PointAt(interval.Max), paramsA: [interval.Min, interval.Max]),
             (Line la, Plane pb, _) =>
-                RhinoIntersect.LinePlane(la, pb, out double param)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([la.PointAt(param)], [], [param], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                singlePt(RhinoIntersect.LinePlane(la, pb, out double param), la.PointAt(param), paramsA: [param]),
             (Line la, Sphere sb, _) =>
                 countedPts((int)RhinoIntersect.LineSphere(la, sb, out Point3d ps1, out Point3d ps2), ps1, ps2),
             (Line la, Cylinder cylb, _) =>
@@ -175,9 +185,7 @@ internal static class IntersectionCore {
 #pragma warning restore IDISP004
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
-                RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([point], [], [], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                singlePt(RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point), point),
             (Plane pa, Circle cb, _) =>
                 RhinoIntersect.PlaneCircle(pa, cb, out double pct1, out double pct2) switch {
                     PlaneCircleIntersection.Tangent => ResultFactory.Create(value: new Intersect.IntersectionOutput(
@@ -187,26 +195,18 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Plane pa, Sphere sb, _) =>
-                ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc)) switch {
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
-                    1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(psc)], [], [], [], [])),
+                circleIntx((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle psc), psc, c => new ArcCurve(c)),
 #pragma warning restore IDISP004
-                    2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([psc.Center], [], [], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
             (Plane pa, BoundingBox boxb, _) =>
                 RhinoIntersect.PlaneBoundingBox(pa, boxb, out Polyline poly) && poly?.Count > 0
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
                         [.. from pt in poly select pt], [], [], [], [], [poly]))
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (Sphere sa, Sphere sb, _) =>
-                ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc)) switch {
 #pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
-                    1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(ssc)], [], [], [], [])),
+                circleIntx((int)RhinoIntersect.SphereSphere(sa, sb, out Circle ssc), ssc, c => new ArcCurve(c)),
 #pragma warning restore IDISP004
-                    2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([ssc.Center], [], [], [], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
             (Circle ca, Circle cb, _) =>
                 countedPts((int)RhinoIntersect.CircleCircle(ca, cb, out Point3d ccp1, out Point3d ccp2), ccp1, ccp2),
             (Arc aa, Arc ab, _) =>
