@@ -52,7 +52,7 @@ internal static class ExtractionCore {
         try {
             V mode = ExtractionConfig.GetValidationMode(kind: kind, geometryType: normalized.GetType());
             return ResultFactory.Create(value: normalized)
-                .Validate(args: mode == V.None ? null : [context, mode,])
+                .Validate(args: [context, mode,])
                 .Bind(g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)DispatchExtraction(geometry: g, kind: kind, param: param, includeEnds: includeEnds, context: context).AsReadOnly()));
         } finally {
             if (shouldDispose) {

@@ -42,12 +42,9 @@ public static class Extract {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
         Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];
+        IReadOnlyList<IReadOnlyList<Point3d>> successValues = [.. results.Select(r => r.Value),];
         return accumulateErrors
-            ? results.All(r => r.IsSuccess)
-                ? ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),])
-                : ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),])
-            : results.FirstOrDefault(r => !r.IsSuccess) is Result<IReadOnlyList<Point3d>> failure
-                ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,])
-                : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]);
+            ? results.All(r => r.IsSuccess) ? ResultFactory.Create(value: successValues) : ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),])
+            : results.FirstOrDefault(r => !r.IsSuccess) is Result<IReadOnlyList<Point3d>> failure ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,]) : ResultFactory.Create(value: successValues);
     }
 }
