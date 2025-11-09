@@ -4,9 +4,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Semantic extraction validation mode mapping with type inheritance fallback.</summary>
+/// <summary>Validation modes for semantic extraction with type inheritance fallback.</summary>
 internal static class ExtractionConfig {
-    /// <summary>Validation mode mapping for semantic extraction kinds and geometry types.</summary>
+    /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
             [(1, typeof(Brep))] = V.Standard | V.MassProperties,
@@ -26,7 +26,7 @@ internal static class ExtractionConfig {
             [(11, typeof(Curve))] = V.Standard | V.Degeneracy,
         }.ToFrozenDictionary();
 
-    /// <summary>Retrieves validation mode for extraction kind and geometry type with inheritance fallback.</summary>
+    /// <summary>Gets validation mode with inheritance fallback for (kind, type) pair.</summary>
     internal static V GetValidationMode(byte kind, Type geometryType) =>
         ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact : ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType)).OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0)).Select(kv => kv.Value).DefaultIfEmpty(V.Standard).First();
 }

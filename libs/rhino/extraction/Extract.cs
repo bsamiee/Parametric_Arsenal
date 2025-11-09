@@ -9,29 +9,29 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Polymorphic point extraction with singular API.</summary>
+/// <summary>Polymorphic point extraction from geometry.</summary>
 public static class Extract {
-    /// <summary>Type-safe semantic extraction mode specifier for point extraction operations.</summary>
+    /// <summary>Semantic extraction mode for point operations.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct Semantic(byte kind) {
         internal readonly byte Kind = kind;
 
-        /// <summary>Centroids and characteristic vertices (corners, midpoints) via mass properties.</summary>
+        /// <summary>Centroids and characteristic vertices via mass properties.</summary>
         public static readonly Semantic Analytical = new(1);
 
-        /// <summary>Geometric extrema: curve endpoints, surface domain corners, bounding box vertices.</summary>
+        /// <summary>Geometric extrema: endpoints, corners, bounding box vertices.</summary>
         public static readonly Semantic Extremal = new(2);
 
-        /// <summary>NURBS Greville points computed from knot vectors.</summary>
+        /// <summary>NURBS Greville points from knot vectors.</summary>
         public static readonly Semantic Greville = new(3);
 
         /// <summary>Curve inflection points where curvature sign changes.</summary>
         public static readonly Semantic Inflection = new(4);
 
-        /// <summary>Circle/ellipse quadrant points at 0°, 90°, 180°, 270°.</summary>
+        /// <summary>Circle/ellipse quadrant points (0°, 90°, 180°, 270°).</summary>
         public static readonly Semantic Quadrant = new(5);
 
-        /// <summary>Topology edge midpoints for Brep, Mesh, and polycurve structures.</summary>
+        /// <summary>Topology edge midpoints for Brep/Mesh/polycurve.</summary>
         public static readonly Semantic EdgeMidpoints = new(6);
 
         /// <summary>Topology face centroids via area mass properties.</summary>
@@ -50,7 +50,7 @@ public static class Extract {
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
 
-    /// <summary>Extracts points from heterogeneous geometry collections with unified error accumulation and parallel execution support.</summary>
+    /// <summary>Batch point extraction with error accumulation and parallel support.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
         Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];

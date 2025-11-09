@@ -9,16 +9,16 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Polymorphic analysis engine with geometry-specific overloads and unified internal dispatch.</summary>
+/// <summary>Polymorphic differential geometry analysis with unified dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Analysis is the primary API entry point for the Analysis namespace")]
 public static class Analysis {
-    /// <summary>Polymorphic analysis result marker providing location property for spatial queries.</summary>
+    /// <summary>Analysis result marker with location property.</summary>
     public interface IResult {
-        /// <summary>Evaluation point location in world coordinates.</summary>
+        /// <summary>Evaluation point in world coordinates.</summary>
         public Point3d Location { get; }
     }
 
-    /// <summary>Curve differential geometry: derivatives, curvature, torsion, frames, discontinuities.</summary>
+    /// <summary>Curve differential geometry with derivatives, curvature, frames.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CurveData(
         Point3d Location,
@@ -34,7 +34,7 @@ public static class Analysis {
         [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Curve @ {this.Location} | κ={this.Curvature:F3} | L={this.Length:F3} | Disc={this.DiscontinuityParameters?.Length.ToString(CultureInfo.InvariantCulture) ?? "0"}");
     }
 
-    /// <summary>Surface differential geometry: Gaussian/mean curvature, principal directions, singularities.</summary>
+    /// <summary>Surface differential geometry with Gaussian/mean curvature, singularities.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SurfaceData(
         Point3d Location,
@@ -56,7 +56,7 @@ public static class Analysis {
             $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}{(this.AtSingularity ? " [singular]" : "")}");
     }
 
-    /// <summary>Brep topology and geometry: vertices/edges, manifold state, proximity, volume properties.</summary>
+    /// <summary>Brep topology with vertices/edges, manifold state, volume properties.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BrepData(
         Point3d Location,
@@ -85,7 +85,7 @@ public static class Analysis {
             $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsSolid ? " [solid]" : "")}{(this.IsManifold ? " [manifold]" : "")}");
     }
 
-    /// <summary>Mesh topology: vertices/edges, manifold detection, closure state, volume properties.</summary>
+    /// <summary>Mesh topology with manifold detection, closure state, volume.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshData(
         Point3d Location,
@@ -102,7 +102,7 @@ public static class Analysis {
             $"Mesh @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsClosed ? " [closed]" : "")}{(this.IsManifold ? " [manifold]" : "")}");
     }
 
-    /// <summary>Analyzes curve geometry producing comprehensive derivative, curvature, frame, and discontinuity data.</summary>
+    /// <summary>Curve analysis: derivatives, curvature, frames, discontinuities.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<CurveData> Analyze(
         Curve curve,
@@ -113,7 +113,7 @@ public static class Analysis {
         AnalysisCore.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (CurveData)results[0]);
 
-    /// <summary>Analyzes surface geometry producing comprehensive derivative, curvature, frame, and singularity data.</summary>
+    /// <summary>Surface analysis: derivatives, curvature, frames, singularities.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<SurfaceData> Analyze(
         Surface surface,
@@ -124,7 +124,7 @@ public static class Analysis {
         AnalysisCore.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (SurfaceData)results[0]);
 
-    /// <summary>Analyzes brep geometry producing comprehensive surface evaluation, topology navigation, and proximity data.</summary>
+    /// <summary>Brep analysis: surface evaluation, topology, proximity.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<BrepData> Analyze(
         Brep brep,
@@ -137,7 +137,7 @@ public static class Analysis {
         AnalysisCore.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
             .Map(results => (BrepData)results[0]);
 
-    /// <summary>Analyzes mesh geometry producing comprehensive topology navigation and manifold inspection data.</summary>
+    /// <summary>Mesh analysis: topology navigation, manifold inspection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<MeshData> Analyze(
         Mesh mesh,
@@ -147,7 +147,7 @@ public static class Analysis {
         AnalysisCore.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0, enableDiagnostics: enableDiagnostics)
             .Map(results => (MeshData)results[0]);
 
-    /// <summary>Analyzes collections of geometry producing heterogeneous results via UnifiedOperation batch processing.</summary>
+    /// <summary>Batch analysis with heterogeneous geometry types.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IResult>> AnalyzeMultiple<T>(
         IReadOnlyList<T> geometries,

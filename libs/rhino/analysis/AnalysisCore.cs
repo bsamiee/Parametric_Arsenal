@@ -11,14 +11,14 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Differential geometry computation with ArrayPool buffers and FrozenDictionary dispatch.</summary>
+/// <summary>Differential geometry computation with pooled buffers and dispatch.</summary>
 internal static class AnalysisCore {
-    /// <summary>Validates geometry and executes computation logic with proper type casting.</summary>
+    /// <summary>Validates geometry and executes typed computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Analysis.IResult> ValidateAndCompute<TGeom>(object geometry, IGeometryContext context, V mode, Func<TGeom, Result<Analysis.IResult>> compute) =>
         ResultFactory.Create(value: (TGeom)geometry).Validate(args: [context, mode]).Bind(compute);
 
-    /// <summary>Validates surface curvature for valid differential geometry data.</summary>
+    /// <summary>Validates surface curvature for finite values.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsValidCurvature(SurfaceCurvature sc) => !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian);
 

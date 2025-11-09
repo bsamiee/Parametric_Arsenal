@@ -4,9 +4,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Orientation transformation validation modes and vector/alignment thresholds.</summary>
+/// <summary>Validation modes and thresholds for orientation transformations.</summary>
 internal static class OrientConfig {
-    /// <summary>Validation mode mapping for orientation geometry types.</summary>
+    /// <summary>Type-to-validation mode mapping for orientation operations.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
@@ -25,12 +25,12 @@ internal static class OrientConfig {
             [typeof(PointCloud)] = V.None,
         }.ToFrozenDictionary();
 
-    /// <summary>Minimum vector magnitude: 1e-8 for non-degenerate direction vectors.</summary>
+    /// <summary>Minimum vector magnitude 1e-8 for non-degenerate directions.</summary>
     internal const double MinVectorLength = 1e-8;
-    /// <summary>Parallel detection: 1e-6 tolerance for vector alignment detection.</summary>
+    /// <summary>Parallel detection tolerance 1e-6 for vector alignment.</summary>
     internal const double ParallelThreshold = 1e-6;
-    /// <summary>Minimum point count for best-fit plane: 3 points required.</summary>
+    /// <summary>Minimum 3 points required for best-fit plane.</summary>
     internal const int BestFitMinPoints = 3;
-    /// <summary>Best-fit residual threshold: 1e-3 maximum allowed deviation.</summary>
+    /// <summary>Maximum 1e-3 deviation for best-fit plane residuals.</summary>
     internal const double BestFitResidualThreshold = 1e-3;
 }

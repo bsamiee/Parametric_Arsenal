@@ -4,12 +4,12 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Topology operation type constants and validation mode dispatch configuration.</summary>
+/// <summary>Operation types and validation mode dispatch for topology analysis.</summary>
 internal static class TopologyConfig {
-    /// <summary>Topology operation type enumeration for dispatch table lookup.</summary>
+    /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 
-    /// <summary>Per-operation validation and diagnostic configuration metadata.</summary>
+    /// <summary>Operation metadata: (Type, OpType) to (ValidationMode, Name) mapping.</summary>
     internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), (V ValidationMode, string OpName)> OperationMeta =
         new Dictionary<(Type, OpType), (V, string)> {
             [(typeof(Brep), OpType.NakedEdges)] = (V.Standard | V.Topology, "Topology.GetNakedEdges.Brep"),
@@ -29,6 +29,6 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>G2 curvature threshold: 10% of angle tolerance for smooth-to-curvature edge classification.</summary>
+    /// <summary>G2 curvature threshold ratio: 10% of angle tolerance.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
 }

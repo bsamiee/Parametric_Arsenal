@@ -10,7 +10,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>RTree construction and spatial query execution with zero-allocation pooled buffers.</summary>
+/// <summary>RTree construction and queries with pooled buffers.</summary>
 internal static class SpatialCore {
     private static readonly Func<object, RTree> _pointArrayFactory = s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree();
     private static readonly Func<object, RTree> _pointCloudFactory = s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree();
@@ -19,7 +19,7 @@ internal static class SpatialCore {
     private static readonly Func<object, RTree> _surfaceArrayFactory = s => BuildGeometryArrayTree((Surface[])s);
     private static readonly Func<object, RTree> _brepArrayFactory = s => BuildGeometryArrayTree((Brep[])s);
 
-    /// <summary>Unified configuration mapping input/query type pairs to tree factory, validation mode, buffer size, and execution strategy.</summary>
+    /// <summary>(Input, Query) type pairs to (Factory, Mode, BufferSize, Execute) mapping.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
         new (Type Input, Type Query, Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)[] {
             (typeof(Point3d[]), typeof(Sphere), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
@@ -57,12 +57,12 @@ internal static class SpatialCore {
             ? GetTree(source: m1, factory: _meshFactory).Bind(t1 => GetTree(source: m2, factory: _meshFactory).Bind(t2 => ExecuteOverlapSearch(tree1: t1, tree2: t2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)))
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
-    /// <summary>Retrieves or constructs RTree for geometry with automatic caching using ConditionalWeakTable.</summary>
+    /// <summary>Gets cached or constructs RTree with automatic caching.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<RTree> GetTree<T>(T source, Func<object, RTree> factory) where T : notnull =>
         ResultFactory.Create(value: Spatial.TreeCache.GetValue(key: source, createValueCallback: _ => factory(source!)));
 
-    /// <summary>Constructs RTree from geometry array by inserting bounding boxes with index tracking.</summary>
+    /// <summary>Builds RTree from geometry array with bounding box insertion.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
@@ -72,7 +72,7 @@ internal static class SpatialCore {
         return tree;
     }
 
-    /// <summary>Executes RTree range search with sphere or bounding box query using ArrayPool for zero-allocation results.</summary>
+    /// <summary>Range search with sphere/box query using pooled buffers.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
@@ -91,7 +91,7 @@ internal static class SpatialCore {
         }
     }
 
-    /// <summary>Executes k-nearest or distance-limited proximity search using RTree algorithms.</summary>
+    /// <summary>K-nearest or distance-limited proximity search.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
@@ -106,7 +106,7 @@ internal static class SpatialCore {
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
-    /// <summary>Executes mesh overlap detection using RTree.SearchOverlaps with tolerance-aware double-tree algorithm.</summary>
+    /// <summary>Mesh overlap detection with tolerance-aware dual-tree search.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
