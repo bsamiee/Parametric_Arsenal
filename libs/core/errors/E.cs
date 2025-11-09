@@ -58,6 +58,12 @@ public static class E {
             [2507] = "Invalid curve parameter for orientation",
             [2508] = "Invalid surface UV parameters",
             [2509] = "Frame extraction failed",
+            [2600] = "Feature extraction failed",
+            [2601] = "Feature classification failed",
+            [2610] = "Primitive decomposition failed",
+            [2611] = "No primitives detected in geometry",
+            [2620] = "Pattern extraction failed",
+            [2621] = "No pattern detected in geometry collection",
             [3000] = "Geometry must be valid",
             [3100] = "Curve must be closed and planar for area centroid",
             [3200] = "Bounding box is invalid",
@@ -163,6 +169,12 @@ public static class E {
         public static readonly SystemError InvalidCurveParameter = Get(2507);
         public static readonly SystemError InvalidSurfaceUV = Get(2508);
         public static readonly SystemError FrameExtractionFailed = Get(2509);
+        public static readonly SystemError FeatureExtractionFailed = Get(2600);
+        public static readonly SystemError FeatureClassificationFailed = Get(2601);
+        public static readonly SystemError DecompositionFailed = Get(2610);
+        public static readonly SystemError NoPrimitivesDetected = Get(2611);
+        public static readonly SystemError PatternExtractionFailed = Get(2620);
+        public static readonly SystemError NoPatternDetected = Get(2621);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>

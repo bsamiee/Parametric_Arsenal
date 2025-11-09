@@ -6,6 +6,13 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Validation modes for semantic extraction with type inheritance fallback.</summary>
 internal static class ExtractionConfig {
+    internal const double FilletG2Threshold = 0.95;
+    internal const double ChamferAngleTolerance = 0.1;
+    internal const int MinHoleSides = 16;
+    internal const double PrimitiveFitTolerance = 0.001;
+    internal const int PrimitiveSampleCount = 100;
+    internal const double SymmetryAngleTolerance = 0.01;
+    internal const int PatternMinInstances = 3;
     /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
