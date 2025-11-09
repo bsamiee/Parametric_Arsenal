@@ -41,21 +41,29 @@ internal static class IntersectionCore {
             (Ray3d ray, GeometryBase[] geoms, { MaxHits: int hits }) =>
                 ResultFactory.Create(value: new Intersect.IntersectionOutput([.. RhinoIntersect.RayShoot(ray, geoms, hits)], [], [], [], [], [])),
             (Curve ca, Curve cb, _) when ReferenceEquals(ca, cb) =>
-                (RhinoIntersect.CurveSelf(ca, tolerance)) switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                ((Func<CurveIntersections?, Result<Intersect.IntersectionOutput>>)(ci => {
+                    using (ci) {
+                        return ci switch {
+                            null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                            { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                        };
+                    }
+                }))(RhinoIntersect.CurveSelf(ca, tolerance)),
             (Curve ca, Curve cb, _) =>
-                (RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca) switch {
-                    (null, _) => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    ( { Count: > 0 } r, Curve overlap) => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA],
-                        overlap is not null ? [.. from e in r where e.IsOverlap let c = overlap.Trim(e.OverlapA) where c is not null select c] : [],
-                        [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                ((Func<CurveIntersections?, Curve, Result<Intersect.IntersectionOutput>>)((ci, overlap) => {
+                    using (ci) {
+                        return ci switch {
+                            null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                            { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                [.. from e in r select e.PointA],
+                                overlap is not null ? [.. from e in r where e.IsOverlap let c = overlap.Trim(e.OverlapA) where c is not null select c] : [],
+                                [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                        };
+                    }
+                }))(RhinoIntersect.CurveCurve(ca, cb, tolerance, tolerance), ca),
             (Curve ca, BrepFace bf, _) =>
                 (RhinoIntersect.CurveBrepFace(ca, bf, tolerance, out Curve[] curves1, out Point3d[] points1), curves1, points1) switch {
                     (true, { Length: > 0 } c, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. p], [.. c], [], [], [], [])),
@@ -64,26 +72,38 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Curve ca, Surface sb, _) =>
-                RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance) switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                ((Func<CurveIntersections?, Result<Intersect.IntersectionOutput>>)(ci => {
+                    using (ci) {
+                        return ci switch {
+                            null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                            { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                        };
+                    }
+                }))(RhinoIntersect.CurveSurface(ca, sb, tolerance, overlapTolerance: tolerance)),
             (Curve ca, Plane pb, _) =>
-                RhinoIntersect.CurvePlane(ca, pb, tolerance) switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                ((Func<CurveIntersections?, Result<Intersect.IntersectionOutput>>)(ci => {
+                    using (ci) {
+                        return ci switch {
+                            null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                            { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                        };
+                    }
+                }))(RhinoIntersect.CurvePlane(ca, pb, tolerance)),
             (Curve ca, Line lb, _) =>
-                RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance) switch {
-                    null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                    { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
+                ((Func<CurveIntersections?, Result<Intersect.IntersectionOutput>>)(ci => {
+                    using (ci) {
+                        return ci switch {
+                            null => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                            { Count: > 0 } r => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                [.. from e in r select e.PointA], [], [.. from e in r select e.ParameterA], [.. from e in r select e.ParameterB], [], [])),
+                            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                        };
+                    }
+                }))(RhinoIntersect.CurveLine(ca, lb, tolerance, overlapTolerance: tolerance)),
             (Curve ca, Brep bb, _) =>
                 (RhinoIntersect.CurveBrep(ca, bb, tolerance, out Curve[] curves2, out Point3d[] points2), curves2, points2) switch {
                     (true, { Length: > 0 } c, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. p], [.. c], [], [], [], [])),
@@ -202,8 +222,10 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Plane pa, Plane pb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                 RhinoIntersect.PlanePlane(pa, pb, out Line line)
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
+#pragma warning restore IDISP004
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (ValueTuple<Plane, Plane> planes, Plane p3, _) =>
                 RhinoIntersect.PlanePlanePlane(planes.Item1, planes.Item2, p3, out Point3d point)
@@ -216,8 +238,10 @@ internal static class IntersectionCore {
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
             (Plane pa, Sphere sb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                 ((int)RhinoIntersect.PlaneSphere(pa, sb, out Circle circle)) switch {
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(circle)], [], [], [], [])),
+#pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([circle.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
@@ -226,8 +250,10 @@ internal static class IntersectionCore {
                     ? ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from pt in poly select pt], [], [], [], [], [poly]))
                     : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             (Sphere sa, Sphere sb, _) =>
+#pragma warning disable IDISP004 // Don't ignore created IDisposable - ownership transferred to caller via result
                 ((int)RhinoIntersect.SphereSphere(sa, sb, out Circle sphereCircle)) switch {
                     1 => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(sphereCircle)], [], [], [], [])),
+#pragma warning restore IDISP004
                     2 => ResultFactory.Create(value: new Intersect.IntersectionOutput([sphereCircle.Center], [], [], [], [], [])),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 },
