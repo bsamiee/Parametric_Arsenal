@@ -25,6 +25,7 @@ internal static class TopologyCore {
     internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops, bool enableDiagnostics) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NakedEdges, enableDiagnostics: enableDiagnostics,
             operation: g => g switch {
+                Brep { Edges.Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
                 Brep brep => Enumerable.Range(0, brep.Edges.Count)
                     .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
                     .Select(i => (Index: i, Curve: brep.Edges[i].DuplicateCurve(), Length: brep.Edges[i].GetLength()))
@@ -34,7 +35,8 @@ internal static class TopologyCore {
                 Mesh mesh => Enumerable.Range(0, mesh.TopologyEdges.Count)
                     .Select(i => (Index: i, Faces: mesh.TopologyEdges.GetConnectedFaces(i), Vertices: mesh.TopologyEdges.GetTopologyVertices(i)))
                     .Where(t => t.Faces.Length == 1)
-                    .Select(t => (t.Index, Curve: new LineCurve(mesh.TopologyVertices[t.Vertices.I], mesh.TopologyVertices[t.Vertices.J]), Length: mesh.TopologyVertices[t.Vertices.I].DistanceTo(mesh.TopologyVertices[t.Vertices.J])))
+                    // LineCurve ownership transfers to NakedEdgeData; consumer must dispose
+                    .Select(t => (t.Index, Curve: (Curve)new LineCurve(mesh.TopologyVertices[t.Vertices.I], mesh.TopologyVertices[t.Vertices.J]), Length: mesh.TopologyVertices[t.Vertices.I].DistanceTo(mesh.TopologyVertices[t.Vertices.J])))
                     .ToArray() switch {
                         (int Index, Curve Curve, double Length)[] edges => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [.. edges.Select(e => e.Curve),], EdgeIndices: [.. edges.Select(e => e.Index),], Valences: [.. edges.Select(_ => 1),], IsOrdered: orderLoops, TotalEdgeCount: mesh.TopologyEdges.Count, TotalLength: edges.Sum(e => e.Length)),]),
                     },
@@ -80,12 +82,11 @@ internal static class TopologyCore {
                                         Locations: [.. nm.Select(t => new Point3d(
                                             (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) / 2.0,
                                             (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) / 2.0,
-                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) / 2.0,
-                                        ),],
+                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) / 2.0)),
+                                        ],
                                         IsManifold: isManifold && nm.Length == 0,
                                         IsOrientable: oriented,
-                                        MaxValence: nm.Length > 0 ? nm.Max(t => t.Faces.Length) : 0,
-                                    ),
+                                        MaxValence: nm.Length > 0 ? nm.Max(t => t.Faces.Length) : 0),
                                 ])
                                 : ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
                     },
@@ -219,14 +220,22 @@ internal static class TopologyCore {
     internal static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context, bool enableDiagnostics) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology, enableDiagnostics: enableDiagnostics,
             operation: g => g switch {
-                Mesh { Ngons.Count: 0 } mesh => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(NgonIndices: [], FaceIndicesPerNgon: [], BoundaryEdgesPerNgon: [], NgonCenters: [], EdgeCountPerNgon: [], TotalNgons: 0, TotalFaces: mesh.Faces.Count),]),
-                Mesh mesh => Enumerable.Range(0, mesh.Ngons.Count).ToArray() switch {
-#pragma warning disable IDE0004
-                    int[] ngonIndices => ((IReadOnlyList<IReadOnlyList<int>>)[.. ngonIndices.Select(i => (IReadOnlyList<int>)[.. Enumerable.Range(0, (int)mesh.Ngons[i].FaceCount).Select(f => (int)mesh.Ngons[i].FaceIndexList()[f]),]),], (IReadOnlyList<IReadOnlyList<int>>)[.. ngonIndices.Select(i => (IReadOnlyList<int>)[.. mesh.Ngons.GetNgonBoundary([i]) ?? [],]),], (IReadOnlyList<Point3d>)[.. ngonIndices.Select(i => mesh.Ngons.GetNgonCenter(i) switch { Point3d pt when pt.IsValid => pt, _ => Point3d.Origin }),]) switch {
-#pragma warning restore IDE0004
-                        (IReadOnlyList<IReadOnlyList<int>> faceIndices, IReadOnlyList<IReadOnlyList<int>> boundaryEdges, IReadOnlyList<Point3d> centers) => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(NgonIndices: ngonIndices, FaceIndicesPerNgon: faceIndices, BoundaryEdgesPerNgon: boundaryEdges, NgonCenters: centers, EdgeCountPerNgon: [.. boundaryEdges.Select(static edges => edges.Count),], TotalNgons: mesh.Ngons.Count, TotalFaces: mesh.Faces.Count),]),
-                    },
-                },
+                Mesh mesh => ((Func<(IReadOnlyList<int> b, IReadOnlyList<int> f, Point3d c)[], Result<IReadOnlyList<Topology.NgonTopologyData>>>)(
+                    data => data.Length == 0
+                        ? ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData([], [], [], [], [], 0, mesh.Faces.Count),])
+                        : ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(
+                            NgonIndices: [.. Enumerable.Range(0, data.Length),],
+                            FaceIndicesPerNgon: [.. data.Select(d => d.f),],
+                            BoundaryEdgesPerNgon: [.. data.Select(d => d.b),],
+                            NgonCenters: [.. data.Select(d => d.c),],
+                            EdgeCountPerNgon: [.. data.Select(d => d.b.Count),],
+                            TotalNgons: data.Length,
+                            TotalFaces: mesh.Faces.Count),
+                        ])))([.. Enumerable.Range(0, mesh.Ngons.Count).Select(i => (
+                        b: (IReadOnlyList<int>)[.. mesh.Ngons.GetNgonBoundary([i,]) ?? [],],
+                        f: (IReadOnlyList<int>)[.. Array.ConvertAll(mesh.Ngons[i].FaceIndexList() ?? [], x => unchecked((int)x)),],
+                        c: mesh.Ngons.GetNgonCenter(i) is Point3d pt && pt.IsValid ? pt : Point3d.Origin)),
+                        ]),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 }
