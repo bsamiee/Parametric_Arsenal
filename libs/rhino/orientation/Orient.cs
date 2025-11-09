@@ -49,11 +49,11 @@ public static class Orient {
         public static OrientSpec Surface(Surface s, double u, double v) => new(s, (u, v));
 
         internal Result<Plane> ToPlane() =>
-            this.Target switch {
+            Target switch {
                 Plane p => ResultFactory.Create(value: p),
-                global::Rhino.Geometry.Curve c when c.FrameAt(this.Parameters.Item1, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
+                global::Rhino.Geometry.Curve c when c.FrameAt(Parameters.Item1, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
                 global::Rhino.Geometry.Curve => ResultFactory.Create<Plane>(error: E.Geometry.InvalidCurveParameter),
-                global::Rhino.Geometry.Surface s when s.FrameAt(this.Parameters.Item1, this.Parameters.Item2, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
+                global::Rhino.Geometry.Surface s when s.FrameAt(Parameters.Item1, Parameters.Item2, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
                 global::Rhino.Geometry.Surface => ResultFactory.Create<Plane>(error: E.Geometry.InvalidSurfaceUV),
                 _ => ResultFactory.Create<Plane>(error: E.Geometry.InvalidOrientationMode),
             };
