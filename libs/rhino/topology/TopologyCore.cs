@@ -70,21 +70,24 @@ internal static class TopologyCore {
                     .Select(i => (Index: i, Faces: mesh.TopologyEdges.GetConnectedFaces(i), Vertices: mesh.TopologyEdges.GetTopologyVertices(i)))
                     .Where(t => t.Faces.Length > 2)
                     .ToArray() switch {
-                        (int Index, int[] Faces, IndexPair Vertices)[] nm => mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _) switch {
-                            bool isManifold => ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
-                                new Topology.NonManifoldData(
-                                    EdgeIndices: [.. nm.Select(t => t.Index),],
-                                    VertexIndices: [],
-                                    Valences: [.. nm.Select(t => t.Faces.Length),],
-                                    Locations: [.. nm.Select(t => new Point3d(
-                                        (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) / 2.0,
-                                        (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) / 2.0,
-                                        (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) / 2.0)),],
-                                    IsManifold: isManifold && nm.Length == 0,
-                                    IsOrientable: oriented,
-                                    MaxValence: nm.Length > 0 ? nm.Max(t => t.Faces.Length) : 0),
-                            ]),
-                        },
+                        (int Index, int[] Faces, IndexPair Vertices)[] nm =>
+                            mesh.IsManifold(topologicalTest: true, out bool oriented, out bool _) is bool isManifold
+                                ? ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
+                                    new Topology.NonManifoldData(
+                                        EdgeIndices: [.. nm.Select(t => t.Index),],
+                                        VertexIndices: [],
+                                        Valences: [.. nm.Select(t => t.Faces.Length),],
+                                        Locations: [.. nm.Select(t => new Point3d(
+                                            (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) / 2.0,
+                                            (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) / 2.0,
+                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) / 2.0,
+                                        ),],
+                                        IsManifold: isManifold && nm.Length == 0,
+                                        IsOrientable: oriented,
+                                        MaxValence: nm.Length > 0 ? nm.Max(t => t.Faces.Length) : 0,
+                                    ),
+                                ])
+                                : ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
                     },
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
