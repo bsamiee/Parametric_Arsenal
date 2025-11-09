@@ -26,7 +26,7 @@ internal static class ExtractionCore {
             (double length, bool ends) => ((byte)11, (object)length, ends),
             Vector3d dir => ((byte)12, (object)dir, true),
             Continuity cont => ((byte)13, (object)cont, true),
-            Extract.Semantic { Kind: byte k } => (k, (object?)null, true),
+            byte k when k is >= 1 and <= 7 => (k, (object?)null, true),
             _ => ((byte)0, (object?)null, false),
         };
 #pragma warning restore IDE0004

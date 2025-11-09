@@ -35,11 +35,27 @@ internal static class ExtractionConfig {
         }.ToFrozenDictionary();
 
     /// <summary>Retrieves validation mode for extraction kind and geometry type with inheritance fallback.</summary>
-    internal static V GetValidationMode(byte kind, Type geometryType) =>
-        ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact :
-            ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(V.Standard)
-                .First();
+    internal static V GetValidationMode(byte kind, Type geometryType) {
+        (byte, Type) key = (kind, geometryType);
+        return ValidationModes.TryGetValue(key, out V exact) ? exact
+            : (kind, geometryType.Name) switch {
+                (1, "Brep") => V.Standard | V.MassProperties,
+                (1, "Curve" or "NurbsCurve" or "LineCurve" or "ArcCurve" or "PolyCurve" or "PolylineCurve") => V.Standard | V.AreaCentroid,
+                (1, "Surface" or "NurbsSurface" or "PlaneSurface") => V.Standard | V.AreaCentroid,
+                (1, "Mesh") => V.Standard | V.MassProperties,
+                (1, "PointCloud") => V.Standard,
+                (2, _) => V.BoundingBox,
+                (3, _) when geometryType.Name.Contains("Curve", StringComparison.Ordinal) || geometryType.Name.Contains("Surface", StringComparison.Ordinal) => V.Standard,
+                (4 or 10 or 11, _) when geometryType.Name.Contains("Curve", StringComparison.Ordinal) => V.Standard | V.Degeneracy,
+                (5, _) when geometryType.Name.Contains("Curve", StringComparison.Ordinal) => V.Tolerance,
+                (6, "Brep") => V.Standard | V.Topology,
+                (6, "Mesh") => V.Standard | V.MeshSpecific,
+                (6, _) when geometryType.Name.Contains("Curve", StringComparison.Ordinal) => V.Standard,
+                (7, "Brep") => V.Standard | V.Topology,
+                (7, "Mesh") => V.Standard | V.MeshSpecific,
+                (12 or 13, _) when geometryType.Name.Contains("Curve", StringComparison.Ordinal) => V.Standard,
+                (10, _) when geometryType.Name.Contains("Surface", StringComparison.Ordinal) => V.Standard,
+                _ => V.Standard,
+            };
+    }
 }
