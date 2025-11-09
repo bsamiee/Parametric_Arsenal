@@ -62,20 +62,15 @@ public static class Orient {
         UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? ex)
-                    ? ex(item)
-                    : OrientCore.PlaneExtractors
-                        .Where(kv => kv.Key.IsInstanceOfType(item))
-                        .OrderByDescending(kv => kv.Key, Comparer<Type>.Create((a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
-                        .Select(kv => kv.Value(item))
-                        .DefaultIfEmpty(ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
-                        .First())
-                .Bind(src => target.IsValid
-                    ? OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target))
-                    : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane))),
+                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? extractor) ? extractor(item)
+                    : OrientCore.PlaneExtractors.FirstOrDefault(kv => kv.Key.IsInstanceOfType(item)).Value?.Invoke(item)
+                    ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
+                .Bind(src => !target.IsValid
+                    ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
+                    : OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target)))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -123,8 +118,8 @@ public static class Orient {
                     (BoundingBox b, Vector3d s, Vector3d t) when b.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
                         (new Vector3d(s), new Vector3d(t), anchor ?? b.Center) switch {
                             (Vector3d su, Vector3d tu, Point3d pt) when su.Unitize() && tu.Unitize() =>
-                                (Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold)
-                                    ? (Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold)
+                                Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
+                                    ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
                                         ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.ParallelVectorAlignment)
                                         : OrientCore.ApplyTransform(item, Transform.Identity)
                                     : OrientCore.ApplyTransform(item, Transform.Rotation(su, tu, pt)),
@@ -159,7 +154,7 @@ public static class Orient {
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -180,7 +175,7 @@ public static class Orient {
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V m) ? m : V.Standard,
+                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
