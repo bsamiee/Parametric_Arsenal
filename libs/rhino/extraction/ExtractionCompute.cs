@@ -19,9 +19,11 @@ internal static class ExtractionCompute {
                         .Where(e => e.EdgeCurve is not null)
                         .Select(e => {
                             bool isG2Continuous = !e.GetNextDiscontinuity(Continuity.G2_locus_continuous, e.Domain.Min, e.Domain.Max, out double _);
-                            double curvMid = e.EdgeCurve.CurvatureAt(e.Domain.Mid).Length;
-                            double curvThreshold = Math.Max(ExtractionConfig.FilletG2Threshold * curvMid, ExtractionConfig.FilletG2AbsoluteTolerance);
-                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && Math.Abs(e.EdgeCurve.CurvatureAt(e.Domain.Min).Length - e.EdgeCurve.CurvatureAt(e.Domain.Max).Length) < curvThreshold;
+                            double curvStart = e.EdgeCurve.CurvatureAt(e.Domain.Min).Length;
+                            double curvEnd = e.EdgeCurve.CurvatureAt(e.Domain.Max).Length;
+                            double avgEndpointCurv = 0.5 * (curvStart + curvEnd);
+                            double curvThreshold = Math.Max(ExtractionConfig.FilletG2Threshold * avgEndpointCurv, ExtractionConfig.FilletG2AbsoluteTolerance);
+                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && Math.Abs(curvStart - curvEnd) < curvThreshold;
                             double tangentAngle = Math.Abs(Vector3d.VectorAngle(e.TangentAt(e.Domain.Min), e.TangentAt(e.Domain.Max)));
                             return (
                                 Type: isG2Continuous && hasConstantCurvature
@@ -36,15 +38,11 @@ internal static class ExtractionCompute {
                         })
                         .Concat(
                             brep.Loops
-                                .Select(l => (Loop: l, Curve: l.To3dCurve()))
-                                .Where(t => t.Loop.LoopType == BrepLoopType.Inner && t.Curve?.IsClosed is true && t.Curve.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHoleSides)
-                                .Select(t => {
-                                    Curve curve = t.Curve;
-                                    AreaMassProperties? amp = AreaMassProperties.Compute(curve);
-                                    double area = amp?.Area ?? 0.0;
-                                    amp?.Dispose();
-                                    curve?.Dispose();
-                                    return (Type: (byte)2, Param: area);
+                                .Where(l => l.LoopType == BrepLoopType.Inner && l.To3dCurve() is Curve c && c.IsClosed && c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHoleSides)
+                                .Select(l => {
+                                    using Curve? curve = l.To3dCurve();
+                                    using AreaMassProperties? amp = curve is not null ? AreaMassProperties.Compute(curve) : null;
+                                    return (Type: (byte)2, Param: amp?.Area ?? 0.0);
                                 })
                         )
                         .ToArray(),
@@ -69,9 +67,8 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create(value: (
                     Primitives: b.Faces
                             .Select(f => {
-                                Surface surf = f.DuplicateSurface();
+                                using Surface surf = f.DuplicateSurface();
                                 (bool success, byte type, Plane frame, double[] pars) = ClassifySurface(surf);
-                                surf?.Dispose();
                                 return (Success: success, Primitive: (Type: type, Frame: frame, Params: pars));
                             })
                             .Where(t => t.Success)
@@ -113,10 +110,12 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
-    private static double ComputeAngularVariance(double[] angles) =>
-        angles.Length switch {
+    private static double ComputeAngularVariance(double[] angles) {
+        double mean = angles.Length > 0 ? angles.Average() : 0.0;
+        return angles.Length switch {
             0 => double.MaxValue,
             1 => 0.0,
-            _ => angles.Average(a => Math.Pow(a - angles.Average(), 2)),
+            _ => angles.Average(a => Math.Pow(a - mean, 2)),
         };
+    }
 }

@@ -72,10 +72,10 @@ internal static class TopologyCompute {
         return (v: brep.Vertices.Count, e: brep.Edges.Count, f: brep.Faces.Count, solid: brep.IsSolid) switch {
             (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 && isSolid =>
                 ResultFactory.Create(value: (
-                    Genus: (2 - vCount + eCount - fCount) / 2,
+                    Genus: (eCount - vCount - fCount + 2) / 2,
                     Loops: ExtractLoops(),
                     isSolid,
-                    HandleCount: (2 - vCount + eCount - fCount) / 2)),
+                    HandleCount: (eCount - vCount - fCount + 2) / 2)),
             (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 =>
                 ResultFactory.Create(value: (
                     Genus: 0,

@@ -99,7 +99,15 @@ internal static class AnalysisCompute {
                 double aspectRatio = max / (min + context.AbsoluteTolerance);
                 double skewness = isQuad
                     ? Math.Abs((((verts[1] - verts[0]).Length + (verts[3] - verts[2]).Length) / ((verts[2] - verts[1]).Length + (verts[0] - verts[3]).Length + context.AbsoluteTolerance)) - 1.0)
-                    : Math.Abs((Vector3d.CrossProduct(verts[1] - verts[0], verts[2] - verts[0]).Length / (((verts[1] - verts[0]).Length * (verts[2] - verts[0]).Length) + context.AbsoluteTolerance)) - AnalysisConfig.EquilateralTriangleRatio);
+                    : (verts[1] - verts[0], verts[2] - verts[1], verts[0] - verts[2]) is (Vector3d ab, Vector3d bc, Vector3d ca)
+                        ? new[] {
+                            Vector3d.VectorAngle(-ca, ab) * (180.0 / Math.PI),
+                            Vector3d.VectorAngle(-ab, bc) * (180.0 / Math.PI),
+                            Vector3d.VectorAngle(-bc, ca) * (180.0 / Math.PI),
+                        } is double[] angles
+                            ? Math.Max(Math.Abs(angles[0] - 60.0), Math.Max(Math.Abs(angles[1] - 60.0), Math.Abs(angles[2] - 60.0))) / 60.0
+                            : 1.0
+                        : 1.0;
                 double jacobian = isQuad
                     ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges
                         ? edges.Zip(edges.Skip(1).Append(edges[0]), (e1, e2) => Vector3d.CrossProduct(e1, e2).Length).Min() / ((edges.Average(e => e.Length) * edges.Average(e => e.Length)) + context.AbsoluteTolerance)
