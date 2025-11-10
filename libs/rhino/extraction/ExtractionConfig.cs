@@ -6,59 +6,58 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Configuration constants for semantic extraction: type identifiers, detection thresholds, and validation mode mappings.</summary>
 internal static class ExtractionConfig {
+    /// <summary>Classification type enumeration for unified dispatch.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "Byte is required for compatibility with existing API")]
+    internal enum ClassificationType : byte {
+        FeatureFillet = 0,
+        FeatureChamfer = 1,
+        FeatureHole = 2,
+        FeatureGenericEdge = 3,
+        FeatureVariableRadiusFillet = 4,
+        PrimitivePlane = 10,
+        PrimitiveCylinder = 11,
+        PrimitiveSphere = 12,
+        PrimitiveUnknown = 13,
+        PrimitiveCone = 14,
+        PrimitiveTorus = 15,
+        PrimitiveExtrusion = 16,
+        PatternLinear = 20,
+        PatternRadial = 21,
+        PatternGrid = 22,
+        PatternScaling = 23,
+    }
+
     /// <summary>Epsilon tolerance for zero comparisons and near-zero checks.</summary>
     internal const double Epsilon = 1e-10;
 
-    /// <summary>Feature type identifiers for edge/loop classification (separate from primitive types).</summary>
-    internal const byte FeatureTypeFillet = 0;
-    internal const byte FeatureTypeChamfer = 1;
-    internal const byte FeatureTypeHole = 2;
-    internal const byte FeatureTypeGenericEdge = 3;
-    internal const byte FeatureTypeVariableRadiusFillet = 4;
+    /// <summary>Edge classification thresholds (curvature variation, sample count, angle thresholds).</summary>
+    internal static readonly FrozenDictionary<string, double> EdgeThresholds =
+        new Dictionary<string, double>(StringComparer.Ordinal) {
+            ["FilletCurvatureVariation"] = 0.15,
+            ["FilletCurvatureSampleCount"] = 5,
+            ["G2ContinuityTolerance"] = 0.01,
+            ["SharpEdgeAngle"] = 0.349,
+            ["SmoothEdgeAngle"] = 2.967,
+            ["MinHolePolySides"] = 16,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    /// <summary>Primitive type identifiers for surface classification (separate from feature types).</summary>
-    internal const byte PrimitiveTypePlane = 0;
-    internal const byte PrimitiveTypeCylinder = 1;
-    internal const byte PrimitiveTypeSphere = 2;
-    internal const byte PrimitiveTypeUnknown = 3;
-    internal const byte PrimitiveTypeCone = 4;
-    internal const byte PrimitiveTypeTorus = 5;
-    internal const byte PrimitiveTypeExtrusion = 6;
+    /// <summary>Primitive fitting and analysis thresholds.</summary>
+    internal static readonly FrozenDictionary<string, double> PrimitiveThresholds =
+        new Dictionary<string, double>(StringComparer.Ordinal) {
+            ["FitTolerance"] = 0.001,
+            ["ResidualSampleCount"] = 20,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    /// <summary>Pattern type identifiers: 0=Linear, 1=Radial, 2=Grid, 3=Scaling.</summary>
-    internal const byte PatternTypeLinear = 0;
-    internal const byte PatternTypeRadial = 1;
-    internal const byte PatternTypeGrid = 2;
-    internal const byte PatternTypeScaling = 3;
-
-    /// <summary>Fillet curvature coefficient of variation threshold 0.15 for constant curvature detection.</summary>
-    internal const double FilletCurvatureVariationThreshold = 0.15;
-    /// <summary>Fillet curvature sample count 5 for edge analysis.</summary>
-    internal const int FilletCurvatureSampleCount = 5;
-    /// <summary>G2 continuity angle tolerance 0.01 radians for smooth edge detection.</summary>
-    internal const double G2ContinuityTolerance = 0.01;
-    /// <summary>Chamfer dihedral angle range: sharp edge below 0.349 radians (20°).</summary>
-    internal const double SharpEdgeAngleThreshold = 0.349;
-    /// <summary>Chamfer dihedral angle range: smooth edge above 2.967 radians (170°).</summary>
-    internal const double SmoothEdgeAngleThreshold = 2.967;
-    /// <summary>Minimum hole polyline sides 16 for circular approximation.</summary>
-    internal const int MinHolePolySides = 16;
-    /// <summary>Primitive fit tolerance 0.001 for TryGet* methods.</summary>
-    internal const double PrimitiveFitTolerance = 0.001;
-    /// <summary>Primitive residual sample count 20 for RMS distance calculation.</summary>
-    internal const int PrimitiveResidualSampleCount = 20;
-    /// <summary>Pattern minimum instances 3 for detection.</summary>
-    internal const int PatternMinInstances = 3;
-    /// <summary>Radial pattern distance variation tolerance 0.05 relative to mean radius.</summary>
-    internal const double RadialDistanceVariationThreshold = 0.05;
-    /// <summary>Radial pattern angle variation tolerance 0.05 radians for uniform spacing.</summary>
-    internal const double RadialAngleVariationThreshold = 0.05;
-    /// <summary>Grid orthogonality threshold 0.1 for dot product in basis detection.</summary>
-    internal const double GridOrthogonalityThreshold = 0.1;
-    /// <summary>Grid point deviation tolerance 0.1 for integer coordinate validation.</summary>
-    internal const double GridPointDeviationThreshold = 0.1;
-    /// <summary>Scaling pattern variance threshold 0.1 for ratio consistency.</summary>
-    internal const double ScalingVarianceThreshold = 0.1;
+    /// <summary>Pattern detection thresholds for all pattern types.</summary>
+    internal static readonly FrozenDictionary<string, double> PatternThresholds =
+        new Dictionary<string, double>(StringComparer.Ordinal) {
+            ["MinInstances"] = 3,
+            ["RadialDistanceVariation"] = 0.05,
+            ["RadialAngleVariation"] = 0.05,
+            ["GridOrthogonality"] = 0.1,
+            ["GridPointDeviation"] = 0.1,
+            ["ScalingVariance"] = 0.1,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
     /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
