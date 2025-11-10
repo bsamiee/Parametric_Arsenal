@@ -49,4 +49,10 @@ internal static class OrientConfig {
     internal const double LowProfileAspectRatio = 0.5;
     /// <summary>Pattern anomaly threshold 0.5 for deviation detection.</summary>
     internal const double PatternAnomalyThreshold = 0.5;
+    /// <summary>Minimum optimization score 0.1 for accepting orientation transforms.</summary>
+    internal const double MinimumOptimizationScore = 0.1;
+    /// <summary>Rotation symmetry sample count 36 for 10-degree increments.</summary>
+    internal const int RotationSymmetrySampleCount = 36;
+    /// <summary>Symmetry angle tolerance 0.01 radians for orientation matching.</summary>
+    internal const double SymmetryAngleToleranceRadians = 0.01;
 }

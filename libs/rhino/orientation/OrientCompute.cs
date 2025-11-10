@@ -83,9 +83,9 @@ internal static class OrientCompute {
                                             reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
                                             return bb.Vertices.Any(vb => reflected.DistanceTo(vb.Location) < tolerance);
                                         }) ? (byte)1 : (byte)0
-                                        : new Plane(pa.Origin, pa.ZAxis) is Plane mirror && mirror.IsValid && ba.Vertices.All(va => {
+                                        : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid && ba.Vertices.All(va => {
                                             Point3d reflected = va.Location;
-                                            reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
+                                            reflected.Transform(Transform.Mirror(mirrorPlane: mirror2));
                                             return bb.Vertices.Any(vb => reflected.DistanceTo(vb.Location) < tolerance);
                                         }) ? (byte)1 : (byte)0,
                                     (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > tolerance => Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).All(i => {
@@ -123,14 +123,17 @@ internal static class OrientCompute {
             : tolerance <= 0.0
                 ? ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : geometries.Length >= OrientConfig.PatternMinInstances
-                    ? geometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)).ToArray() is Result<Point3d>[] centroidResults && centroidResults.All(r => r.IsSuccess)
-                        ? centroidResults.Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen && avgLen > tolerance
-                            ? deltas.All(v => Math.Abs(v.Length - avgLen) / avgLen < tolerance)
-                                ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (0, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Translation((Vector3d)centroids[0] + deltas[0] * i)),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= tolerance * OrientConfig.PatternAnomalyThreshold).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
-                                : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > tolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < tolerance)
-                                    ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(2.0 * Math.PI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= tolerance * OrientConfig.PatternAnomalyThreshold).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
-                                    : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
-                            : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
-                        : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(r => !r.IsSuccess)} geometries"))
+                    ? ((Func<Result<(byte, Transform[], int[], double)>>)(() => {
+                        Result<Point3d>[] centroidResults = [.. geometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)),];
+                        return centroidResults.All(r => r.IsSuccess)
+                            ? centroidResults.Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen && avgLen > tolerance
+                                ? deltas.All(v => Math.Abs(v.Length - avgLen) / avgLen < tolerance)
+                                    ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (0, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Translation((Vector3d)centroids[0] + (deltas[0] * i))),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= (tolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
+                                    : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > tolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < tolerance)
+                                        ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(2.0 * Math.PI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (tolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
+                                        : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
+                                : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
+                            : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(r => !r.IsSuccess)} geometries"));
+                    }))()
                     : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientConfig.PatternMinInstances} geometries, got {geometries.Length}"));
 }
