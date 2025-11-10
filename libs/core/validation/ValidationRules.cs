@@ -46,13 +46,13 @@ public static class ValidationRules {
             [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface", "HasNakedEdges",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
             [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular", "GetLength",], E.Validation.DegenerateGeometry),
             [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse",], E.Validation.ToleranceExceeded),
-            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], [], E.Validation.NonManifoldEdges),
+            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], [], E.Validation.MeshInvalid),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
             [V.PolycurveStructure] = (["IsValid", "HasGap", "IsNested",], [], E.Validation.PolycurveGaps),
             [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
             [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
-            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),
+            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Uses BrepTopologyInvalid for all 3 methods
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
@@ -121,7 +121,7 @@ public static class ValidationRules {
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "Degree", StringComparison.Ordinal) =>
-                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),
+                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),  // RhinoCommon NURBS require degree >= 1
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "CapCount", StringComparison.Ordinal) =>
