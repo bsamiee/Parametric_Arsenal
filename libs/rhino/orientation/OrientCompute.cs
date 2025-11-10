@@ -15,7 +15,7 @@ internal static class OrientCompute {
         double tolerance) =>
         brep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
             ? ((Func<Result<(Transform, double, byte[])>>)(() => {
-                VolumeMassProperties? vmp = brep.IsSolid ? VolumeMassProperties.Compute(brep) : null;
+                using VolumeMassProperties? vmp = brep.IsSolid ? VolumeMassProperties.Compute(brep) : null;
                 Plane[] testPlanes = [
                     new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
                     new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
@@ -31,7 +31,7 @@ internal static class OrientCompute {
                             ? (xf, criteria switch {
                                 1 => 1.0 / (testBox.Diagonal.Length + tolerance),
                                 2 => vmp is not null ? testBox.Center.Z - vmp.Centroid.Z : 0.0,
-                                3 => testBox.IsDegenerate(tolerance) switch { 0b001 or 0b010 or 0b100 => 1.0, _ => 0.0 },
+                                3 => testBox.IsDegenerate(tolerance) is int deg && deg != 0 ? 1.0 / deg : 0.0,
                                 4 => (testBox.Min.Z >= -tolerance ? 0.5 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? 0.5 : 0.0),
                                 _ => 0.0,
                             }, criteria switch { 1 => [1,], 2 => [2,], 3 => [3,], 4 => [4,], _ => [], })
@@ -39,7 +39,6 @@ internal static class OrientCompute {
                 }),
                 ];
 
-                vmp?.Dispose();
                 (Transform best, double bestScore, byte[] met) = results.OrderByDescending(r => r.Score).First();
                 return ResultFactory.Create(value: (best, bestScore, met));
             }))()
@@ -51,25 +50,28 @@ internal static class OrientCompute {
         GeometryBase geometryA,
         GeometryBase geometryB,
         double tolerance) =>
-        (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA) ? extA(geometryA) : ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType),
-         OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB) ? extB(geometryB) : ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType))
+        (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
+         OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
         switch {
-            (Result<Plane> { IsSuccess: true } ra, Result<Plane> { IsSuccess: true } rb) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
-                ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
-                    ? ((geometryA, geometryB) switch {
-                        (Brep ba, Brep bb) when TestReflectionSymmetry(ba, bb, new Plane(pa.Origin, pb.Origin - pa.Origin), tolerance) => (byte)1,
-                        (Curve ca, Curve cb) when TestRotationSymmetry(ca, cb, pa.Origin, pa.ZAxis, tolerance) => (byte)2,
-                        _ => (byte)0,
-                    }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
-                        double dot when Math.Abs(dot - 1.0) < tolerance => (byte)1,
-                        double dot when Math.Abs(dot) < tolerance => (byte)2,
-                        _ => (byte)3,
-                    }) is (byte symmetry, byte relationship)
-                        ? ResultFactory.Create(value: (xform, twist, tilt, symmetry, relationship))
+            (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
+                (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
+                    ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
+                        ? ((geometryA, geometryB) switch {
+                            (Brep ba, Brep bb) when (pb.Origin - pa.Origin).Length > tolerance && TestReflectionSymmetry(ba, bb, new Plane(pa.Origin, pb.Origin - pa.Origin), tolerance) => (byte)1,
+                            (Curve ca, Curve cb) when TestRotationSymmetry(ca, cb, pa.Origin, pa.ZAxis, tolerance) => (byte)2,
+                            _ => (byte)0,
+                        }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
+                            double dot when Math.Abs(dot - 1.0) < tolerance => (byte)1,
+                            double dot when Math.Abs(dot) < tolerance => (byte)2,
+                            _ => (byte)3,
+                        }) is (byte symmetry, byte relationship)
+                            ? ResultFactory.Create(value: (xform, twist, tilt, symmetry, relationship))
+                            : ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
                         : ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
-                    : ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
-                : ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
-            _ => ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
+                    : ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
+                _ => ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
+            },
+            _ => ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.UnsupportedOrientationType),
         };
 
     /// <summary>Detect patterns in geometry array and compute alignment.</summary>
@@ -88,12 +90,21 @@ internal static class OrientCompute {
             : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.InsufficientParameters);
 
     private static bool TestReflectionSymmetry(Brep a, Brep b, Plane mirror, double tolerance) =>
-        a.Vertices.Count == b.Vertices.Count && a.Vertices.Zip(b.Vertices, (va, vb) => {
+        mirror.IsValid && a.Vertices.Count == b.Vertices.Count && a.Vertices.Zip(b.Vertices, (va, vb) => {
             Point3d reflected = va.Location;
             reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
             return reflected.DistanceTo(vb.Location) < tolerance;
         }).All(match => match);
 
-    private static bool TestRotationSymmetry(Curve a, Curve b, Point3d center, Vector3d _, double tolerance) =>
-        a.SpanCount == b.SpanCount && Enumerable.Range(0, 8).All(i => a.Domain.ParameterAt(i / 7.0) is double t && (a.PointAt(t) is Point3d ptA && b.PointAt(t) is Point3d ptB && Math.Atan2((ptA - center).Y, (ptA - center).X) is double angleA && Math.Atan2((ptB - center).Y, (ptB - center).X) is double angleB && Math.Abs(angleA - angleB) < tolerance));
+    private static bool TestRotationSymmetry(Curve a, Curve b, Point3d center, Vector3d axis, double tolerance) =>
+        a.SpanCount == b.SpanCount && axis.IsValid && axis.Length > tolerance && Enumerable.Range(0, 8).All(i => {
+            double t = a.Domain.ParameterAt(i / 7.0);
+            Point3d ptA = a.PointAt(t);
+            Point3d ptB = b.PointAt(t);
+            Vector3d vecA = ptA - center;
+            Vector3d vecB = ptB - center;
+            double distA = vecA.Length;
+            double distB = vecB.Length;
+            return Math.Abs(distA - distB) < tolerance && (distA < tolerance || (Math.Abs(Vector3d.VectorAngle(vecA, vecB) - (2.0 * Math.PI / 8.0)) < tolerance || Math.Abs(Vector3d.VectorAngle(vecA, vecB)) < tolerance));
+        });
 }
