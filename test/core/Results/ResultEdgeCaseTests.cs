@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Arsenal.Core.Tests.Results;
 
-/// <summary>Comprehensive edge case tests for Result operations covering untested branches and boundary conditions.</summary>
+/// <summary>Edge case tests for Result operations covering untested branches and boundary conditions.</summary>
 public sealed class ResultEdgeCaseTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 7001, "Edge1"),
@@ -16,7 +16,7 @@ public sealed class ResultEdgeCaseTests {
 
     private static readonly int[] TestArray = [1, 2, 3];
 
-    /// <summary>Verifies value type default handling using zero-value semantics.</summary>
+    /// <summary>Verifies value type default handling via zero-value semantics.</summary>
     [Fact]
     public void ValueTypeDefaultHandlingCreatesSuccessfully() => Test.RunAll(
         () => Assert.Equal((true, 0), (ResultFactory.Create(value: 0).IsSuccess, ResultFactory.Create(value: 0).Value)),
@@ -37,7 +37,7 @@ public sealed class ResultEdgeCaseTests {
         () => Assert.True(ResultFactory.Create(value: 42).Ensure([]).IsSuccess),
         () => Assert.Equal(42, ResultFactory.Create(value: 42).Ensure([]).Value));
 
-    /// <summary>Verifies OnError overloads apply correct transformations with explicit type dispatch.</summary>
+    /// <summary>Verifies OnError overloads apply transformations with explicit type dispatch.</summary>
     [Fact]
     public void OnErrorOverloadsApplyCorrectTransformations() => Test.RunAll(
         () => {
@@ -57,7 +57,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal((true, 50), (mapThenRecover.IsSuccess, mapThenRecover.Value));
         });
 
-    /// <summary>Verifies Traverse with single values versus collections using type-based dispatch.</summary>
+    /// <summary>Verifies Traverse with single values and collections via type-based dispatch.</summary>
     [Fact]
     public void TraverseSingleValueVersusCollectionBehavesCorrectly() => Test.RunAll(
         () => {
@@ -75,7 +75,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.False(failed.IsSuccess);
         });
 
-    /// <summary>Verifies TraverseElements with empty collections and error propagation.</summary>
+    /// <summary>Verifies TraverseElements empty collections and error propagation handling.</summary>
     [Fact]
     public void TraverseElementsEmptyAndErrorPropagationHandlesCorrectly() => Test.RunAll(
         () => {
@@ -94,7 +94,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.False(partial.IsSuccess);
         }), 20));
 
-    /// <summary>Verifies Lift partial application actually executes returned function.</summary>
+    /// <summary>Verifies Lift partial application executes returned function correctly.</summary>
     [Fact]
     public void LiftPartialApplicationExecutesCorrectly() => Test.RunAll(
         () => {
@@ -125,7 +125,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal(v > 0, success);
         }), 20));
 
-    /// <summary>Verifies Match for reduction semantics with success handler defaults to seed on failure.</summary>
+    /// <summary>Verifies Match reduction defaults to seed on failure.</summary>
     [Fact]
     public void MatchReductionWithoutFailureHandlerDefaultsToSeed() => Test.RunAll(
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((seed, val) =>
@@ -134,7 +134,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Match(v => unchecked(seed + v), _ => seed)))),
         () => Assert.Equal(100, ResultFactory.Create<int>(error: Errors.E1).Match(v => 100 + v, _ => 100)));
 
-    /// <summary>Verifies Match executes correct branch with exhaustive pattern coverage.</summary>
+    /// <summary>Verifies Match executes correct branch with exhaustive patterns.</summary>
     [Fact]
     public void MatchExecutesCorrectBranchExhaustively() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -166,7 +166,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal(original.IsSuccess, tapped.IsSuccess);
         }), 20));
 
-    /// <summary>Verifies Validate with premise and conclusion implements logical implication.</summary>
+    /// <summary>Verifies Validate premise/conclusion implements logical implication.</summary>
     [Fact]
     public void ValidatePremiseConclusionImplementsImplication() => Test.RunAll(
         () => Assert.True(ResultFactory.Create(value: 5).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
@@ -225,7 +225,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.False(flattened.IsSuccess);
         });
 
-    /// <summary>Verifies Match extracts value correctly with pattern matching semantics.</summary>
+    /// <summary>Verifies Match extracts value via pattern matching semantics.</summary>
     [Fact]
     public void MatchExtractsValueWithPatternMatchingSemantics() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -239,7 +239,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal((false, default), (success, extracted));
         }), 20));
 
-    /// <summary>Verifies deferred Result with Map/Bind chains evaluates lazily then correctly.</summary>
+    /// <summary>Verifies deferred Result with Map/Bind chains evaluates lazily.</summary>
     [Fact]
     public void DeferredResultWithChainsEvaluatesLazilyThenCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -252,7 +252,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.True(evalCount >= 1 && mapCount >= 1 && bindCount >= 1);
         }), 20));
 
-    /// <summary>Verifies OnError does not execute handlers on success with all overloads.</summary>
+    /// <summary>Verifies OnError does not execute handlers on success.</summary>
     [Fact]
     public void OnErrorDoesNotExecuteHandlersOnSuccess() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -271,7 +271,7 @@ public sealed class ResultEdgeCaseTests {
             Assert.Equal((v, false), (result.Value, recoverWithCalled));
         })));
 
-    /// <summary>Verifies Ensure with mixed validation array formats handles correctly.</summary>
+    /// <summary>Verifies Ensure handles mixed validation array formats correctly.</summary>
     [Fact]
     public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {

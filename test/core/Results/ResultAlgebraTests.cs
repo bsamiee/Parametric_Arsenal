@@ -7,14 +7,14 @@ using Xunit;
 
 namespace Arsenal.Core.Tests.Results;
 
-/// <summary>Comprehensive algebraic tests for Result monad covering category theory laws, factory polymorphism, and operational semantics.</summary>
+/// <summary>Algebraic tests for Result monad with category theory laws, factory polymorphism, and operational semantics.</summary>
 public sealed class ResultAlgebraTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
         new(ErrorDomain.Results, 1001, "E1"),
         new(ErrorDomain.Results, 1002, "E2"),
         new(ErrorDomain.Results, 1003, "E3"));
 
-    /// <summary>Verifies functor category laws (identity and composition) using property-based testing.</summary>
+    /// <summary>Verifies functor laws (identity and composition) via property-based testing.</summary>
     [Fact]
     public void FunctorLaws() => Test.RunAll(
         () => Test.Law<int>("FunctorIdentity", ResultGenerators.ResultGen<int>()),
@@ -23,7 +23,7 @@ public sealed class ResultAlgebraTests {
             f: x => x.ToString(CultureInfo.InvariantCulture),
             g: s => s.Length));
 
-    /// <summary>Verifies monad category laws (left identity, right identity, associativity) with algebraic composition.</summary>
+    /// <summary>Verifies monad laws (left identity, right identity, associativity) with algebraic composition.</summary>
     [Fact]
     public void MonadLaws() => Test.RunAll(
         () => Gen.Int.Select(ResultGenerators.MonadicFunctionGen<int, string>()).Run((int v, Func<int, Result<string>> f) =>
@@ -33,7 +33,7 @@ public sealed class ResultAlgebraTests {
             (Result<int> r, Func<int, Result<string>> f, Func<string, Result<double>> g) =>
                 r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))), 50));
 
-    /// <summary>Verifies applicative functor and equality laws using reflexivity, symmetry, and hash consistency.</summary>
+    /// <summary>Verifies applicative functor and equality laws via reflexivity, symmetry, and hash consistency.</summary>
     [Fact]
     public void ApplicativeAndEqualityLaws() => Test.RunAll(
         () => Test.Law<int>("ApplicativeIdentity", ResultGenerators.ResultGen<int>()),
@@ -41,7 +41,7 @@ public sealed class ResultAlgebraTests {
         () => Test.Law<int>("EqualitySymmetric", ResultGenerators.ResultGen<int>(), ResultGenerators.ResultGen<int>(), 100),
         () => Test.Law<int>("HashConsistent", Gen.Int, (Func<int, Result<int>>)(v => ResultFactory.Create(value: v)), 100));
 
-    /// <summary>Verifies Map functor transformation with both property-based and concrete value testing.</summary>
+    /// <summary>Verifies Map functor transformation via property-based and concrete value testing.</summary>
     [Fact]
     public void MapFunctorTransformation() => Test.RunAll(
         () => Assert.Equal(10, ResultFactory.Create(value: 5).Map(static x => x * 2).Value),
@@ -50,7 +50,7 @@ public sealed class ResultAlgebraTests {
         () => Gen.Int.Run((Action<int>)(n => Assert.Equal(unchecked(n + 100), ResultFactory.Create(value: n).Map(x => unchecked(x + 100)).Value))),
         () => Assert.False(ResultFactory.Create<int>(error: Errors.E1).Map(static x => x * 2).IsSuccess));
 
-    /// <summary>Verifies Bind monadic chaining with flatMap semantics and error propagation.</summary>
+    /// <summary>Verifies Bind monadic chaining with error propagation and flatMap semantics.</summary>
     [Fact]
     public void BindMonadicChaining() => Test.RunAll(
         () => Assert.Equal(15, ResultFactory.Create(value: 5).Bind(static x => ResultFactory.Create(value: x * 3)).Value),
@@ -60,7 +60,7 @@ public sealed class ResultAlgebraTests {
         () => Assert.False(ResultFactory.Create<int>(error: Errors.E1).Bind(static x => ResultFactory.Create(value: x * 2)).IsSuccess),
         () => Assert.False(ResultFactory.Create(value: 5).Bind(static _ => ResultFactory.Create<int>(error: Errors.E1)).IsSuccess));
 
-    /// <summary>Verifies ResultFactory.Create polymorphic parameter detection using tuple pattern matching.</summary>
+    /// <summary>Verifies ResultFactory.Create polymorphic parameter detection via tuple pattern matching.</summary>
     [Fact]
     public void CreatePolymorphicParameterDetection() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -82,7 +82,7 @@ public sealed class ResultAlgebraTests {
         () => ResultGenerators.NestedResultGen<int>().Run((Action<Result<Result<int>>>)(nested =>
             Assert.Equal(nested.IsSuccess && nested.Value.IsSuccess, ResultFactory.Create<int>(nested: nested).IsSuccess)), 50));
 
-    /// <summary>Verifies Validate polymorphic parameter matching with predicate, unless, premise/conclusion, batch validations, and monadic validation.</summary>
+    /// <summary>Verifies Validate polymorphic operations with predicate, unless, premise/conclusion, and batch validations.</summary>
     [Fact]
     public void ValidatePolymorphicOperations() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v =>
@@ -107,7 +107,7 @@ public sealed class ResultAlgebraTests {
         () => Gen.Int.Run((Action<int>)(v =>
             Assert.Equal(v > 0, ResultFactory.Create(value: v).Validate(args: [(Func<int, bool>)(x => x > 0), Errors.E1]).IsSuccess)), 50));
 
-    /// <summary>Verifies Lift applicative functor with partial application, arity detection, and error accumulation.</summary>
+    /// <summary>Verifies Lift applicative functor with partial application and error accumulation.</summary>
     [Fact]
     public void LiftApplicativeFunctor() {
         Func<int, int, int> add = static (x, y) => unchecked(x + y);
@@ -130,7 +130,7 @@ public sealed class ResultAlgebraTests {
             }), 50));
     }
 
-    /// <summary>Verifies TraverseElements monadic collection transformation with error accumulation and empty collection handling.</summary>
+    /// <summary>Verifies TraverseElements monadic transformation with error accumulation and empty collections.</summary>
     [Fact]
     public void TraverseElementsMonadicTransformation() => Test.RunAll(
         () => Gen.Int.List[1, 10].Run((Action<List<int>>)(items => {
@@ -147,7 +147,7 @@ public sealed class ResultAlgebraTests {
             Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).IsSuccess)), 50),
         () => Assert.Empty(ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).Value));
 
-    /// <summary>Verifies Match pattern exhaustion with algebraic extraction and reduction semantics.</summary>
+    /// <summary>Verifies Match pattern exhaustion with algebraic extraction semantics.</summary>
     [Theory]
     [MemberData(nameof(MatchExtractionTestCases))]
     public void MatchExtractionExhaustivePatterns(Result<int> result, bool expectedSuccess) =>
@@ -165,7 +165,7 @@ public sealed class ResultAlgebraTests {
         }
     }
 
-    /// <summary>Verifies Match reduction with correct handler invocation and accumulation patterns.</summary>
+    /// <summary>Verifies Match reduction with handler invocation and accumulation patterns.</summary>
     [Fact]
     public void MatchReductionSemantics() => Test.RunAll(
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((value, seed) =>
@@ -176,7 +176,7 @@ public sealed class ResultAlgebraTests {
         () => Gen.Int.Run((Action<int>)(seed =>
             Assert.Equal(seed, ResultFactory.Create<int>(error: Errors.E1).Match(v => unchecked(seed + v), _ => seed)))));
 
-    /// <summary>Verifies Ensure predicate validation with single and multiple validation patterns.</summary>
+    /// <summary>Verifies Ensure predicate validation with single and multiple patterns.</summary>
     [Fact]
     public void EnsurePredicateValidation() => Test.RunAll(
         () => Gen.Int[1, 100].Run((Action<int>)(value =>
@@ -189,7 +189,7 @@ public sealed class ResultAlgebraTests {
             Assert.Equal(value > 0,
                 ResultFactory.Create(deferred: () => ResultFactory.Create(value: value)).Ensure(x => x > 0, Errors.E1).IsSuccess))));
 
-    /// <summary>Verifies Ensure multiple validations with error accumulation logic.</summary>
+    /// <summary>Verifies Ensure multiple validations with error accumulation.</summary>
     [Fact]
     public void EnsureMultipleValidationsErrorAccumulation() => Test.RunAll(
         () => Gen.Int[1, 100].Run((Action<int>)(v => Assert.True(ResultFactory.Create(value: v).Ensure(x => x > 0, Errors.E1).IsSuccess)), 50),
@@ -199,7 +199,7 @@ public sealed class ResultAlgebraTests {
         () => Gen.Int.Run((Action<int>)(v => Assert.Equal(v > 0,
             ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)).Ensure(x => x > 0, Errors.E1).IsSuccess)), 50));
 
-    /// <summary>Verifies Apply applicative functor with parallel error accumulation matrix.</summary>
+    /// <summary>Verifies Apply applicative functor with parallel error accumulation.</summary>
     [Fact]
     public void ApplyApplicativeFunctorParallelErrors() {
         (SystemError funcErr, SystemError valErr) = (
@@ -224,7 +224,7 @@ public sealed class ResultAlgebraTests {
             });
     }
 
-    /// <summary>Verifies Traverse collection transformation with single value versus collection dispatch.</summary>
+    /// <summary>Verifies Traverse collection transformation with single value and collection dispatch.</summary>
     [Fact]
     public void TraverseCollectionTransformation() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => Assert.Single(ResultFactory.Create(value: v).Traverse(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture))).Value))),
@@ -239,7 +239,7 @@ public sealed class ResultAlgebraTests {
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(err =>
             Assert.False(ResultFactory.Create<IEnumerable<int>>(error: err).TraverseElements(x => ResultFactory.Create(value: unchecked(x * 2))).IsSuccess)), 50));
 
-    /// <summary>Verifies deferred execution with lazy evaluation and resource safety.</summary>
+    /// <summary>Verifies deferred execution with lazy evaluation semantics.</summary>
     [Fact]
     public void DeferredExecutionLazyEvaluation() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
@@ -296,7 +296,7 @@ public sealed class ResultAlgebraTests {
             Assert.Equal((isSuccess, !isSuccess), (successCalled, failureCalled));
         })));
 
-    /// <summary>Verifies OnError transformation and recovery with all overload variants.</summary>
+    /// <summary>Verifies OnError transformation and recovery with overload variants.</summary>
     [Fact]
     public void OnErrorTransformationAndRecovery() => Test.RunAll(
         () => ResultGenerators.SystemErrorGen.Run((Action<SystemError>)(origErr => {
@@ -309,7 +309,7 @@ public sealed class ResultAlgebraTests {
             Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError(_ => ResultFactory.Create(value: 99)).Value)), 50),
         () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Ensure(x => x > 0, Errors.E2).Errors));
 
-    /// <summary>Verifies null argument handling with algebraic exception patterns.</summary>
+    /// <summary>Verifies null argument handling via exception patterns.</summary>
     [Fact]
     public void NullArgumentExceptionPatterns() {
         (Result<int> success, Result<int> failure) = (ResultFactory.Create(value: 42), ResultFactory.Create<int>(error: Errors.E1));

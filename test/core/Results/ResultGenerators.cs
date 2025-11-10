@@ -6,20 +6,23 @@ using CsCheck;
 
 namespace Arsenal.Core.Tests.Results;
 
-/// <summary>Algebraic generators using zero-allocation static lambdas, inline type dispatch, and modern C# patterns.</summary>
+/// <summary>Algebraic generators with zero-allocation static lambdas and inline type dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Test generators used for property-based testing")]
 public static class ResultGenerators {
-    /// <summary>Generates SystemError using LINQ composition with static lambdas.</summary>
+    /// <summary>Generates SystemError via LINQ composition with static lambdas.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<SystemError> SystemErrorGen =>
         from domain in Gen.OneOf(Gen.Const(ErrorDomain.Results), Gen.Const(ErrorDomain.Validation), Gen.Const(ErrorDomain.Geometry))
         from code in Gen.Int[1000, 9999]
         from message in Gen.String.Where(static s => !string.IsNullOrWhiteSpace(s))
         select new SystemError(domain, code, message);
 
-    /// <summary>Generates SystemError arrays using zero-allocation conversion.</summary>
+    /// <summary>Generates SystemError arrays with zero-allocation conversion.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<SystemError[]> SystemErrorArrayGen => SystemErrorGen.List[1, 5].Select(static list => list.ToArray());
 
-    /// <summary>Generates Result with algebraic state distribution (2×2 matrix: success/failure × immediate/deferred).</summary>
+    /// <summary>Generates Result with algebraic state distribution (success/failure × immediate/deferred).</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<T>> ResultGen<T>() where T : notnull => (typeof(T) switch {
         Type t when t == typeof(int) => (Gen<T>)(object)Gen.Int,
         Type t when t == typeof(string) => (Gen<T>)(object)Gen.String.Where(static s => s is not null),
@@ -28,7 +31,8 @@ public static class ResultGenerators {
         _ => throw new NotSupportedException($"Type {typeof(T)} not supported"),
     }).ToResult(SystemErrorGen, 1, 1, 1);
 
-    /// <summary>Generates successful Results with immediate/deferred distribution using inline type dispatch.</summary>
+    /// <summary>Generates successful Results with immediate/deferred distribution via inline type dispatch.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<T>> SuccessGen<T>() where T : notnull => Gen.Frequency([
         (1, (IGen<Result<T>>)(typeof(T) switch {
             Type t when t == typeof(int) => (Gen<T>)(object)Gen.Int,
@@ -46,16 +50,19 @@ public static class ResultGenerators {
         }).Select(static v => ResultFactory.Create(deferred: () => ResultFactory.Create(value: v)))),
     ]);
 
-    /// <summary>Generates failed Results with immediate/deferred distribution.</summary>
+    /// <summary>Generates failed Results with immediate/deferred error distribution.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<T>> FailureGen<T>() where T : notnull => Gen.Frequency([
         (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create<T>(error: e))),
         (1, (IGen<Result<T>>)SystemErrorGen.Select(static e => ResultFactory.Create(deferred: () => ResultFactory.Create<T>(error: e)))),
     ]);
 
-    /// <summary>Generates nested Result using recursive composition.</summary>
+    /// <summary>Generates nested Result via recursive composition.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<Result<T>>> NestedResultGen<T>() where T : notnull => ResultGen<T>().ToResult(SystemErrorGen);
 
-    /// <summary>Generates Result containing collections using monadic map and inline type dispatch.</summary>
+    /// <summary>Generates Result containing collections via monadic map and inline type dispatch.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<IEnumerable<T>>> CollectionResultGen<T>() where T : notnull => (typeof(T) switch {
         Type t when t == typeof(int) => (Gen<T>)(object)Gen.Int,
         Type t when t == typeof(string) => (Gen<T>)(object)Gen.String.Where(static s => s is not null),
@@ -64,10 +71,12 @@ public static class ResultGenerators {
         _ => throw new NotSupportedException($"Type {typeof(T)} not supported"),
     }).List[0, 10].ToResult(SystemErrorGen).Select(static r => r.Map(static list => (IEnumerable<T>)list));
 
-    /// <summary>Generates collections of Results using static cast.</summary>
+    /// <summary>Generates collections of Results via static cast.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<IEnumerable<Result<T>>> ResultCollectionGen<T>() where T : notnull => ResultGen<T>().List[0, 10].Select(static list => (IEnumerable<Result<T>>)list);
 
-    /// <summary>Generates monadic functions with actual transformations using value-dependent logic.</summary>
+    /// <summary>Generates monadic functions with value-dependent transformations.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
         (typeof(T), typeof(TResult)) switch {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
@@ -91,7 +100,8 @@ public static class ResultGenerators {
             _ => SystemErrorGen.Select(err => new Func<T, Result<TResult>>(_ => ResultFactory.Create<TResult>(error: err))),
         };
 
-    /// <summary>Generates pure functions with actual transformations using value-dependent operations.</summary>
+    /// <summary>Generates pure functions with value-dependent transformations.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Func<T, TResult>> PureFunctionGen<T, TResult>() where T : notnull where TResult : notnull =>
         (typeof(T), typeof(TResult)) switch {
             (Type t, Type r) when t == typeof(int) && r == typeof(string) =>
@@ -105,13 +115,16 @@ public static class ResultGenerators {
             _ => throw new NotSupportedException(string.Create(CultureInfo.InvariantCulture, $"Pure function generation not supported for {typeof(T)} -> {typeof(TResult)}")),
         };
 
-    /// <summary>Generates predicates using constant boolean capture.</summary>
+    /// <summary>Generates predicates via constant boolean capture.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Func<T, bool>> PredicateGen<T>() where T : notnull => Gen.Bool.SelectMany(result => Gen.Const<Func<T, bool>>(_ => result));
 
-    /// <summary>Generates validation arrays using Cartesian composition.</summary>
+    /// <summary>Generates validation arrays via Cartesian composition.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<(Func<T, bool>, SystemError)[]> ValidationArrayGen<T>() where T : notnull => PredicateGen<T>().Select(SystemErrorGen).List[1, 5].Select(static list => list.ToArray());
 
-    /// <summary>Generates binary operations using static function set.</summary>
+    /// <summary>Generates binary operations from static function set.</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Func<int, int, int>> BinaryFunctionGen => Gen.OneOf(
         Gen.Const<Func<int, int, int>>(static (a, b) => unchecked(a + b)),
         Gen.Const<Func<int, int, int>>(static (a, b) => unchecked(a * b)),
