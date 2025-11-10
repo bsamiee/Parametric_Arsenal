@@ -4,19 +4,58 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Validation modes for semantic extraction with type inheritance fallback.</summary>
+/// <summary>Configuration constants for semantic extraction: type identifiers, detection thresholds, and validation mode mappings.</summary>
 internal static class ExtractionConfig {
-    internal const double FilletG2Threshold = 0.95;
-    internal const double FilletG2AbsoluteTolerance = 0.001;
-    internal const double ChamferAngleTolerance = 0.1;
-    internal const int MinHoleSides = 16;
+    /// <summary>Epsilon tolerance for zero comparisons and near-zero checks.</summary>
+    internal const double Epsilon = 1e-10;
+
+    /// <summary>Feature type identifiers: 0=Fillet, 1=Chamfer, 2=Hole, 3=GenericEdge, 4=VariableRadiusFillet.</summary>
+    internal const byte FeatureTypeFillet = 0;
+    internal const byte FeatureTypeChamfer = 1;
+    internal const byte FeatureTypeHole = 2;
+    internal const byte FeatureTypeGenericEdge = 3;
+    internal const byte FeatureTypeVariableRadiusFillet = 4;
+
+    /// <summary>Primitive type identifiers: 0=Plane, 1=Cylinder, 2=Sphere, 3=Unknown, 4=Cone, 5=Torus, 6=Extrusion.</summary>
+    internal const byte PrimitiveTypePlane = 0;
+    internal const byte PrimitiveTypeCylinder = 1;
+    internal const byte PrimitiveTypeSphere = 2;
+    internal const byte PrimitiveTypeUnknown = 3;
+    internal const byte PrimitiveTypeCone = 4;
+    internal const byte PrimitiveTypeTorus = 5;
+    internal const byte PrimitiveTypeExtrusion = 6;
+
+    /// <summary>Pattern type identifiers: 0=Linear, 1=Radial, 2=Grid, 3=Scaling.</summary>
+    internal const byte PatternTypeLinear = 0;
+    internal const byte PatternTypeRadial = 1;
+    internal const byte PatternTypeGrid = 2;
+    internal const byte PatternTypeScaling = 3;
+
+    /// <summary>Fillet curvature coefficient of variation threshold 0.15 for constant curvature detection.</summary>
+    internal const double FilletCurvatureVariationThreshold = 0.15;
+    /// <summary>Fillet curvature sample count 5 for edge analysis.</summary>
+    internal const int FilletCurvatureSampleCount = 5;
+    /// <summary>G2 continuity angle tolerance 0.01 radians for smooth edge detection.</summary>
+    internal const double G2ContinuityTolerance = 0.01;
+    /// <summary>Chamfer dihedral angle range: sharp edge below 0.349 radians (20°).</summary>
+    internal const double SharpEdgeAngleThreshold = 0.349;
+    /// <summary>Chamfer dihedral angle range: smooth edge above 2.967 radians (170°).</summary>
+    internal const double SmoothEdgeAngleThreshold = 2.967;
+    /// <summary>Minimum hole polyline sides 16 for circular approximation.</summary>
+    internal const int MinHolePolySides = 16;
+    /// <summary>Primitive fit tolerance 0.001 for TryGet* methods.</summary>
     internal const double PrimitiveFitTolerance = 0.001;
-    internal const int PrimitiveSampleCount = 100;
-    internal const double SymmetryAngleTolerance = 0.01;
+    /// <summary>Primitive residual sample count 20 for RMS distance calculation.</summary>
+    internal const int PrimitiveResidualSampleCount = 20;
+    /// <summary>Pattern minimum instances 3 for detection.</summary>
     internal const int PatternMinInstances = 3;
-    /// <summary>Orthogonality threshold 0.1 for dot product in grid basis detection.</summary>
+    /// <summary>Radial pattern distance variation tolerance 0.05 relative to mean radius.</summary>
+    internal const double RadialDistanceVariationThreshold = 0.05;
+    /// <summary>Radial pattern angle variation tolerance 0.05 radians for uniform spacing.</summary>
+    internal const double RadialAngleVariationThreshold = 0.05;
+    /// <summary>Grid orthogonality threshold 0.1 for dot product in basis detection.</summary>
     internal const double GridOrthogonalityThreshold = 0.1;
-    /// <summary>Grid point validation tolerance 0.1 for integer coordinate deviation.</summary>
+    /// <summary>Grid point deviation tolerance 0.1 for integer coordinate validation.</summary>
     internal const double GridPointDeviationThreshold = 0.1;
     /// <summary>Scaling pattern variance threshold 0.1 for ratio consistency.</summary>
     internal const double ScalingVarianceThreshold = 0.1;
