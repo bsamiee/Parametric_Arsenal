@@ -212,6 +212,7 @@ public static class ValidationRules {
             ];
 
         Expression[] validationExpressions = [.. memberValidations
+            .Where(validation => validation.Member is not null && !(validation.Member is Type { Name: "Void" }))
             .Select<(MemberInfo Member, SystemError Error, string Name, byte Kind), Expression>(validation => validation.Member switch {
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
