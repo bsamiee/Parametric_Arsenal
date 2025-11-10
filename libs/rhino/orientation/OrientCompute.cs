@@ -78,16 +78,22 @@ internal static class OrientCompute {
                             ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                                 ? ((geometryA, geometryB) switch {
                                     (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > OrientConfig.MinVectorLength
-                                        ? new Plane(pa.Origin, pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid && ba.Vertices.All(va => {
-                                            Point3d reflected = va.Location;
-                                            reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
-                                            return bb.Vertices.Any(vb => reflected.DistanceTo(vb.Location) < tolerance);
-                                        }) ? (byte)1 : (byte)0
-                                        : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid && ba.Vertices.All(va => {
-                                            Point3d reflected = va.Location;
-                                            reflected.Transform(Transform.Mirror(mirrorPlane: mirror2));
-                                            return bb.Vertices.Any(vb => reflected.DistanceTo(vb.Location) < tolerance);
-                                        }) ? (byte)1 : (byte)0,
+                                        ? new Plane(pa.Origin, pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
+                                            && ba.Vertices.Select(va => {
+                                                Point3d reflected = va.Location;
+                                                reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
+                                                return reflected;
+                                            }).ToArray() is Point3d[] reflectedA
+                                            && reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
+                                                ? (byte)1 : (byte)0
+                                        : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid
+                                            && ba.Vertices.Select(va => {
+                                                Point3d reflected = va.Location;
+                                                reflected.Transform(Transform.Mirror(mirrorPlane: mirror2));
+                                                return reflected;
+                                            }).ToArray() is Point3d[] reflectedA2
+                                            && reflectedA2.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
+                                                ? (byte)1 : (byte)0,
                                     (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > tolerance => Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).All(i => {
                                         double t = ca.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1));
                                         Point3d ptA = ca.PointAt(t);
