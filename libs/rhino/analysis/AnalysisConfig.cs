@@ -47,6 +47,9 @@ internal static class AnalysisConfig {
     /// <summary>Inflection sharpness threshold 0.5 for curvature sign change.</summary>
     internal const double InflectionSharpnessThreshold = 0.5;
 
+    /// <summary>Smoothness score sensitivity multiplier 10.0 for average curvature variation.</summary>
+    internal const double SmoothnessSensitivity = 10.0;
+
     /// <summary>Mesh FEA: aspect ratio warning 3.0, critical 10.0.</summary>
     internal const double AspectRatioWarning = 3.0;
     internal const double AspectRatioCritical = 10.0;
