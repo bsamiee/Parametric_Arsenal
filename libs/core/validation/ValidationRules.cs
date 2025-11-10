@@ -52,6 +52,8 @@ public static class ValidationRules {
             [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational",], [], E.Validation.NurbsControlPointCount),
             [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
+            [V.SelfIntersection] = ([], ["HasSelfIntersections",], E.Validation.SelfIntersecting),
+            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.InvalidTopology),
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();

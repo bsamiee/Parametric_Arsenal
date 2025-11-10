@@ -85,6 +85,9 @@ public static class E {
             [3905] = "NURBS control point count below minimum",
             [3906] = "Extrusion profile curve invalid",
             [3907] = "Surface UV domain has singularity",
+            [3410] = "Brep topology is invalid",
+            [3411] = "Brep geometry is invalid",
+            [3412] = "Brep tolerances and flags are invalid",
             [3920] = "Invalid unit conversion scale",
             [3930] = "Unsupported operation type",
             [3931] = "Input filtered by predicate",
@@ -213,6 +216,9 @@ public static class E {
         public static readonly SystemError NurbsControlPointCount = Get(3905);
         public static readonly SystemError ExtrusionProfileInvalid = Get(3906);
         public static readonly SystemError UVDomainSingularity = Get(3907);
+        public static readonly SystemError BrepTopologyInvalid = Get(3410);
+        public static readonly SystemError BrepGeometryInvalid = Get(3411);
+        public static readonly SystemError BrepTolerancesInvalid = Get(3412);
         public static readonly SystemError InvalidUnitConversion = Get(3920);
         public static readonly SystemError UnsupportedOperationType = Get(3930);
         public static readonly SystemError InputFiltered = Get(3931);
