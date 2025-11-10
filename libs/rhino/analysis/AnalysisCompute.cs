@@ -10,12 +10,13 @@ namespace Arsenal.Rhino.Analysis;
 /// <summary>Dense geometric quality analysis algorithms with zero duplication.</summary>
 internal static class AnalysisCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(double[] GaussianSamples, double[] MeanSamples, (double U, double V)[] Singularities, double ManufacturingScore)> SurfaceQuality(Surface surface) =>
+    internal static Result<(double[] GaussianSamples, double[] MeanSamples, (double U, double V)[] Singularities, double ManufacturingScore)> SurfaceQuality(Surface surface, IGeometryContext context) =>
         !surface.IsValid
             ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Validation.GeometryInvalid)
-            : ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
-                int gridSize = (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount);
-                gridSize = gridSize < 2 ? 2 : gridSize;
+            : surface.Domain(0).Length <= context.AbsoluteTolerance || surface.Domain(1).Length <= context.AbsoluteTolerance
+                ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("Surface domain too small"))
+                : ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
+                    int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
                 SurfaceCurvature[] curvatures = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0)))))
                     .Select(uv => (UV: uv, Curvature: surface.CurvatureAt(u: uv.u, v: uv.v)))
@@ -25,41 +26,59 @@ internal static class AnalysisCompute {
                 return curvatures.Length > 0
                     ? ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
                         double[] gaussianSorted = [.. curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order()];
-                        double medianGaussian = gaussianSorted[gaussianSorted.Length / 2];
-                        (double, double)[] singularities = [.. Enumerable.Range(0, gridSize)
-                            .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0)))))
-                            .Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)),
-                        ];
+                        double medianGaussian = gaussianSorted.Length > 0 ? gaussianSorted[gaussianSorted.Length / 2] : 0.0;
+                        double maxGaussian = gaussianSorted.Length > 0 ? gaussianSorted[^1] : 0.0;
                         double avgGaussian = curvatures.Average(sc => Math.Abs(sc.Gaussian));
-                        double score = avgGaussian < medianGaussian * AnalysisConfig.HighCurvatureMultiplier
-                            ? 1.0 - (avgGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))
-                            : 0.5;
-                        return ResultFactory.Create(value: (GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(), MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(), Singularities: singularities, ManufacturingScore: score));
+                        double stdDevGaussian = Math.Sqrt(curvatures.Sum(sc => Math.Pow(Math.Abs(sc.Gaussian) - avgGaussian, 2)) / curvatures.Length);
+
+                        (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
+                            .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
+                        ];
+                        (double, double)[] singularities = [.. uvGrid.Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)),];
+
+                        double score = medianGaussian > context.AbsoluteTolerance
+                            ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier)))
+                            : maxGaussian < context.AbsoluteTolerance ? 1.0 : 0.0;
+
+                        return ResultFactory.Create(value: (GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(), MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(), Singularities: singularities, ManufacturingScore: Math.Clamp(score, 0.0, 1.0)));
                     }))()
-                    : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed);
+                    : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(double SmoothnessScore, double[] CurvatureSamples, (double Parameter, bool IsSharp)[] InflectionPoints, double EnergyMetric)> CurveFairness(Curve curve) =>
+    internal static Result<(double SmoothnessScore, double[] CurvatureSamples, (double Parameter, bool IsSharp)[] InflectionPoints, double EnergyMetric)> CurveFairness(Curve curve, IGeometryContext context) =>
         !curve.IsValid
             ? ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Validation.GeometryInvalid)
-            : Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
-                .Select(i => curve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
-                .Select(t => (Parameter: t, Curvature: curve.CurvatureAt(t)))
-                .Where(pair => pair.Curvature.IsValid)
-                .ToArray() is (double Parameter, Vector3d Curvature)[] samples && samples.Length > 2
-            ? samples.Select(s => s.Curvature.Length).ToArray() is double[] curvatures
-                ? ((Func<Result<(double, double[], (double, bool)[], double)>>)(() => {
-                    double avgDiff = Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1);
-                    (double, bool)[] inflections = [.. Enumerable.Range(1, curvatures.Length - 2)
-                        .Where(i => Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)
-                        .Select(i => (samples[i].Parameter, true)),
-                    ];
-                    double energy = curvatures.Sum(k => k * k) * (curve.GetLength() / AnalysisConfig.CurveFairnessSampleCount);
-                    return ResultFactory.Create(value: (SmoothnessScore: 1.0 / (1.0 + (avgDiff * 10.0)), CurvatureSamples: curvatures, InflectionPoints: inflections, EnergyMetric: energy));
-                }))()
-                : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed)
-            : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed);
+            : curve.GetLength() <= context.AbsoluteTolerance
+                ? ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Curve length too small"))
+                : Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
+                    .Select(i => curve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
+                    .Select(t => (Parameter: t, Curvature: curve.CurvatureAt(t)))
+                    .Where(pair => pair.Curvature.IsValid)
+                    .ToArray() is (double Parameter, Vector3d Curvature)[] samples && samples.Length > 2
+                ? samples.Select(s => s.Curvature.Length).ToArray() is double[] curvatures
+                    ? ((Func<Result<(double, double[], (double, bool)[], double)>>)(() => {
+                        double avgDiff = Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1);
+                        double maxCurvature = curvatures.Max();
+
+                        (double, bool)[] inflections = [.. Enumerable.Range(1, curvatures.Length - 2)
+                            .Where(i => {
+                                double prevSlope = curvatures[i] - curvatures[i - 1];
+                                double nextSlope = curvatures[i + 1] - curvatures[i];
+                                return Math.Abs(prevSlope - nextSlope) > AnalysisConfig.InflectionSharpnessThreshold || ((prevSlope * nextSlope) < 0);
+                            })
+                            .Select(i => (samples[i].Parameter, Math.Abs(curvatures[i] - curvatures[i - 1]) > AnalysisConfig.InflectionSharpnessThreshold)),
+                        ];
+
+                        double curveLength = curve.GetLength();
+                        double arcLength = curveLength / (AnalysisConfig.CurveFairnessSampleCount - 1);
+                        double energy = curvatures.Sum(k => k * k) * arcLength;
+                        double normalizedEnergy = maxCurvature > context.AbsoluteTolerance ? energy / (maxCurvature * curveLength) : 0.0;
+
+                        return ResultFactory.Create(value: (SmoothnessScore: Math.Clamp(1.0 / (1.0 + (avgDiff * 10.0)), 0.0, 1.0), CurvatureSamples: curvatures, InflectionPoints: inflections, EnergyMetric: normalizedEnergy));
+                    }))()
+                    : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed)
+                : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaces, (int Warning, int Critical) Counts)> MeshForFEA(Mesh mesh, IGeometryContext context) =>
@@ -96,10 +115,12 @@ internal static class AnalysisCompute {
                             : 1.0
                         : 1.0;
                 double jacobian = isQuad
-                    ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges && edges.Average(e => e.Length) is double avgLen
+                    ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges && edges.Average(e => e.Length) is double avgLen && avgLen > context.AbsoluteTolerance
                         ? edges.Zip(edges.Skip(1).Append(edges[0]), (e1, e2) => Vector3d.CrossProduct(e1, e2).Length).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
-                        : 1.0
-                    : 1.0;
+                        : 0.0
+                    : verts.Take(3).Zip(verts.Skip(1).Take(2).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] triEdges && triEdges.Length is 3
+                        ? Vector3d.CrossProduct(triEdges[0], triEdges[1]).Length / ((2.0 * triEdges.Average(e => e.Length) * triEdges.Average(e => e.Length)) + context.AbsoluteTolerance)
+                        : 0.0;
                 return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
             }).ToArray() is (double AspectRatio, double Skewness, double Jacobian)[] metrics && metrics.Length > 0
             ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (
