@@ -174,15 +174,13 @@ public static class Analysis {
     /// <summary>Surface quality: curvature distribution, singularities, manufacturing score.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double[] GaussianCurvatures, double[] MeanCurvatures, (double U, double V)[] SingularityLocations, double ManufacturingRating)> AnalyzeSurfaceQuality(
-        Surface surface,
-        IGeometryContext context) =>
+        Surface surface) =>
         AnalysisCompute.SurfaceQuality(surface: surface);
 
     /// <summary>Curve fairness: smoothness score, curvature samples, inflection points, energy.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double SmoothnessScore, double[] CurvatureValues, (double Parameter, bool IsSharp)[] InflectionPoints, double BendingEnergy)> AnalyzeCurveFairness(
-        Curve curve,
-        IGeometryContext context) =>
+        Curve curve) =>
         AnalysisCompute.CurveFairness(curve: curve);
 
     /// <summary>Mesh FEA quality: aspect ratios, skewness, Jacobians, problematic elements.</summary>

@@ -223,4 +223,3 @@ public static class Orient {
         IGeometryContext context) =>
         OrientCompute.DetectPattern(geometries, context.AbsoluteTolerance);
 }
-
