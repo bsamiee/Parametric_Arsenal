@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
@@ -39,130 +38,40 @@ public static class ValidationRules {
         public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
     }
 
-    private static readonly FrozenDictionary<V, ((string Member, SystemError Error)[] Properties, (string Member, SystemError Error)[] Methods)> _validationRules =
-        new Dictionary<V, ((string Member, SystemError Error)[], (string Member, SystemError Error)[])> {
-            [V.Standard] = (
-                Properties: [(Member: "IsValid", Error: E.Validation.GeometryInvalid),],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.AreaCentroid] = (
-                Properties: [(Member: "IsClosed", Error: E.Validation.CurveNotClosedOrPlanar),],
-                Methods: [(Member: "IsPlanar", Error: E.Validation.CurveNotClosedOrPlanar),]),
-            [V.BoundingBox] = (
-                Properties: Array.Empty<(string Member, SystemError Error)>(),
-                Methods: [(Member: "GetBoundingBox", Error: E.Validation.BoundingBoxInvalid),]),
-            [V.MassProperties] = (
-                Properties: [
-                    (Member: "IsSolid", Error: E.Validation.MassPropertiesComputationFailed),
-                    (Member: "IsClosed", Error: E.Validation.MassPropertiesComputationFailed),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.Topology] = (
-                Properties: [
-                    (Member: "IsManifold", Error: E.Validation.InvalidTopology),
-                    (Member: "IsClosed", Error: E.Validation.InvalidTopology),
-                    (Member: "IsSolid", Error: E.Validation.InvalidTopology),
-                    (Member: "IsSurface", Error: E.Validation.InvalidTopology),
-                    (Member: "HasNakedEdges", Error: E.Validation.InvalidTopology),
-                ],
-                Methods: [
-                    (Member: "IsManifold", Error: E.Validation.InvalidTopology),
-                    (Member: "IsPointInside", Error: E.Validation.InvalidTopology),
-                ]),
-            [V.Degeneracy] = (
-                Properties: [
-                    (Member: "IsPeriodic", Error: E.Validation.DegenerateGeometry),
-                    (Member: "IsPolyline", Error: E.Validation.DegenerateGeometry),
-                ],
-                Methods: [
-                    (Member: "IsShort", Error: E.Validation.DegenerateGeometry),
-                    (Member: "IsSingular", Error: E.Validation.DegenerateGeometry),
-                    (Member: "IsDegenerate", Error: E.Validation.DegenerateGeometry),
-                    (Member: "IsRectangular", Error: E.Validation.DegenerateGeometry),
-                    (Member: "GetLength", Error: E.Validation.DegenerateGeometry),
-                ]),
-            [V.Tolerance] = (
-                Properties: Array.Empty<(string Member, SystemError Error)>(),
-                Methods: [
-                    (Member: "IsPlanar", Error: E.Validation.ToleranceExceeded),
-                    (Member: "IsLinear", Error: E.Validation.ToleranceExceeded),
-                    (Member: "IsArc", Error: E.Validation.ToleranceExceeded),
-                    (Member: "IsCircle", Error: E.Validation.ToleranceExceeded),
-                    (Member: "IsEllipse", Error: E.Validation.ToleranceExceeded),
-                ]),
-            [V.MeshSpecific] = (
-                Properties: [
-                    (Member: "IsManifold", Error: E.Validation.MeshInvalid),
-                    (Member: "IsClosed", Error: E.Validation.MeshInvalid),
-                    (Member: "HasNgons", Error: E.Validation.MeshInvalid),
-                    (Member: "HasVertexColors", Error: E.Validation.MeshInvalid),
-                    (Member: "HasVertexNormals", Error: E.Validation.MeshInvalid),
-                    (Member: "IsTriangleMesh", Error: E.Validation.MeshInvalid),
-                    (Member: "IsQuadMesh", Error: E.Validation.MeshInvalid),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.SurfaceContinuity] = (
-                Properties: [(Member: "IsPeriodic", Error: E.Validation.PositionalDiscontinuity),],
-                Methods: [(Member: "IsContinuous", Error: E.Validation.PositionalDiscontinuity),]),
-            [V.PolycurveStructure] = (
-                Properties: [
-                    (Member: "IsValid", Error: E.Validation.PolycurveGaps),
-                    (Member: "HasGap", Error: E.Validation.PolycurveGaps),
-                    (Member: "IsNested", Error: E.Validation.PolycurveGaps),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.NurbsGeometry] = (
-                Properties: [
-                    (Member: "IsValid", Error: E.Validation.NurbsControlPointCount),
-                    (Member: "IsPeriodic", Error: E.Validation.NurbsControlPointCount),
-                    (Member: "IsRational", Error: E.Validation.NurbsControlPointCount),
-                    (Member: "Degree", Error: E.Validation.NurbsControlPointCount),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.ExtrusionGeometry] = (
-                Properties: [
-                    (Member: "IsValid", Error: E.Validation.ExtrusionProfileInvalid),
-                    (Member: "IsSolid", Error: E.Validation.ExtrusionProfileInvalid),
-                    (Member: "IsClosed", Error: E.Validation.ExtrusionProfileInvalid),
-                    (Member: "IsCappedAtTop", Error: E.Validation.ExtrusionProfileInvalid),
-                    (Member: "IsCappedAtBottom", Error: E.Validation.ExtrusionProfileInvalid),
-                    (Member: "CapCount", Error: E.Validation.ExtrusionProfileInvalid),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.UVDomain] = (
-                Properties: [
-                    (Member: "IsValid", Error: E.Validation.UVDomainSingularity),
-                    (Member: "HasNurbsForm", Error: E.Validation.UVDomainSingularity),
-                ],
-                Methods: Array.Empty<(string Member, SystemError Error)>()),
-            [V.SelfIntersection] = (
-                Properties: Array.Empty<(string Member, SystemError Error)>(),
-                Methods: [(Member: "CurveSelf", Error: E.Validation.SelfIntersecting),]),
-            [V.BrepGranular] = (
-                Properties: Array.Empty<(string Member, SystemError Error)>(),
-                Methods: [
-                    (Member: "IsValidTopology", Error: E.Validation.BrepTopologyInvalid),
-                    (Member: "IsValidGeometry", Error: E.Validation.BrepGeometryInvalid),
-                    (Member: "IsValidTolerancesAndFlags", Error: E.Validation.BrepTolerancesAndFlagsInvalid),
-                ]),
-        }.ToFrozenDictionary();
-
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
     private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
-
     private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
     private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
     private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
     private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
     private static readonly ConstantExpression _continuityC1 = Expression.Constant(Continuity.C1_continuous);
     private static readonly ConstantExpression _nullCurveIntersections = Expression.Constant(null, typeof(CurveIntersections));
-
     private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
-    private static readonly MethodInfo _curveSelf = typeof(Intersection).GetMethod(nameof(Intersection.CurveSelf), new[] { typeof(Curve), typeof(double), })!;
-    private static readonly MethodInfo _dispose = typeof(IDisposable).GetMethod(nameof(IDisposable.Dispose))!;
+    private static readonly MethodInfo _curveSelf = typeof(Intersection).GetMethod(nameof(Intersection.CurveSelf), [typeof(Curve), typeof(double),])!;
+    private static readonly MethodInfo _dispose = typeof(IDisposable).GetMethod(name: nameof(IDisposable.Dispose), bindingAttr: BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly, binder: null, types: Type.EmptyTypes, modifiers: null)!;
+
+    private static readonly FrozenDictionary<V, ((string Member, SystemError Error)[] Properties, (string Member, SystemError Error)[] Methods)> _validationRules =
+        new Dictionary<V, ((string Member, SystemError Error)[], (string Member, SystemError Error)[])> {
+            [V.Standard] = ([(Member: "IsValid", Error: E.Validation.GeometryInvalid),], []),
+            [V.AreaCentroid] = ([(Member: "IsClosed", Error: E.Validation.CurveNotClosedOrPlanar),], [(Member: "IsPlanar", Error: E.Validation.CurveNotClosedOrPlanar),]),
+            [V.BoundingBox] = ([], [(Member: "GetBoundingBox", Error: E.Validation.BoundingBoxInvalid),]),
+            [V.MassProperties] = ([(Member: "IsSolid", Error: E.Validation.MassPropertiesComputationFailed), (Member: "IsClosed", Error: E.Validation.MassPropertiesComputationFailed),], []),
+            [V.Topology] = ([(Member: "IsManifold", Error: E.Validation.InvalidTopology), (Member: "IsClosed", Error: E.Validation.InvalidTopology), (Member: "IsSolid", Error: E.Validation.InvalidTopology), (Member: "IsSurface", Error: E.Validation.InvalidTopology), (Member: "HasNakedEdges", Error: E.Validation.InvalidTopology),], [(Member: "IsManifold", Error: E.Validation.InvalidTopology), (Member: "IsPointInside", Error: E.Validation.InvalidTopology),]),
+            [V.Degeneracy] = ([(Member: "IsPeriodic", Error: E.Validation.DegenerateGeometry), (Member: "IsPolyline", Error: E.Validation.DegenerateGeometry),], [(Member: "IsShort", Error: E.Validation.DegenerateGeometry), (Member: "IsSingular", Error: E.Validation.DegenerateGeometry), (Member: "IsDegenerate", Error: E.Validation.DegenerateGeometry), (Member: "IsRectangular", Error: E.Validation.DegenerateGeometry), (Member: "GetLength", Error: E.Validation.DegenerateGeometry),]),
+            [V.Tolerance] = ([], [(Member: "IsPlanar", Error: E.Validation.ToleranceExceeded), (Member: "IsLinear", Error: E.Validation.ToleranceExceeded), (Member: "IsArc", Error: E.Validation.ToleranceExceeded), (Member: "IsCircle", Error: E.Validation.ToleranceExceeded), (Member: "IsEllipse", Error: E.Validation.ToleranceExceeded),]),
+            [V.MeshSpecific] = ([(Member: "IsManifold", Error: E.Validation.MeshInvalid), (Member: "IsClosed", Error: E.Validation.MeshInvalid), (Member: "HasNgons", Error: E.Validation.MeshInvalid), (Member: "HasVertexColors", Error: E.Validation.MeshInvalid), (Member: "HasVertexNormals", Error: E.Validation.MeshInvalid), (Member: "IsTriangleMesh", Error: E.Validation.MeshInvalid), (Member: "IsQuadMesh", Error: E.Validation.MeshInvalid),], []),
+            [V.SurfaceContinuity] = ([(Member: "IsPeriodic", Error: E.Validation.PositionalDiscontinuity),], [(Member: "IsContinuous", Error: E.Validation.PositionalDiscontinuity),]),
+            [V.PolycurveStructure] = ([(Member: "IsValid", Error: E.Validation.PolycurveGaps), (Member: "HasGap", Error: E.Validation.PolycurveGaps), (Member: "IsNested", Error: E.Validation.PolycurveGaps),], []),
+            [V.NurbsGeometry] = ([(Member: "IsValid", Error: E.Validation.NurbsControlPointCount), (Member: "IsPeriodic", Error: E.Validation.NurbsControlPointCount), (Member: "IsRational", Error: E.Validation.NurbsControlPointCount), (Member: "Degree", Error: E.Validation.NurbsControlPointCount),], []),
+            [V.ExtrusionGeometry] = ([(Member: "IsValid", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsSolid", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsClosed", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsCappedAtTop", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsCappedAtBottom", Error: E.Validation.ExtrusionProfileInvalid), (Member: "CapCount", Error: E.Validation.ExtrusionProfileInvalid),], []),
+            [V.UVDomain] = ([(Member: "IsValid", Error: E.Validation.UVDomainSingularity), (Member: "HasNurbsForm", Error: E.Validation.UVDomainSingularity),], []),
+            [V.SelfIntersection] = ([], [(Member: "CurveSelf", Error: E.Validation.SelfIntersecting),]),
+            [V.BrepGranular] = ([], [(Member: "IsValidTopology", Error: E.Validation.BrepTopologyInvalid), (Member: "IsValidGeometry", Error: E.Validation.BrepGeometryInvalid), (Member: "IsValidTolerancesAndFlags", Error: E.Validation.BrepTolerancesAndFlagsInvalid),]),
+        }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator for runtime type and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -188,97 +97,32 @@ public static class ValidationRules {
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
-
-        (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations =
-            [.. V.AllFlags
-                .Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag))
-                .SelectMany(flag => {
-                    ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = _validationRules[flag];
-                    return (IEnumerable<(MemberInfo Member, SystemError Error, string Name, byte Kind)>)[
-                        .. properties.Select(prop => (
-                            Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: prop.Member, kind: 1),
-                                static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            prop.Error,
-                            prop.Member,
-                            (byte)1)),
-                        .. methods.Select(method => (
-                            Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: method.Member, kind: 2),
-                                static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            method.Error,
-                            method.Member,
-                            (byte)2)),
-                    ];
-                }),
-            ];
-
-        Expression[] validationExpressions = [.. memberValidations
-            .Where(validation => validation.Member is not null && !(validation.Member is Type { Name: "Void" }))
-            .Select<(MemberInfo Member, SystemError Error, string Name, byte Kind), Expression>(validation => validation.Member switch {
-                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
-                    Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
-                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                        _nullSystemError),
-                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "Degree", StringComparison.Ordinal) =>
-                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),  // RhinoCommon NURBS require degree >= 1
-                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                        _nullSystemError),
-                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "CapCount", StringComparison.Ordinal) =>
-                    Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(2)),
-                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                        _nullSystemError),
-                MethodInfo method => Expression.Condition(
-                    (method.GetParameters(), method.ReturnType, method.Name) switch {
-                        ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method)),
-                        ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(double) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
-                        ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue)),
-                        ([{ ParameterType: Type pt }], Type rt, string name) when rt == typeof(bool) && pt == typeof(Continuity) && string.Equals(name, "IsContinuous", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _continuityC1)),
-                        (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue), "IsValid")),
-                        (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _originPoint,
-                                Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), _constantFalse)),
-                        (_, Type rt, string name) when string.Equals(name, "GetLength", StringComparison.Ordinal) && rt == typeof(double) =>
-                            Expression.LessThanOrEqual(Expression.Call(Expression.Convert(geometry, runtimeType), method), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance))),
-                        _ => _constantFalse,
-                    },
-                    Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                    _nullSystemError),
-                Type _ when string.Equals(validation.Name, "CurveSelf", StringComparison.Ordinal) =>
-                    ((Func<Expression>)(() => {
-                        ParameterExpression intersections = Expression.Variable(typeof(CurveIntersections), "si");
-                        ParameterExpression resultVariable = Expression.Variable(typeof(SystemError?), "sr");
-                        return Expression.Block(
-                            typeof(SystemError?),
-                            new ParameterExpression[] { intersections, resultVariable, },
-                            Expression.Assign(intersections, Expression.Call(_curveSelf,
-                                Expression.Convert(geometry, runtimeType),
-                                Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
-                            Expression.Assign(resultVariable,
-                                Expression.Condition(
-                                    Expression.AndAlso(
-                                        Expression.NotEqual(intersections, _nullCurveIntersections),
-                                        Expression.GreaterThan(Expression.Property(intersections, nameof(CurveIntersections.Count)), Expression.Constant(0))),
-                                    Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
-                                    _nullSystemError)),
-                            Expression.IfThen(
-                                Expression.NotEqual(intersections, _nullCurveIntersections),
-                                Expression.Call(Expression.Convert(intersections, typeof(IDisposable)), _dispose)),
-                            resultVariable);
-                    }))(),
-                _ => _nullSystemError,
-            }),
+        (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations = [.. V.AllFlags.Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag)).SelectMany(flag => {
+            ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = _validationRules[flag];
+            return (IEnumerable<(MemberInfo Member, SystemError Error, string Name, byte Kind)>)[.. properties.Select(p => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: p.Member, kind: 1), static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), p.Error, p.Member, (byte)1)), .. methods.Select(m => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: m.Member, kind: 2), static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), m.Error, m.Member, (byte)2)),];
+        }),
         ];
 
-        return Expression.Lambda<Func<object, IGeometryContext, SystemError[]>>(
-            Expression.Call(_enumerableToArray.MakeGenericMethod(typeof(SystemError)),
-                Expression.Call(_enumerableSelect.MakeGenericMethod(typeof(SystemError?), typeof(SystemError)),
-                    Expression.Call(_enumerableWhere.MakeGenericMethod(typeof(SystemError?)),
-                        Expression.NewArrayInit(typeof(SystemError?), validationExpressions),
-                        Expression.Lambda<Func<SystemError?, bool>>(Expression.NotEqual(error, _nullSystemError), error)),
-                    Expression.Lambda<Func<SystemError?, SystemError>>(Expression.Convert(error, typeof(SystemError)), error))),
-            geometry, context).Compile();
+        UnaryExpression errorConst = Expression.Convert(Expression.Constant(default(SystemError)), typeof(SystemError?));
+        Expression[] validationExpressions = [.. memberValidations.Where(v => v.Member is not null and not Type { Name: "Void" }).Select(v => v.Member switch {
+            PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(bool) => Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), p)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
+            PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(int) && string.Equals(pn, "Degree", StringComparison.Ordinal) => Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), p), Expression.Constant(1)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
+            PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(int) && string.Equals(pn, "CapCount", StringComparison.Ordinal) => Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), p), Expression.Constant(2)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
+            MethodInfo m => Expression.Condition((m.GetParameters(), m.ReturnType, m.Name) switch {
+                ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), m)),
+                ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(double) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), m, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
+                ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), m, _constantTrue)),
+                ([{ ParameterType: Type pt }], Type rt, string n) when rt == typeof(bool) && pt == typeof(Continuity) && string.Equals(n, "IsContinuous", StringComparison.Ordinal) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), m, _continuityC1)),
+                (_, _, string n) when string.Equals(n, "GetBoundingBox", StringComparison.Ordinal) => Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), m, _constantTrue), "IsValid")),
+                (_, _, string n) when string.Equals(n, "IsPointInside", StringComparison.Ordinal) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), m, _originPoint, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), _constantFalse)),
+                (_, Type rt, string n) when string.Equals(n, "GetLength", StringComparison.Ordinal) && rt == typeof(double) => Expression.LessThanOrEqual(Expression.Call(Expression.Convert(geometry, runtimeType), m), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance))),
+                _ => _constantFalse,
+            }, Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
+            Type when string.Equals(v.Name, "CurveSelf", StringComparison.Ordinal) => typeof(Curve).IsAssignableFrom(runtimeType) ? ((Func<Expression>)(() => { ParameterExpression i = Expression.Variable(typeof(CurveIntersections), "si"); ParameterExpression r = Expression.Variable(typeof(SystemError?), "sr"); return Expression.Block(typeof(SystemError?), [i, r,], Expression.Assign(i, Expression.Call(_curveSelf, Expression.Convert(geometry, runtimeType), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))), Expression.Assign(r, Expression.Condition(Expression.AndAlso(Expression.NotEqual(i, _nullCurveIntersections), Expression.GreaterThan(Expression.Property(i, nameof(CurveIntersections.Count)), Expression.Constant(0))), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError)), Expression.IfThen(Expression.NotEqual(i, _nullCurveIntersections), Expression.Call(Expression.Convert(i, typeof(IDisposable)), _dispose)), r); }))() : _nullSystemError,
+            _ => _nullSystemError,
+        }),
+        ];
+
+        return Expression.Lambda<Func<object, IGeometryContext, SystemError[]>>(Expression.Call(_enumerableToArray.MakeGenericMethod(typeof(SystemError)), Expression.Call(_enumerableSelect.MakeGenericMethod(typeof(SystemError?), typeof(SystemError)), Expression.Call(_enumerableWhere.MakeGenericMethod(typeof(SystemError?)), Expression.NewArrayInit(typeof(SystemError?), validationExpressions), Expression.Lambda<Func<SystemError?, bool>>(Expression.NotEqual(error, _nullSystemError), error)), Expression.Lambda<Func<SystemError?, SystemError>>(Expression.Convert(error, typeof(SystemError)), error))), geometry, context).Compile();
     }
 }
