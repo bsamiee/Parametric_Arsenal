@@ -52,6 +52,7 @@ public static class ValidationRules {
             [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
             [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
+            [V.SelfIntersection] = ([], ["HasSelfIntersections",], E.Validation.SelfIntersecting),
             [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Uses BrepTopologyInvalid for all 3 methods
         }.ToFrozenDictionary();
 
