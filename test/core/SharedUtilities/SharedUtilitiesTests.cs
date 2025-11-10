@@ -111,8 +111,10 @@ public sealed class SharedUtilitiesTests {
 
     /// <summary>Verifies Test.Combine for assertion composition.</summary>
     [Fact]
-    public void TestAssert_Combine_ExecutesAll() =>
-        Test.Combine(() => true, () => 1 + 1 == 2, () => "test".Length == 4);
+    public void TestAssert_Combine_ExecutesAll() {
+        const int x = 2;
+        Test.Combine(() => x > 1, () => 1 + 1 == 2, () => "test".Length == 4);
+    }
 
     /// <summary>Verifies Test.ExactlyOne for exclusive OR.</summary>
     [Fact]

@@ -4,91 +4,64 @@ Industrial-strength property-based testing infrastructure with algebraic law ver
 
 ## Architecture
 
-### Core Files (4 files, 575 LOC total)
+### Core Files (2 files, 534 LOC total)
 
-#### 1. TestGen.cs (69 lines)
-**Purpose**: Generation + Assertion Execution  
-**Methods**: 3 public + 5 private helpers
+#### 1. Test.cs (308 lines) **UNIFIED**
+**Purpose**: Complete property-based testing infrastructure - generation, execution, assertions, and category theory law verification  
+**Methods**: 30+ public methods + private helpers
+
+**Generation**:
 - `ToResult<T>()` - Result generator with algebraic state distribution (success/failure × immediate/deferred)
+
+**Execution**:
 - `Run<T>()` - Polymorphic assertion dispatcher with delegate type detection
-- `RunAll()` - Sequential assertion execution with for loop optimization
+- `RunAll()` - Sequential assertion execution with for loop optimization (2-3x faster)
 
-**Key Features**:
-- For loops instead of Array.ForEach (2-3x faster)
-- Pattern matching on delegate type and arity
-- Tuple support (arity 2-3) via reflection
-- Zero-allocation static lambdas
-- ValueTuple deconstruction for cleaner code
+**Category Theory Laws**:
+- `Law<T>()` - Unified dispatcher for 6 laws via FrozenDictionary O(1) lookup
+- `Functor<T, T2, T3>()` - Functor identity + composition laws
+- `Monad<T, T2, T3>()` - Monad left/right identity + associativity laws
 
-**Improvements**:
-- Optimized RunAll from Array.ForEach to for loop
-- Extracted helper methods for clarity
-- Better tuple field extraction
+**Quantifiers (∀, ∃, ⇒, ⇔)**:
+- `ForAll<T>()` - Universal quantification
+- `Exists<T>()` - Existential quantification with witness finding
+- `Implies<T>()` - Implication verification
+- `Equivalent<T>()` - Logical equivalence
 
-#### 2. TestLaw.cs (78 lines)
-**Purpose**: Category theory law verification  
-**Methods**: 3 public + 3 private helpers
-- `Verify<T>()` - Unified dispatcher for 6 laws via FrozenDictionary
-- `VerifyFunctor<T, T2, T3>()` - Functor identity + composition laws
-- `VerifyMonad<T, T2, T3>()` - Monad left/right identity + associativity laws
-
-**Key Features**:
-- FrozenDictionary dispatch for O(1) law lookup
-- Polymorphic arity handling (1-3 parameters)
-- Type erasure via object coercion
-- Inline law implementations using static lambdas
-
-**Improvements**:
-- Extracted helper methods (InvokeUnaryLaw, InvokeBinaryLaw, InvokeHashLaw)
-- Optimized pattern matching
-- InvariantCulture compliance
-
-#### 3. TestAssert.cs (188 lines) **NEW**
-**Purpose**: Property-based assertion combinators  
-**Methods**: 19 public assertion methods
-
-**Quantifiers**:
-- `ForAll<T>()` - Universal quantification (∀x: P(x))
-- `Exists<T>()` - Existential quantification (∃x: P(x))
-- `Implies<T>()` - Logical implication (P ⇒ Q)
-- `Equivalent<T>()` - Logical equivalence (P ⇔ Q)
-
-**Temporal Logic**:
-- `Eventually<T>()` - Temporal eventually (◇P)
-- `Always<T>()` - Temporal always (□P)
+**Temporal Logic (◇, □)**:
+- `Eventually<T>()` - Eventual satisfaction verification
+- `Always<T>()` - Continuous satisfaction verification
 
 **Collections**:
-- `All<T>()` - All elements satisfy predicate
-- `Any<T>()` - At least one element satisfies
-- `None<T>()` - No elements satisfy
-- `Count<T>()` - Exact count satisfying predicate
-- `Ordered<T>()` - Ordering relation holds
-- `Increasing<T>()` - Strictly increasing
-- `Decreasing<T>()` - Strictly decreasing
-- `NonDecreasing<T>()` - Non-decreasing
-
-**Comparisons**:
-- `Compare<T>()` - FrozenDictionary dispatch (Equal, NotEqual, LessThan, etc.)
-- `EqualWithin()` - Floating-point tolerance
+- `All<T>()`, `Any<T>()`, `None<T>()` - Predicate verification
+- `Count<T>()` - Cardinality verification
+- `Ordered<T>()`, `Ordering<T>()` - Relation verification
+- `Increasing<T>()`, `Decreasing<T>()`, `NonDecreasing<T>()` - Monotonicity verification
 
 **Result Validation**:
-- `Success<T>()` - Verifies Result success with optional predicate
-- `Failure<T>()` - Verifies Result failure with optional predicate
+- `Success<T>()` - Success verification with optional predicate
+- `Failure<T>()` - Failure verification with optional predicate
 
-**Exception Handling**:
-- `Throws<TException>()` - Exception type verification with predicate
+**Comparison & Tolerance**:
+- `Compare<T>()` - FrozenDictionary dispatch comparison
+- `EqualWithin()` - Floating-point tolerance comparison
 
-**Composition**:
-- `Combine()` - Short-circuit evaluation
+**Exception & Composition**:
+- `Throws<TException>()` - Exception verification with optional predicate
+- `Combine()` - Sequential assertion composition
 - `ExactlyOne()` - Exclusive OR verification
 
 **Key Features**:
-- FrozenDictionary comparison dispatch (O(1))
-- Pattern matching throughout
-- No if/else statements
+- Zero if/else statements (pattern matching/ternary only)
+- FrozenDictionary dispatch for O(1) lookups
+- For loops on hot paths (2-3x faster than LINQ)
+- InvariantCulture for all string operations
+- Tuple support (arity 2-3) via reflection
+- Zero-allocation static lambdas
+
 - InvariantCulture for all formatting
 
-#### 4. TestBench.cs (240 lines) **NEW**
+#### 2. TestBench.cs (226 lines)
 **Purpose**: Performance benchmarking for property-based tests  
 **Types**: 2 structs + 21 methods
 - `Measurement` struct - Zero-allocation timing/memory metrics
@@ -128,20 +101,24 @@ Industrial-strength property-based testing infrastructure with algebraic law ver
 
 | Metric | Limit | Actual | Status |
 |--------|-------|--------|--------|
-| Files | ≤ 4 | 4 | ✅ (at limit) |
-| Types | ≤ 10 | 6 | ✅ (well within) |
-| Total LOC | - | 575 | ✅ |
+| Files | ≤ 4 | 2 | ✅ (50% under limit) |
+| Types | ≤ 10 | 3 | ✅ (70% under limit) |
+| Total LOC | - | 534 | ✅ |
 | Methods <300 LOC | ✓ | ✓ | ✅ All compliant |
 
 **File Breakdown**:
-1. TestGen.cs - 69 LOC (3 public + 5 helpers)
-2. TestLaw.cs - 78 LOC (3 public + 3 helpers)
-3. TestAssert.cs - 188 LOC (19 public methods)
-4. TestBench.cs - 240 LOC (2 structs + 21 methods)
+1. Test.cs - 308 LOC (30+ public methods, unified infrastructure)
+2. TestBench.cs - 226 LOC (2 structs + 21 methods)
 
-## Performance Improvements
+## Consolidation & Performance Improvements
 
-**TestGen.RunAll**:
+**Consolidation**:
+- Merged TestGen + TestLaw + TestAssert → Test.cs (unified API)
+- Reduced from 4 files to 2 files (50% reduction)
+- Reduced from 575 LOC to 534 LOC (7% reduction)
+- Reduced from 6 types to 3 types (50% reduction)
+
+**Test.RunAll**:
 - Before: Array.ForEach (LINQ overhead)
 - After: for loop (direct iteration)
 - Speedup: ~2-3x faster on hot paths
