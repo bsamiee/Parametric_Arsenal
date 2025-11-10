@@ -63,8 +63,8 @@ public static class Extract {
 
     /// <summary>Extract design features: fillets, chamfers, holes, bosses with confidence scores.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<((byte Type, double Parameter)[] Features, double Confidence)> ExtractDesignFeatures(Brep brep) =>
-        ExtractionCompute.ExtractFeatures(brep);
+    public static Result<((byte Type, double Parameter)[] Features, double Confidence)> ExtractDesignFeatures(Brep brep, IGeometryContext context) =>
+        ExtractionCompute.ExtractFeatures(brep, context);
 
     /// <summary>Decompose geometry to best-fit primitives: planes, cylinders, spheres with residuals.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

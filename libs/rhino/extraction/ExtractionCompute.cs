@@ -2,6 +2,7 @@ using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
@@ -9,14 +10,14 @@ namespace Arsenal.Rhino.Extraction;
 /// <summary>Feature extraction algorithms: design features, primitive decomposition, pattern recognition.</summary>
 internal static class ExtractionCompute {
     [Pure]
-    internal static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeatures(Brep brep) =>
-        !brep.IsValid
-            ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Validation.GeometryInvalid)
-            : brep.Faces.Count is 0
+    internal static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeatures(Brep brep, IGeometryContext context) =>
+        ResultFactory.Create(value: brep)
+            .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
+            .Bind(validBrep => validBrep.Faces.Count is 0
                 ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no faces"))
-                : brep.Edges.Count is 0
+                : validBrep.Edges.Count is 0
                     ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no edges"))
-                    : ExtractFeaturesInternal(brep: brep);
+                    : ExtractFeaturesInternal(brep: validBrep));
 
     [Pure]
     private static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeaturesInternal(Brep brep) {
