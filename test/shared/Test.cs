@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using CsCheck;
@@ -36,6 +37,7 @@ public static class Test {
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     /// <summary>Generates Result with algebraic state distribution (success/failure × immediate/deferred).</summary>
+    [System.Diagnostics.Contracts.Pure]
     public static Gen<Result<T>> ToResult<T>(this Gen<T> valueGen, Gen<SystemError> errorGen, int successWeight = 1, int failureWeight = 1, int deferredWeight = 0) =>
         deferredWeight == 0
             ? Gen.Frequency([
@@ -60,8 +62,10 @@ public static class Test {
         };
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int RunFunc<T>(Gen<T> gen, Func<T, bool> prop, int iter) { gen.Sample(prop, iter: iter); return 0; }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int RunAction<T>(Gen<T> gen, Action<T> act, int iter) { gen.Sample(v => { act(v); return true; }, iter: iter); return 0; }
 
     private static int RunTuple2<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
@@ -154,14 +158,14 @@ public static class Test {
             r.Bind(f).Bind(g).Equals(r.Bind(x => f(x).Bind(g))), iter: iter / 2);
     }
 
-    /// <summary>Verifies universal quantification (∀x: P(x)) using property-based generation.</summary>
+    /// <summary>Verifies universal quantification ∀x P(x) using property-based generation.</summary>
     public static void ForAll<T>(Gen<T> gen, Func<T, bool> predicate, int iter = 100, string? message = null) =>
         gen.Sample(value => {
             _ = predicate(value) ? true : throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"ForAll failed: predicate false for {value}"));
             return true;
         }, iter: iter);
 
-    /// <summary>Verifies existential quantification (∃x: P(x)) by finding witness within iteration budget.</summary>
+    /// <summary>Verifies existential quantification ∃x P(x) by finding witness within iteration budget.</summary>
     public static void Exists<T>(Gen<T> gen, Func<T, bool> predicate, int maxAttempts = 1000, string? message = null) {
         (int attempts, bool found) = (0, false);
         gen.Sample(value => {
@@ -171,21 +175,21 @@ public static class Test {
         }, iter: maxAttempts);
     }
 
-    /// <summary>Verifies implication (P(x) ⇒ Q(x)) for all generated values satisfying premise.</summary>
+    /// <summary>Verifies implication P(x) ⇒ Q(x) for all generated values satisfying premise.</summary>
     public static void Implies<T>(Gen<T> gen, Func<T, bool> premise, Func<T, bool> conclusion, int iter = 100, string? message = null) =>
         gen.Sample(value => {
             _ = !premise(value) || conclusion(value) ? true : throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"Implication failed: premise holds but conclusion false for {value}"));
             return true;
         }, iter: iter);
 
-    /// <summary>Verifies equivalence (P(x) ⇔ Q(x)) for all generated values.</summary>
+    /// <summary>Verifies equivalence P(x) ⇔ Q(x) for all generated values.</summary>
     public static void Equivalent<T>(Gen<T> gen, Func<T, bool> left, Func<T, bool> right, int iter = 100, string? message = null) =>
         gen.Sample(value => {
             _ = left(value) == right(value) ? true : throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"Equivalence failed: left={left(value)}, right={right(value)} for {value}"));
             return true;
         }, iter: iter);
 
-    /// <summary>Verifies predicate eventually holds within iteration budget (temporal: ◇P).</summary>
+    /// <summary>Verifies predicate eventually holds within iteration budget (temporal ◇P).</summary>
     public static void Eventually<T>(Gen<T> gen, Func<T, bool> predicate, int maxAttempts = 100, string? message = null) {
         (bool satisfied, int attempt) = (false, 0);
         gen.Sample(value => {
@@ -195,11 +199,11 @@ public static class Test {
         }, iter: maxAttempts);
     }
 
-    /// <summary>Verifies predicate holds continuously for all values (temporal: □P).</summary>
+    /// <summary>Verifies predicate holds continuously for all values (temporal □P).</summary>
     public static void Always<T>(Gen<T> gen, Func<T, bool> predicate, int iter = 100, string? message = null) =>
         ForAll(gen, predicate, iter, message ?? "Always failed: predicate violated");
 
-    /// <summary>Verifies comparison using FrozenDictionary dispatch for O(1) lookup.</summary>
+    /// <summary>Verifies comparison using FrozenDictionary O(1) dispatch (Equal, NotEqual, LessThan, GreaterThan, etc).</summary>
     public static void Compare<T>(T left, T right, string comparison, string? message = null) where T : IComparable =>
         _ = _comparisons.TryGetValue(comparison, out Func<object, object, bool>? op) && op(left!, right!)
             ? true
@@ -271,7 +275,7 @@ public static class Test {
         }
     }
 
-    /// <summary>Verifies collection ordering using FrozenDictionary dispatch for O(1) lookup (Increasing, Decreasing, NonDecreasing).</summary>
+    /// <summary>Verifies collection ordering using FrozenDictionary O(1) dispatch (Increasing, Decreasing, NonDecreasing).</summary>
     public static void Ordering<T>(IEnumerable<T> collection, string ordering, string? message = null) where T : IComparable {
         _ = _orderings.TryGetValue(ordering, out Func<IComparable, IComparable, bool>? relation) ? true : throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Unknown ordering: {ordering}"), nameof(ordering));
         T? previous = default;
@@ -282,15 +286,15 @@ public static class Test {
         }
     }
 
-    /// <summary>Verifies collection is strictly increasing using FrozenDictionary dispatch.</summary>
+    /// <summary>Verifies collection is strictly increasing via FrozenDictionary dispatch.</summary>
     public static void Increasing<T>(IEnumerable<T> collection, string? message = null) where T : IComparable =>
         Ordering(collection, "Increasing", message);
 
-    /// <summary>Verifies collection is strictly decreasing using FrozenDictionary dispatch.</summary>
+    /// <summary>Verifies collection is strictly decreasing via FrozenDictionary dispatch.</summary>
     public static void Decreasing<T>(IEnumerable<T> collection, string? message = null) where T : IComparable =>
         Ordering(collection, "Decreasing", message);
 
-    /// <summary>Verifies collection is non-decreasing using FrozenDictionary dispatch.</summary>
+    /// <summary>Verifies collection is non-decreasing via FrozenDictionary dispatch.</summary>
     public static void NonDecreasing<T>(IEnumerable<T> collection, string? message = null) where T : IComparable =>
         Ordering(collection, "NonDecreasing", message);
 

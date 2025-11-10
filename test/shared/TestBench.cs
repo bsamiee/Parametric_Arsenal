@@ -16,17 +16,20 @@ public static class TestBench {
         public readonly int Iterations;
         public readonly double TicksPerIteration;
         public readonly double BytesPerIteration;
+        public readonly double ElapsedMilliseconds;
+        public readonly double ElapsedMicroseconds;
+        public readonly double MemoryKilobytes;
+        public readonly double MemoryMegabytes;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Measurement(long ticks, long bytes, int iterations) {
             (this.ElapsedTicks, this.MemoryBytes, this.Iterations) = (ticks, bytes, iterations);
             (this.TicksPerIteration, this.BytesPerIteration) = (iterations > 0 ? (double)ticks / iterations : 0.0, iterations > 0 ? (double)bytes / iterations : 0.0);
+            this.ElapsedMilliseconds = ticks / Stopwatch.Frequency * 1000.0;
+            this.ElapsedMicroseconds = ticks / Stopwatch.Frequency * 1000000.0;
+            this.MemoryKilobytes = bytes / 1024.0;
+            this.MemoryMegabytes = bytes / (1024.0 * 1024.0);
         }
-
-        public readonly double ElapsedMilliseconds => this.ElapsedTicks / Stopwatch.Frequency * 1000.0;
-        public readonly double ElapsedMicroseconds => this.ElapsedTicks / Stopwatch.Frequency * 1000000.0;
-        public readonly double MemoryKilobytes => this.MemoryBytes / 1024.0;
-        public readonly double MemoryMegabytes => this.MemoryBytes / (1024.0 * 1024.0);
     }
 
     /// <summary>Statistical summary with percentiles and variance.</summary>
@@ -51,6 +54,7 @@ public static class TestBench {
             this.StdDev = count > 0 ? CalculateStdDev(sorted, this.Mean) : 0.0;
         }
 
+        [System.Diagnostics.Contracts.Pure]
         private static double CalculateMean(double[] values) {
             double sum = 0.0;
             for (int i = 0; i < values.Length; i++) {
@@ -59,6 +63,7 @@ public static class TestBench {
             return sum / values.Length;
         }
 
+        [System.Diagnostics.Contracts.Pure]
         private static double CalculatePercentile(double[] sorted, int percentile) {
             double index = (percentile / 100.0) * (sorted.Length - 1);
             int lowerIndex = (int)Math.Floor(index);
@@ -68,6 +73,7 @@ public static class TestBench {
                 : sorted[lowerIndex] + ((sorted[upperIndex] - sorted[lowerIndex]) * (index - lowerIndex));
         }
 
+        [System.Diagnostics.Contracts.Pure]
         private static double CalculateStdDev(double[] values, double mean) {
             double sumSquaredDiff = 0.0;
             for (int i = 0; i < values.Length; i++) {
@@ -143,14 +149,15 @@ public static class TestBench {
     public static bool DetectRegression(Action baseline, Action current, double regressionThreshold = 1.1, int runs = 10) =>
         Compare(baseline, current, runs) > regressionThreshold;
 
-    /// <summary>Computes rate metric from measurement: AllocationRate (bytes/sec), Throughput (ops/sec).</summary>
+    /// <summary>Computes rate metric from measurement (allocation rate bytes/sec or throughput ops/sec).</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
+    [System.Diagnostics.Contracts.Pure]
     public static double Rate(Measurement m, bool isThroughput) {
         double seconds = (double)m.ElapsedTicks / Stopwatch.Frequency;
         return seconds > 0.0 ? (isThroughput ? m.Iterations / seconds : m.MemoryBytes / seconds) : 0.0;
     }
 
-    /// <summary>Measures allocation rate (bytes per second) for action.</summary>
+    /// <summary>Measures allocation rate in bytes per second for action.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static double AllocationRate(Action action, int iterations = 1000) =>
         Rate(Measure(action, iterations, warmupIterations: 10), isThroughput: false);
@@ -175,7 +182,7 @@ public static class TestBench {
         return (timings, new Statistics(timings));
     }
 
-    /// <summary>Measures throughput (operations per second) for action.</summary>
+    /// <summary>Measures throughput in operations per second for action.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static double Throughput(Action action, int iterations = 1000) =>
         Rate(Measure(action, iterations, warmupIterations: 10), isThroughput: true);

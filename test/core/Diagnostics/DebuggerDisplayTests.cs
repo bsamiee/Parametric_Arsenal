@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Arsenal.Core.Tests.Diagnostics;
 
-/// <summary>Tests verifying DebuggerDisplay attributes work correctly without side effects.</summary>
+/// <summary>Tests verifying DebuggerDisplay attributes without side effects.</summary>
 public sealed class DebuggerDisplayTests {
     [Fact]
     public void ResultSuccessDebuggerDisplayShowsValue() {
