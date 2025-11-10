@@ -48,12 +48,12 @@ internal static class AnalysisCompute {
             ? ((Func<Result<(double, double[], (double, bool)[], double)>>)(() => {
                 int len = samples.Length;
                 double[] curvatures = new double[len];
-                double diffSum = 0.0;
                 for (int i = 0; i < len; i++) {
                     curvatures[i] = samples[i].Curvature.Length;
-                    if (i > 0) {
-                        diffSum += Math.Abs(curvatures[i] - curvatures[i - 1]);
-                    }
+                }
+                double diffSum = 0.0;
+                for (int i = 1; i < len; i++) {
+                    diffSum += Math.Abs(curvatures[i] - curvatures[i - 1]);
                 }
                 double avgDiff = diffSum / (len - 1);
                 (double, bool)[] inflections = [.. Enumerable.Range(1, len - 2)
@@ -89,7 +89,6 @@ internal static class AnalysisCompute {
                 double[] aspectRatios = new double[len];
                 double[] skewness = new double[len];
                 double[] jacobians = new double[len];
-                List<int> problematic = [];
                 (int warning, int critical) = (0, 0);
                 for (int i = 0; i < len; i++) {
                     (double ar, double sk, double jac) = metrics[i];
@@ -98,15 +97,14 @@ internal static class AnalysisCompute {
                     jacobians[i] = jac;
                     bool isCritical = ar > AnalysisConfig.AspectRatioCritical || sk > AnalysisConfig.SkewnessCritical || jac < AnalysisConfig.JacobianCritical;
                     bool isWarning = ar > AnalysisConfig.AspectRatioWarning || sk > AnalysisConfig.SkewnessWarning || jac < AnalysisConfig.JacobianWarning;
-                    if (isCritical) {
-                        problematic.Add(i);
-                        critical++;
-                    }
-                    if (isWarning) {
-                        warning++;
-                    }
+                    critical += isCritical ? 1 : 0;
+                    warning += isWarning ? 1 : 0;
                 }
-                return ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (aspectRatios, skewness, jacobians, [.. problematic], (warning, critical)));
+                int[] problematic = [.. Enumerable.Range(0, len).Where(i => {
+                    (double ar, double sk, double jac) = metrics[i];
+                    return ar > AnalysisConfig.AspectRatioCritical || sk > AnalysisConfig.SkewnessCritical || jac < AnalysisConfig.JacobianCritical;
+                }),];
+                return ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (aspectRatios, skewness, jacobians, problematic, (warning, critical)));
             }))()
             : ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Geometry.MeshAnalysisFailed);
 }
