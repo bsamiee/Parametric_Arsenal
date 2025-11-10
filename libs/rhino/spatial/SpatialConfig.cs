@@ -1,32 +1,25 @@
 using System.Collections.Frozen;
+using Arsenal.Core.Context;
+using Arsenal.Core.Results;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Configuration constants and parameters for spatial algorithms.</summary>
+/// <summary>Configuration constants and FrozenDictionary dispatch for spatial algorithms.</summary>
 internal static class SpatialConfig {
     internal const int DefaultBufferSize = 2048;
     internal const int LargeBufferSize = 4096;
-
-    /// <summary>K-means convergence: max 100 iterations, tolerance from context.</summary>
     internal const int KMeansMaxIterations = 100;
-
-    /// <summary>K-means++ uses seed 42 for deterministic initialization.</summary>
     internal const int KMeansSeed = 42;
-
-    /// <summary>DBSCAN minimum 4 points to form core cluster.</summary>
     internal const int DBSCANMinPoints = 4;
-
-    /// <summary>Medial axis offset distance multiplier for skeleton computation.</summary>
     internal const double MedialAxisOffsetMultiplier = 10.0;
-
-    /// <summary>DBSCAN uses RTree spatial indexing when point count exceeds this threshold.</summary>
     internal const int DBSCANRTreeThreshold = 100;
 
-    /// <summary>Clustering algorithm identifiers: 0=KMeans++, 1=DBSCAN, 2=Hierarchical.</summary>
-    internal static readonly FrozenDictionary<byte, (int MaxIter, int MinPts)> ClusterParams =
-        new Dictionary<byte, (int, int)> {
-            [0] = (KMeansMaxIterations, 0),
-            [1] = (0, DBSCANMinPoints),
-            [2] = (0, 0),
+    /// <summary>Clustering algorithm metadata: byte id → (name, requires k, requires epsilon, maxIter, minPts, assign function).</summary>
+    internal static readonly FrozenDictionary<byte, (string Name, bool RequiresK, bool RequiresEpsilon, int MaxIter, int MinPts, Func<Point3d[], int, double, (int MaxIter, int MinPts), IGeometryContext, int[]> Assign)> ClusterAlgorithms =
+        new Dictionary<byte, (string, bool, bool, int, int, Func<Point3d[], int, double, (int MaxIter, int MinPts), IGeometryContext, int[]>)> {
+            [0] = ("KMeans++", true, false, KMeansMaxIterations, 0, static (pts, k, _, config, ctx) => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, config.MaxIter)),
+            [1] = ("DBSCAN", false, true, 0, DBSCANMinPoints, static (pts, _, eps, config, _) => SpatialCompute.DBSCANAssign(pts, eps, config.MinPts)),
+            [2] = ("Hierarchical", true, false, 0, 0, static (pts, k, _, _, _) => SpatialCompute.HierarchicalAssign(pts, k)),
         }.ToFrozenDictionary();
 }
