@@ -18,38 +18,39 @@ internal static class TopologyCompute {
                 ? ResultFactory.Create<(double[], (int, int, double)[], byte[])>(
                     error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {log}"))
                 : ((Func<Result<(double[], (int, int, double)[], byte[])>>)(() => {
-                double[] gaps = [.. Enumerable.Range(0, brep.Edges.Count)
-                    .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked && brep.Edges[i].EdgeCurve is not null)
-                    .Select(i => brep.Edges[i].PointAtStart.DistanceTo(brep.Edges[i].PointAtEnd)),
-                ];
+                    double[] gaps = [.. Enumerable.Range(0, brep.Edges.Count)
+                        .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked && brep.Edges[i].EdgeCurve is not null)
+                        .Select(i => brep.Edges[i].PointAtStart.DistanceTo(brep.Edges[i].PointAtEnd)),
+                    ];
 
-                int nakedEdgeCount = brep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
-                int nonManifoldEdgeCount = brep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
+                    int nakedEdgeCount = brep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
+                    int nonManifoldEdgeCount = brep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
 
-                (int EdgeA, int EdgeB, double Distance)[] nearMisses = brep.Edges.Count < 100
-                    ? [.. (from i in Enumerable.Range(0, brep.Edges.Count)
-                          from j in Enumerable.Range(i + 1, brep.Edges.Count - i - 1)
-                          where brep.Edges[i].EdgeCurve is not null && brep.Edges[j].EdgeCurve is not null
-                          let result = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d ptA, out Point3d ptB)
-                              ? (Success: true, Distance: ptA.DistanceTo(ptB))
-                              : (Success: false, Distance: double.MaxValue)
-                          where result.Success && result.Distance < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier && result.Distance > context.AbsoluteTolerance
-                          select (EdgeA: i, EdgeB: j, result.Distance)),]
-                    : [];
+                    (int EdgeA, int EdgeB, double Distance)[] nearMisses = brep.Edges.Count < 100
+                        ? [.. (from i in Enumerable.Range(0, brep.Edges.Count)
+                               from j in Enumerable.Range(i + 1, brep.Edges.Count - i - 1)
+                               where brep.Edges[i].EdgeCurve is not null && brep.Edges[j].EdgeCurve is not null
+                               let result = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d ptA, out Point3d ptB)
+                               ? (Success: true, Distance: ptA.DistanceTo(ptB))
+                               : (Success: false, Distance: double.MaxValue)
+                               where result.Success && result.Distance < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier && result.Distance > context.AbsoluteTolerance
+                               select (EdgeA: i, EdgeB: j, result.Distance)),
+                        ]
+                        : [];
 
-                byte[] repairs = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Length) switch {
-                    (> 0, > 0, > 0) => [0, 1, 2, 3,],
-                    (> 0, > 0, _) => [0, 1, 2,],
-                    (> 0, _, > 0) => [0, 1, 3,],
-                    (_, > 0, > 0) => [2, 3,],
-                    (> 0, _, _) => [0, 1,],
-                    (_, > 0, _) => [2,],
-                    (_, _, > 0) => [3,],
-                    _ => [0,],
-                };
+                    byte[] repairs = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Length) switch {
+                        ( > 0, > 0, > 0) => [0, 1, 2, 3,],
+                        ( > 0, > 0, _) => [0, 1, 2,],
+                        ( > 0, _, > 0) => [0, 1, 3,],
+                        (_, > 0, > 0) => [2, 3,],
+                        ( > 0, _, _) => [0, 1,],
+                        (_, > 0, _) => [2,],
+                        (_, _, > 0) => [3,],
+                        _ => [0,],
+                    };
 
-                return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
-            }))();
+                    return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
+                }))();
 
     [Pure]
     internal static Result<(Brep Healed, byte Strategy, bool Success)> Heal(
@@ -59,31 +60,31 @@ internal static class TopologyCompute {
         !brep.IsValid
             ? ResultFactory.Create<(Brep, byte, bool)>(error: E.Validation.GeometryInvalid)
             : ((Func<Result<(Brep, byte, bool)>>)(() => {
-            static Brep? DisposeReturningNull(Brep b) { b.Dispose(); return null; }
-            int originalNakedEdges = brep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
+                static Brep? DisposeReturningNull(Brep b) { b.Dispose(); return null; }
+                int originalNakedEdges = brep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
 
-            (byte Strategy, Brep? Healed, int NakedEdges)[] attempts = [.. Enumerable.Range(0, Math.Min(maxStrategy + 1, 4))
-                .Select(s => {
-                    byte strategy = (byte)s;
-                    Brep copy = brep.DuplicateBrep();
-                    bool success = strategy switch {
-                        0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
-                        1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                        2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
-                        _ => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                    };
-                    bool isValid = success && copy.IsValidTopology(out string _);
-                    int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
-                    Brep? result = isValid && nakedEdges < originalNakedEdges ? copy : DisposeReturningNull(copy);
-                    return (Strategy: strategy, Healed: result, NakedEdges: nakedEdges);
-                }),
-            ];
+                (byte Strategy, Brep? Healed, int NakedEdges)[] attempts = [.. Enumerable.Range(0, Math.Min(maxStrategy + 1, 4))
+                    .Select(s => {
+                        byte strategy = (byte)s;
+                        Brep copy = brep.DuplicateBrep();
+                        bool success = strategy switch {
+                            0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
+                            1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
+                            _ => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                        };
+                        bool isValid = success && copy.IsValidTopology(out string _);
+                        int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
+                        Brep? result = isValid && nakedEdges < originalNakedEdges ? copy : DisposeReturningNull(copy);
+                        return (Strategy: strategy, Healed: result, NakedEdges: nakedEdges);
+                    }),
+                ];
 
-            (byte strategy, Brep? healed, int nakedEdges) = attempts.Where(a => a.Healed is not null).OrderBy(a => a.NakedEdges).FirstOrDefault();
-            return healed is not null
-                ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
-                : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
-        }))();
+                (byte strategy, Brep? healed, int nakedEdges) = attempts.Where(a => a.Healed is not null).OrderBy(a => a.NakedEdges).FirstOrDefault();
+                return healed is not null
+                    ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
+                    : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
+            }))();
 
     [Pure]
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(

@@ -11,10 +11,8 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.ToArray() is int[] arr && arr.Length > 0
-            ? arr.Aggregate((X: 0.0, Y: 0.0, Z: 0.0), (sum, idx) => (sum.X + pts[idx].X, sum.Y + pts[idx].Y, sum.Z + pts[idx].Z)) is (double x, double y, double z)
-                ? new Point3d(x / arr.Length, y / arr.Length, z / arr.Length)
-                : Point3d.Origin
+        indices.ToArray() is { Length: > 0 } arr
+            ? new Point3d(arr.Sum(i => pts[i].X) / arr.Length, arr.Sum(i => pts[i].Y) / arr.Length, arr.Sum(i => pts[i].Z) / arr.Length)
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -35,15 +33,19 @@ internal static class SpatialCompute {
 
     private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, (int maxIter, int minPts) config, IGeometryContext context) where T : GeometryBase {
         Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
-        return ((algorithm is 0 or 2) && k > pts.Length)
+        return (algorithm is 0 or 2) && k > pts.Length
             ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-            : algorithm switch {
+            : (algorithm switch {
                 0 => KMeansAssign(pts, k, context.AbsoluteTolerance, config.maxIter),
                 1 => DBSCANAssign(pts, epsilon, config.minPts),
                 2 => HierarchicalAssign(pts, k),
                 _ => [],
-            } is int[] assigns && (algorithm is 1 ? (assigns.Any(a => a >= 0) ? assigns.Where(a => a >= 0).Max() + 1 : 0) : k) is int nc && nc > 0
-                ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is int[] m && m.Length > 0 ? Centroid(m, pts) is Point3d centroid ? (centroid, [.. m.Select(i => pts[i].DistanceTo(centroid))]) : (Point3d.Origin, Array.Empty<double>()) : (Point3d.Origin, Array.Empty<double>())).ToArray())
+            }) is int[] assigns && assigns.Length > 0 && (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int nc && nc > 0
+                ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, nc).Select(c =>
+                    Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is { Length: > 0 } m
+                        ? (Centroid(m, pts), [.. m.Select(i => pts[i].DistanceTo(Centroid(m, pts))),])
+                        : (Point3d.Origin, Array.Empty<double>())),
+                ])
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
 
@@ -226,7 +228,7 @@ internal static class SpatialCompute {
         (List<Point3d> lower, List<Point3d> upper) = (BuildHalf(pts), BuildHalf([.. pts.AsEnumerable().Reverse(),]));
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
-            ? ResultFactory.Create<Point3d[]>(value: result)
+            ? ResultFactory.Create(value: result)
             : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
     }
 
@@ -246,15 +248,14 @@ internal static class SpatialCompute {
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
                 : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
 
-    private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) {
-        (int a, int b) = (0, points.Skip(1).Select((p, i) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: i + 1)).OrderByDescending(x => x.Dist).FirstOrDefault().Idx);
-        int c = points.Skip(2).Select((p, i) => (Area: TriangleArea(points[a].Point, points[b].Point, p.Point), Idx: i + 2)).Where(x => x.Area > context.AbsoluteTolerance).OrderByDescending(x => x.Area).FirstOrDefault().Idx;
-        return c > 0
-            ? points.Skip(3).Select((p, i) => (Vol: TetrahedronVolume(points[a].Point, points[b].Point, points[c].Point, p.Point), Idx: i + 3)).Where(x => Math.Abs(x.Vol) > context.AbsoluteTolerance).OrderByDescending(x => Math.Abs(x.Vol)).FirstOrDefault() is (double v, int d) && d > 0
-                ? (true, v > 0 ? [(a, b, c), (a, c, d), (a, d, b), (b, d, c),] : [(a, c, b), (a, d, c), (a, b, d), (b, c, d),])
-                : (false, [])
+    private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
+        (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
+        points.Where((_, i) => i >= 2).Select((p, i) => (Area: TriangleArea(points[a].Point, points[b].Point, p.Point), Idx: i + 2))
+            .Where(x => x.Area > context.AbsoluteTolerance).OrderByDescending(x => x.Area).FirstOrDefault() is (double, int c) && c > 1 &&
+        points.Where((_, i) => i >= 3).Select((p, i) => (Vol: TetrahedronVolume(points[a].Point, points[b].Point, points[c].Point, p.Point), Idx: i + 3))
+            .Where(x => Math.Abs(x.Vol) > context.AbsoluteTolerance).OrderByDescending(x => Math.Abs(x.Vol)).FirstOrDefault() is (double v, int d) && d > 2
+            ? (true, v > 0 ? [(a, b, c), (a, c, d), (a, d, b), (b, d, c),] : [(a, c, b), (a, d, c), (a, b, d), (b, c, d),])
             : (false, []);
-    }
 
     private static Result<int[][]> BuildConvexHull3D((Point3d Point, int Index)[] indexed, (int, int, int)[] initialFaces, IGeometryContext context) {
         HashSet<(int, int, int)> faces = [.. initialFaces,];
@@ -268,7 +269,8 @@ internal static class SpatialCompute {
             (int, int, int)[] visibleFaces = [.. faces.Where(f => {
                 Vector3d normal = Vector3d.CrossProduct(indexed[f.Item2].Point - indexed[f.Item1].Point, indexed[f.Item3].Point - indexed[f.Item1].Point);
                 return Vector3d.Multiply(normal, indexed[i].Point - indexed[f.Item1].Point) > context.AbsoluteTolerance;
-            }),];
+            }),
+            ];
 
             if (visibleFaces.Length is 0) {
                 continue;
@@ -366,25 +368,16 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ComputeVoronoi2D(points: points, triangles: triangles, _: context));
 
-    private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext _) {
-        Dictionary<int, List<Point3d>> voronoiCells = Enumerable.Range(0, points.Length).ToDictionary(static i => i, static _ => new List<Point3d>());
-        Point3d[] circumcenters = [.. triangles.Select(t => Circumcenter2D(points[t[0]], points[t[1]], points[t[2]])),];
-
-        for (int i = 0; i < triangles.Length; i++) {
-            int[] triangle = triangles[i];
-            Point3d cc = circumcenters[i];
-            voronoiCells[triangle[0]].Add(cc);
-            voronoiCells[triangle[1]].Add(cc);
-            voronoiCells[triangle[2]].Add(cc);
-        }
-
-        Point3d[][] result = [.. voronoiCells.Values.Select(cell => {
-            Point3d center = new(cell.Average(p => p.X), cell.Average(p => p.Y), cell.Average(p => p.Z));
-            return cell.OrderBy(p => Math.Atan2(p.Y - center.Y, p.X - center.X)).ToArray();
-        }),];
-
-        return ResultFactory.Create<Point3d[][]>(value: result);
-    }
+    private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext _) =>
+        ResultFactory.Create(value: triangles.Select(t => Circumcenter2D(points[t[0]], points[t[1]], points[t[2]])).ToArray() is Point3d[] circumcenters
+            ? Enumerable.Range(0, points.Length).Select(i =>
+                triangles.Select((t, ti) => (t, ti))
+                    .Where(p => p.t.Contains(i))
+                    .Select(p => circumcenters[p.ti])
+                    .ToArray() is { Length: > 0 } cell
+                        ? cell.OrderBy(p => Math.Atan2(p.Y - cell.Average(c => c.Y), p.X - cell.Average(c => c.X))).ToArray()
+                        : []).ToArray()
+            : []);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Circumcenter2D(Point3d a, Point3d b, Point3d c) {

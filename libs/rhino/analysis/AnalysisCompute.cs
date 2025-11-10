@@ -17,36 +17,36 @@ internal static class AnalysisCompute {
                 ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("Surface domain too small"))
                 : ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
                     int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
-                SurfaceCurvature[] curvatures = [.. Enumerable.Range(0, gridSize)
-                    .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0)))))
-                    .Select(uv => (UV: uv, Curvature: surface.CurvatureAt(u: uv.u, v: uv.v)))
-                    .Where(pair => !double.IsNaN(pair.Curvature.Gaussian) && !double.IsInfinity(pair.Curvature.Gaussian))
-                    .Select(pair => pair.Curvature),
-                ];
-                return curvatures.Length > 0
-                    ? ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
-                        double[] gaussianSorted = [.. curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order()];
-                        double medianGaussian = gaussianSorted.Length > 0 ? gaussianSorted[gaussianSorted.Length / 2] : 0.0;
-                        double maxGaussian = gaussianSorted.Length > 0 ? gaussianSorted[^1] : 0.0;
-                        double avgGaussian = curvatures.Average(sc => Math.Abs(sc.Gaussian));
-                        double stdDevGaussian = Math.Sqrt(curvatures.Sum(sc => Math.Pow(Math.Abs(sc.Gaussian) - avgGaussian, 2)) / curvatures.Length);
+                    SurfaceCurvature[] curvatures = [.. Enumerable.Range(0, gridSize)
+                        .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0)))))
+                        .Select(uv => (UV: uv, Curvature: surface.CurvatureAt(u: uv.u, v: uv.v)))
+                        .Where(pair => !double.IsNaN(pair.Curvature.Gaussian) && !double.IsInfinity(pair.Curvature.Gaussian))
+                        .Select(pair => pair.Curvature),
+                    ];
+                    return curvatures.Length > 0
+                        ? ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
+                            double[] gaussianSorted = [.. curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order()];
+                            double medianGaussian = gaussianSorted.Length > 0 ? gaussianSorted[gaussianSorted.Length / 2] : 0.0;
+                            double maxGaussian = gaussianSorted.Length > 0 ? gaussianSorted[^1] : 0.0;
+                            double avgGaussian = curvatures.Average(sc => Math.Abs(sc.Gaussian));
+                            double stdDevGaussian = Math.Sqrt(curvatures.Sum(sc => Math.Pow(Math.Abs(sc.Gaussian) - avgGaussian, 2)) / curvatures.Length);
 
-                        (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
-                            .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
-                        ];
-                        (double, double)[] singularities = [.. uvGrid.Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)),];
+                            (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
+                                .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
+                            ];
+                            (double, double)[] singularities = [.. uvGrid.Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)),];
 
-                        // Manufacturing score penalizes surfaces with high variation in Gaussian curvature.
-                        // Formula normalizes std dev by median (typical magnitude) and configurable multiplier.
-                        // High variation relative to scale reduces score, reflecting lower manufacturability.
-                        double score = medianGaussian > context.AbsoluteTolerance
-                            ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier)))
-                            : maxGaussian < context.AbsoluteTolerance ? 1.0 : 0.0;
+                            // Manufacturing score penalizes surfaces with high variation in Gaussian curvature.
+                            // Formula normalizes std dev by median (typical magnitude) and configurable multiplier.
+                            // High variation relative to scale reduces score, reflecting lower manufacturability.
+                            double score = medianGaussian > context.AbsoluteTolerance
+                                ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier)))
+                                : maxGaussian < context.AbsoluteTolerance ? 1.0 : 0.0;
 
-                        return ResultFactory.Create(value: (GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(), MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(), Singularities: singularities, ManufacturingScore: Math.Clamp(score, 0.0, 1.0)));
-                    }))()
-                    : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
-            }))();
+                            return ResultFactory.Create(value: (GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(), MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(), Singularities: singularities, ManufacturingScore: Math.Clamp(score, 0.0, 1.0)));
+                        }))()
+                        : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
+                }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double SmoothnessScore, double[] CurvatureSamples, (double Parameter, bool IsSharp)[] InflectionPoints, double EnergyMetric)> CurveFairness(Curve curve, IGeometryContext context) =>
