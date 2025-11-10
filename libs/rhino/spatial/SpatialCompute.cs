@@ -107,11 +107,7 @@ internal static class SpatialCompute {
                 centroids[i] = newCentroid;
             }
 
-            maxShift = maxShift <= tol ? maxShift : (maxShift > double.MaxValue ? double.MaxValue : maxShift);
-
-            if (maxShift <= tol) {
-                break;
-            }
+            _ = maxShift <= tol ? iter = maxIter : 0;
         }
 
         return assignments;
@@ -124,9 +120,6 @@ internal static class SpatialCompute {
 
         // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
         RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
-        int[] GetNeighbors(int idx) => tree is not null
-            ? (buffer: new List<int>(), search: tree.Search(new Sphere(pts[idx], eps), (_, args) => _ = args.Id != idx ? buffer.Add(args.Id) : -1)) is var _ ? [.. buffer,] : []
-            : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
 
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
@@ -134,7 +127,9 @@ internal static class SpatialCompute {
             }
 
             visited[i] = true;
-            int[] neighbors = GetNeighbors(i);
+            int[] neighbors = tree is not null
+                ? ((Func<int[]>)(() => { List<int> buffer = []; _ = tree.Search(new Sphere(pts[i], eps), (_, args) => _ = args.Id != i ? buffer.Add(args.Id) : -1); return [.. buffer,]; }))()
+                : [.. Enumerable.Range(0, pts.Length).Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps),];
 
             if (neighbors.Length < minPts) {
                 continue;
@@ -150,7 +145,9 @@ internal static class SpatialCompute {
                 }
 
                 visited[cur] = true;
-                int[] curNeighbors = GetNeighbors(cur);
+                int[] curNeighbors = tree is not null
+                    ? ((Func<int[]>)(() => { List<int> buffer = []; _ = tree.Search(new Sphere(pts[cur], eps), (_, args) => _ = args.Id != cur ? buffer.Add(args.Id) : -1); return [.. buffer,]; }))()
+                    : [.. Enumerable.Range(0, pts.Length).Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps),];
 
                 if (curNeighbors.Length >= minPts) {
                     foreach (int nb in curNeighbors.Where(nb => assignments[nb] == -1)) {
@@ -158,9 +155,7 @@ internal static class SpatialCompute {
                     }
                 }
 
-                if (assignments[cur] == -1) {
-                    assignments[cur] = clusterId;
-                }
+                assignments[cur] = assignments[cur] == -1 ? clusterId : assignments[cur];
             }
 
             clusterId++;
