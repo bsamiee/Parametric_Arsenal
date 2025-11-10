@@ -24,7 +24,7 @@ internal static class OrientCompute {
                     ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Validation.ToleranceAbsoluteInvalid)
                     : brep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
                         ? ((Func<Result<(Transform, double, byte[])>>)(() => {
-                            using VolumeMassProperties? vmp = criteria is 2 && brep.IsSolid && brep.IsManifold ? VolumeMassProperties.Compute(brep) : null;
+                            using VolumeMassProperties? vmp = brep.IsSolid && brep.IsManifold ? VolumeMassProperties.Compute(brep) : null;
                             Plane[] testPlanes = [
                                 new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
                                 new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
