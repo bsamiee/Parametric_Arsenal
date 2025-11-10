@@ -62,7 +62,7 @@ public sealed class SharedUtilitiesTests {
     public void TestBench_Measure_RecordsTiming() {
         TestBench.Measurement m = TestBench.Measure(() => { int x = 0; for (int i = 0; i < 100; i++) { x += i; } }, iterations: 10);
         Assert.True(m.ElapsedTicks > 0);
-        Assert.True(m.Iterations == 10);
+        Assert.Equal(10, m.Iterations);
     }
 
     /// <summary>Verifies TestBench.Benchmark for statistical analysis.</summary>
@@ -105,7 +105,7 @@ public sealed class SharedUtilitiesTests {
     /// <summary>Verifies Test.Law for category theory laws.</summary>
     [Fact]
     public void TestLaw_Verify_ChecksFunctorIdentity() {
-        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(new Arsenal.Core.Errors.SystemError(Arsenal.Core.Errors.ErrorDomain.Results, 1000, "test")), successWeight: 1, failureWeight: 0);
+        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(new Errors.SystemError(Errors.ErrorDomain.Results, 1000, "test")), successWeight: 1, failureWeight: 0);
         Test.Law<int>("FunctorIdentity", gen, 50);
     }
 

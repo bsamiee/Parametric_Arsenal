@@ -69,7 +69,7 @@ public static class Test {
         bool isAction = assertion.GetType() == typeof(Action<,>).MakeGenericType(typeArgs);
         Func<T, bool> runner = isAction
             ? v => { (object? item1, object? item2) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v)); InvokeTuple(assertion, item1, item2); return true; }
-            : v => { (object? item1, object? item2) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2)!; };
+        : v => { (object? item1, object? item2) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2)!; };
         gen.Sample(runner, iter: iter);
         return 0;
     }
@@ -79,7 +79,7 @@ public static class Test {
         bool isAction = assertion.GetType() == typeof(Action<,,>).MakeGenericType(typeArgs);
         Func<T, bool> runner = isAction
             ? v => { (object? item1, object? item2, object? item3) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v)); InvokeTuple(assertion, item1, item2, item3); return true; }
-            : v => { (object? item1, object? item2, object? item3) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2, item3)!; };
+        : v => { (object? item1, object? item2, object? item3) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2, item3)!; };
         gen.Sample(runner, iter: iter);
         return 0;
     }
@@ -213,7 +213,7 @@ public static class Test {
 
     /// <summary>Verifies Result is success and value satisfies predicate.</summary>
     public static void Success<T>(Result<T> result, Func<T, bool>? predicate = null, string? message = null) =>
-        result.Match(
+        _ = result.Match(
             onSuccess: value => {
                 _ = predicate is null || predicate(value) ? true : throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"Success predicate failed for value {value}"));
                 return true;
@@ -222,7 +222,7 @@ public static class Test {
 
     /// <summary>Verifies Result is failure with optional error predicate.</summary>
     public static void Failure<T>(Result<T> result, Func<SystemError[], bool>? predicate = null, string? message = null) =>
-        result.Match(
+        _ = result.Match(
             onSuccess: value => throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"Expected failure but got success with value {value}")),
             onFailure: errors => {
                 _ = predicate is null || predicate(errors) ? true : throw new InvalidOperationException(message ?? string.Create(CultureInfo.InvariantCulture, $"Failure predicate violated for errors: {string.Join(", ", errors.Select(e => e.Message))}"));
