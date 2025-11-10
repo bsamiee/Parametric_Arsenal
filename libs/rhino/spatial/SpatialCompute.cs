@@ -286,6 +286,7 @@ internal static class SpatialCompute {
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
                 : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
 
+    [Pure]
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
         points.Where((_, i) => i >= 2).Select((p, i) => (Area: TriangleArea(points[a].Point, points[b].Point, p.Point), Idx: i + 2))
@@ -392,6 +393,7 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ComputeVoronoi2D(points: points, triangles: triangles, _: context));
 
+    [Pure]
     private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext _) =>
         ResultFactory.Create(value: triangles.Select(t => Circumcenter2D(points[t[0]], points[t[1]], points[t[2]])).ToArray() is Point3d[] circumcenters
             ? Enumerable.Range(0, points.Length).Select(i =>
