@@ -18,7 +18,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies value type default handling using zero-value semantics.</summary>
     [Fact]
-    public void ValueTypeDefaultHandlingCreatesSuccessfully() => TestGen.RunAll(
+    public void ValueTypeDefaultHandlingCreatesSuccessfully() => Test.RunAll(
         () => Assert.Equal((true, 0), (ResultFactory.Create(value: 0).IsSuccess, ResultFactory.Create(value: 0).Value)),
         () => Assert.Equal((true, 0.0), (ResultFactory.Create(value: 0.0).IsSuccess, ResultFactory.Create(value: 0.0).Value)),
         () => Assert.Equal((true, false), (ResultFactory.Create(value: false).IsSuccess, ResultFactory.Create(value: false).Value)),
@@ -28,7 +28,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Ensure with empty validation array returns identity.</summary>
     [Fact]
-    public void EnsureEmptyValidationArrayReturnsIdentity() => TestGen.RunAll(
+    public void EnsureEmptyValidationArrayReturnsIdentity() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> original = ResultFactory.Create(value: v);
             Result<int> ensured = original.Ensure([]);
@@ -39,7 +39,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies OnError overloads apply correct transformations with explicit type dispatch.</summary>
     [Fact]
-    public void OnErrorOverloadsApplyCorrectTransformations() => TestGen.RunAll(
+    public void OnErrorOverloadsApplyCorrectTransformations() => Test.RunAll(
         () => {
             Result<int> mapped = ResultFactory.Create<int>(error: Errors.E1).OnError(_ => [Errors.E2]);
             Assert.Equal(Errors.E2, mapped.Error);
@@ -59,7 +59,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Traverse with single values versus collections using type-based dispatch.</summary>
     [Fact]
-    public void TraverseSingleValueVersusCollectionBehavesCorrectly() => TestGen.RunAll(
+    public void TraverseSingleValueVersusCollectionBehavesCorrectly() => Test.RunAll(
         () => {
             Result<IReadOnlyList<string>> single = ResultFactory.Create(value: 42).Traverse(x => ResultFactory.Create(value: x.ToString(CultureInfo.InvariantCulture)));
             Assert.Equal((true, 1, "42"), (single.IsSuccess, single.Value.Count, single.Value[0]));
@@ -77,7 +77,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies TraverseElements with empty collections and error propagation.</summary>
     [Fact]
-    public void TraverseElementsEmptyAndErrorPropagationHandlesCorrectly() => TestGen.RunAll(
+    public void TraverseElementsEmptyAndErrorPropagationHandlesCorrectly() => Test.RunAll(
         () => {
             Result<IReadOnlyList<int>> empty = ResultFactory.Create<IEnumerable<int>>(value: []).TraverseElements(x => ResultFactory.Create(value: x * 2));
             Assert.Equal((true, 0), (empty.IsSuccess, empty.Value.Count));
@@ -96,7 +96,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Lift partial application actually executes returned function.</summary>
     [Fact]
-    public void LiftPartialApplicationExecutesCorrectly() => TestGen.RunAll(
+    public void LiftPartialApplicationExecutesCorrectly() => Test.RunAll(
         () => {
             Result<Func<object[], int>> partial = (Result<Func<object[], int>>)ResultFactory.Lift<int>(
                 (Func<int, int, int, int>)((x, y, z) => unchecked(x + y + z)),
@@ -114,7 +114,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Ensure with deferred results evaluates lazily then filters.</summary>
     [Fact]
-    public void EnsureDeferredEvaluationThenFiltersCorrectly() => TestGen.RunAll(
+    public void EnsureDeferredEvaluationThenFiltersCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             int count = 0;
             Result<int> deferred = ResultFactory.Create(deferred: () => { count++; return ResultFactory.Create(value: v); });
@@ -127,7 +127,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Match for reduction semantics with success handler defaults to seed on failure.</summary>
     [Fact]
-    public void MatchReductionWithoutFailureHandlerDefaultsToSeed() => TestGen.RunAll(
+    public void MatchReductionWithoutFailureHandlerDefaultsToSeed() => Test.RunAll(
         () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((seed, val) =>
             Assert.Equal(unchecked(seed + val), ResultFactory.Create(value: val).Match(v => unchecked(seed + v), _ => seed)))),
         () => Gen.Int.Run((Action<int>)(seed =>
@@ -136,7 +136,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Match executes correct branch with exhaustive pattern coverage.</summary>
     [Fact]
-    public void MatchExecutesCorrectBranchExhaustively() => TestGen.RunAll(
+    public void MatchExecutesCorrectBranchExhaustively() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             bool successCalled = false, failureCalled = false;
             int result = ResultFactory.Create(value: v).Match(
@@ -154,7 +154,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Tap side-effect method preserves Result identity.</summary>
     [Fact]
-    public void TapMethodPreservesResultIdentity() => TestGen.RunAll(
+    public void TapMethodPreservesResultIdentity() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> original = ResultFactory.Create(value: v);
             Result<int> tapped = original.Tap(onSuccess: _ => { });
@@ -168,7 +168,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Validate with premise and conclusion implements logical implication.</summary>
     [Fact]
-    public void ValidatePremiseConclusionImplementsImplication() => TestGen.RunAll(
+    public void ValidatePremiseConclusionImplementsImplication() => Test.RunAll(
         () => Assert.True(ResultFactory.Create(value: 5).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
         () => Assert.True(ResultFactory.Create(value: 50).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
         () => Assert.False(ResultFactory.Create(value: 150).Validate(error: Errors.E1, premise: x => x > 10, conclusion: x => x < 100).IsSuccess),
@@ -178,7 +178,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Validate unless parameter inverts predicate logic.</summary>
     [Fact]
-    public void ValidateUnlessParameterInvertsPredicateLogic() => TestGen.RunAll(
+    public void ValidateUnlessParameterInvertsPredicateLogic() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v =>
             Assert.Equal(v >= 0, ResultFactory.Create(value: v).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess))),
         () => Assert.True(ResultFactory.Create(value: 5).Validate(predicate: x => x < 0, error: Errors.E1, unless: true).IsSuccess),
@@ -186,7 +186,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Validate with monadic validation executes conditional bind.</summary>
     [Fact]
-    public void ValidateMonadicValidationExecutesConditionalBind() => TestGen.RunAll(
+    public void ValidateMonadicValidationExecutesConditionalBind() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> validated = ResultFactory.Create(value: v).Validate(
                 predicate: x => x > 10,
@@ -198,7 +198,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Create with conditionals executes inline validation.</summary>
     [Fact]
-    public void CreateWithConditionalsExecutesInlineValidation() => TestGen.RunAll(
+    public void CreateWithConditionalsExecutesInlineValidation() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v =>
             Assert.Equal(v is > 0 and < 100, ResultFactory.Create(
                 value: v,
@@ -208,7 +208,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Create with nested Result flattens correctly.</summary>
     [Fact]
-    public void CreateWithNestedResultFlattensCorrectly() => TestGen.RunAll(
+    public void CreateWithNestedResultFlattensCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<Result<int>> nested = ResultFactory.Create(value: ResultFactory.Create(value: v));
             Result<int> flattened = ResultFactory.Create<int>(nested: nested);
@@ -227,7 +227,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Match extracts value correctly with pattern matching semantics.</summary>
     [Fact]
-    public void MatchExtractsValueWithPatternMatchingSemantics() => TestGen.RunAll(
+    public void MatchExtractsValueWithPatternMatchingSemantics() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> result = ResultFactory.Create(value: v);
             (bool success, int extracted) = result.Match(val => (true, val), _ => (false, default));
@@ -241,7 +241,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies deferred Result with Map/Bind chains evaluates lazily then correctly.</summary>
     [Fact]
-    public void DeferredResultWithChainsEvaluatesLazilyThenCorrectly() => TestGen.RunAll(
+    public void DeferredResultWithChainsEvaluatesLazilyThenCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             int evalCount = 0, mapCount = 0, bindCount = 0;
             Result<int> deferred = ResultFactory.Create(deferred: () => { evalCount++; return ResultFactory.Create(value: v); });
@@ -254,7 +254,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies OnError does not execute handlers on success with all overloads.</summary>
     [Fact]
-    public void OnErrorDoesNotExecuteHandlersOnSuccess() => TestGen.RunAll(
+    public void OnErrorDoesNotExecuteHandlersOnSuccess() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             bool mapCalled = false;
             Result<int> result = ResultFactory.Create(value: v).OnError(_ => { mapCalled = true; return [Errors.E1]; });
@@ -273,7 +273,7 @@ public sealed class ResultEdgeCaseTests {
 
     /// <summary>Verifies Ensure with mixed validation array formats handles correctly.</summary>
     [Fact]
-    public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => TestGen.RunAll(
+    public void EnsureMixedValidationArrayFormatsHandlesCorrectly() => Test.RunAll(
         () => Gen.Int.Run((Action<int>)(v => {
             Result<int> result = ResultFactory.Create(value: v).Ensure(
                 (x => x > 0, Errors.E1),

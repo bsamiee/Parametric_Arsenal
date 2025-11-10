@@ -194,7 +194,8 @@
           "Arsenal.Core": "[1.0.0, )",
           "CsCheck": "[4.4.1, )",
           "Microsoft.NET.Test.Sdk": "[18.0.0, )",
-          "xunit.abstractions": "[2.0.3, )"
+          "xunit.abstractions": "[2.0.3, )",
+          "xunit.assert": "[2.9.2, )"
         }
       }
     }

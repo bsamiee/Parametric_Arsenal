@@ -91,22 +91,22 @@ public sealed class SharedUtilitiesTests {
         Assert.True(throughput > 0.0);
     }
 
-    /// <summary>Verifies TestGen.RunAll executes all assertions.</summary>
+    /// <summary>Verifies Test.RunAll executes all assertions.</summary>
     [Fact]
     public void TestGen_RunAll_ExecutesAllAssertions() {
         int count = 0;
-        TestGen.RunAll(
+        Test.RunAll(
             () => count++,
             () => count++,
             () => count++);
         Assert.Equal(3, count);
     }
 
-    /// <summary>Verifies TestLaw.Verify for category theory laws.</summary>
+    /// <summary>Verifies Test.Law for category theory laws.</summary>
     [Fact]
     public void TestLaw_Verify_ChecksFunctorIdentity() {
         Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(new Arsenal.Core.Errors.SystemError(Arsenal.Core.Errors.ErrorDomain.Results, 1000, "test")), successWeight: 1, failureWeight: 0);
-        TestLaw.Verify<int>("FunctorIdentity", gen, 50);
+        Test.Law<int>("FunctorIdentity", gen, 50);
     }
 
     /// <summary>Verifies TestAssert.Combine for assertion composition.</summary>
