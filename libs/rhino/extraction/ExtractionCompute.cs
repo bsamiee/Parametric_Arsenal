@@ -43,30 +43,13 @@ internal static class ExtractionCompute {
     }
 
     [Pure]
-    private static (byte Type, double Param) ClassifyEdge(BrepEdge edge, Brep brep) {
-        (double tMin, double tMax) = (edge.Domain.Min, edge.Domain.Max);
-        double[] parameters = new double[ExtractionConfig.FilletCurvatureSampleCount];
-
-        for (int i = 0; i < ExtractionConfig.FilletCurvatureSampleCount; i++) {
-            parameters[i] = edge.Domain.ParameterAt(i / (ExtractionConfig.FilletCurvatureSampleCount - 1.0));
-        }
-
-        Vector3d[] curvatureVectors = new Vector3d[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++) {
-            curvatureVectors[i] = edge.EdgeCurve.CurvatureAt(parameters[i]);
-        }
-
-        double[] curvatures = [.. curvatureVectors.Where(v => v.IsValid).Select(v => v.Length),];
-
-        return curvatures.Length < 2
-            ? (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: edge.EdgeCurve.GetLength())
-            : ClassifyEdgeFromCurvature(
-                edge: edge,
-                brep: brep,
-                curvatures: curvatures,
-                tMin: tMin,
-                tMax: tMax);
-    }
+    private static (byte Type, double Param) ClassifyEdge(BrepEdge edge, Brep brep) =>
+        (edge.Domain.Min, edge.Domain.Max, Enumerable.Range(0, ExtractionConfig.FilletCurvatureSampleCount)
+            .Select(i => edge.EdgeCurve.CurvatureAt(edge.Domain.ParameterAt(i / (ExtractionConfig.FilletCurvatureSampleCount - 1.0))))
+            .Where(v => v.IsValid)
+            .Select(v => v.Length).ToArray()) is (double tMin, double tMax, double[] curvatures) && curvatures.Length >= 2
+                ? ClassifyEdgeFromCurvature(edge: edge, brep: brep, curvatures: curvatures, tMin: tMin, tMax: tMax)
+                : (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: edge.EdgeCurve.GetLength());
 
     [Pure]
     private static (byte Type, double Param) ClassifyEdgeFromCurvature(
@@ -74,25 +57,12 @@ internal static class ExtractionCompute {
         Brep brep,
         double[] curvatures,
         double tMin,
-        double tMax) {
-        double mean = curvatures.Average();
-        double variance = curvatures.Sum(k => (k - mean) * (k - mean)) / curvatures.Length;
-        double stdDev = Math.Sqrt(variance);
-        double coefficientOfVariation = mean > ExtractionConfig.Epsilon ? stdDev / mean : 0.0;
-
-        bool isG2Continuous = !edge.GetNextDiscontinuity(
-            continuityType: Continuity.G2_locus_continuous,
-            t0: tMin,
-            t1: tMax,
-            t: out double _);
-
-        bool isConstantCurvature = coefficientOfVariation < ExtractionConfig.FilletCurvatureVariationThreshold;
-        bool isFillet = isG2Continuous && isConstantCurvature && mean > ExtractionConfig.Epsilon;
-
-        return isFillet
-            ? (Type: ExtractionConfig.FeatureTypeFillet, Param: 1.0 / mean)
-            : ClassifyEdgeByDihedral(edge: edge, brep: brep, mean: mean);
-    }
+        double tMax) =>
+        (curvatures.Average(), !edge.GetNextDiscontinuity(continuityType: Continuity.G2_locus_continuous, t0: tMin, t1: tMax, t: out double _)) is (double mean, bool isG2)
+            && Math.Sqrt(curvatures.Sum(k => (k - mean) * (k - mean)) / curvatures.Length) / (mean > ExtractionConfig.Epsilon ? mean : 1.0) is double coeffVar
+            && isG2 && coeffVar < ExtractionConfig.FilletCurvatureVariationThreshold && mean > ExtractionConfig.Epsilon
+                ? (Type: ExtractionConfig.FeatureTypeFillet, Param: 1.0 / mean)
+                : ClassifyEdgeByDihedral(edge: edge, brep: brep, mean: mean);
 
     [Pure]
     private static (byte Type, double Param) ClassifyEdgeByDihedral(BrepEdge edge, Brep brep, double mean) {
@@ -230,31 +200,21 @@ internal static class ExtractionCompute {
                             };
 
     [Pure]
-    private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) {
-        (Interval u, Interval v) = (surface.Domain(0), surface.Domain(1));
-        int samplesPerDir = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount));
-        double[] squaredDistances = new double[samplesPerDir * samplesPerDir];
-        int idx = 0;
-        for (int i = 0; i < samplesPerDir; i++) {
-            for (int j = 0; j < samplesPerDir; j++) {
-                double uParam = u.ParameterAt(i / (double)(samplesPerDir - 1));
-                double vParam = v.ParameterAt(j / (double)(samplesPerDir - 1));
-                Point3d surfacePoint = surface.PointAt(u: uParam, v: vParam);
-                Point3d primitivePoint = type switch {
-                    ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(surfacePoint),
-                    ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
-                    ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
-                    ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: surfacePoint, conePlane: frame, baseRadius: pars[0], height: pars[1]),
-                    ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: surfacePoint, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
-                    ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(surfacePoint),
-                    _ => surfacePoint,
-                };
-                squaredDistances[idx++] = surfacePoint.DistanceToSquared(primitivePoint);
-            }
-        }
-
-        return Math.Sqrt(squaredDistances.Sum() / (samplesPerDir * samplesPerDir));
-    }
+    private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) =>
+        (surface.Domain(0), surface.Domain(1), (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount))) is (Interval u, Interval v, int samplesPerDir)
+            ? Math.Sqrt(Enumerable.Range(0, samplesPerDir).SelectMany(i => Enumerable.Range(0, samplesPerDir).Select(j =>
+                surface.PointAt(u: u.ParameterAt(i / (double)(samplesPerDir - 1)), v: v.ParameterAt(j / (double)(samplesPerDir - 1))) is Point3d sp
+                    ? sp.DistanceToSquared(type switch {
+                        ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(sp),
+                        ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: sp, cylinderPlane: frame, radius: pars[0]),
+                        ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: sp, center: frame.Origin, radius: pars[0]),
+                        ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: sp, conePlane: frame, baseRadius: pars[0], height: pars[1]),
+                        ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: sp, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
+                        ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(sp),
+                        _ => sp,
+                    })
+                    : 0.0)).Sum() / (samplesPerDir * samplesPerDir))
+            : 0.0;
 
     [Pure]
     private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) {
@@ -307,15 +267,8 @@ internal static class ExtractionCompute {
                 error: E.Geometry.NoPatternDetected.WithContext($"Need at least {ExtractionConfig.PatternMinInstances.ToString(System.Globalization.CultureInfo.InvariantCulture)} instances"))
             : DetectPatternType(centers: [.. geometries.Select(g => g.GetBoundingBox(accurate: false).Center),], context: context);
 
-    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) {
-        Vector3d[] deltas = new Vector3d[centers.Length - 1];
-        for (int i = 0; i < deltas.Length; i++) {
-            deltas[i] = centers[i + 1] - centers[i];
-        }
-
-        bool allDeltasEqual = deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance);
-
-        return allDeltasEqual
+    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
+        Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[i]).ToArray() is Vector3d[] deltas && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeLinear, SymmetryTransform: Transform.Translation(deltas[0]), Confidence: 1.0))
             : TryDetectRadialPattern(centers: centers, context: context) is Result<(byte, Transform, double)> radialResult && radialResult.IsSuccess
                 ? radialResult
@@ -323,9 +276,7 @@ internal static class ExtractionCompute {
                     ? gridResult
                     : TryDetectScalingPattern(centers: centers, context: context) is Result<(byte, Transform, double)> scaleResult && scaleResult.IsSuccess
                         ? scaleResult
-                        : ResultFactory.Create<(byte, Transform, double)>(
-                            error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
-    }
+                        : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
         Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
@@ -348,29 +299,12 @@ internal static class ExtractionCompute {
         Point3d[] centers,
         Point3d centroid,
         double _,
-        IGeometryContext __) {
-        Vector3d[] radii = new Vector3d[centers.Length];
-        for (int i = 0; i < centers.Length; i++) {
-            radii[i] = centers[i] - centroid;
-        }
-
-        Vector3d normal = ComputeBestFitPlaneNormal(points: centers, centroid: centroid);
-        double[] angles = new double[centers.Length - 1];
-
-        for (int i = 0; i < angles.Length; i++) {
-            angles[i] = Vector3d.VectorAngle(radii[i], radii[i + 1]);
-        }
-
-        double meanAngle = angles.Average();
-        bool uniformAngles = angles.All(a => Math.Abs(a - meanAngle) < ExtractionConfig.RadialAngleVariationThreshold);
-
-        return uniformAngles
-            ? ResultFactory.Create(value: (
-                Type: ExtractionConfig.PatternTypeRadial,
-                SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid),
-                Confidence: 0.9))
-            : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
-    }
+        IGeometryContext __) =>
+        (centers.Select(c => c - centroid).ToArray(), ComputeBestFitPlaneNormal(points: centers, centroid: centroid)) is (Vector3d[] radii, Vector3d normal)
+            && Enumerable.Range(0, radii.Length - 1).Select(i => Vector3d.VectorAngle(radii[i], radii[i + 1])).ToArray() is double[] angles
+            && angles.Average() is double meanAngle && angles.All(a => Math.Abs(a - meanAngle) < ExtractionConfig.RadialAngleVariationThreshold)
+                ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeRadial, SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid), Confidence: 0.9))
+                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
     private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) {
@@ -390,25 +324,13 @@ internal static class ExtractionCompute {
         return Vector3d.ZAxis;
     }
 
-    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) {
-        Point3d origin = centers[0];
-        Vector3d[] relativeVectors = new Vector3d[centers.Length - 1];
-
-        for (int i = 0; i < relativeVectors.Length; i++) {
-            relativeVectors[i] = centers[i + 1] - origin;
-        }
-
-        Vector3d[] candidates = [.. relativeVectors.Where(v => v.Length > context.AbsoluteTolerance),];
-
-        return candidates.Length >= 2
+    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
+        (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)
+            && relativeVectors.Where(v => v.Length > context.AbsoluteTolerance).ToArray() is Vector3d[] candidates && candidates.Length >= 2
             && FindGridBasis(candidates: candidates, context: context) is (Vector3d u, Vector3d v, bool success) && success
             && relativeVectors.All(vec => IsGridPoint(vector: vec, u: u, v: v, context: context))
-            ? ResultFactory.Create(value: (
-                Type: ExtractionConfig.PatternTypeGrid,
-                SymmetryTransform: Transform.PlaneToPlane(Plane.WorldXY, new Plane(origin, u, v)),
-                Confidence: 0.9))
-            : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
-    }
+                ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeGrid, SymmetryTransform: Transform.PlaneToPlane(Plane.WorldXY, new Plane(origin, u, v)), Confidence: 0.9))
+                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) {
         Vector3d[] orderedCandidates = [.. candidates.OrderBy(c => c.SquareLength),];
@@ -435,30 +357,13 @@ internal static class ExtractionCompute {
             && Math.Abs(b - Math.Round(b)) < ExtractionConfig.GridPointDeviationThreshold;
     }
 
-    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectScalingPattern(Point3d[] centers, IGeometryContext context) {
-        Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
-        double[] distances = new double[centers.Length];
-
-        for (int i = 0; i < centers.Length; i++) {
-            distances[i] = centroid.DistanceTo(centers[i]);
-        }
-
-        double[] ratios = new double[distances.Length - 1];
-        for (int i = 0; i < ratios.Length; i++) {
-            ratios[i] = distances[i] > context.AbsoluteTolerance ? distances[i + 1] / distances[i] : 0.0;
-        }
-
-        double[] validRatios = [.. ratios.Where(r => r > context.AbsoluteTolerance),];
-
-        return validRatios.Length >= 2
-            && ComputeVariance(values: validRatios) is double variance
-            && variance < ExtractionConfig.ScalingVarianceThreshold
-            ? ResultFactory.Create(value: (
-                Type: ExtractionConfig.PatternTypeScaling,
-                SymmetryTransform: Transform.Scale(anchor: centroid, scaleFactor: validRatios.Average()),
-                Confidence: 0.7))
-            : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
-    }
+    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectScalingPattern(Point3d[] centers, IGeometryContext context) =>
+        new Point3d(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z)) is Point3d centroid
+            && centers.Select(c => centroid.DistanceTo(c)).ToArray() is double[] distances
+            && Enumerable.Range(0, distances.Length - 1).Select(i => distances[i] > context.AbsoluteTolerance ? distances[i + 1] / distances[i] : 0.0).Where(r => r > context.AbsoluteTolerance).ToArray() is double[] validRatios
+            && validRatios.Length >= 2 && ComputeVariance(values: validRatios) is double variance && variance < ExtractionConfig.ScalingVarianceThreshold
+                ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeScaling, SymmetryTransform: Transform.Scale(anchor: centroid, scaleFactor: validRatios.Average()), Confidence: 0.7))
+                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
     private static double ComputeVariance(double[] values) =>
