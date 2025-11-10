@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Globalization;
 using Arsenal.Core.Results;
 using CsCheck;
 
@@ -20,40 +21,43 @@ public static class TestLaw {
 
     /// <summary>Verifies category theory laws using FrozenDictionary O(1) dispatch with polymorphic arity.</summary>
     public static void Verify<T>(string law, params object[] args) where T : notnull {
-        switch (law, args) {
-            case ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", [Gen<Result<T>> gen,]):
-                ((Action<Gen<Result<object>>, int>)_laws[law])(gen.Select(static r => r.Map(static x => (object)x!)), 100);
-                break;
-            case ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", [Gen<Result<T>> gen, int iter,]):
-                ((Action<Gen<Result<object>>, int>)_laws[law])(gen.Select(static r => r.Map(static x => (object)x!)), iter);
-                break;
-            case ("EqualitySymmetric", [Gen<Result<T>> gen1, Gen<Result<T>> gen2,]):
-                ((Action<Gen<Result<object>>, Gen<Result<object>>, int>)_laws[law])(
-                    gen1.Select(static r => r.Map(static x => (object)x!)),
-                    gen2.Select(static r => r.Map(static x => (object)x!)),
-                    100);
-                break;
-            case ("EqualitySymmetric", [Gen<Result<T>> gen1, Gen<Result<T>> gen2, int iter,]):
-                ((Action<Gen<Result<object>>, Gen<Result<object>>, int>)_laws[law])(
-                    gen1.Select(static r => r.Map(static x => (object)x!)),
-                    gen2.Select(static r => r.Map(static x => (object)x!)),
-                    iter);
-                break;
-            case ("HashConsistent", [Gen<T> gen, Func<T, Result<T>> toResult,]):
-                ((Action<Gen<object>, Func<object, Result<object>>, int>)_laws[law])(
-                    gen.Select(static x => (object)x!),
-                    v => toResult((T)v).Map(static x => (object)x!),
-                    100);
-                break;
-            case ("HashConsistent", [Gen<T> gen, Func<T, Result<T>> toResult, int iter,]):
-                ((Action<Gen<object>, Func<object, Result<object>>, int>)_laws[law])(
-                    gen.Select(static x => (object)x!),
-                    v => toResult((T)v).Map(static x => (object)x!),
-                    iter);
-                break;
-            default:
-                throw new ArgumentException($"Unsupported law: {law} with {args.Length} args", nameof(law));
-        }
+        int argCount = args.Length;
+        _ = (law, argCount) switch {
+            ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", 1) =>
+                InvokeUnaryLaw(law, (Gen<Result<T>>)args[0], 100),
+            ("FunctorIdentity" or "MonadRightIdentity" or "ApplicativeIdentity" or "EqualityReflexive", 2) =>
+                InvokeUnaryLaw(law, (Gen<Result<T>>)args[0], (int)args[1]),
+            ("EqualitySymmetric", 2) =>
+                InvokeBinaryLaw(law, (Gen<Result<T>>)args[0], (Gen<Result<T>>)args[1], 100),
+            ("EqualitySymmetric", 3) =>
+                InvokeBinaryLaw(law, (Gen<Result<T>>)args[0], (Gen<Result<T>>)args[1], (int)args[2]),
+            ("HashConsistent", 2) =>
+                InvokeHashLaw(law, (Gen<T>)args[0], (Func<T, Result<T>>)args[1], 100),
+            ("HashConsistent", 3) =>
+                InvokeHashLaw(law, (Gen<T>)args[0], (Func<T, Result<T>>)args[1], (int)args[2]),
+            _ => throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Unsupported law: {law} with {argCount} args"), nameof(law)),
+        };
+    }
+
+    private static int InvokeUnaryLaw<T>(string law, Gen<Result<T>> gen, int iter) where T : notnull {
+        ((Action<Gen<Result<object>>, int>)_laws[law])(gen.Select(static r => r.Map(static x => (object)x!)), iter);
+        return 0;
+    }
+
+    private static int InvokeBinaryLaw<T>(string law, Gen<Result<T>> gen1, Gen<Result<T>> gen2, int iter) where T : notnull {
+        ((Action<Gen<Result<object>>, Gen<Result<object>>, int>)_laws[law])(
+            gen1.Select(static r => r.Map(static x => (object)x!)),
+            gen2.Select(static r => r.Map(static x => (object)x!)),
+            iter);
+        return 0;
+    }
+
+    private static int InvokeHashLaw<T>(string law, Gen<T> gen, Func<T, Result<T>> toResult, int iter) where T : notnull {
+        ((Action<Gen<object>, Func<object, Result<object>>, int>)_laws[law])(
+            gen.Select(static x => (object)x!),
+            v => toResult((T)v).Map(static x => (object)x!),
+            iter);
+        return 0;
     }
 
     /// <summary>Verifies functor identity and composition laws.</summary>

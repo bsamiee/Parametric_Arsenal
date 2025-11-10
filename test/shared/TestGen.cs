@@ -22,38 +22,41 @@ public static class TestGen {
 
     /// <summary>Executes property-based test with polymorphic delegate dispatch for Func, Action, and tuple patterns.</summary>
     public static void Run<T>(this Gen<T> gen, Delegate assertion, int iter = 100) {
-        _ = (typeof(T), typeof(T).IsGenericType ? typeof(T).GetGenericTypeDefinition() : null, assertion) switch {
-            (_, _, Func<T, bool> prop) => RunAction(() => ExecuteFunc(gen, prop, iter)),
-            (_, _, Action<T> act) => RunAction(() => ExecuteAction(gen, act, iter)),
-            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,>) => RunAction(() => ExecuteTuple2(gen, gt, assertion, iter)),
-            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,,>) => RunAction(() => ExecuteTuple3(gen, gt, assertion, iter)),
+        (Type type, Type? genericDef) = (typeof(T), typeof(T).IsGenericType ? typeof(T).GetGenericTypeDefinition() : null);
+        _ = (type, genericDef, assertion) switch {
+            (_, _, Func<T, bool> prop) => ExecuteFuncInline(gen, prop, iter),
+            (_, _, Action<T> act) => ExecuteActionInline(gen, act, iter),
+            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,>) => ExecuteTuple2Inline(gen, gt, assertion, iter),
+            (Type gt, Type gtd, _) when gtd == typeof(ValueTuple<,,>) => ExecuteTuple3Inline(gen, gt, assertion, iter),
             (Type gt, _, _) => throw new ArgumentException($"Unsupported assertion: {gt}, {assertion.GetType()}", nameof(assertion)),
         };
     }
 
-    private static int RunAction(Action action) { action(); return 0; }
+    private static int ExecuteFuncInline<T>(Gen<T> gen, Func<T, bool> prop, int iter) { gen.Sample(prop, iter: iter); return 0; }
 
-    private static void ExecuteFunc<T>(Gen<T> gen, Func<T, bool> prop, int iter) => gen.Sample(prop, iter: iter);
+    private static int ExecuteActionInline<T>(Gen<T> gen, Action<T> act, int iter) { gen.Sample(v => { act(v); return true; }, iter: iter); return 0; }
 
-    private static void ExecuteAction<T>(Gen<T> gen, Action<T> act, int iter) => gen.Sample(v => { act(v); return true; }, iter: iter);
-
-    private static void ExecuteTuple2<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
-        bool isAction = assertion.GetType() == typeof(Action<,>).MakeGenericType(genType.GetGenericArguments());
+    private static int ExecuteTuple2Inline<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
+        Type[] typeArgs = genType.GetGenericArguments();
+        bool isAction = assertion.GetType() == typeof(Action<,>).MakeGenericType(typeArgs);
         Func<T, bool> runner = isAction
-            ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),]); return true; }
-        : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v),])!;
+            ? v => { (object? item1, object? item2) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v)); InvokeTuple(assertion, item1, item2); return true; }
+            : v => { (object? item1, object? item2) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2)!; };
         gen.Sample(runner, iter: iter);
+        return 0;
     }
 
-    private static void ExecuteTuple3<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
-        bool isAction = assertion.GetType() == typeof(Action<,,>).MakeGenericType(genType.GetGenericArguments());
+    private static int ExecuteTuple3Inline<T>(Gen<T> gen, Type genType, Delegate assertion, int iter) {
+        Type[] typeArgs = genType.GetGenericArguments();
+        bool isAction = assertion.GetType() == typeof(Action<,,>).MakeGenericType(typeArgs);
         Func<T, bool> runner = isAction
-            ? v => { SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),]); return true; }
-        : v => (bool)SafeInvoke(assertion, [v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v),])!;
+            ? v => { (object? item1, object? item2, object? item3) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v)); InvokeTuple(assertion, item1, item2, item3); return true; }
+            : v => { (object? item1, object? item2, object? item3) = (v!.GetType().GetField("Item1")!.GetValue(v), v!.GetType().GetField("Item2")!.GetValue(v), v!.GetType().GetField("Item3")!.GetValue(v)); return (bool)InvokeTuple(assertion, item1, item2, item3)!; };
         gen.Sample(runner, iter: iter);
+        return 0;
     }
 
-    private static object? SafeInvoke(Delegate del, object?[] args) {
+    private static object? InvokeTuple(Delegate del, params object?[] args) {
         try {
             return del.DynamicInvoke(args);
         } catch (System.Reflection.TargetInvocationException tie) {
@@ -61,6 +64,10 @@ public static class TestGen {
         }
     }
 
-    /// <summary>Executes multiple assertions in parallel using Array.ForEach.</summary>
-    public static void RunAll(params Action[] assertions) => Array.ForEach(assertions, static action => action());
+    /// <summary>Executes multiple assertions sequentially using for loop for optimal performance.</summary>
+    public static void RunAll(params Action[] assertions) {
+        for (int i = 0; i < assertions.Length; i++) {
+            assertions[i]();
+        }
+    }
 }
