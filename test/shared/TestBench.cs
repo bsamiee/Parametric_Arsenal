@@ -140,25 +140,25 @@ public static class TestBench {
 
     /// <summary>Detects performance regression by comparing current to baseline with threshold.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static bool DetectRegression(Action baseline, Action current, double regressionThreshold = 1.1, int runs = 10) {
-        double ratio = Compare(baseline, current, runs);
-        return ratio > regressionThreshold;
+    public static bool DetectRegression(Action baseline, Action current, double regressionThreshold = 1.1, int runs = 10) =>
+        Compare(baseline, current, runs) > regressionThreshold;
+
+    /// <summary>Computes rate metric from measurement: AllocationRate (bytes/sec), Throughput (ops/sec).</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static double Rate(Measurement m, bool isThroughput) {
+        double seconds = (double)m.ElapsedTicks / Stopwatch.Frequency;
+        return seconds > 0.0 ? (isThroughput ? m.Iterations / seconds : m.MemoryBytes / seconds) : 0.0;
     }
 
     /// <summary>Measures allocation rate (bytes per second) for action.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static double AllocationRate(Action action, int iterations = 1000) {
-        Measurement m = Measure(action, iterations, warmupIterations: 10);
-        double seconds = (double)m.ElapsedTicks / Stopwatch.Frequency;
-        return seconds > 0.0 ? m.MemoryBytes / seconds : 0.0;
-    }
+    public static double AllocationRate(Action action, int iterations = 1000) =>
+        Rate(Measure(action, iterations, warmupIterations: 10), isThroughput: false);
 
     /// <summary>Verifies action produces zero allocations.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static bool IsZeroAllocation(Action action, int iterations = 100) {
-        Measurement m = Measure(action, iterations, warmupIterations: 10);
-        return m.MemoryBytes == 0;
-    }
+    public static bool IsZeroAllocation(Action action, int iterations = 100) =>
+        Measure(action, iterations, warmupIterations: 10).MemoryBytes == 0;
 
     /// <summary>Profiles hot path by measuring time distribution across iterations.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -177,25 +177,15 @@ public static class TestBench {
 
     /// <summary>Measures throughput (operations per second) for action.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static double Throughput(Action action, int iterations = 1000) {
-        Measurement m = Measure(action, iterations, warmupIterations: 10);
-        double seconds = (double)m.ElapsedTicks / Stopwatch.Frequency;
-        return seconds > 0.0 ? iterations / seconds : 0.0;
-    }
-
-    /// <summary>Finds optimal iteration count for target duration (seconds).</summary>
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    public static int CalibrateIterations(Action action, double targetSeconds = 1.0) {
-        Measurement initial = Measure(action, iterations: 10, warmupIterations: 2);
-        double initialSeconds = (double)initial.ElapsedTicks / Stopwatch.Frequency;
-        int estimated = initialSeconds > 0.0 ? (int)(targetSeconds / initialSeconds * 10) : 100;
-        return Math.Max(10, Math.Min(estimated, 100000));
-    }
+    public static double Throughput(Action action, int iterations = 1000) =>
+        Rate(Measure(action, iterations, warmupIterations: 10), isThroughput: true);
 
     /// <summary>Measures action with adaptive iteration count for consistent measurement duration.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Measurement MeasureAdaptive(Action action, double targetSeconds = 1.0) {
-        int iterations = CalibrateIterations(action, targetSeconds);
+        Measurement initial = Measure(action, iterations: 10, warmupIterations: 2);
+        double initialSeconds = (double)initial.ElapsedTicks / Stopwatch.Frequency;
+        int iterations = initialSeconds > 0.0 ? Math.Max(10, Math.Min((int)(targetSeconds / initialSeconds * 10), 100000)) : 100;
         return Measure(action, iterations, warmupIterations: Math.Max(2, iterations / 10));
     }
 
