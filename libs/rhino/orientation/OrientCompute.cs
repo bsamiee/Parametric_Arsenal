@@ -41,7 +41,7 @@ internal static class OrientCompute {
                                     : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
                                         ? (xf, criteria switch {
                                             1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
-                                            2 => vmp is not null ? Math.Max(0.0, 1.0 - ((testBox.Center - vmp.Centroid).Length / testBox.Diagonal.Length)) : 0.0,
+                                            2 => vmp is not null && testBox.Diagonal.Length > tolerance ? Math.Max(0.0, 1.0 - ((testBox.Center - vmp.Centroid).Length / testBox.Diagonal.Length)) : 0.0,
                                             3 => testBox.IsDegenerate(tolerance) is int deg ? deg switch {
                                                 0 => 0.0,
                                                 >= 1 and <= 3 => Math.Max(0.0, 1.0 - (deg / 4.0)),
