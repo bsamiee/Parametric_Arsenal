@@ -251,6 +251,52 @@ libs/rhino/curves/
 ├── Curve.cs (3-4 types), CurveCore.cs (2-3 types), CurveConfig.cs (2 types)
 ```
 
+## Pattern C: Eliminate Unnecessary Loops
+
+**BEFORE** (nested loops, O(n²)):
+```csharp
+for (int i = 0; i < curves.Length; i++) {
+    for (int j = 0; j < points.Length; j++) {
+        if (curves[i].ClosestPoint(points[j], out double t) && Distance < tolerance) {
+            results.Add((i, j));
+        }
+    }
+}
+```
+
+**AFTER** (spatial indexing, O(n+m)):
+```csharp
+RTree tree = BuildCurveTree(curves);
+for (int i = 0; i < points.Length; i++) {
+    tree.Search(new Sphere(points[i], tolerance), (_, args) => {
+        results.Add((args.Id, i));
+    });
+}
+```
+
+**BEFORE** (switch in loop):
+```csharp
+foreach (GeometryBase geom in geometries) {
+    Result<T> result = geom switch {
+        Curve c => ProcessCurve(c, context),
+        Surface s => ProcessSurface(s, context),
+        _ => error,
+    };
+    results.Add(result);
+}
+```
+
+**AFTER** (dispatch table lookup, no type switching):
+```csharp
+for (int i = 0; i < geometries.Length; i++) {
+    GeometryBase geom = geometries[i];
+    Result<T> result = _dispatch.TryGetValue(geom.GetType(), out Func<GeometryBase, IGeometryContext, Result<T>> op)
+        ? op(geom, context)
+        : error;
+    results[i] = result;
+}
+```
+
 # [REFACTORING CHECKLIST]
 
 Before committing:
@@ -265,8 +311,17 @@ Before committing:
 - [ ] Result<T> used consistently
 - [ ] UnifiedOperation used for polymorphic operations
 - [ ] ValidationRules used for validation
-- [ ] All tests still pass
 - [ ] `dotnet build` succeeds with zero warnings
+- [ ] Loops minimized (spatial indexing, dispatch tables, better algorithms)
+
+# [VERIFICATION BEFORE COMPLETION]
+
+Mandatory validation:
+1. **Metrics Improved**: LOC decreased, files/types at or below limits
+2. **Validation Succeeds**: Code quality standards met
+3. **Build Clean**: Zero warnings after changes
+4. **Functionality Preserved**: No behavior changes unless explicitly intended
+5. **Architecture Better**: More dispatch tables, more generics, less branching, fewer loops
 
 # [QUALITY METRICS]
 

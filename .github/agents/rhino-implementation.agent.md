@@ -235,6 +235,16 @@ Before committing:
 - [ ] **Integration matches blueprint exactly**
 - [ ] `dotnet build` succeeds with zero warnings
 
+# [VERIFICATION BEFORE COMPLETION]
+
+Critical validation steps:
+1. **Blueprint Compliance**: Implementation matches blueprint exactly
+2. **SDK Correctness**: RhinoCommon APIs used as documented
+3. **Infrastructure Integration**: Result<T>, UnifiedOperation, ValidationRules properly used
+4. **No Duplication**: Confirmed not recreating existing functionality
+5. **Build Clean**: `dotnet build` succeeds with zero warnings
+6. **Limits Met**: Files ≤4, types ≤10, members ≤300 LOC
+
 # [REMEMBER]
 - **Blueprint is law** - follow it precisely
 - **Exemplars guide style** - match their density and patterns

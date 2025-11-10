@@ -95,6 +95,24 @@ V.All                                         // All validations
 mode.Has(V.Standard)                          // Check flag
 ```
 
+### Loop/Iteration Patterns
+
+```csharp
+// Hot paths - Use for loops (2-3x faster)
+for (int i = 0; i < array.Length; i++) { /* index access */ }
+
+// Clarity - Use LINQ (80-90% of code)
+items.Where(pred).Select(transform).ToArray()
+
+// Optimization - Eliminate loops
+_dispatch.TryGetValue(key, out var operation)  // FrozenDictionary dispatch
+
+// Best practices
+items.Any()                    // ✅ Not .Count() > 0
+items.Where(p).Select(t)       // ✅ Not materialized until needed
+[.. results.SelectMany(x)]     // ✅ Collection expression with spread
+```
+
 ---
 
 ## 🎯 Core Principles

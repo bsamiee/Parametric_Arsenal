@@ -304,7 +304,17 @@ Before committing tests:
 - [ ] File count: ≤4 per test folder
 - [ ] Type count: ≤10 per test folder
 - [ ] Test methods: ≤300 LOC (ideally 50-150)
-- [ ] All tests pass: `dotnet test`
+- [ ] `dotnet test` succeeds with no failures
+
+# [VERIFICATION BEFORE COMPLETION]
+
+Mandatory validation:
+1. **All Tests Pass**: `dotnet test` succeeds with no failures
+2. **Coverage Comprehensive**: Property laws, edge cases, integration scenarios
+3. **CsCheck Usage**: Property-based tests for core/ mathematical invariants
+4. **Rhino.Testing**: Headless tests for libs/rhino geometry operations
+5. **Pattern Compliance**: No var, no if/else, named parameters used
+6. **Limits Respected**: Test files ≤4, test classes ≤10 per folder
 
 # [COMMON TESTING PATTERNS]
 
