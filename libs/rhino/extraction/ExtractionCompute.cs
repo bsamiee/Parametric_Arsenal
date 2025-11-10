@@ -340,27 +340,20 @@ internal static class ExtractionCompute {
 
     [Pure]
     private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) {
-        double[,] covariance = new double[3, 3];
+        Vector3d v1 = (points[0] - centroid);
+        v1 = v1.Length > 1e-10 ? v1 / v1.Length : Vector3d.XAxis;
 
-        for (int i = 0; i < points.Length; i++) {
-            Vector3d diff = points[i] - centroid;
-            covariance[0, 0] += diff.X * diff.X;
-            covariance[0, 1] += diff.X * diff.Y;
-            covariance[0, 2] += diff.X * diff.Z;
-            covariance[1, 1] += diff.Y * diff.Y;
-            covariance[1, 2] += diff.Y * diff.Z;
-            covariance[2, 2] += diff.Z * diff.Z;
+        for (int i = 1; i < points.Length; i++) {
+            Vector3d v2 = (points[i] - centroid);
+            v2 = v2.Length > 1e-10 ? v2 / v2.Length : Vector3d.YAxis;
+            Vector3d normal = Vector3d.CrossProduct(v1, v2);
+
+            if (normal.Length > 1e-10) {
+                return normal / normal.Length;
+            }
         }
 
-        covariance[1, 0] = covariance[0, 1];
-        covariance[2, 0] = covariance[0, 2];
-        covariance[2, 1] = covariance[1, 2];
-
-        Vector3d normal = Vector3d.CrossProduct(
-            new Vector3d(covariance[0, 0], covariance[1, 0], covariance[2, 0]),
-            new Vector3d(covariance[0, 1], covariance[1, 1], covariance[2, 1]));
-
-        return normal.Length > 1e-10 ? normal / normal.Length : Vector3d.ZAxis;
+        return Vector3d.ZAxis;
     }
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) {
