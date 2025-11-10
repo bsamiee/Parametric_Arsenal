@@ -2,6 +2,7 @@ using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
@@ -15,12 +16,12 @@ internal static class TopologyCompute {
         !brep.IsValidTopology(out string topologyLog)
             ? ResultFactory.Create<(double[], (int, int, double)[], byte[])>(
                 error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
-            : !brep.IsValid
-                ? ResultFactory.Create<(double[], (int, int, double)[], byte[])>(error: E.Validation.GeometryInvalid)
-                : ((Func<Result<(double[], (int, int, double)[], byte[])>>)(() => {
-                    (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, brep.Edges.Count)
-                        .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked && brep.Edges[i].EdgeCurve is not null)
-                        .Select(i => (Index: i, Start: brep.Edges[i].PointAtStart, End: brep.Edges[i].PointAtEnd)),
+            : ResultFactory.Create(value: brep)
+                .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
+                .Bind(validBrep => ((Func<Result<(double[], (int, int, double)[], byte[])>>)(() => {
+                    (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, validBrep.Edges.Count)
+                        .Where(i => validBrep.Edges[i].Valence == EdgeAdjacency.Naked && validBrep.Edges[i].EdgeCurve is not null)
+                        .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
                     ];
 
                     double[] gaps = nakedEdges.Length is > 0 and < TopologyConfig.MaxEdgesForNearMissAnalysis
@@ -49,13 +50,13 @@ internal static class TopologyCompute {
                         : [];
 
                     int nakedEdgeCount = nakedEdges.Length;
-                    int nonManifoldEdgeCount = brep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
+                    int nonManifoldEdgeCount = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
 
                     (int EdgeA, int EdgeB, double Distance)[] nearMisses = nakedEdges.Length < TopologyConfig.MaxEdgesForNearMissAnalysis
                         ? [.. (from i in Enumerable.Range(0, nakedEdges.Length)
                                from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
-                               let edgeI = brep.Edges[nakedEdges[i].Index]
-                               let edgeJ = brep.Edges[nakedEdges[j].Index]
+                               let edgeI = validBrep.Edges[nakedEdges[i].Index]
+                               let edgeJ = validBrep.Edges[nakedEdges[j].Index]
                                let result = edgeI.EdgeCurve.ClosestPoints(edgeJ.EdgeCurve, out Point3d ptA, out Point3d ptB)
                                ? (Success: true, Distance: ptA.DistanceTo(ptB))
                                : (Success: false, Distance: double.MaxValue)
@@ -76,7 +77,7 @@ internal static class TopologyCompute {
                     };
 
                     return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
-                }))();
+                }))());
 
     [Pure]
     internal static Result<(Brep Healed, byte Strategy, bool Success)> Heal(
@@ -85,15 +86,15 @@ internal static class TopologyCompute {
         IGeometryContext context) =>
         !brep.IsValidTopology(out string _)
             ? ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid before healing"))
-            : !brep.IsValid
-                ? ResultFactory.Create<(Brep, byte, bool)>(error: E.Validation.GeometryInvalid)
-                : ((Func<Result<(Brep, byte, bool)>>)(() => {
-                    int originalNakedEdges = brep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
+            : ResultFactory.Create(value: brep)
+                .Validate(args: [context, V.Standard | V.Topology,])
+                .Bind(validBrep => ((Func<Result<(Brep, byte, bool)>>)(() => {
+                    int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
 
                     (byte Strategy, Brep? Healed, int NakedEdges)[] attempts = [.. Enumerable.Range(0, Math.Min(maxStrategy + 1, 4))
                         .Select(s => {
                             byte strategy = (byte)s;
-                            Brep copy = brep.DuplicateBrep();
+                            Brep copy = validBrep.DuplicateBrep();
                             bool success = strategy switch {
                                 0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
                                 1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
@@ -113,7 +114,7 @@ internal static class TopologyCompute {
                     return healed is not null
                         ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
                         : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
-                }))();
+                }))());
 
     [Pure]
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(
@@ -121,13 +122,14 @@ internal static class TopologyCompute {
         IGeometryContext context) =>
         !brep.IsValidTopology(out string _)
             ? ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid for feature extraction"))
-            : !brep.IsValid
-                ? ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Validation.GeometryInvalid)
-                : (brep.Vertices.Count, brep.Edges.Count, brep.Faces.Count, brep.IsSolid && brep.IsManifold, brep.Loops.Select((l, i) => ((Func<(int LoopIndex, bool IsHole)>)(() => { using Curve? c = l.To3dCurve(); return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (c?.GetLength() ?? 0.0) > context.AbsoluteTolerance); }))()).ToArray()) switch {
+            : ResultFactory.Create(value: brep)
+                .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
+                .Map(validBrep => (validBrep.Vertices.Count, validBrep.Edges.Count, validBrep.Faces.Count, validBrep.IsSolid && validBrep.IsManifold, validBrep.Loops.Select((l, i) => ((Func<(int LoopIndex, bool IsHole)>)(() => { using Curve? c = l.To3dCurve(); return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (c?.GetLength() ?? 0.0) > context.AbsoluteTolerance); }))()).ToArray()))
+                .Bind(data => data switch {
                     (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 && solid && (e - v - f + 2) / 2 is int genus && genus >= 0 =>
                         ResultFactory.Create(value: (Genus: genus, Loops: loops, solid, HandleCount: genus)),
                     (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 =>
                         ResultFactory.Create(value: (Genus: 0, Loops: loops, solid, HandleCount: 0)),
                     _ => ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
-                };
+                });
 }

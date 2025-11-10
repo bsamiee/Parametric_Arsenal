@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -12,17 +13,17 @@ namespace Arsenal.Rhino.Analysis;
 internal static class AnalysisCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double[] GaussianSamples, double[] MeanSamples, (double U, double V)[] Singularities, double UniformityScore)> SurfaceQuality(Surface surface, IGeometryContext context) =>
-        !surface.IsValid
-            ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Validation.GeometryInvalid)
-            : surface.Domain(0).Length <= context.AbsoluteTolerance || surface.Domain(1).Length <= context.AbsoluteTolerance
+        ResultFactory.Create(value: surface)
+            .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
+            .Bind(validSurface => validSurface.Domain(0).Length <= context.AbsoluteTolerance || validSurface.Domain(1).Length <= context.AbsoluteTolerance
                 ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("Surface domain too small"))
                 : ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
                     int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
                     (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
-                        .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
+                        .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
                     ];
                     SurfaceCurvature[] curvatures = [.. uvGrid
-                        .Select(uv => surface.CurvatureAt(u: uv.u, v: uv.v))
+                        .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
                         .Where(sc => !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)),
                     ];
                     return curvatures.Length > 0
@@ -33,25 +34,25 @@ internal static class AnalysisCompute {
                         ? ResultFactory.Create(value: (
                             GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(),
                             MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
-                            Singularities: uvGrid.Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)).ToArray(),
+                            Singularities: uvGrid.Where(uv => validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)).ToArray(),
                             UniformityScore: Math.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
                         : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
-                }))();
+                }))());
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double SmoothnessScore, double[] CurvatureSamples, (double Parameter, bool IsSharp)[] InflectionPoints, double EnergyMetric)> CurveFairness(Curve curve, IGeometryContext context) =>
-        !curve.IsValid
-            ? ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Validation.GeometryInvalid)
-            : curve.GetLength() <= context.AbsoluteTolerance
+        ResultFactory.Create(value: curve)
+            .Validate(args: [context, V.Standard | V.Degeneracy | V.SurfaceContinuity,])
+            .Bind(validCurve => validCurve.GetLength() <= context.AbsoluteTolerance
                 ? ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Curve length too small"))
                 : Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
-                    .Select(i => curve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
-                    .Select(t => (Parameter: t, Curvature: curve.CurvatureAt(t)))
+                    .Select(i => validCurve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
+                    .Select(t => (Parameter: t, Curvature: validCurve.CurvatureAt(t)))
                     .Where(pair => pair.Curvature.IsValid)
                     .ToArray() is (double Parameter, Vector3d Curvature)[] samples && samples.Length > 2
                     && samples.Select(s => s.Curvature.Length).ToArray() is double[] curvatures
                     && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
-                    && curve.GetLength() is double curveLength && curveLength > 0.0
+                    && validCurve.GetLength() is double curveLength && curveLength > 0.0
                 ? ResultFactory.Create(value: (
                     SmoothnessScore: Math.Clamp(1.0 / (1.0 + (avgDiff * AnalysisConfig.SmoothnessSensitivity)), 0.0, 1.0),
                     CurvatureSamples: curvatures,
@@ -60,29 +61,31 @@ internal static class AnalysisCompute {
                         .Select(i => (samples[i].Parameter, Math.Abs(curvatures[i] - curvatures[i - 1]) > AnalysisConfig.InflectionSharpnessThreshold))
                         .ToArray(),
                     EnergyMetric: curvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance ? (curvatures.Sum(k => k * k) * (curveLength / (AnalysisConfig.CurveFairnessSampleCount - 1))) / (maxCurv * curveLength) : 0.0))
-                : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
+                : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples")));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaces, (int Warning, int Critical) Counts)> MeshForFEA(Mesh mesh, IGeometryContext context) =>
-        !mesh.IsValid || mesh.Faces.Count == 0
-            ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Validation.GeometryInvalid)
-            : ((Func<Result<(double[], double[], double[], int[], (int, int))>>)(() => {
+        ResultFactory.Create(value: mesh)
+            .Validate(args: [context, V.Standard | V.MeshSpecific,])
+            .Bind(validMesh => validMesh.Faces.Count == 0
+                ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Validation.GeometryInvalid)
+                : ((Func<Result<(double[], double[], double[], int[], (int, int))>>)(() => {
                 Point3d[] vertices = ArrayPool<Point3d>.Shared.Rent(4);
                 double[] edgeLengths = ArrayPool<double>.Shared.Rent(4);
                 try {
-                    (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, mesh.Faces.Count).Select(i => {
-                        Point3d center = mesh.Faces.GetFaceCenter(i);
-                        MeshFace face = mesh.Faces[i];
+                    (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, validMesh.Faces.Count).Select(i => {
+                        Point3d center = validMesh.Faces.GetFaceCenter(i);
+                        MeshFace face = validMesh.Faces[i];
                         bool isQuad = face.IsQuad;
-                        bool validIndices = face.A >= 0 && face.A < mesh.Vertices.Count
-                            && face.B >= 0 && face.B < mesh.Vertices.Count
-                            && face.C >= 0 && face.C < mesh.Vertices.Count
-                            && (!isQuad || (face.D >= 0 && face.D < mesh.Vertices.Count));
+                        bool validIndices = face.A >= 0 && face.A < validMesh.Vertices.Count
+                            && face.B >= 0 && face.B < validMesh.Vertices.Count
+                            && face.C >= 0 && face.C < validMesh.Vertices.Count
+                            && (!isQuad || (face.D >= 0 && face.D < validMesh.Vertices.Count));
 
-                        vertices[0] = validIndices ? (Point3d)mesh.Vertices[face.A] : center;
-                        vertices[1] = validIndices ? (Point3d)mesh.Vertices[face.B] : center;
-                        vertices[2] = validIndices ? (Point3d)mesh.Vertices[face.C] : center;
-                        vertices[3] = validIndices && isQuad ? (Point3d)mesh.Vertices[face.D] : vertices[0];
+                        vertices[0] = validIndices ? (Point3d)validMesh.Vertices[face.A] : center;
+                        vertices[1] = validIndices ? (Point3d)validMesh.Vertices[face.B] : center;
+                        vertices[2] = validIndices ? (Point3d)validMesh.Vertices[face.C] : center;
+                        vertices[3] = validIndices && isQuad ? (Point3d)validMesh.Vertices[face.D] : vertices[0];
 
                         int vertCount = isQuad ? 4 : 3;
 
@@ -146,5 +149,5 @@ internal static class AnalysisCompute {
                     ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
                     ArrayPool<double>.Shared.Return(edgeLengths, clearArray: true);
                 }
-            }))();
+            }))());
 }
