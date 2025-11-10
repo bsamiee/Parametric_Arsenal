@@ -208,7 +208,7 @@ internal static class ExtractionCompute {
     [Pure]
     private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurface(Surface surface) =>
         surface.TryGetPlane(out Plane pl, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-            ? (true, ExtractionConfig.PrimitiveTypePlane, pl, [pl.OriginX, pl.OriginY, pl.OriginZ, pl.Normal.X, pl.Normal.Y, pl.Normal.Z,])
+            ? (true, ExtractionConfig.PrimitiveTypePlane, pl, [pl.OriginX, pl.OriginY, pl.OriginZ,])
             : surface.TryGetCylinder(out Cylinder cyl, tolerance: ExtractionConfig.PrimitiveFitTolerance)
                 && cyl.Radius > ExtractionConfig.PrimitiveFitTolerance
                 ? (true, ExtractionConfig.PrimitiveTypeCylinder, new Plane(cyl.CircleAt(0.0).Center, cyl.Axis), [cyl.Radius, cyl.TotalHeight,])
@@ -241,7 +241,7 @@ internal static class ExtractionCompute {
                 double vParam = v.ParameterAt(j / (double)(samplesPerDir - 1));
                 Point3d surfacePoint = surface.PointAt(u: uParam, v: vParam);
                 Point3d primitivePoint = type switch {
-                    ExtractionConfig.PrimitiveTypePlane when pars.Length >= 6 => frame.ClosestPoint(surfacePoint),
+                    ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(surfacePoint),
                     ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
                     ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
                     ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: surfacePoint, conePlane: frame, baseRadius: pars[0], height: pars[1]),

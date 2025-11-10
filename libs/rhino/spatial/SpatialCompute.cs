@@ -13,7 +13,9 @@ internal static class SpatialCompute {
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
         indices.ToArray() is { Length: > 0 } arr
             ? ((Func<Point3d>)(() => {
-                double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
+                double sumX = 0.0;
+                double sumY = 0.0;
+                double sumZ = 0.0;
                 for (int i = 0; i < arr.Length; i++) {
                     sumX += pts[arr[i]].X;
                     sumY += pts[arr[i]].Y;
@@ -140,23 +142,27 @@ internal static class SpatialCompute {
         // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
+        int[] GetNeighbors(int idx) {
+            return tree is not null
+                ? ((Func<int[]>)(() => {
+                    List<int> buffer = [];
+                    _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
+                        if (args.Id != idx) {
+                            buffer.Add(args.Id);
+                        }
+                    });
+                    return [.. buffer,];
+                }))()
+                : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
+        }
+
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
                 continue;
             }
 
             visited[i] = true;
-            int[] neighbors = tree is not null
-                ? ((Func<int[]>)(() => {
-                    List<int> buffer = [];
-                    _ = tree.Search(new Sphere(pts[i], eps), (_, args) => {
-                        if (args.Id != i) {
-                            buffer.Add(args.Id);
-                        }
-                    });
-                    return [.. buffer,];
-                }))()
-                : [.. Enumerable.Range(0, pts.Length).Where(j => j != i && pts[i].DistanceTo(pts[j]) <= eps),];
+            int[] neighbors = GetNeighbors(i);
 
             if (neighbors.Length < minPts) {
                 continue;
@@ -172,17 +178,7 @@ internal static class SpatialCompute {
                 }
 
                 visited[cur] = true;
-                int[] curNeighbors = tree is not null
-                    ? ((Func<int[]>)(() => {
-                        List<int> buffer = [];
-                        _ = tree.Search(new Sphere(pts[cur], eps), (_, args) => {
-                            if (args.Id != cur) {
-                                buffer.Add(args.Id);
-                            }
-                        });
-                        return [.. buffer,];
-                    }))()
-                    : [.. Enumerable.Range(0, pts.Length).Where(j => j != cur && pts[cur].DistanceTo(pts[j]) <= eps),];
+                int[] curNeighbors = GetNeighbors(cur);
 
                 if (curNeighbors.Length >= minPts) {
                     foreach (int nb in curNeighbors.Where(nb => assignments[nb] == -1)) {

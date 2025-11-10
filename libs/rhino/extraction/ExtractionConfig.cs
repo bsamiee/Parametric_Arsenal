@@ -9,14 +9,14 @@ internal static class ExtractionConfig {
     /// <summary>Epsilon tolerance for zero comparisons and near-zero checks.</summary>
     internal const double Epsilon = 1e-10;
 
-    /// <summary>Feature type identifiers: 0=Fillet, 1=Chamfer, 2=Hole, 3=GenericEdge, 4=VariableRadiusFillet.</summary>
+    /// <summary>Feature type identifiers for edge/loop classification (separate from primitive types).</summary>
     internal const byte FeatureTypeFillet = 0;
     internal const byte FeatureTypeChamfer = 1;
     internal const byte FeatureTypeHole = 2;
     internal const byte FeatureTypeGenericEdge = 3;
     internal const byte FeatureTypeVariableRadiusFillet = 4;
 
-    /// <summary>Primitive type identifiers: 0=Plane, 1=Cylinder, 2=Sphere, 3=Unknown, 4=Cone, 5=Torus, 6=Extrusion.</summary>
+    /// <summary>Primitive type identifiers for surface classification (separate from feature types).</summary>
     internal const byte PrimitiveTypePlane = 0;
     internal const byte PrimitiveTypeCylinder = 1;
     internal const byte PrimitiveTypeSphere = 2;
