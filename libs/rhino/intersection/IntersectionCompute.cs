@@ -13,7 +13,7 @@ internal static class IntersectionCompute {
     internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB) =>
         (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
             (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-            (int n, int pa, int pb) when pa >= n && pb >= n && n <= pa && n <= pb => (geomA, geomB) switch {
+            (int n, int pa, int pb) when pa >= n && pb >= n => (geomA, geomB) switch {
                 (Curve ca, Curve cb) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count).Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) ? Vector3d.VectorAngle(ta, tb) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles && angles.Length > 0
                     ? ResultFactory.Create(value: (Type: angles.Average() < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: angles.Average() < IntersectionConfig.TangentAngleThreshold ? 1.0 : 0.5))
                     : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),

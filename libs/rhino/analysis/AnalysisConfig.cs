@@ -59,6 +59,5 @@ internal static class AnalysisConfig {
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
 
-    /// <summary>Equilateral triangle ratio: √3/2 ≈ 0.866025403784439 for skewness reference.</summary>
-    internal const double EquilateralTriangleRatio = 0.866025403784439;
+
 }

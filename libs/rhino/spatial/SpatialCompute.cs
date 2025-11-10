@@ -46,7 +46,7 @@ internal static class SpatialCompute {
                 1 => DBSCANAssign(pts, epsilon, config.minPts),
                 2 => HierarchicalAssign(pts, k),
                 _ => [],
-            } is int[] assigns && (algorithm is 1 ? (assigns.Length > 0 && assigns.Max() >= 0 ? assigns.Max() + 1 : 0) : k) is int nc && nc > 0
+            } is int[] assigns && (algorithm is 1 ? (assigns.Any(a => a >= 0) ? assigns.Where(a => a >= 0).Max() + 1 : 0) : k) is int nc && nc > 0
                 ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is int[] m && m.Length > 0 ? Centroid(m, pts) is Point3d centroid ? (centroid, [.. m.Select(i => pts[i].DistanceTo(centroid))]) : (Point3d.Origin, Array.Empty<double>()) : (Point3d.Origin, Array.Empty<double>())).ToArray())
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
@@ -233,11 +233,30 @@ internal static class SpatialCompute {
         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
     }
 
+    /// <summary>
+    /// Computes the 2D convex hull of a set of points projected onto the XY plane.
+    /// <para>
+    /// <b>All input points must have the same Z coordinate (i.e., be coplanar in the XY plane).</b>
+    /// If this condition is not met, the result is an error.
+    /// </para>
+    /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Point3d[]> ConvexHull2D(Point3d[] points) =>
-        points.Length < 3
+    internal static Result<Point3d[]> ConvexHull2D(Point3d[] points) {
+        const double Epsilon = 1e-8;
+        double z0 = points.Length > 0 ? points[0].Z : 0.0;
+        bool allSameZ = true;
+        for (int i = 1; i < points.Length; i++) {
+            if (System.Math.Abs(points[i].Z - z0) > Epsilon) {
+                allSameZ = false;
+                break;
+            }
+        }
+        return points.Length < 3
             ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
-            : BuildConvexHull2D(points: points);
+            : !allSameZ
+                ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"))
+                : BuildConvexHull2D(points: points);
+    }
 
     private static Result<Point3d[]> BuildConvexHull2D(Point3d[] points) {
         Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];

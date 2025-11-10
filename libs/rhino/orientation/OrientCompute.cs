@@ -57,7 +57,9 @@ internal static class OrientCompute {
                 (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
                     ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                         ? ((geometryA, geometryB) switch {
-                            (Brep ba, Brep bb) when (pb.Origin - pa.Origin).Length > tolerance && TestReflectionSymmetry(ba, bb, new Plane(pa.Origin, pb.Origin - pa.Origin), tolerance) => (byte)1,
+                            (Brep ba, Brep bb) when ((pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
+                                ? TestReflectionSymmetry(ba, bb, new Plane(pa.Origin, pb.Origin - pa.Origin), tolerance)
+                                : TestReflectionSymmetry(ba, bb, new Plane(pa.Origin, pa.ZAxis), tolerance)) => (byte)1,
                             (Curve ca, Curve cb) when TestRotationSymmetry(ca, cb, pa.Origin, pa.ZAxis, tolerance) => (byte)2,
                             _ => (byte)0,
                         }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {

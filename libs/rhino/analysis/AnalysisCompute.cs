@@ -15,6 +15,7 @@ internal static class AnalysisCompute {
             ? ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Validation.GeometryInvalid)
             : ((Func<Result<(double[], double[], (double, double)[], double)>>)(() => {
                 int gridSize = (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount);
+                gridSize = gridSize < 2 ? 2 : gridSize;
                 SurfaceCurvature[] curvatures = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: surface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: surface.Domain(1).ParameterAt(j / (gridSize - 1.0)))))
                     .Select(uv => (UV: uv, Curvature: surface.CurvatureAt(u: uv.u, v: uv.v)))
@@ -99,11 +100,11 @@ internal static class AnalysisCompute {
                 double aspectRatio = max / (min + context.AbsoluteTolerance);
                 double skewness = isQuad
                     ? Math.Abs((((verts[1] - verts[0]).Length + (verts[3] - verts[2]).Length) / ((verts[2] - verts[1]).Length + (verts[0] - verts[3]).Length + context.AbsoluteTolerance)) - 1.0)
-                    : (verts[1] - verts[0], verts[2] - verts[1], verts[0] - verts[2]) is (Vector3d ab, Vector3d bc, Vector3d ca)
+                    : (verts[1] - verts[0], verts[2] - verts[0], verts[2] - verts[1], verts[0] - verts[1], verts[0] - verts[2], verts[1] - verts[2]) is (Vector3d ab, Vector3d ac, Vector3d bc, Vector3d ba, Vector3d ca, Vector3d cb)
                         ? new[] {
-                            Vector3d.VectorAngle(-ca, ab) * (180.0 / Math.PI),
-                            Vector3d.VectorAngle(-ab, bc) * (180.0 / Math.PI),
-                            Vector3d.VectorAngle(-bc, ca) * (180.0 / Math.PI),
+                            Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI), // angle at A
+                            Vector3d.VectorAngle(bc, ba) * (180.0 / Math.PI), // angle at B
+                            Vector3d.VectorAngle(ca, cb) * (180.0 / Math.PI), // angle at C
                         } is double[] angles
                             ? Math.Max(Math.Abs(angles[0] - 60.0), Math.Max(Math.Abs(angles[1] - 60.0), Math.Abs(angles[2] - 60.0))) / 60.0
                             : 1.0

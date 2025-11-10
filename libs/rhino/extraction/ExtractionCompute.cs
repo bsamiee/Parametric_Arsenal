@@ -19,18 +19,46 @@ internal static class ExtractionCompute {
                         .Where(e => e.EdgeCurve is not null)
                         .Select(e => {
                             bool isG2Continuous = !e.GetNextDiscontinuity(Continuity.G2_locus_continuous, e.Domain.Min, e.Domain.Max, out double _);
-                            double curvStart = e.EdgeCurve.CurvatureAt(e.Domain.Min).Length;
-                            double curvEnd = e.EdgeCurve.CurvatureAt(e.Domain.Max).Length;
-                            double avgEndpointCurv = 0.5 * (curvStart + curvEnd);
-                            double curvThreshold = Math.Max(ExtractionConfig.FilletG2Threshold * avgEndpointCurv, ExtractionConfig.FilletG2AbsoluteTolerance);
-                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && Math.Abs(curvStart - curvEnd) < curvThreshold;
-                            double tangentAngle = Math.Abs(Vector3d.VectorAngle(e.TangentAt(e.Domain.Min), e.TangentAt(e.Domain.Max)));
+                            double t0 = e.Domain.Min;
+                            double t1 = 0.5 * (e.Domain.Min + e.Domain.Max);
+                            double t2 = e.Domain.Max;
+                            double[] curvatures = [
+                                e.EdgeCurve.CurvatureAt(t0).Length,
+                                e.EdgeCurve.CurvatureAt(t1).Length,
+                                e.EdgeCurve.CurvatureAt(t2).Length,
+                            ];
+                            double maxCurv = curvatures.Max();
+                            double minCurv = curvatures.Min();
+                            double avgCurv = 0.5 * (curvatures[0] + curvatures[2]);
+                            double curvThreshold = Math.Max(ExtractionConfig.FilletG2Threshold * avgCurv, ExtractionConfig.FilletG2AbsoluteTolerance);
+                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && (maxCurv - minCurv) < curvThreshold;
+                            int[] adjacentFaces = e.AdjacentFaces();
+                            double dihedralAngle =
+                                adjacentFaces.Length == 2
+                                    ? (
+                                        e.Brep.Faces[adjacentFaces[0]].NormalAt(
+                                            e.Brep.Faces[adjacentFaces[0]].ClosestPoint(e.PointAt((e.Domain.Min + e.Domain.Max) * 0.5), out double u0, out double v0)
+                                                ? u0 : 0.0,
+                                            e.Brep.Faces[adjacentFaces[0]].ClosestPoint(e.PointAt((e.Domain.Min + e.Domain.Max) * 0.5), out double _, out double v0b)
+                                                ? v0b : 0.0
+                                        ),
+                                        e.Brep.Faces[adjacentFaces[1]].NormalAt(
+                                            e.Brep.Faces[adjacentFaces[1]].ClosestPoint(e.PointAt((e.Domain.Min + e.Domain.Max) * 0.5), out double u1, out double v1)
+                                                ? u1 : 0.0,
+                                            e.Brep.Faces[adjacentFaces[1]].ClosestPoint(e.PointAt((e.Domain.Min + e.Domain.Max) * 0.5), out double _, out double v1b)
+                                                ? v1b : 0.0
+                                        )
+                                    ) is (Vector3d n0, Vector3d n1)
+                                        ? Math.Abs(Vector3d.VectorAngle(n0, n1))
+                                        : 0.0
+                                    )
+                                    : 0.0;
                             return (
                                 Type: isG2Continuous && hasConstantCurvature
                                     ? (byte)0
                                     : isG2Continuous && !hasConstantCurvature
                                         ? (byte)4
-                                        : Math.Abs(tangentAngle - (Math.PI / 4)) < ExtractionConfig.ChamferAngleTolerance
+                                        : Math.Abs(dihedralAngle - (Math.PI / 4)) < ExtractionConfig.ChamferAngleTolerance
                                             ? (byte)1
                                             : (byte)3,
                                 Param: e.EdgeCurve.GetLength()
@@ -67,9 +95,14 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create(value: (
                     Primitives: b.Faces
                             .Select(f => {
-                                using Surface surf = f.DuplicateSurface();
-                                (bool success, byte type, Plane frame, double[] pars) = ClassifySurface(surf);
-                                return (Success: success, Primitive: (Type: type, Frame: frame, Params: pars));
+                                Surface? surf = f.DuplicateSurface();
+                                return surf is null
+                                    ? (Success: false, Primitive: (Type: (byte)0, Frame: Plane.Unset, Params: Array.Empty<double>()))
+                                    : (
+                                        (bool success, byte type, Plane frame, double[] pars) = ClassifySurface(surf),
+                                        surf.Dispose(),
+                                        (Success: success, Primitive: (Type: type, Frame: frame, Params: pars))
+                                    ).Item3;
                             })
                             .Where(t => t.Success)
                             .Select(t => t.Primitive).ToArray(),

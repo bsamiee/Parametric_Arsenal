@@ -97,7 +97,7 @@ public static class E {
             [4101] = "K-means k parameter must be positive",
             [4102] = "DBSCAN epsilon parameter must be positive",
             [4103] = "Cluster count exceeds point count",
-            [4104] = "All points are identical - degenerate point set",
+
             [4105] = "Direction vector is zero-length",
             [4200] = "Medial axis computation failed",
             [4201] = "Non-planar medial axis not supported",
