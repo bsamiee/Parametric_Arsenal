@@ -73,6 +73,6 @@ public static class Extract {
 
     /// <summary>Extract geometric patterns: symmetries, sequences, transformations with confidence.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries) =>
-        ExtractionCompute.ExtractPatterns(geometries);
+    public static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
+        ExtractionCompute.ExtractPatterns(geometries, context: context);
 }
