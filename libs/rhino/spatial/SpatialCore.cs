@@ -12,22 +12,12 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>RTree construction and queries with pooled buffers.</summary>
 internal static class SpatialCore {
-    private static readonly FrozenDictionary<Type, Func<object, RTree>> _treeFactories =
-        new Dictionary<Type, Func<object, RTree>> {
-            [typeof(Point3d[])] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
-            [typeof(PointCloud)] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
-            [typeof(Mesh)] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [typeof(Curve[])] = static s => BuildGeometryArrayTree((Curve[])s),
-            [typeof(Surface[])] = static s => BuildGeometryArrayTree((Surface[])s),
-            [typeof(Brep[])] = static s => BuildGeometryArrayTree((Brep[])s),
-        }.ToFrozenDictionary();
-
-    private static readonly Func<object, RTree> _pointArrayFactory = _treeFactories[typeof(Point3d[])];
-    private static readonly Func<object, RTree> _pointCloudFactory = _treeFactories[typeof(PointCloud)];
-    private static readonly Func<object, RTree> _meshFactory = _treeFactories[typeof(Mesh)];
-    private static readonly Func<object, RTree> _curveArrayFactory = _treeFactories[typeof(Curve[])];
-    private static readonly Func<object, RTree> _surfaceArrayFactory = _treeFactories[typeof(Surface[])];
-    private static readonly Func<object, RTree> _brepArrayFactory = _treeFactories[typeof(Brep[])];
+    private static readonly Func<object, RTree> _pointArrayFactory = s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(Point3d[]))](s);
+    private static readonly Func<object, RTree> _pointCloudFactory = s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(PointCloud))](s);
+    private static readonly Func<object, RTree> _meshFactory = s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(Mesh))](s);
+    private static readonly Func<object, RTree> _curveArrayFactory = s => BuildGeometryArrayTree((Curve[])s);
+    private static readonly Func<object, RTree> _surfaceArrayFactory = s => BuildGeometryArrayTree((Surface[])s);
+    private static readonly Func<object, RTree> _brepArrayFactory = s => BuildGeometryArrayTree((Brep[])s);
 
     /// <summary>(Input, Query) type pairs to (Factory, Mode, BufferSize, Execute) mapping.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
