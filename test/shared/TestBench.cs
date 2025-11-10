@@ -25,8 +25,8 @@ public static class TestBench {
         internal Measurement(long ticks, long bytes, int iterations) {
             (this.ElapsedTicks, this.MemoryBytes, this.Iterations) = (ticks, bytes, iterations);
             (this.TicksPerIteration, this.BytesPerIteration) = (iterations > 0 ? (double)ticks / iterations : 0.0, iterations > 0 ? (double)bytes / iterations : 0.0);
-            this.ElapsedMilliseconds = ticks / Stopwatch.Frequency * 1000.0;
-            this.ElapsedMicroseconds = ticks / Stopwatch.Frequency * 1000000.0;
+            this.ElapsedMilliseconds = (double)ticks / Stopwatch.Frequency * 1000.0;
+            this.ElapsedMicroseconds = (double)ticks / Stopwatch.Frequency * 1000000.0;
             this.MemoryKilobytes = bytes / 1024.0;
             this.MemoryMegabytes = bytes / (1024.0 * 1024.0);
         }
