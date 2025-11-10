@@ -85,8 +85,6 @@ internal static class AnalysisCompute {
                         vertices[3] = validIndices && isQuad ? (Point3d)mesh.Vertices[face.D] : vertices[0];
 
                         int vertCount = isQuad ? 4 : 3;
-
-                        // FEA Aspect Ratio: ratio of longest to shortest edge (industry standard)
                         for (int j = 0; j < vertCount; j++) {
                             edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
                         }
@@ -97,8 +95,6 @@ internal static class AnalysisCompute {
                             maxEdge = Math.Max(maxEdge, edgeLengths[j]);
                         }
                         double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
-
-                        // FEA Skewness: angular deviation from ideal (90° for quads, 60° for triangles)
                         double skewness = isQuad
                             ? ((double[])[
                                 Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0]),
@@ -115,9 +111,6 @@ internal static class AnalysisCompute {
                                     ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
                                     : 1.0
                                 : 1.0;
-
-                        // Jacobian: simplified approximation using cross products (full Jacobian requires isoparametric mapping).
-                        // Measures element shape quality via ratio of minimum cross-product to average edge length squared.
                         double jacobian = isQuad
                             ? edgeLengths.Take(4).Average() is double avgLen && avgLen > context.AbsoluteTolerance
                                 ? ((double[])[

@@ -63,7 +63,6 @@ internal static class SpatialCompute {
         Point3d[] centroids = new Point3d[k];
         Random rng = new(SpatialConfig.KMeansSeed);
 
-        // K-means++ initialization with squared distances
         centroids[0] = pts[rng.Next(pts.Length)];
         for (int i = 1; i < k; i++) {
             double[] distSq = new double[pts.Length];
@@ -97,10 +96,7 @@ internal static class SpatialCompute {
                 centroids[i] = pts[selectedIdx];
             }
         }
-
-        // Lloyd's algorithm with hot-path optimization
         for (int iter = 0; iter < maxIter; iter++) {
-            // Assign to nearest centroid (hot path - use for loops)
             for (int i = 0; i < pts.Length; i++) {
                 int nearest = 0;
                 double minDist = pts[i].DistanceTo(centroids[0]);
@@ -110,8 +106,6 @@ internal static class SpatialCompute {
                 }
                 assignments[i] = nearest;
             }
-
-            // Recompute centroids and check convergence
             (Point3d Sum, int Count)[] clusters = [.. Enumerable.Range(0, k).Select(static _ => (Point3d.Origin, 0)),];
             for (int i = 0; i < pts.Length; i++) {
                 clusters[assignments[i]] = (clusters[assignments[i]].Sum + pts[i], clusters[assignments[i]].Count + 1);
@@ -137,8 +131,6 @@ internal static class SpatialCompute {
         int[] assignments = [.. Enumerable.Repeat(-1, pts.Length),];
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
-
-        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
         int[] GetNeighbors(int idx) {
@@ -250,13 +242,7 @@ internal static class SpatialCompute {
         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
     }
 
-    /// <summary>
-    /// Computes the 2D convex hull of a set of points projected onto the XY plane.
-    /// <para>
-    /// <b>All input points must have the same Z coordinate (i.e., be coplanar in the XY plane).</b>
-    /// If this condition is not met, the result is an error.
-    /// </para>
-    /// </summary>
+    /// <summary>2D convex hull of coplanar XY points using Andrew's monotone chain algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
@@ -265,8 +251,6 @@ internal static class SpatialCompute {
 
     private static Result<Point3d[]> BuildConvexHull2D(Point3d[] points, IGeometryContext context) {
         Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-
-        // Build lower hull (Andrew's monotone chain)
         List<Point3d> lower = [];
         for (int i = 0; i < pts.Length; i++) {
             while (lower.Count >= 2 && CrossProduct2D(lower[^2], lower[^1], pts[i]) <= context.AbsoluteTolerance) {
@@ -274,8 +258,6 @@ internal static class SpatialCompute {
             }
             lower.Add(pts[i]);
         }
-
-        // Build upper hull
         List<Point3d> upper = [];
         Point3d[] reversed = [.. pts.AsEnumerable().Reverse(),];
         for (int i = 0; i < reversed.Length; i++) {
@@ -295,10 +277,7 @@ internal static class SpatialCompute {
     private static double CrossProduct2D(Point3d o, Point3d a, Point3d b) =>
         ((a.X - o.X) * (b.Y - o.Y)) - ((a.Y - o.Y) * (b.X - o.X));
 
-    /// <summary>
-    /// Computes the 3D convex hull of a set of points using incremental algorithm.
-    /// <para>Returns mesh faces as vertex index triples.</para>
-    /// </summary>
+    /// <summary>3D convex hull using incremental algorithm, returns mesh faces as vertex index triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
         points.Length < 4
@@ -360,10 +339,7 @@ internal static class SpatialCompute {
     private static double TetrahedronVolume(Point3d a, Point3d b, Point3d c, Point3d d) =>
         Vector3d.Multiply(Vector3d.CrossProduct(b - a, c - a), d - a) / 6.0;
 
-    /// <summary>
-    /// Computes 2D Delaunay triangulation using Bowyer-Watson incremental algorithm.
-    /// <para>Returns triangle vertex indices as triples for XY-projected points.</para>
-    /// </summary>
+    /// <summary>2D Delaunay triangulation using Bowyer-Watson algorithm, returns triangle vertex indices as triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
@@ -409,10 +385,7 @@ internal static class SpatialCompute {
         return det > context.AbsoluteTolerance;
     }
 
-    /// <summary>
-    /// Computes 2D Voronoi diagram from Delaunay triangulation.
-    /// <para>Returns Voronoi cell vertices for each input point.</para>
-    /// </summary>
+    /// <summary>2D Voronoi diagram from Delaunay triangulation, returns cell vertices for each input point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
