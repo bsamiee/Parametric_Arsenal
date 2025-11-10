@@ -12,7 +12,15 @@ internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
         indices.ToArray() is int[] arr && arr.Length > 0
-            ? new Point3d(arr.Sum(i => pts[i].X) / arr.Length, arr.Sum(i => pts[i].Y) / arr.Length, arr.Sum(i => pts[i].Z) / arr.Length)
+            ? ((Func<Point3d>)(() => {
+                (double sumX, double sumY, double sumZ) = (0.0, 0.0, 0.0);
+                foreach (int idx in arr) {
+                    sumX += pts[idx].X;
+                    sumY += pts[idx].Y;
+                    sumZ += pts[idx].Z;
+                }
+                return new Point3d(sumX / arr.Length, sumY / arr.Length, sumZ / arr.Length);
+            }))()
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

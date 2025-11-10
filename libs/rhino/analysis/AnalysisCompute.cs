@@ -57,8 +57,7 @@ internal static class AnalysisCompute {
                 }
                 double avgDiff = diffSum / (len - 1);
                 (double, bool)[] inflections = [.. Enumerable.Range(1, len - 2)
-                    .Where(i => curvatures[i - 1] * curvatures[i + 1] < 0
-                        || Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)
+                    .Where(i => Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)
                     .Select(i => (samples[i].Parameter, IsSharp: Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)),
                 ];
                 double energy = curvatures.Sum(k => k * k) * (curve.GetLength() / AnalysisConfig.CurveFairnessSampleCount);
