@@ -37,21 +37,18 @@ internal static class TopologyCompute {
                           select (EdgeA: i, EdgeB: j, result.Distance)),]
                     : [];
 
-                List<byte> repairs = [];
-                if (nakedEdgeCount > 0) {
-                    repairs.AddRange([0, 1,]);
-                }
-                if (nonManifoldEdgeCount > 0) {
-                    repairs.Add(2);
-                }
-                if (nearMisses.Length > 0) {
-                    repairs.Add(3);
-                }
-                if (repairs.Count is 0) {
-                    repairs.Add(0);
-                }
+                byte[] repairs = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Length) switch {
+                    (> 0, > 0, > 0) => [0, 1, 2, 3,],
+                    (> 0, > 0, _) => [0, 1, 2,],
+                    (> 0, _, > 0) => [0, 1, 3,],
+                    (_, > 0, > 0) => [2, 3,],
+                    (> 0, _, _) => [0, 1,],
+                    (_, > 0, _) => [2,],
+                    (_, _, > 0) => [3,],
+                    _ => [0,],
+                };
 
-                return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, [.. repairs,]));
+                return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
             }))();
 
     [Pure]

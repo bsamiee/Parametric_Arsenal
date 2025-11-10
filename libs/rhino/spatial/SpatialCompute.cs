@@ -227,7 +227,7 @@ internal static class SpatialCompute {
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create<Point3d[]>(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -244,10 +244,10 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
-                : ResultFactory.Create<int[][]>(error: E.Geometry.InvalidGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
+                : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) {
-        (int a, int b) = (0, points.Skip(1).Select((p, i) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: i + 1)).OrderByDescending(x => x.Dist).First().Idx);
+        (int a, int b) = (0, points.Skip(1).Select((p, i) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: i + 1)).OrderByDescending(x => x.Dist).FirstOrDefault().Idx);
         int c = points.Skip(2).Select((p, i) => (Area: TriangleArea(points[a].Point, points[b].Point, p.Point), Idx: i + 2)).Where(x => x.Area > context.AbsoluteTolerance).OrderByDescending(x => x.Area).FirstOrDefault().Idx;
         return c > 0
             ? points.Skip(3).Select((p, i) => (Vol: TetrahedronVolume(points[a].Point, points[b].Point, points[c].Point, p.Point), Idx: i + 3)).Where(x => Math.Abs(x.Vol) > context.AbsoluteTolerance).OrderByDescending(x => Math.Abs(x.Vol)).FirstOrDefault() is (double v, int d) && d > 0

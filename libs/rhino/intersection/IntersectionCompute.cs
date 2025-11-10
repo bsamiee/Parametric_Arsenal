@@ -17,13 +17,13 @@ internal static class IntersectionCompute {
                 (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                 (int n, int pa, int pb) when pa >= n && pb >= n => (geomA, geomB) switch {
                 (Curve ca, Curve cb) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count).Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) ? Vector3d.VectorAngle(ta, tb) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles && angles.Length > 0 && angles.Average() is double avgAngle
-                    ? ResultFactory.Create(value: (Type: avgAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle < IntersectionConfig.TangentAngleThreshold ? 1.0 : 0.5))
+                    ? ResultFactory.Create(value: (Type: avgAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                     : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                (Curve c, Surface s) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count && output.ParametersB.Count >= (2 * i) + 1).Select(i => s.NormalAt(output.ParametersA[i * 2], output.ParametersA[(i * 2) + 1]) is Vector3d sn && c.TangentAt(output.ParametersB[i]) is Vector3d ct ? Math.Abs(Vector3d.VectorAngle(sn, ct) - (Math.PI / 2)) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles2 && angles2.Length > 0 && angles2.Average() is double avgAngle2
-                    ? ResultFactory.Create(value: (Type: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles2, IsGrazing: angles2.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? 0.8 : 0.4))
+                (Curve c, Surface s) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count && output.ParametersA.Count >= (2 * i) + 1).Select(i => s.NormalAt(output.ParametersA[i * 2], output.ParametersA[(i * 2) + 1]) is Vector3d sn && c.TangentAt(output.ParametersB[i]) is Vector3d ct ? Math.Abs(Vector3d.VectorAngle(sn, ct) - (Math.PI / 2)) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles2 && angles2.Length > 0 && angles2.Average() is double avgAngle2
+                    ? ResultFactory.Create(value: (Type: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles2, IsGrazing: angles2.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore))
                     : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
                 (Surface s, Curve c) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count && output.ParametersA.Count >= (2 * i) + 1).Select(i => s.NormalAt(output.ParametersB[i * 2], output.ParametersB[(i * 2) + 1]) is Vector3d sn && c.TangentAt(output.ParametersA[i]) is Vector3d ct ? Math.Abs(Vector3d.VectorAngle(sn, ct) - (Math.PI / 2)) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles3 && angles3.Length > 0 && angles3.Average() is double avgAngle3
-                    ? ResultFactory.Create(value: (Type: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles3, IsGrazing: angles3.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? 0.8 : 0.4))
+                    ? ResultFactory.Create(value: (Type: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles3, IsGrazing: angles3.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore))
                     : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
                 _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
             },
@@ -60,9 +60,7 @@ internal static class IntersectionCompute {
         baseOutput.Points.Count switch {
             0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
             int n => (geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor, Generate3DPerturbationDirections(count: IntersectionConfig.StabilitySampleCount)) switch {
-                (double perturbDist, Vector3d[] directions) => directions.SelectMany(dir => {
-                        List<(double Delta, IDisposable? Resource)> results = [];
-                    (double Delta, IDisposable? Resource) result = geomA switch {
+                (double perturbDist, Vector3d[] directions) => directions.Select(dir => geomA switch {
                         Curve ca when ca.DuplicateCurve() is Curve caCopy => caCopy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
                             ? (Math.Abs(perturbResult.Value.Points.Count - n), (IDisposable?)caCopy)
                             : (0.0, (IDisposable?)caCopy),
@@ -70,10 +68,7 @@ internal static class IntersectionCompute {
                             ? (Math.Abs(perturbResult.Value.Points.Count - n), (IDisposable?)saCopy)
                             : (0.0, (IDisposable?)saCopy),
                         _ => (0.0, null),
-                    };
-                    results.Add(result);
-                    return results;
-                }).ToArray() is (double Delta, IDisposable? Resource)[] perturbResults && perturbResults.Length > 0 && perturbResults.Select(p => { p.Resource?.Dispose(); return p.Delta; }).ToArray() is double[] deltas
+                    }).ToArray() is (double Delta, IDisposable? Resource)[] perturbResults && perturbResults.Length > 0 && perturbResults.Select(p => { p.Resource?.Dispose(); return (double)p.Delta; }).ToArray() is double[] deltas
                     ? ResultFactory.Create(value: (Score: 1.0 / (1.0 + deltas.Average()), Sensitivity: deltas.Max() / n, UnstableFlags: Enumerable.Range(0, n).Select(_ => deltas.Any(d => d > 1.0)).ToArray()))
                     : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
             },

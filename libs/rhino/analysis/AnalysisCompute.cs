@@ -36,6 +36,9 @@ internal static class AnalysisCompute {
                         ];
                         (double, double)[] singularities = [.. uvGrid.Where(uv => surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)),];
 
+                        // Manufacturing score penalizes surfaces with high variation in Gaussian curvature.
+                        // Formula normalizes std dev by median (typical magnitude) and configurable multiplier.
+                        // High variation relative to scale reduces score, reflecting lower manufacturability.
                         double score = medianGaussian > context.AbsoluteTolerance
                             ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier)))
                             : maxGaussian < context.AbsoluteTolerance ? 1.0 : 0.0;

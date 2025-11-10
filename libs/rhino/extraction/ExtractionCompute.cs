@@ -75,7 +75,7 @@ internal static class ExtractionCompute {
                 ? (true, 1, new Plane(cyl.Center, cyl.Axis), [cyl.Radius, cyl.TotalHeight,])
                 : s.TryGetSphere(out Sphere sph, tolerance: ExtractionConfig.PrimitiveFitTolerance) && sph.Radius > ExtractionConfig.PrimitiveFitTolerance
                     ? (true, 2, new Plane(sph.Center, Vector3d.ZAxis), [sph.Radius,])
-                    : s.TryGetCone(out Cone cone, tolerance: ExtractionConfig.PrimitiveFitTolerance) && cone.Radius > ExtractionConfig.PrimitiveFitTolerance && cone.Height > ExtractionConfig.PrimitiveFitTolerance
+                    : s.TryGetCone(out Cone cone, tolerance: ExtractionConfig.PrimitiveFitTolerance) && cone.Radius > ExtractionConfig.PrimitiveFitTolerance && cone.Height > ExtractionConfig.PrimitiveFitTolerance && Math.Abs(cone.Height) > 1e-8
                         ? (true, 4, new Plane(cone.BasePoint, cone.Axis), [cone.Radius, cone.Height, Math.Atan(cone.Radius / cone.Height),])
                         : s.TryGetTorus(out Torus torus, tolerance: ExtractionConfig.PrimitiveFitTolerance) && torus.MajorRadius > ExtractionConfig.PrimitiveFitTolerance && torus.MinorRadius > ExtractionConfig.PrimitiveFitTolerance
                             ? (true, 5, torus.Plane, [torus.MajorRadius, torus.MinorRadius,])
@@ -96,7 +96,9 @@ internal static class ExtractionCompute {
         Vector3d[] deltas = [.. pts.Zip(pts.Skip(1), (a, b) => b - a),];
 
         // Linear translation (type 0)
-        return deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
+        return deltas.Length is 0
+            ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(error: E.Geometry.NoPatternDetected)
+            : deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: (Type: (byte)0, SymmetryTransform: Transform.Translation(deltas[0]), Confidence: 1.0))
             : pts.Skip(1).Select(p => Vector3d.VectorAngle(pts[0] - pts[1], p - pts[1])).ToArray() is double[] angles && angles.Length > 0 && Math.Sqrt(ComputeAngularVariance(angles)) < ExtractionConfig.SymmetryAngleTolerance
                 ? ResultFactory.Create(value: (Type: (byte)1, SymmetryTransform: Transform.Rotation(angles[0], Vector3d.ZAxis, pts[0]), Confidence: 0.8))
@@ -122,20 +124,21 @@ internal static class ExtractionCompute {
 
     private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) {
         Vector3d u = candidates[0] / candidates[0].Length;
-        Vector3d v = candidates.Skip(1).FirstOrDefault(c => Math.Abs(Vector3d.Multiply(u, c / c.Length)) < 0.1);
+        Vector3d v = candidates.Skip(1).FirstOrDefault(c => c.Length > context.AbsoluteTolerance && Math.Abs(Vector3d.Multiply(u, c / c.Length)) < ExtractionConfig.GridOrthogonalityThreshold);
         return v.Length > context.AbsoluteTolerance ? (u * candidates[0].Length, v, true) : (Vector3d.Zero, Vector3d.Zero, false);
     }
 
     private static bool IsGridPoint(Vector3d point, Vector3d u, Vector3d v, IGeometryContext context) {
         double uLen = u.Length;
         double vLen = v.Length;
-        return uLen > context.AbsoluteTolerance && vLen > context.AbsoluteTolerance && Vector3d.Multiply(point, u) / (uLen * uLen) is double a && Vector3d.Multiply(point, v) / (vLen * vLen) is double b && Math.Abs(a - Math.Round(a)) < 0.1 && Math.Abs(b - Math.Round(b)) < 0.1;
+        return uLen > context.AbsoluteTolerance && vLen > context.AbsoluteTolerance && Vector3d.Multiply(point, u) / (uLen * uLen) is double a && Vector3d.Multiply(point, v) / (vLen * vLen) is double b && Math.Abs(a - Math.Round(a)) < ExtractionConfig.GridPointDeviationThreshold && Math.Abs(b - Math.Round(b)) < ExtractionConfig.GridPointDeviationThreshold;
     }
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectScalingPattern(Point3d[] pts, IGeometryContext context) {
         Point3d origin = pts[0];
         double[] distances = [.. pts.Skip(1).Select(p => origin.DistanceTo(p)).Where(d => d > context.AbsoluteTolerance),];
-        return distances.Length >= 2 && distances.Zip(distances.Skip(1), (a, b) => b / a).ToArray() is double[] ratios && ratios.Length > 0 && Math.Sqrt(ComputeAngularVariance(ratios)) < 0.1
+        double[] ratios = [.. distances.Zip(distances.Skip(1), (a, b) => (a, b)).Where(pair => pair.a > context.AbsoluteTolerance).Select(pair => pair.b / pair.a),];
+        return distances.Length >= 2 && ratios.Length > 0 && Math.Sqrt(ComputeAngularVariance(ratios)) < ExtractionConfig.ScalingVarianceThreshold
             ? ResultFactory.Create(value: (Type: (byte)3, SymmetryTransform: Transform.Scale(anchor: origin, scaleFactor: ratios[0]), Confidence: 0.7))
             : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
     }
