@@ -800,6 +800,10 @@ dotnet_diagnostic.IDISP025.severity = error                                    #
 # --------------------------------------------------------------------
 # Nullable Reference Types (CS86**)
 # --------------------------------------------------------------------
+dotnet_diagnostic.NX0001.severity = none
+dotnet_diagnostic.NX0002.severity = none
+dotnet_diagnostic.NX0003.severity = none
+dotnet_diagnostic.NX0004.severity = none
 dotnet_diagnostic.CS8600.severity = error                                      # Null to non-nullable
 dotnet_diagnostic.CS8601.severity = error                                      # Null reference assignment
 dotnet_diagnostic.CS8602.severity = error                                      # Dereference possibly null

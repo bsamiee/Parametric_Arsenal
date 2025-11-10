@@ -77,23 +77,13 @@
   <!-- Code Analyzers                               -->
   <!-- ============================================ -->
   <ItemGroup>
-    <!-- IDisposable pattern enforcement and memory leak detection -->
     <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
-
-    <!-- Comprehensive C# code quality and refactoring suggestions -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-
-    <!-- Performance, code quality, and best practices enforcement -->
     <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
-
-    <!-- Microsoft .NET code quality analyzers (CA rules) -->
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
-
-    <!-- Async/await best practices and common mistakes -->
     <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" />
-
-    <!-- Reflection usage analysis and optimization -->
     <PackageReference Include="ReflectionAnalyzers" Version="0.3.1" PrivateAssets="all" />
+    <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- ============================================ -->

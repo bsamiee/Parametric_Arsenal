@@ -48,6 +48,12 @@
           "Microsoft.TestPlatform.TestHost": "18.0.0"
         }
       },
+      "Nullable.Extended.Analyzer": {
+        "type": "Direct",
+        "requested": "[1.15.6581, )",
+        "resolved": "1.15.6581",
+        "contentHash": "lQ025E+aNR34QfXvRiHxNXTHK6JBkvpIIZD2IMk8QyROTZAkqs+PFasEa2xkIC+cN2C0Mw5MRnhX/Wrmz/qKfw=="
+      },
       "ReflectionAnalyzers": {
         "type": "Direct",
         "requested": "[0.3.1, )",
