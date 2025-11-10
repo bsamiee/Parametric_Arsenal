@@ -71,8 +71,9 @@ public static class Intersect {
     public static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> ClassifyIntersection(
         IntersectionOutput output,
         GeometryBase geometryA,
-        GeometryBase geometryB) =>
-        IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB);
+        GeometryBase geometryB,
+        IGeometryContext context) =>
+        IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB, context: context);
 
     /// <summary>Find near-misses within tolerance band: (pointsA[], pointsB[], distances[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
