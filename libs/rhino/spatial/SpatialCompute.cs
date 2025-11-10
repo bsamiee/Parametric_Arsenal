@@ -25,25 +25,31 @@ internal static class SpatialCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d ExtractCentroid(GeometryBase g) => g switch {
-        Curve c when AreaMassProperties.Compute(c) is { } amp => amp.Centroid,
-        Surface s when AreaMassProperties.Compute(s) is { } amp => amp.Centroid,
-        Brep b when VolumeMassProperties.Compute(b) is { } vmp => vmp.Centroid,
-        Mesh m when VolumeMassProperties.Compute(m) is { } vmp => vmp.Centroid,
+        Curve c => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(c); return amp?.Centroid ?? c.GetBoundingBox(accurate: false).Center; }))(),
+        Surface s => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(s); return amp?.Centroid ?? s.GetBoundingBox(accurate: false).Center; }))(),
+        Brep b => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(b); return vmp?.Centroid ?? b.GetBoundingBox(accurate: false).Center; }))(),
+        Mesh m => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(m); return vmp?.Centroid ?? m.GetBoundingBox(accurate: false).Center; }))(),
         _ => g.GetBoundingBox(accurate: false).Center,
     };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        SpatialConfig.ClusterParams.TryGetValue(algorithm, out (int maxIter, int minPts) config) && ((algorithm is 0 or 2 && k > 0) || (algorithm is 1 && epsilon > 0))
-            ? geometry.Select(ExtractCentroid).ToArray() is Point3d[] pts && algorithm switch {
+        !SpatialConfig.ClusterParams.TryGetValue(algorithm, out (int maxIter, int minPts) config) || !((algorithm is 0 or 2 && k > 0) || (algorithm is 1 && epsilon > 0))
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon)
+            : ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, config: config, context: context);
+
+    private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, (int maxIter, int minPts) config, IGeometryContext context) where T : GeometryBase {
+        Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
+        return ((algorithm is 0 or 2) && k > pts.Length)
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
+            : algorithm switch {
                 0 => KMeansAssign(pts, k, context.AbsoluteTolerance, config.maxIter),
                 1 => DBSCANAssign(pts, epsilon, config.minPts),
                 2 => HierarchicalAssign(pts, k),
                 _ => [],
-            } is int[] assigns && (algorithm is 1 ? assigns.Max() + 1 : k) is int nc && nc > 0
-                ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is int[] m && m.Length > 0 ? (Centroid(m, pts), [.. m.Select(i => pts[i].DistanceTo(Centroid(m, pts)))]) : (Point3d.Origin, Array.Empty<double>())).ToArray())
-                : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
-            : ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon);
+            } is int[] assigns && (algorithm is 1 ? (assigns.Length > 0 && assigns.Max() >= 0 ? assigns.Max() + 1 : 0) : k) is int nc && nc > 0
+                ? ResultFactory.Create(value: Enumerable.Range(0, nc).Select(c => Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is int[] m && m.Length > 0 ? Centroid(m, pts) is Point3d centroid ? (centroid, [.. m.Select(i => pts[i].DistanceTo(centroid))]) : (Point3d.Origin, Array.Empty<double>()) : (Point3d.Origin, Array.Empty<double>())).ToArray())
+                : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
+    }
 
     private static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
@@ -64,15 +70,18 @@ internal static class SpatialCompute {
             }
 
             double sum = distSq.Sum();
-            double target = rng.NextDouble() * sum;
-            double cumulative = 0;
-            for (int j = 0; j < pts.Length; j++) {
-                cumulative += distSq[j];
-                if (cumulative >= target) {
-                    centroids[i] = pts[j];
-                    break;
-                }
-            }
+            centroids[i] = sum <= tol
+                ? pts[rng.Next(pts.Length)]
+                : ((Func<Point3d>)(() => {
+                    double target = rng.NextDouble() * sum;
+                    double cumulative = 0.0;
+                    int j = 0;
+                    while (j < pts.Length) {
+                        cumulative += distSq[j];
+                        return cumulative >= target ? pts[j] : (++j < pts.Length ? Point3d.Unset : pts[^1]);
+                    }
+                    return pts[^1];
+                }))();
         }
 
         // Lloyd's algorithm
@@ -181,11 +190,15 @@ internal static class SpatialCompute {
             _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
         };
 
-    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
+    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
+        direction.Length <= context.AbsoluteTolerance
+            ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection)
+            : ProximityFieldCompute(geometry: geometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context);
+
+    private static Result<(int, double, double)[]> ProximityFieldCompute(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
         using RTree tree = new();
         BoundingBox bounds = BoundingBox.Empty;
 
-        // Build RTree with proper bounds calculation
         for (int i = 0; i < geometry.Length; i++) {
             BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
             _ = tree.Insert(bbox, i);
@@ -218,4 +231,36 @@ internal static class SpatialCompute {
 
         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
     }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Point3d[]> ConvexHull2D(Point3d[] points) =>
+        points.Length < 3
+            ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
+            : BuildConvexHull2D(points: points);
+
+    private static Result<Point3d[]> BuildConvexHull2D(Point3d[] points) {
+        Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+
+        List<Point3d> lower = [];
+        for (int i = 0; i < pts.Length; i++) {
+            while (lower.Count >= 2 && CrossProduct2D(lower[^2], lower[^1], pts[i]) <= 0.0) {
+                lower.RemoveAt(lower.Count - 1);
+            }
+            lower.Add(pts[i]);
+        }
+
+        List<Point3d> upper = [];
+        for (int i = pts.Length - 1; i >= 0; i--) {
+            while (upper.Count >= 2 && CrossProduct2D(upper[^2], upper[^1], pts[i]) <= 0.0) {
+                upper.RemoveAt(upper.Count - 1);
+            }
+            upper.Add(pts[i]);
+        }
+
+        return ResultFactory.Create<Point3d[]>(value: [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),]);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double CrossProduct2D(Point3d o, Point3d a, Point3d b) =>
+        ((a.X - o.X) * (b.Y - o.Y)) - ((a.Y - o.Y) * (b.X - o.X));
 }
