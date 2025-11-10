@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Validation mode configuration using bitwise flag operations.</summary>
+/// <summary>Validation mode flags with bitwise operations.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct V(ushort flags) : IEquatable<V> {

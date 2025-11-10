@@ -8,7 +8,7 @@ using Arsenal.Core.Errors;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Monadic result container with lazy evaluation and functional composition.</summary>
+/// <summary>Monadic result with lazy evaluation and functional composition.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly struct Result<T> : IEquatable<Result<T>> {
@@ -72,7 +72,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Maps success value through transform (functor).</summary>
+    /// <summary>Maps success value through transform.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Map<TOut>(Func<T, TOut> transform) {
         ArgumentNullException.ThrowIfNull(transform);
@@ -84,7 +84,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Chains operation returning Result (monad flatMap).</summary>
+    /// <summary>Chains operation returning Result.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Bind<TOut>(Func<T, Result<TOut>> operation) {
         ArgumentNullException.ThrowIfNull(operation);
@@ -96,7 +96,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Validates value using predicate, returns error if false.</summary>
+    /// <summary>Validates value using predicate.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(Func<T, bool> predicate, SystemError error) {
         ArgumentNullException.ThrowIfNull(predicate);
@@ -109,7 +109,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Validates value using multiple predicates, accumulates all failures.</summary>
+    /// <summary>Validates value using multiple predicates.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Ensure(params (Func<T, bool>, SystemError)[] validations) {
         Result<T> self = this;
@@ -122,7 +122,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Matches success/failure, returns result of handler.</summary>
+    /// <summary>Matches success/failure and returns result.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<SystemError[], TResult> onFailure) {
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -131,7 +131,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Executes side effects, returns original Result unchanged.</summary>
+    /// <summary>Executes side effects and returns unchanged Result.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> Tap(Action<T>? onSuccess = null, Action<SystemError[]>? onFailure = null) {
         Result<T> self = this;
@@ -140,7 +140,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
             onFailure: errors => { onFailure?.Invoke(errors); return self; });
     }
 
-    /// <summary>Applies function in Result to value in Result (applicative).</summary>
+    /// <summary>Applies function in Result to value in Result.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<TOut> Apply<TOut>(Result<Func<T, TOut>> func) {
         Result<T> self = this;
@@ -158,7 +158,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Maps errors to new errors on failure.</summary>
+    /// <summary>Maps errors on failure.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnError(Func<SystemError[], SystemError[]> mapError) {
         ArgumentNullException.ThrowIfNull(mapError);
@@ -171,7 +171,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Recovers from failure by providing value.</summary>
+    /// <summary>Recovers from failure with value.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnError(Func<SystemError[], T> recover) {
         ArgumentNullException.ThrowIfNull(recover);
@@ -184,7 +184,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Recovers from failure by chaining to alternative Result.</summary>
+    /// <summary>Recovers from failure with alternative Result.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnError(Func<SystemError[], Result<T>> recoverWith) {
         ArgumentNullException.ThrowIfNull(recoverWith);
@@ -197,7 +197,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
         };
     }
 
-    /// <summary>Maps collection elements through Result-returning function.</summary>
+    /// <summary>Maps collection elements through Result function.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<IReadOnlyList<TOut>> Traverse<TOut>(Func<T, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);

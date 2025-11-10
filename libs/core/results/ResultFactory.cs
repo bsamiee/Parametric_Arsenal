@@ -7,19 +7,19 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Factory for creating and manipulating Result instances.</summary>
+/// <summary>Factory for creating and manipulating Result.</summary>
 public static class ResultFactory {
-    /// <summary>True if type is Rhino.Geometry.* (no assembly load).</summary>
+    /// <summary>True if type is Rhino.Geometry.*.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsGeometryType(Type type) =>
         type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
 
-    /// <summary>Adds item to Result list using applicative composition.</summary>
+    /// <summary>Adds item to Result list via applicative composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
         accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
 
-    /// <summary>Maps IEnumerable elements through Result-returning function.</summary>
+    /// <summary>Maps IEnumerable elements through Result function.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);
@@ -27,7 +27,7 @@ public static class ResultFactory {
             (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
     }
 
-    /// <summary>Creates Result via polymorphic dispatch (value/errors/error/deferred/conditionals/nested).</summary>
+    /// <summary>Creates Result via polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
         T? value = default,
@@ -47,7 +47,7 @@ public static class ResultFactory {
             _ => throw new ArgumentException(E.Results.InvalidCreate.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result via polymorphic dispatch (predicate/validation/validations/args for geometry).</summary>
+    /// <summary>Validates Result via polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
@@ -73,7 +73,7 @@ public static class ResultFactory {
             _ => result,
         };
 
-    /// <summary>Lifts function into Result context with partial application support.</summary>
+    /// <summary>Lifts function into Result context with partial application.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Lift<TResult>(Delegate func, params object[] args) {
         ArgumentNullException.ThrowIfNull(func);

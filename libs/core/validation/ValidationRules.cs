@@ -12,9 +12,9 @@ using Rhino.Geometry.Intersect;
 
 namespace Arsenal.Core.Validation;
 
-/// <summary>Validation system using compiled expression trees and cached validators.</summary>
+/// <summary>Validation via compiled expression trees with caching.</summary>
 public static class ValidationRules {
-    /// <summary>Cache key structure for validator lookups.</summary>
+    /// <summary>Cache key for validator lookups.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
         public readonly Type Type = type;
@@ -73,12 +73,12 @@ public static class ValidationRules {
             [V.BrepGranular] = ([], [(Member: "IsValidTopology", Error: E.Validation.BrepTopologyInvalid), (Member: "IsValidGeometry", Error: E.Validation.BrepGeometryInvalid), (Member: "IsValidTolerancesAndFlags", Error: E.Validation.BrepTolerancesAndFlagsInvalid),]),
         }.ToFrozenDictionary();
 
-    /// <summary>Gets or compiles cached validator for runtime type and mode.</summary>
+    /// <summary>Gets or compiles cached validator for type and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Func<object, IGeometryContext, SystemError[]> GetOrCompileValidator(Type runtimeType, V mode) =>
         _validatorCache.GetOrAdd(new CacheKey(runtimeType, mode), static k => CompileValidator(k.Type, k.Mode));
 
-    /// <summary>Generates validation errors for tolerance values (used by GeometryContext).</summary>
+    /// <summary>Validation errors for tolerance values.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
@@ -93,7 +93,7 @@ public static class ValidationRules {
             _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
         };
 
-    /// <summary>Compiles expression tree validator for runtime type (zero-allocation).</summary>
+    /// <summary>Compiles zero-allocation validator via expression trees.</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));

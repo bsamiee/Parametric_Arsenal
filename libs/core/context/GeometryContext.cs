@@ -20,24 +20,24 @@ public sealed record GeometryContext(
     UnitSystem Units) : IGeometryContext {
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Abs={this.AbsoluteTolerance:g6}, Rel={this.RelativeTolerance:g6}, AngRad={this.AngleToleranceRadians:g6}, Units={this.Units}");
 
-    /// <summary>Squared absolute distance tolerance for fast distance checks.</summary>
+    /// <summary>Squared absolute tolerance for fast distance checks.</summary>
     [Pure]
     public double AbsoluteToleranceSquared => this.AbsoluteTolerance * this.AbsoluteTolerance;
 
-    /// <summary>Angular tolerance in degrees for UI/display.</summary>
+    /// <summary>Angular tolerance in degrees.</summary>
     [Pure]
     public double AngleToleranceDegrees => RhinoMath.ToDegrees(this.AngleToleranceRadians);
 
-    /// <summary>True if value differences are within absolute tolerance.</summary>
+    /// <summary>True if values differ within absolute tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinAbsoluteTolerance(double a, double b) => RhinoMath.EpsilonEquals(a, b, this.AbsoluteTolerance);
 
-    /// <summary>True if angle differences are within angular tolerance.</summary>
+    /// <summary>True if angles differ within angular tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinAngleTolerance(double angleRadians1, double angleRadians2) =>
         RhinoMath.EpsilonEquals(angleRadians1, angleRadians2, this.AngleToleranceRadians);
 
-    /// <summary>True if squared distance is within squared absolute tolerance.</summary>
+    /// <summary>True if squared distance within squared tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsWithinSquaredTolerance(double squaredDistance) => squaredDistance <= this.AbsoluteToleranceSquared;
 
@@ -46,14 +46,14 @@ public sealed record GeometryContext(
     public static Result<GeometryContext> CreateWithDefaults(UnitSystem units) =>
         Create(absoluteTolerance: 0.01, relativeTolerance: 0.0, angleToleranceRadians: RhinoMath.ToRadians(1.0), units: units);
 
-    /// <summary>Creates context from RhinoDoc model tolerances and units.</summary>
+    /// <summary>Creates context from RhinoDoc model tolerances.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
         ArgumentNullException.ThrowIfNull(doc);
         return Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
     }
 
-    /// <summary>Returns scale factor from context Units to target units.</summary>
+    /// <summary>Scale factor from current units to target units.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<double> GetLengthScale(UnitSystem targetUnits) =>
         targetUnits == this.Units ? ResultFactory.Create(value: 1.0) :
@@ -61,7 +61,7 @@ public sealed record GeometryContext(
             ? ResultFactory.Create(value: scale)
             : ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]);
 
-    /// <summary>Converts length value from context Units to target units.</summary>
+    /// <summary>Converts length from current units to target units.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
         !RhinoMath.IsValidDouble(value) ? ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]) :
@@ -69,7 +69,7 @@ public sealed record GeometryContext(
             ? ResultFactory.Create(value: value * scale)
             : ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]));
 
-    /// <summary>Creates validated context with normalization (invalid values use defaults).</summary>
+    /// <summary>Creates validated context with normalization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) {
         (double normAbs, double normAngle) = (absoluteTolerance <= 0d ? 0.01 : absoluteTolerance, angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians);
