@@ -11,7 +11,17 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.ToArray() is int[] arr && arr.Length > 0 ? new Point3d(arr.Average(i => pts[i].X), arr.Average(i => pts[i].Y), arr.Average(i => pts[i].Z)) : Point3d.Origin;
+        indices.ToArray() is int[] arr && arr.Length > 0
+            ? ((Func<Point3d>)(() => {
+                (double sumX, double sumY, double sumZ) = (0.0, 0.0, 0.0);
+                foreach (int idx in arr) {
+                    sumX += pts[idx].X;
+                    sumY += pts[idx].Y;
+                    sumZ += pts[idx].Z;
+                }
+                return new Point3d(sumX / arr.Length, sumY / arr.Length, sumZ / arr.Length);
+            }))()
+            : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d ExtractCentroid(GeometryBase g) => g switch {
@@ -48,7 +58,7 @@ internal static class SpatialCompute {
                 double minDist = double.MaxValue;
                 for (int c = 0; c < i; c++) {
                     double d = pts[j].DistanceTo(centroids[c]);
-                    minDist = d < minDist ? d : minDist;
+                    minDist = Math.Min(d, minDist);
                 }
                 distSq[j] = minDist * minDist;
             }
@@ -91,7 +101,7 @@ internal static class SpatialCompute {
             for (int i = 0; i < k; i++) {
                 newCentroids[i] = counts[i] > 0 ? newCentroids[i] / counts[i] : centroids[i];
                 double shift = centroids[i].DistanceTo(newCentroids[i]);
-                maxShift = shift > maxShift ? shift : maxShift;
+                maxShift = Math.Max(shift, maxShift);
                 centroids[i] = newCentroids[i];
             }
 

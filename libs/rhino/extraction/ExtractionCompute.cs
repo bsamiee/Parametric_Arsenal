@@ -1,3 +1,4 @@
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
@@ -6,42 +7,43 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Feature extraction algorithms: design features, primitive decomposition, pattern recognition.</summary>
 internal static class ExtractionCompute {
+    [Pure]
     internal static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeatures(Brep brep) =>
         brep.Edges.Count is 0
             ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Geometry.FeatureExtractionFailed)
             : ResultFactory.Create(value: (
-                Features: Array.Empty<(byte Type, double Param)>().Concat(
-                    brep.Edges
-                        .Where(e => e.EdgeCurve is not null)
-                        .Select(e => (
-                            Type: !e.GetNextDiscontinuity(Continuity.G2_locus_continuous, e.Domain.Min, e.Domain.Max, out double _)
-                                ? (byte)0
-                                : Math.Abs(Vector3d.VectorAngle(e.TangentAt(e.Domain.Mid), e.EdgeCurve.TangentAt(e.EdgeCurve.Domain.Mid)) - (Math.PI / 4)) < ExtractionConfig.ChamferAngleTolerance
-                                    ? (byte)1
-                                    : (byte)3,
-                            Param: e.EdgeCurve.GetLength()
-                        ))
-                        .Concat(
-                            brep.Loops
-                                .Where(l => l.LoopType == BrepLoopType.Inner && l.To3dCurve() is Curve c && c.IsClosed && c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHoleSides)
-                                .Select(l => {
-                                    using Curve? curve = l.To3dCurve();
-                                    using AreaMassProperties? amp = curve is not null ? AreaMassProperties.Compute(curve) : null;
-                                    return (Type: (byte)2, Param: amp?.Area ?? 0.0);
-                                })
-                        )
-                ).ToArray(),
+                Features: brep.Edges
+                    .Where(e => e.EdgeCurve is not null)
+                    .Select(e => (
+                        Type: !e.GetNextDiscontinuity(Continuity.G2_locus_continuous, e.Domain.Min, e.Domain.Max, out double _)
+                            ? (byte)0
+                            : Math.Abs(Vector3d.VectorAngle(e.TangentAt(e.Domain.Mid), e.EdgeCurve.TangentAt(e.EdgeCurve.Domain.Mid)) - (Math.PI / 4)) < ExtractionConfig.ChamferAngleTolerance
+                                ? (byte)1
+                                : (byte)3,
+                        Param: e.EdgeCurve.GetLength()
+                    ))
+                    .Concat(
+                        brep.Loops
+                            .Where(l => l.LoopType == BrepLoopType.Inner && l.To3dCurve() is Curve c && c.IsClosed && c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHoleSides)
+                            .Select(l => {
+                                using Curve? curve = l.To3dCurve();
+                                using AreaMassProperties? amp = curve is not null ? AreaMassProperties.Compute(curve) : null;
+                                return (Type: (byte)2, Param: amp?.Area ?? 0.0);
+                            })
+                    )
+                    .ToArray(),
                 Confidence: brep.Edges.Count > 0 ? 1.0 - (brep.Edges.Count(e => e.EdgeCurve is null) / (double)brep.Edges.Count) : 0.0
             ));
 
     private static readonly double[] _zeroResidual = [0.0,];
 
+    [Pure]
     internal static Result<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry) =>
         geometry switch {
             Surface s => (s.TryGetPlane(out Plane pl, tolerance: ExtractionConfig.PrimitiveFitTolerance), s.TryGetCylinder(out Cylinder cyl, tolerance: ExtractionConfig.PrimitiveFitTolerance), s.TryGetSphere(out Sphere sph, tolerance: ExtractionConfig.PrimitiveFitTolerance)) switch {
                 (true, _, _) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(value: ([(Type: 0, Frame: pl, Params: [pl.OriginX, pl.OriginY, pl.OriginZ,]),], _zeroResidual)),
                 (_, true, _) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(value: ([(Type: 1, Frame: new Plane(cyl.Center, cyl.Axis), Params: [cyl.Radius, cyl.TotalHeight,]),], _zeroResidual)),
-                (_, _, true) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(value: ([(Type: 2, Frame: new Plane(sph.Center, Vector3d.ZAxis), Params: [sph.Radius,]),], [0.0,])),
+                (_, _, true) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(value: ([(Type: 2, Frame: new Plane(sph.Center, Vector3d.ZAxis), Params: [sph.Radius,]),], _zeroResidual)),
                 _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(error: E.Geometry.NoPrimitivesDetected),
             },
             Brep b => b.Faces.Count is 0
@@ -61,6 +63,7 @@ internal static class ExtractionCompute {
             _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(error: E.Geometry.DecompositionFailed),
         };
 
+    [Pure]
     internal static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries) =>
         geometries.Length < ExtractionConfig.PatternMinInstances
             ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(error: E.Geometry.NoPatternDetected)

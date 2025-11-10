@@ -1,3 +1,4 @@
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
@@ -7,6 +8,7 @@ namespace Arsenal.Rhino.Orientation;
 /// <summary>Optimization, relative orientation, and pattern alignment algorithms.</summary>
 internal static class OrientCompute {
     /// <summary>Optimize orientation for manufacturing or stability criteria.</summary>
+    [Pure]
     internal static Result<(Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
@@ -44,6 +46,7 @@ internal static class OrientCompute {
             : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed);
 
     /// <summary>Compute relative orientation between two geometries.</summary>
+    [Pure]
     internal static Result<(Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelative(
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -70,6 +73,7 @@ internal static class OrientCompute {
         };
 
     /// <summary>Detect patterns in geometry array and compute alignment.</summary>
+    [Pure]
     internal static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectPattern(
         GeometryBase[] geometries,
         double tolerance) =>
