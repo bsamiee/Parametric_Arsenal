@@ -75,10 +75,11 @@ internal static class SpatialCompute {
                 : ((Func<Point3d>)(() => {
                     double target = rng.NextDouble() * sum;
                     double cumulative = 0.0;
-                    int j = 0;
-                    while (j < pts.Length) {
+                    for (int j = 0; j < pts.Length; j++) {
                         cumulative += distSq[j];
-                        return cumulative >= target ? pts[j] : (++j < pts.Length ? Point3d.Unset : pts[^1]);
+                        if (cumulative >= target) {
+                            return pts[j];
+                        }
                     }
                     return pts[^1];
                 }))();

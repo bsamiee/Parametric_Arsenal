@@ -19,7 +19,9 @@ internal static class ExtractionCompute {
                         .Where(e => e.EdgeCurve is not null)
                         .Select(e => {
                             bool isG2Continuous = !e.GetNextDiscontinuity(Continuity.G2_locus_continuous, e.Domain.Min, e.Domain.Max, out double _);
-                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && Math.Abs(e.EdgeCurve.CurvatureAt(e.Domain.Min).Length - e.EdgeCurve.CurvatureAt(e.Domain.Max).Length) < ExtractionConfig.FilletG2Threshold * e.EdgeCurve.CurvatureAt(e.Domain.Mid).Length;
+                            double curvMid = e.EdgeCurve.CurvatureAt(e.Domain.Mid).Length;
+                            double curvThreshold = Math.Max(ExtractionConfig.FilletG2Threshold * curvMid, ExtractionConfig.FilletG2AbsoluteTolerance);
+                            bool hasConstantCurvature = !e.EdgeCurve.TryGetPolyline(out Polyline _) && Math.Abs(e.EdgeCurve.CurvatureAt(e.Domain.Min).Length - e.EdgeCurve.CurvatureAt(e.Domain.Max).Length) < curvThreshold;
                             double tangentAngle = Math.Abs(Vector3d.VectorAngle(e.TangentAt(e.Domain.Min), e.TangentAt(e.Domain.Max)));
                             return (
                                 Type: isG2Continuous && hasConstantCurvature
@@ -81,6 +83,8 @@ internal static class ExtractionCompute {
 
     [Pure]
     private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurface(Surface s) {
+        // Suppress IDE0004 (redundant cast): The explicit (byte) casts in the nested ternary chain
+        // are required by coding guidelines (no var, explicit types) but trigger IDE0004 due to cascading pattern
 #pragma warning disable IDE0004
         return s.TryGetPlane(out Plane pl, tolerance: ExtractionConfig.PrimitiveFitTolerance)
             ? (true, (byte)0, pl, [pl.OriginX, pl.OriginY, pl.OriginZ,])
@@ -103,7 +107,7 @@ internal static class ExtractionCompute {
             : geometries.Select(g => g.GetBoundingBox(accurate: false).Center).ToArray() is Point3d[] pts && pts.Length >= 2
                 ? pts.Zip(pts.Skip(1), (a, b) => b - a).ToArray() is Vector3d[] deltas && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
                     ? ResultFactory.Create(value: (Type: (byte)0, SymmetryTransform: Transform.Translation(deltas[0]), Confidence: 1.0))
-                    : pts.Skip(1).Select(p => Vector3d.VectorAngle(pts[0] - pts[1], p - pts[1])).ToArray() is double[] angles && angles.Length > 0 && ComputeAngularVariance(angles) < ExtractionConfig.SymmetryAngleTolerance
+                    : pts.Skip(1).Select(p => Vector3d.VectorAngle(pts[0] - pts[1], p - pts[1])).ToArray() is double[] angles && angles.Length > 0 && Math.Sqrt(ComputeAngularVariance(angles)) < ExtractionConfig.SymmetryAngleTolerance
                         ? ResultFactory.Create(value: (Type: (byte)1, SymmetryTransform: Transform.Rotation(angles[0], Vector3d.ZAxis, pts[0]), Confidence: 0.8))
                         : ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(error: E.Geometry.NoPatternDetected)
                 : ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(error: E.Geometry.NoPatternDetected);

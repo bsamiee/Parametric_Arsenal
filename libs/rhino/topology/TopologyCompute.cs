@@ -62,30 +62,27 @@ internal static class TopologyCompute {
     [Pure]
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(
         Brep brep,
-        IGeometryContext _) =>
-        (v: brep.Vertices.Count, e: brep.Edges.Count, f: brep.Faces.Count, solid: brep.IsSolid) switch {
+        IGeometryContext _) {
+        (int LoopIndex, bool IsHole)[] ExtractLoops() => [.. brep.Loops
+            .Select((l, i) => {
+                using Curve? curve = l.To3dCurve();
+                return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (curve?.GetLength() ?? 0.0) > TopologyConfig.MinLoopLength);
+            }),];
+
+        return (v: brep.Vertices.Count, e: brep.Edges.Count, f: brep.Faces.Count, solid: brep.IsSolid) switch {
             (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 && isSolid =>
                 ResultFactory.Create(value: (
                     Genus: (2 - vCount + eCount - fCount) / 2,
-                    Loops: brep.Loops
-                        .Select((l, i) => {
-                            using Curve? curve = l.To3dCurve();
-                            return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (curve?.GetLength() ?? 0.0) > TopologyConfig.MinLoopLength);
-                        })
-                        .ToArray(),
+                    Loops: ExtractLoops(),
                     isSolid,
                     HandleCount: (2 - vCount + eCount - fCount) / 2)),
             (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 =>
                 ResultFactory.Create(value: (
                     Genus: 0,
-                    Loops: brep.Loops
-                        .Select((l, i) => {
-                            using Curve? curve = l.To3dCurve();
-                            return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (curve?.GetLength() ?? 0.0) > TopologyConfig.MinLoopLength);
-                        })
-                        .ToArray(),
+                    Loops: ExtractLoops(),
                     isSolid,
                     HandleCount: 0)),
             _ => ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.FeatureExtractionFailed),
         };
+    }
 }

@@ -96,15 +96,17 @@ internal static class OrientCompute {
             return reflected.DistanceTo(vb.Location) < tolerance;
         }).All(match => match);
 
-    private static bool TestRotationSymmetry(Curve a, Curve b, Point3d center, Vector3d axis, double tolerance) =>
-        a.SpanCount == b.SpanCount && axis.IsValid && axis.Length > tolerance && Enumerable.Range(0, 8).All(i => {
-            double t = a.Domain.ParameterAt(i / 7.0);
+    private static bool TestRotationSymmetry(Curve a, Curve b, Point3d center, Vector3d axis, double tolerance) {
+        const int sampleCount = 8;
+        return a.SpanCount == b.SpanCount && axis.IsValid && axis.Length > tolerance && Enumerable.Range(0, sampleCount).All(i => {
+            double t = a.Domain.ParameterAt(i / (double)(sampleCount - 1));
             Point3d ptA = a.PointAt(t);
             Point3d ptB = b.PointAt(t);
             Vector3d vecA = ptA - center;
             Vector3d vecB = ptB - center;
             double distA = vecA.Length;
             double distB = vecB.Length;
-            return Math.Abs(distA - distB) < tolerance && (distA < tolerance || (Math.Abs(Vector3d.VectorAngle(vecA, vecB) - (2.0 * Math.PI / 8.0)) < tolerance || Math.Abs(Vector3d.VectorAngle(vecA, vecB)) < tolerance));
+            return (distA < tolerance && distB < tolerance) || (Math.Abs(distA - distB) < tolerance && Vector3d.VectorAngle(vecA, vecB) < tolerance);
         });
+    }
 }

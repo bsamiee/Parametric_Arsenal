@@ -82,8 +82,11 @@ internal static class AnalysisCompute {
                 Point3f center = (Point3f)mesh.Faces.GetFaceCenter(i);
                 MeshFace face = mesh.Faces[i];
                 bool isQuad = face.IsQuad;
-                int maxIndex = Math.Max(Math.Max(face.A, face.B), Math.Max(face.C, isQuad ? face.D : face.C));
-                Point3d[] verts = maxIndex < mesh.Vertices.Count
+                bool validIndices = face.A >= 0 && face.A < mesh.Vertices.Count
+                    && face.B >= 0 && face.B < mesh.Vertices.Count
+                    && face.C >= 0 && face.C < mesh.Vertices.Count
+                    && (!isQuad || (face.D >= 0 && face.D < mesh.Vertices.Count));
+                Point3d[] verts = validIndices
                     ? [(Point3d)mesh.Vertices[face.A], (Point3d)mesh.Vertices[face.B], (Point3d)mesh.Vertices[face.C], isQuad ? (Point3d)mesh.Vertices[face.D] : (Point3d)mesh.Vertices[face.A],]
                     : [(Point3d)center, (Point3d)center, (Point3d)center, (Point3d)center,];
                 int vertCount = isQuad ? 4 : 3;
@@ -96,7 +99,7 @@ internal static class AnalysisCompute {
                 double aspectRatio = max / (min + context.AbsoluteTolerance);
                 double skewness = isQuad
                     ? Math.Abs((((verts[1] - verts[0]).Length + (verts[3] - verts[2]).Length) / ((verts[2] - verts[1]).Length + (verts[0] - verts[3]).Length + context.AbsoluteTolerance)) - 1.0)
-                    : Math.Abs((Vector3d.CrossProduct(verts[1] - verts[0], verts[2] - verts[0]).Length / (((verts[1] - verts[0]).Length * (verts[2] - verts[0]).Length) + context.AbsoluteTolerance)) - 0.866025403784439);
+                    : Math.Abs((Vector3d.CrossProduct(verts[1] - verts[0], verts[2] - verts[0]).Length / (((verts[1] - verts[0]).Length * (verts[2] - verts[0]).Length) + context.AbsoluteTolerance)) - AnalysisConfig.EquilateralTriangleRatio);
                 double jacobian = isQuad
                     ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges
                         ? edges.Zip(edges.Skip(1).Append(edges[0]), (e1, e2) => Vector3d.CrossProduct(e1, e2).Length).Min() / ((edges.Average(e => e.Length) * edges.Average(e => e.Length)) + context.AbsoluteTolerance)
