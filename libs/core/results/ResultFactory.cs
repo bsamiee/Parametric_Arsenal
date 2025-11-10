@@ -23,8 +23,8 @@ public static class ResultFactory {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);
-        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
+        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: []),
+            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)[.. list, val,]))));
     }
 
     /// <summary>Creates Result via polymorphic dispatch.</summary>
@@ -82,7 +82,7 @@ public static class ResultFactory {
             (var ar, 0, var nrc, var a) when ar > a.Length && nrc == a.Length =>
                 Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
             (var ar, var rc, 0, var a) when ar == a.Length && rc == ar =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => {
                         Type argType = arg.GetType();
                         return argType is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
@@ -95,7 +95,7 @@ public static class ResultFactory {
                     })
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
             (var ar, var rc, 0, var a) when rc == a.Length && ar >= 3 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
                         ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
                             (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),
@@ -104,7 +104,7 @@ public static class ResultFactory {
                         } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
                 .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
             (var ar, var rc, var nrc, var a) when rc > 0 && nrc > 0 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
                         ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
                             (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),
