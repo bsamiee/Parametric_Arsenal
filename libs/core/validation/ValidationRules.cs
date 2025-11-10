@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,6 +9,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Rhino;
 using Rhino.Geometry;
+using Rhino.Geometry.Intersect;
 
 namespace Arsenal.Core.Validation;
 
@@ -52,7 +54,16 @@ public static class ValidationRules {
             [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
             [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
-            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Uses BrepTopologyInvalid for all 3 methods
+            [V.SelfIntersection] = ([], ["CurveSelf",], E.Validation.SelfIntersecting),
+            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),
+        }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<(V Flag, string Member), SystemError> _memberErrors =
+        new Dictionary<(V, string), SystemError> {
+            [(V.BrepGranular, "IsValidTopology")] = E.Validation.BrepTopologyInvalid,
+            [(V.BrepGranular, "IsValidGeometry")] = E.Validation.BrepGeometryInvalid,
+            [(V.BrepGranular, "IsValidTolerancesAndFlags")] = E.Validation.BrepTolerancesAndFlagsInvalid,
+            [(V.SelfIntersection, "CurveSelf")] = E.Validation.SelfIntersecting,
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
@@ -69,6 +80,9 @@ public static class ValidationRules {
     private static readonly MethodInfo _enumerableSelect = typeof(Enumerable).GetMethods()
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Select), StringComparison.Ordinal) && m.GetParameters().Length == 2);
     private static readonly MethodInfo _enumerableToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray), BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)!;
+    private static readonly MethodInfo _curveSelfMethod = typeof(Intersection).GetMethods()
+        .First(static m => string.Equals(m.Name, nameof(Intersection.CurveSelf), StringComparison.Ordinal) && m.GetParameters().Length == 2 && m.GetParameters()[0].ParameterType == typeof(Curve));
+    private static readonly ConstantExpression _nullCurveIntersections = Expression.Constant(null, typeof(CurveIntersections));
 
     /// <summary>Gets or compiles cached validator for runtime type and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -95,27 +109,51 @@ public static class ValidationRules {
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
 
-        (MemberInfo Member, SystemError Error)[] memberValidations =
+        (MemberInfo Member, SystemError Error, V Flag)[] memberValidations =
             [.. V.AllFlags
                 .Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag))
                 .SelectMany(flag => {
-                    (string[] properties, string[] methods, SystemError error) = _validationRules[flag];
-                    return (IEnumerable<(MemberInfo Member, SystemError Error)>)[
+                    (string[] properties, string[] methods, SystemError defaultError) = _validationRules[flag];
+                    return (IEnumerable<(MemberInfo Member, SystemError Error, V Flag)>)[
                         .. properties.Select(prop => (
                             Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: prop, kind: 1),
                                 static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            error)),
+                            Error: _memberErrors.TryGetValue((flag, prop), out SystemError overrideError) ? overrideError : defaultError,
+                            Flag: flag,
+                        )),
                         .. methods.Select(method => (
                             Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: method, kind: 2),
                                 static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            error)),
+                            Error: _memberErrors.TryGetValue((flag, method), out SystemError overrideError) ? overrideError : defaultError,
+                            Flag: flag,
+                        )),
                     ];
                 }),
             ];
 
         Expression[] validationExpressions = [.. memberValidations
-            .Where(validation => validation.Member is not null and not Type { Name: "Void" })
-            .Select<(MemberInfo Member, SystemError Error), Expression>(validation => validation.Member switch {
+            .Where(validation => validation.Flag == V.SelfIntersection || validation.Member is not null and not Type { Name: "Void" })
+            .Select<(MemberInfo Member, SystemError Error, V Flag), Expression>(validation => validation.Flag == V.SelfIntersection
+                ? ((Func<Expression>)(() => {
+                    ParameterExpression intersections = Expression.Variable(typeof(CurveIntersections), "si");
+                    return Expression.Block(
+                        typeof(SystemError?),
+                        new[] { intersections, },
+                        Expression.Assign(intersections,
+                            Expression.Call(
+                                _curveSelfMethod,
+                                Expression.Convert(geometry, typeof(Curve)),
+                                Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
+                        Expression.Condition(
+                            Expression.AndAlso(
+                                Expression.NotEqual(intersections, _nullCurveIntersections),
+                                Expression.GreaterThan(
+                                    Expression.Property(intersections, nameof(CurveIntersections.Count)),
+                                    Expression.Constant(0))),
+                            Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
+                            _nullSystemError));
+                }))()
+                : validation.Member switch {
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
