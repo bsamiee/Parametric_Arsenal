@@ -53,7 +53,8 @@ internal static class SpatialCompute {
                         Point3d centroid = members.Length > 0 ? Centroid(members, pts) : Point3d.Origin;
                         double[] distances = members.Length > 0 ? [.. members.Select(i => pts[i].DistanceTo(centroid)),] : [];
                         return (centroid, distances);
-                    }),])
+                    }),
+                    ])
                     : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
