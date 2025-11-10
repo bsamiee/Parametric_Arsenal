@@ -90,10 +90,10 @@ internal static class IntersectionCompute {
                             return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
                         }))
                     .Take(IntersectionConfig.StabilitySampleCount)
-                    .ToArray()) is (int phi, int theta, Vector3d[] directions) && geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor is double perturbDist
+                    .ToArray()) is (_, _, Vector3d[] directions) && geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor is double perturbDist
                 ? geomA switch {
                     Curve c => directions
-                        .Select(dir => c.DuplicateCurve() is Curve copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new Intersect.IntersectionOptions()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
+                        .Select(dir => c.DuplicateCurve() is Curve copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
                             ? (Delta: Math.Abs(perturbResult.Value.Points.Count - n), Resource: (IDisposable)copy)
                             : ((Func<(double, IDisposable)>)(() => { IDisposable res = (IDisposable)copy; res?.Dispose(); return (0.0, null); }))())
                         .ToArray() is (double Delta, IDisposable Resource)[] perturbResults && perturbResults.Length > 0
@@ -108,7 +108,7 @@ internal static class IntersectionCompute {
                         }))()
                         : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, Enumerable.Repeat(false, n).ToArray())),
                     Surface s => directions
-                        .Select(dir => s.Duplicate() is Surface copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new Intersect.IntersectionOptions()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
+                        .Select(dir => s.Duplicate() is Surface copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
                             ? (Delta: Math.Abs(perturbResult.Value.Points.Count - n), Resource: (IDisposable)copy)
                             : ((Func<(double, IDisposable)>)(() => { IDisposable res = (IDisposable)copy; res?.Dispose(); return (0.0, null); }))())
                         .ToArray() is (double Delta, IDisposable Resource)[] perturbResults && perturbResults.Length > 0
