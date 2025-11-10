@@ -34,14 +34,7 @@ internal static class AnalysisCompute {
                         double score = avgGaussian < medianGaussian * AnalysisConfig.HighCurvatureMultiplier
                             ? 1.0 - (avgGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))
                             : 0.5;
-                        int len = curvatures.Length;
-                        double[] gaussian = new double[len];
-                        double[] mean = new double[len];
-                        for (int i = 0; i < len; i++) {
-                            gaussian[i] = curvatures[i].Gaussian;
-                            mean[i] = curvatures[i].Mean;
-                        }
-                        return ResultFactory.Create(value: (GaussianSamples: gaussian, MeanSamples: mean, Singularities: singularities, ManufacturingScore: score));
+                        return ResultFactory.Create(value: (GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(), MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(), Singularities: singularities, ManufacturingScore: score));
                     }))()
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed);
             }))();
@@ -55,24 +48,17 @@ internal static class AnalysisCompute {
                 .Select(t => (Parameter: t, Curvature: curve.CurvatureAt(t)))
                 .Where(pair => pair.Curvature.IsValid)
                 .ToArray() is (double Parameter, Vector3d Curvature)[] samples && samples.Length > 2
-            ? ((Func<Result<(double, double[], (double, bool)[], double)>>)(() => {
-                int len = samples.Length;
-                double[] curvatures = new double[len];
-                for (int i = 0; i < len; i++) {
-                    curvatures[i] = samples[i].Curvature.Length;
-                }
-                double diffSum = 0.0;
-                for (int i = 1; i < len; i++) {
-                    diffSum += Math.Abs(curvatures[i] - curvatures[i - 1]);
-                }
-                double avgDiff = diffSum / (len - 1);
-                (double, bool)[] inflections = [.. Enumerable.Range(1, len - 2)
-                    .Where(i => Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)
-                    .Select(i => (samples[i].Parameter, IsSharp: Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)),
-                ];
-                double energy = curvatures.Sum(k => k * k) * (curve.GetLength() / AnalysisConfig.CurveFairnessSampleCount);
-                return ResultFactory.Create(value: (SmoothnessScore: 1.0 / (1.0 + (avgDiff * 10.0)), CurvatureSamples: curvatures, InflectionPoints: inflections, EnergyMetric: energy));
-            }))()
+            ? samples.Select(s => s.Curvature.Length).ToArray() is double[] curvatures
+                ? ((Func<Result<(double, double[], (double, bool)[], double)>>)(() => {
+                    double avgDiff = Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1);
+                    (double, bool)[] inflections = [.. Enumerable.Range(1, curvatures.Length - 2)
+                        .Where(i => Math.Abs(curvatures[i - 1] - curvatures[i + 1]) > AnalysisConfig.InflectionSharpnessThreshold)
+                        .Select(i => (samples[i].Parameter, true)),
+                    ];
+                    double energy = curvatures.Sum(k => k * k) * (curve.GetLength() / AnalysisConfig.CurveFairnessSampleCount);
+                    return ResultFactory.Create(value: (SmoothnessScore: 1.0 / (1.0 + (avgDiff * 10.0)), CurvatureSamples: curvatures, InflectionPoints: inflections, EnergyMetric: energy));
+                }))()
+                : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed)
             : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -100,43 +86,27 @@ internal static class AnalysisCompute {
                 double aspectRatio = max / (min + context.AbsoluteTolerance);
                 double skewness = isQuad
                     ? Math.Abs((((verts[1] - verts[0]).Length + (verts[3] - verts[2]).Length) / ((verts[2] - verts[1]).Length + (verts[0] - verts[3]).Length + context.AbsoluteTolerance)) - 1.0)
-                    : (verts[1] - verts[0], verts[2] - verts[0], verts[2] - verts[1], verts[0] - verts[1], verts[0] - verts[2], verts[1] - verts[2]) is (Vector3d ab, Vector3d ac, Vector3d bc, Vector3d ba, Vector3d ca, Vector3d cb)
-                        ? new[] {
-                            Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI), // angle at A
-                            Vector3d.VectorAngle(bc, ba) * (180.0 / Math.PI), // angle at B
-                            Vector3d.VectorAngle(ca, cb) * (180.0 / Math.PI), // angle at C
-                        } is double[] angles
-                            ? Math.Max(Math.Abs(angles[0] - 60.0), Math.Max(Math.Abs(angles[1] - 60.0), Math.Abs(angles[2] - 60.0))) / 60.0
+                    : (verts[1] - verts[0], verts[2] - verts[0], verts[2] - verts[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
+                        ? (
+                            Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI),
+                            Vector3d.VectorAngle(bc, -ab) * (180.0 / Math.PI),
+                            Vector3d.VectorAngle(-ac, -bc) * (180.0 / Math.PI)
+                        ) is (double angleA, double angleB, double angleC)
+                            ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
                             : 1.0
                         : 1.0;
                 double jacobian = isQuad
-                    ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges
-                        ? edges.Zip(edges.Skip(1).Append(edges[0]), (e1, e2) => Vector3d.CrossProduct(e1, e2).Length).Min() / ((edges.Average(e => e.Length) * edges.Average(e => e.Length)) + context.AbsoluteTolerance)
+                    ? verts.Take(4).Zip(verts.Skip(1).Take(3).Append(verts[0]), (a, b) => b - a).ToArray() is Vector3d[] edges && edges.Average(e => e.Length) is double avgLen
+                        ? edges.Zip(edges.Skip(1).Append(edges[0]), (e1, e2) => Vector3d.CrossProduct(e1, e2).Length).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
                         : 1.0
                     : 1.0;
                 return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
             }).ToArray() is (double AspectRatio, double Skewness, double Jacobian)[] metrics && metrics.Length > 0
-            ? ((Func<Result<(double[], double[], double[], int[], (int, int))>>)(() => {
-                int len = metrics.Length;
-                double[] aspectRatios = new double[len];
-                double[] skewness = new double[len];
-                double[] jacobians = new double[len];
-                (int warning, int critical) = (0, 0);
-                for (int i = 0; i < len; i++) {
-                    (double ar, double sk, double jac) = metrics[i];
-                    aspectRatios[i] = ar;
-                    skewness[i] = sk;
-                    jacobians[i] = jac;
-                    bool isCritical = ar > AnalysisConfig.AspectRatioCritical || sk > AnalysisConfig.SkewnessCritical || jac < AnalysisConfig.JacobianCritical;
-                    bool isWarning = ar > AnalysisConfig.AspectRatioWarning || sk > AnalysisConfig.SkewnessWarning || jac < AnalysisConfig.JacobianWarning;
-                    critical += isCritical ? 1 : 0;
-                    warning += isWarning ? 1 : 0;
-                }
-                int[] problematic = [.. Enumerable.Range(0, len).Where(i => {
-                    (double ar, double sk, double jac) = metrics[i];
-                    return ar > AnalysisConfig.AspectRatioCritical || sk > AnalysisConfig.SkewnessCritical || jac < AnalysisConfig.JacobianCritical;
-                }),];
-                return ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (aspectRatios, skewness, jacobians, problematic, (warning, critical)));
-            }))()
+            ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (
+                [.. metrics.Select(m => m.AspectRatio),],
+                [.. metrics.Select(m => m.Skewness),],
+                [.. metrics.Select(m => m.Jacobian),],
+                [.. metrics.Select((m, i) => (m, i)).Where(pair => pair.m.AspectRatio > AnalysisConfig.AspectRatioCritical || pair.m.Skewness > AnalysisConfig.SkewnessCritical || pair.m.Jacobian < AnalysisConfig.JacobianCritical).Select(pair => pair.i),],
+                (metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioWarning || m.Skewness > AnalysisConfig.SkewnessWarning || m.Jacobian < AnalysisConfig.JacobianWarning), metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioCritical || m.Skewness > AnalysisConfig.SkewnessCritical || m.Jacobian < AnalysisConfig.JacobianCritical))))
             : ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Geometry.MeshAnalysisFailed);
 }

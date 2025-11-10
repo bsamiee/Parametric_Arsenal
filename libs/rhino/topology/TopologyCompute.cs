@@ -20,13 +20,13 @@ internal static class TopologyCompute {
                     .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
                     .Select(i => brep.Edges[i].PointAtStart.DistanceTo(brep.Edges[i].PointAtEnd)),
                 ];
-                (int, int, double)[] nearMisses = [.. (from i in Enumerable.Range(0, brep.Edges.Count)
-                                                       from j in Enumerable.Range(i + 1, brep.Edges.Count - i - 1)
-                                                       let result = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d ptA, out Point3d ptB)
-                                                           ? (Success: true, Distance: ptA.DistanceTo(ptB))
-                                                           : (Success: false, Distance: double.MaxValue)
-                                                       where result.Success && result.Distance < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
-                                                       select (i, j, result.Distance)),
+                (int EdgeA, int EdgeB, double Distance)[] nearMisses = [.. (from i in Enumerable.Range(0, brep.Edges.Count)
+                                                                            from j in Enumerable.Range(i + 1, brep.Edges.Count - i - 1)
+                                                                            let result = brep.Edges[i].EdgeCurve.ClosestPoints(brep.Edges[j].EdgeCurve, out Point3d ptA, out Point3d ptB)
+                                                                                ? (Success: true, Distance: ptA.DistanceTo(ptB))
+                                                                                : (Success: false, Distance: double.MaxValue)
+                                                                            where result.Success && result.Distance < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
+                                                                            select (EdgeA: i, EdgeB: j, result.Distance)),
                 ];
                 byte[] repairs = [0, 1, 2, 3,];
                 return ResultFactory.Create(value: (gaps, nearMisses, repairs));
@@ -53,36 +53,21 @@ internal static class TopologyCompute {
                     return (Strategy: strategy, Healed: result);
                 }),
             ];
-            (byte strat, Brep? healed) = attempts.FirstOrDefault(a => a.Healed is not null);
+            (byte strategy, Brep? healed) = attempts.FirstOrDefault(a => a.Healed is not null);
             return healed is not null
-                ? ResultFactory.Create(value: (Healed: healed, Strategy: strat, Success: true))
+                ? ResultFactory.Create(value: (Healed: healed, Strategy: strategy, Success: true))
                 : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed);
         }))();
 
     [Pure]
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(
         Brep brep,
-        IGeometryContext _) {
-        (int LoopIndex, bool IsHole)[] ExtractLoops() => [.. brep.Loops
-            .Select((l, i) => {
-                using Curve? curve = l.To3dCurve();
-                return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (curve?.GetLength() ?? 0.0) > TopologyConfig.MinLoopLength);
-            }),];
-
-        return (v: brep.Vertices.Count, e: brep.Edges.Count, f: brep.Faces.Count, solid: brep.IsSolid) switch {
-            (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 && isSolid =>
-                ResultFactory.Create(value: (
-                    Genus: (eCount - vCount - fCount + 2) / 2,
-                    Loops: ExtractLoops(),
-                    isSolid,
-                    HandleCount: (eCount - vCount - fCount + 2) / 2)),
-            (int vCount, int eCount, int fCount, bool isSolid) when vCount > 0 && eCount > 0 && fCount > 0 =>
-                ResultFactory.Create(value: (
-                    Genus: 0,
-                    Loops: ExtractLoops(),
-                    isSolid,
-                    HandleCount: 0)),
+        IGeometryContext _) =>
+        (brep.Vertices.Count, brep.Edges.Count, brep.Faces.Count, brep.IsSolid, brep.Loops.Select((l, i) => ((Func<(int LoopIndex, bool IsHole)>)(() => { using Curve? c = l.To3dCurve(); return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (c?.GetLength() ?? 0.0) > TopologyConfig.MinLoopLength); }))()).ToArray()) switch {
+            (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 && (e - v - f + 2) / 2 is int genus && solid =>
+                ResultFactory.Create(value: (Genus: genus, Loops: loops, solid, HandleCount: genus)),
+            (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 =>
+                ResultFactory.Create(value: (Genus: 0, Loops: loops, solid, HandleCount: 0)),
             _ => ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.FeatureExtractionFailed),
         };
-    }
 }
