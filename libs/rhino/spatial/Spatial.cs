@@ -63,4 +63,25 @@ public static class Spatial {
         parameters.Direction.Length > context.AbsoluteTolerance
             ? SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context)
             : ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection);
+
+    /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<int[][]> ConvexHull3D(
+        Point3d[] points,
+        IGeometryContext context) =>
+        SpatialCompute.ConvexHull3D(points: points, context: context);
+
+    /// <summary>Compute 2D Delaunay triangulation → triangle vertex indices as int[][].</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<int[][]> DelaunayTriangulation2D(
+        Point3d[] points,
+        IGeometryContext context) =>
+        SpatialCompute.DelaunayTriangulation2D(points: points, context: context);
+
+    /// <summary>Compute 2D Voronoi diagram → cell vertices Point3d[][] for each input point.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<Point3d[][]> VoronoiDiagram2D(
+        Point3d[] points,
+        IGeometryContext context) =>
+        SpatialCompute.VoronoiDiagram2D(points: points, context: context);
 }
