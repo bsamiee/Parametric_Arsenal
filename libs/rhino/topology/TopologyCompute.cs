@@ -24,17 +24,26 @@ internal static class TopologyCompute {
                     ];
 
                     double[] gaps = nakedEdges.Length is > 0 and < TopologyConfig.MaxEdgesForNearMissAnalysis
-                        ? [.. nakedEdges.Select(e1 => nakedEdges
-                            .Where(e2 => e2.Index != e1.Index)
-                            .SelectMany(e2 => new[] {
-                                e1.Start.DistanceTo(e2.Start),
-                                e1.Start.DistanceTo(e2.End),
-                                e1.End.DistanceTo(e2.Start),
-                                e1.End.DistanceTo(e2.End),
+                        ? [.. nakedEdges.SelectMany(e1 => new[] {
+                                nakedEdges
+                                    .Where(e2 => e2.Index != e1.Index)
+                                    .Select(e2 => e1.Start.DistanceTo(e2.Start))
+                                    .Concat(nakedEdges
+                                        .Where(e2 => e2.Index != e1.Index)
+                                        .Select(e2 => e1.Start.DistanceTo(e2.End)))
+                                    .Where(dist => dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier)
+                                    .DefaultIfEmpty(double.MaxValue)
+                                    .Min(),
+                                nakedEdges
+                                    .Where(e2 => e2.Index != e1.Index)
+                                    .Select(e2 => e1.End.DistanceTo(e2.Start))
+                                    .Concat(nakedEdges
+                                        .Where(e2 => e2.Index != e1.Index)
+                                        .Select(e2 => e1.End.DistanceTo(e2.End)))
+                                    .Where(dist => dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier)
+                                    .DefaultIfEmpty(double.MaxValue)
+                                    .Min(),
                             })
-                            .Where(dist => dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier)
-                            .DefaultIfEmpty(double.MaxValue)
-                            .Min())
                             .Where(gap => gap < double.MaxValue),
                         ]
                         : [];

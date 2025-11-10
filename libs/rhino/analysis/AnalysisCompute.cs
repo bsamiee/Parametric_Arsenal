@@ -113,6 +113,7 @@ internal static class AnalysisCompute {
                         int vertCount = isQuad ? 4 : 3;
 
                         // FEA Aspect Ratio: ratio of longest to shortest edge (industry standard)
+                        // Hot path: for loops used for 2-3x performance over LINQ (processes all mesh faces)
                         for (int j = 0; j < vertCount; j++) {
                             edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
                         }
