@@ -26,14 +26,14 @@ internal static class SpatialCompute {
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d ExtractCentroid(GeometryBase g) =>
-        SpatialConfig.TypeExtractors.TryGetValue(("Centroid", g.GetType()), out Func<object, object>? extractor)
-            ? (Point3d)extractor(g)
-            : SpatialConfig.TypeExtractors.Where(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(g))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(static g => ((GeometryBase)g).GetBoundingBox(accurate: false).Center)
-                .First()(g) is Point3d pt ? pt : Point3d.Origin;
+    private static Point3d ExtractCentroid(GeometryBase g) {
+        Type gType = g.GetType();
+        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
+            ? (Point3d)exactExtractor(g)
+            : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(g)).Value is Func<object, object> fallbackExtractor
+                ? (Point3d)fallbackExtractor(g)
+                : g.GetBoundingBox(accurate: false).Center;
+    }
 
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
@@ -44,13 +44,17 @@ internal static class SpatialCompute {
 
     private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
         Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
-        return (algorithm is 0 or 2) && k > pts.Length ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-            : SpatialConfig.TypeExtractors[("ClusterAssign", typeof((byte, Point3d[], int, double, IGeometryContext)))]((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0 && (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int nc && nc > 0
-                ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, nc).Select(c =>
-                    Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is { Length: > 0 } m
-                        ? (Centroid(m, pts), [.. m.Select(i => pts[i].DistanceTo(Centroid(m, pts))),])
-                        : (Point3d.Origin, Array.Empty<double>())),
-                ])
+        return (algorithm is 0 or 2) && k > pts.Length
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
+            : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
+                ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
+                    ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
+                        int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
+                        Point3d centroid = members.Length > 0 ? Centroid(members, pts) : Point3d.Origin;
+                        double[] distances = members.Length > 0 ? [.. members.Select(i => pts[i].DistanceTo(centroid)),] : [];
+                        return (centroid, distances);
+                    }),])
+                    : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
 
