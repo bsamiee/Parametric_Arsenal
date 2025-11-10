@@ -113,7 +113,6 @@ internal static class AnalysisCompute {
                         int vertCount = isQuad ? 4 : 3;
 
                         // FEA Aspect Ratio: ratio of longest to shortest edge (industry standard)
-                        // Hot path: for loops used for 2-3x performance over LINQ (processes all mesh faces)
                         for (int j = 0; j < vertCount; j++) {
                             edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
                         }
@@ -127,12 +126,12 @@ internal static class AnalysisCompute {
 
                         // FEA Skewness: angular deviation from ideal (90° for quads, 60° for triangles)
                         double skewness = isQuad
-                            ? new double[] {
+                            ? ((double[])[
                                 Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0]),
                                 Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
                                 Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
                                 Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
-                            }.Max(angle => Math.Abs((angle * (180.0 / Math.PI)) - 90.0)) / 90.0
+                            ]).Max(angle => Math.Abs((angle * (180.0 / Math.PI)) - 90.0)) / 90.0
                             : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
                                 ? (
                                     Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI),
@@ -147,12 +146,12 @@ internal static class AnalysisCompute {
                         // Measures element shape quality via ratio of minimum cross-product to average edge length squared.
                         double jacobian = isQuad
                             ? edgeLengths.Take(4).Average() is double avgLen && avgLen > context.AbsoluteTolerance
-                                ? new double[] {
+                                ? ((double[])[
                                     Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
                                     Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length,
                                     Vector3d.CrossProduct(vertices[3] - vertices[2], vertices[1] - vertices[2]).Length,
                                     Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length,
-                                }.Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
+                                ]).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
                                 : 0.0
                             : edgeLengths.Take(3).Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
                                 ? Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * triAvgLen * triAvgLen) + context.AbsoluteTolerance)
