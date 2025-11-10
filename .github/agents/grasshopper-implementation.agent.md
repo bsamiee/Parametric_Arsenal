@@ -290,6 +290,15 @@ Before committing:
 - [ ] One type per file
 - [ ] `dotnet build` succeeds with zero warnings
 
+# [VERIFICATION BEFORE COMPLETION]
+
+Critical validation:
+1. **Build Succeeds**: Component compiles without warnings
+2. **No Logic Duplication**: Verified component only wraps libs/rhino
+3. **Result Integration**: All Result<T> handled with Match pattern
+4. **Context Usage**: IGeometryContext properly obtained from document
+5. **Limits Respected**: Files ≤4, types ≤10, members ≤300 LOC
+
 # [REMEMBER]
 - **Thin wrappers only** - expose `libs/rhino/`, never duplicate logic
 - **Result<T> integration** - use Match for all result handling

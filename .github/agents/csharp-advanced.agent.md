@@ -221,6 +221,16 @@ Before committing:
 - [ ] ArrayPool for buffers
 - [ ] Span<T> where applicable
 - [ ] `dotnet build` zero warnings
+- [ ] `dotnet test` all tests pass
+
+# [VERIFICATION BEFORE COMPLETION]
+
+Critical validation steps:
+1. **Build Clean**: `dotnet build` with zero warnings
+2. **Tests Pass**: All existing tests still pass
+3. **Limits Verified**: File count ≤4, type count ≤10, all members ≤300 LOC
+4. **Pattern Compliance**: No var, no if/else, all patterns followed
+5. **Algorithmic Density**: Code is denser than before, not more sprawling
 
 # [REMEMBER]
 - **300 LOC is maximum** - most should be 150-250 LOC

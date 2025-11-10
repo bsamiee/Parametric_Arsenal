@@ -268,6 +268,15 @@ Before committing:
 - [ ] All tests still pass
 - [ ] `dotnet build` succeeds with zero warnings
 
+# [VERIFICATION BEFORE COMPLETION]
+
+Mandatory validation:
+1. **Metrics Improved**: LOC decreased, files/types at or below limits
+2. **Tests Pass**: All existing tests still pass after refactoring
+3. **Build Clean**: Zero warnings after changes
+4. **Functionality Preserved**: No behavior changes unless explicitly intended
+5. **Architecture Better**: More dispatch tables, more generics, less branching
+
 # [QUALITY METRICS]
 
 **Track improvements:**

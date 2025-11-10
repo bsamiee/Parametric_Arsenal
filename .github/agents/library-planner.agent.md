@@ -312,6 +312,16 @@ Before finalizing blueprint:
 - [ ] **Blueprint strictly follows code style**
 - [ ] **Blueprint includes code examples matching existing style**
 
+# [VERIFICATION BEFORE COMPLETION]
+
+Critical blueprint validation:
+1. **Infrastructure Analysis Complete**: All relevant libs/core and libs/rhino files reviewed
+2. **No Duplication Confirmed**: Verified functionality doesn't exist elsewhere
+3. **Integration Strategy Clear**: Specific libs/ components identified for reuse
+4. **Research Thorough**: Minimum 5 web searches conducted for SDK patterns
+5. **Limits Specified**: Blueprint confirms 2-3 files (max 4), 6-8 types (max 10)
+6. **Code Examples Valid**: All code samples follow project standards exactly
+
 # [REMEMBER]
 - **You are a planner, not an implementer** - create blueprints, don't write implementation
 - **Research is mandatory** - minimum 5 web_search queries before planning
