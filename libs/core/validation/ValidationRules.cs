@@ -49,8 +49,8 @@ public static class ValidationRules {
             [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], [], E.Validation.NonManifoldEdges),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
             [V.PolycurveStructure] = (["IsValid", "HasGap", "IsNested",], [], E.Validation.PolycurveGaps),
-            [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational",], [], E.Validation.NurbsControlPointCount),
-            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom",], [], E.Validation.ExtrusionProfileInvalid),
+            [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
+            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
             [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),
         }.ToFrozenDictionary();
@@ -116,8 +116,16 @@ public static class ValidationRules {
         Expression[] validationExpressions = [.. memberValidations
             .Where(validation => validation.Member is not null and not Type { Name: "Void" })
             .Select<(MemberInfo Member, SystemError Error), Expression>(validation => validation.Member switch {
-                PropertyInfo { PropertyType: Type pt } prop when pt == typeof(bool) =>
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
+                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
+                        _nullSystemError),
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "Degree", StringComparison.Ordinal) =>
+                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),
+                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
+                        _nullSystemError),
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "CapCount", StringComparison.Ordinal) =>
+                    Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(2)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 MethodInfo method => Expression.Condition(
