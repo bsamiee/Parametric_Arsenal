@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,6 +9,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Rhino;
 using Rhino.Geometry;
+using Rhino.Geometry.Intersect;
 
 namespace Arsenal.Core.Validation;
 
@@ -52,7 +54,20 @@ public static class ValidationRules {
             [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
             [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
-            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Uses BrepTopologyInvalid for all 3 methods
+            [V.SelfIntersection] = ([], ["HasSelfIntersections",], E.Validation.SelfIntersecting),
+            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Method-specific errors resolved via _memberErrorOverrides
+        }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<(V Mode, string Member), SystemError> _memberErrorOverrides =
+        new Dictionary<(V, string), SystemError> {
+            [(V.BrepGranular, "IsValidTopology")] = E.Validation.BrepTopologyInvalid,
+            [(V.BrepGranular, "IsValidGeometry")] = E.Validation.BrepGeometryInvalid,
+            [(V.BrepGranular, "IsValidTolerancesAndFlags")] = E.Validation.BrepTolerancesAndFlagsInvalid,
+        }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<string, MethodInfo> _extensionMethods =
+        new Dictionary<string, MethodInfo> {
+            ["HasSelfIntersections"] = typeof(ValidationRules).GetMethod(nameof(HasSelfIntersections), BindingFlags.NonPublic | BindingFlags.Static)!,
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
@@ -90,10 +105,17 @@ public static class ValidationRules {
             _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
         };
 
+    [Pure]
+    private static bool HasSelfIntersections(Curve curve, IGeometryContext context) {
+        CurveIntersections? intersections = Intersection.CurveSelf(curve, context.AbsoluteTolerance);
+        return intersections is { Count: > 0 };
+    }
+
     /// <summary>Compiles expression tree validator for runtime type (zero-allocation).</summary>
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
+        Expression convertedGeometry = Expression.Convert(geometry, runtimeType);
 
         (MemberInfo Member, SystemError Error)[] memberValidations =
             [.. V.AllFlags
@@ -104,46 +126,64 @@ public static class ValidationRules {
                         .. properties.Select(prop => (
                             Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: prop, kind: 1),
                                 static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            error)),
+                            Error: _memberErrorOverrides.TryGetValue((flag, prop), out SystemError overrideError) ? overrideError : error)),
                         .. methods.Select(method => (
                             Member: _memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: method, kind: 2),
-                                static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType),
-                            error)),
+                                static (key, state) => {
+                                    (Type Type, FrozenDictionary<string, MethodInfo> Extensions) parameters = state;
+                                    MethodInfo? instanceMethod = parameters.Type.GetMethod(key.Member!);
+                                    return instanceMethod is not null
+                                        ? instanceMethod
+                                        : parameters.Extensions.TryGetValue(key.Member!, out MethodInfo extension)
+                                            ? extension
+                                            : (MemberInfo)typeof(void);
+                                }, (runtimeType, _extensionMethods)),
+                            Error: _memberErrorOverrides.TryGetValue((flag, method), out SystemError overrideError) ? overrideError : error)),
                     ];
                 }),
             ];
 
         Expression[] validationExpressions = [.. memberValidations
             .Where(validation => validation.Member is not null and not Type { Name: "Void" })
-            .Select<(MemberInfo Member, SystemError Error), Expression>(validation => validation.Member switch {
+                .Select<(MemberInfo Member, SystemError Error), Expression>(validation => validation.Member switch {
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
-                    Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
+                    Expression.Condition(Expression.Not(Expression.Property(convertedGeometry, prop)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "Degree", StringComparison.Ordinal) =>
-                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),  // RhinoCommon NURBS require degree >= 1
+                    Expression.Condition(Expression.LessThan(Expression.Property(convertedGeometry, prop), Expression.Constant(1)),  // RhinoCommon NURBS require degree >= 1
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "CapCount", StringComparison.Ordinal) =>
-                    Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(2)),
+                    Expression.Condition(Expression.NotEqual(Expression.Property(convertedGeometry, prop), Expression.Constant(2)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 MethodInfo method => Expression.Condition(
                     (method.GetParameters(), method.ReturnType, method.Name) switch {
-                        ([], Type rt, _) when rt == typeof(bool) => Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method)),
+                        ([], Type rt, _) when rt == typeof(bool) => Expression.Not(method.IsStatic
+                            ? Expression.Call(method)
+                            : Expression.Call(convertedGeometry, method)),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(double) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
+                            Expression.Not(method.IsStatic
+                                ? Expression.Call(method, convertedGeometry, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))
+                                : Expression.Call(convertedGeometry, method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue)),
+                            Expression.Not(method.IsStatic
+                                ? Expression.Call(method, convertedGeometry, _constantTrue)
+                                : Expression.Call(convertedGeometry, method, _constantTrue)),
                         ([{ ParameterType: Type pt }], Type rt, string name) when rt == typeof(bool) && pt == typeof(Continuity) && string.Equals(name, "IsContinuous", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _continuityC1)),
+                            Expression.Not(method.IsStatic
+                                ? Expression.Call(method, convertedGeometry, _continuityC1)
+                                : Expression.Call(convertedGeometry, method, _continuityC1)),
+                        ([{ ParameterType: Type first }, { ParameterType: Type second }], Type rt, _) when rt == typeof(bool) && method.IsStatic && first.IsAssignableFrom(runtimeType) && second == typeof(IGeometryContext) =>
+                            Expression.Not(Expression.Call(method, first == runtimeType ? convertedGeometry : Expression.Convert(convertedGeometry, first), context)),
                         (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue), "IsValid")),
+                            Expression.Not(Expression.Property(Expression.Call(convertedGeometry, method, _constantTrue), "IsValid")),
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
-                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _originPoint,
+                            Expression.Not(Expression.Call(convertedGeometry, method, _originPoint,
                                 Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)), _constantFalse)),
                         (_, Type rt, string name) when string.Equals(name, "GetLength", StringComparison.Ordinal) && rt == typeof(double) =>
-                            Expression.LessThanOrEqual(Expression.Call(Expression.Convert(geometry, runtimeType), method), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance))),
+                            Expression.LessThanOrEqual(Expression.Call(convertedGeometry, method), Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance))),
                         _ => _constantFalse,
                     },
                     Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
