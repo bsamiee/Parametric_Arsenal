@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Dense spatial algorithm implementations with zero duplication.</summary>
+/// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>

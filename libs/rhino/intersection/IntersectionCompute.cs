@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Dense intersection analysis algorithms with zero duplication.</summary>
+/// <summary>Dense intersection analysis algorithms.</summary>
 internal static class IntersectionCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB) =>

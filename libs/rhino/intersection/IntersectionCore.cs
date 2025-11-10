@@ -12,7 +12,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>RhinoCommon intersection dispatch with FrozenDictionary resolution.</summary>
 internal static class IntersectionCore {
-    /// <summary>Result builder for bool/arrays tuple with empty/partial/full discrimination.</summary>
+    /// <summary>Result builder for bool/arrays tuple discrimination.</summary>
     private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersect.IntersectionOutput>> ArrayResultBuilder = t => t switch {
         (true, { Length: > 0 } c, { Length: > 0 } p) => ResultFactory.Create(value: new Intersect.IntersectionOutput(p, c, [], [], [], [])),
         (true, { Length: > 0 } c, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], c, [], [], [], [])),
@@ -37,14 +37,14 @@ internal static class IntersectionCore {
         count > 0 ? ResultFactory.Create(value: new Intersect.IntersectionOutput([p1], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])) :
         ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
 
-    /// <summary>Circle handler with curve/point type discrimination.</summary>
+    /// <summary>Circle handler with curve/point discrimination.</summary>
     private static readonly Func<int, Circle, Result<Intersect.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
         (1, Circle c) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(c)], [], [], [], [])),
         (2, Circle c) => ResultFactory.Create(value: new Intersect.IntersectionOutput([c.Center], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
 
-    /// <summary>Polyline processor with flattening and section preservation.</summary>
+    /// <summary>Polyline processor with flattening and preservation.</summary>
     private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = pl => pl switch { { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from p in pl from pt in p select pt], [], [], [], [], [.. pl])),
         null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),

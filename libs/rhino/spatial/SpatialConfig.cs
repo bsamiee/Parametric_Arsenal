@@ -16,7 +16,7 @@ internal static class SpatialConfig {
     internal const double MedialAxisOffsetMultiplier = 10.0;
     internal const int DBSCANRTreeThreshold = 100;
 
-    /// <summary>COMPREHENSIVE TYPE EXTRACTORS: Polymorphic dispatch for all type-based operations (centroid, RTree factory, etc).</summary>
+    /// <summary>Type extractors: polymorphic dispatch for centroid, RTree factory, etc.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
         new Dictionary<(string, Type), Func<object, object>> {
             // Centroid extraction with mass properties - consolidated pattern using inline computation

@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Operation types and validation mode dispatch for topology analysis.</summary>
+/// <summary>Operation types and validation dispatch for topology.</summary>
 internal static class TopologyConfig {
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }

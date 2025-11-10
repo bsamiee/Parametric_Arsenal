@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Validation modes and algorithm parameters for intersection operations.</summary>
+/// <summary>Validation modes and parameters for intersection operations.</summary>
 internal static class IntersectionConfig {
     /// <summary>Tangent angle threshold 5° for classification.</summary>
     internal const double TangentAngleThreshold = 0.087266;
@@ -18,7 +18,7 @@ internal static class IntersectionConfig {
     /// <summary>Stability perturbation distance 0.1% of geometry size.</summary>
     internal const double StabilityPerturbationFactor = 0.001;
 
-    /// <summary>Stability sample count 8 directions for perturbation testing.</summary>
+    /// <summary>Stability sample count 8 directions for perturbation.</summary>
     internal const int StabilitySampleCount = 8;
 
     /// <summary>Blend score for tangent intersections 1.0.</summary>

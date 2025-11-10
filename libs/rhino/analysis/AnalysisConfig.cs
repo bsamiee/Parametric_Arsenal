@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Validation modes and computation constants for differential geometry.</summary>
+/// <summary>Validation modes and constants for differential geometry.</summary>
 internal static class AnalysisConfig {
     /// <summary>Type-to-validation mode mapping for geometry analysis.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
@@ -47,7 +47,7 @@ internal static class AnalysisConfig {
     /// <summary>Inflection sharpness threshold 0.5 for curvature sign change.</summary>
     internal const double InflectionSharpnessThreshold = 0.5;
 
-    /// <summary>Smoothness score sensitivity multiplier 10.0 for average curvature variation.</summary>
+    /// <summary>Smoothness sensitivity 10.0 for curvature variation.</summary>
     internal const double SmoothnessSensitivity = 10.0;
 
     /// <summary>Mesh FEA: aspect ratio warning 3.0, critical 10.0.</summary>

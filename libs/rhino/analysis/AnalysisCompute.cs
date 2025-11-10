@@ -8,7 +8,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
 
-/// <summary>Dense geometric quality analysis algorithms with zero duplication.</summary>
+/// <summary>Dense geometric quality analysis algorithms.</summary>
 internal static class AnalysisCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double[] GaussianSamples, double[] MeanSamples, (double U, double V)[] Singularities, double UniformityScore)> SurfaceQuality(Surface surface, IGeometryContext context) =>

@@ -16,16 +16,16 @@ public static class Extract {
     public readonly struct Semantic(byte kind) {
         internal readonly byte Kind = kind;
 
-        /// <summary>Centroids and characteristic vertices via mass properties.</summary>
+        /// <summary>Centroids and vertices via mass properties.</summary>
         public static readonly Semantic Analytical = new(1);
 
-        /// <summary>Geometric extrema: endpoints, corners, bounding box vertices.</summary>
+        /// <summary>Geometric extrema: endpoints, corners, bbox vertices.</summary>
         public static readonly Semantic Extremal = new(2);
 
         /// <summary>NURBS Greville points from knot vectors.</summary>
         public static readonly Semantic Greville = new(3);
 
-        /// <summary>Curve inflection points where curvature sign changes.</summary>
+        /// <summary>Curve inflection where curvature sign changes.</summary>
         public static readonly Semantic Inflection = new(4);
 
         /// <summary>Circle/ellipse quadrant points (0°, 90°, 180°, 270°).</summary>
@@ -34,7 +34,7 @@ public static class Extract {
         /// <summary>Topology edge midpoints for Brep/Mesh/polycurve.</summary>
         public static readonly Semantic EdgeMidpoints = new(6);
 
-        /// <summary>Topology face centroids via area mass properties.</summary>
+        /// <summary>Topology face centroids via area properties.</summary>
         public static readonly Semantic FaceCentroids = new(7);
     }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,7 +50,7 @@ public static class Extract {
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
         };
 
-    /// <summary>Batch point extraction with error accumulation and parallel support.</summary>
+    /// <summary>Batch point extraction with error accumulation and parallelism.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
         Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];
