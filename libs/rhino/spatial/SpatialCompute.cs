@@ -11,8 +11,8 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.ToArray() is { Length: > 0 } arr
-            ? new Point3d(arr.Sum(i => pts[i].X) / arr.Length, arr.Sum(i => pts[i].Y) / arr.Length, arr.Sum(i => pts[i].Z) / arr.Length)
+        indices.ToArray() is { Length: > 0 } arr && arr.Aggregate((X: 0.0, Y: 0.0, Z: 0.0), (acc, i) => (acc.X + pts[i].X, acc.Y + pts[i].Y, acc.Z + pts[i].Z)) is (double x, double y, double z)
+            ? new Point3d(x / arr.Length, y / arr.Length, z / arr.Length)
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -57,35 +57,57 @@ internal static class SpatialCompute {
         // K-means++ initialization with squared distances
         centroids[0] = pts[rng.Next(pts.Length)];
         for (int i = 1; i < k; i++) {
-            double[] distSq = [.. pts.Select(p => Enumerable.Range(0, i).Min(c => p.DistanceTo(centroids[c])) is double minDist ? minDist * minDist : 0.0),];
-            double sum = distSq.Sum();
+            double[] distSq = new double[pts.Length];
+            for (int j = 0; j < pts.Length; j++) {
+                double minDist = pts[j].DistanceTo(centroids[0]);
+                for (int c = 1; c < i; c++) {
+                    double dist = pts[j].DistanceTo(centroids[c]);
+                    minDist = dist < minDist ? dist : minDist;
+                }
+                distSq[j] = minDist * minDist;
+            }
+
+            double sum = 0.0;
+            for (int j = 0; j < distSq.Length; j++) {
+                sum += distSq[j];
+            }
+
             centroids[i] = sum <= tol || sum <= 0.0
                 ? pts[rng.Next(pts.Length)]
-                : distSq.Select((d, idx) => (d, idx)).Aggregate((cumulative: 0.0, target: rng.NextDouble() * sum, result: pts.Length - 1), (acc, pair) =>
-                    acc.cumulative >= acc.target ? acc : (acc.cumulative + pair.d, acc.target, pair.idx)).result is int selectedIdx && selectedIdx >= 0 && selectedIdx < pts.Length
-                    ? pts[selectedIdx]
+                : (target: rng.NextDouble() * sum, cumulative: 0.0, selected: 0) is var state && Enumerable.Range(0, distSq.Length).Aggregate(state, (acc, idx) =>
+                    acc.cumulative >= acc.target ? acc : (acc.target, acc.cumulative + distSq[idx], idx)).selected is int sel
+                    ? pts[sel]
                     : pts[^1];
         }
 
-        // Lloyd's algorithm
+        // Lloyd's algorithm with hot-path optimization
         for (int iter = 0; iter < maxIter; iter++) {
-            // Assign to nearest centroid
+            // Assign to nearest centroid (hot path - use for loops)
             for (int i = 0; i < pts.Length; i++) {
-                assignments[i] = Enumerable.Range(0, k).Select(j => (Dist: pts[i].DistanceTo(centroids[j]), Idx: j)).MinBy(pair => pair.Dist).Idx;
+                int nearest = 0;
+                double minDist = pts[i].DistanceTo(centroids[0]);
+                for (int j = 1; j < k; j++) {
+                    double dist = pts[i].DistanceTo(centroids[j]);
+                    (nearest, minDist) = dist < minDist ? (j, dist) : (nearest, minDist);
+                }
+                assignments[i] = nearest;
             }
 
             // Recompute centroids and check convergence
-            (Point3d Sum, int Count)[] clusters = [.. Enumerable.Range(0, k).Select(_ => (Point3d.Origin, 0)),];
+            (Point3d Sum, int Count)[] clusters = [.. Enumerable.Range(0, k).Select(static _ => (Point3d.Origin, 0)),];
             for (int i = 0; i < pts.Length; i++) {
                 clusters[assignments[i]] = (clusters[assignments[i]].Sum + pts[i], clusters[assignments[i]].Count + 1);
             }
 
-            double maxShift = clusters.Select((cluster, i) => {
-                Point3d newCentroid = cluster.Count > 0 ? cluster.Sum / cluster.Count : centroids[i];
+            double maxShift = 0.0;
+            for (int i = 0; i < k; i++) {
+                Point3d newCentroid = clusters[i].Count > 0 ? clusters[i].Sum / clusters[i].Count : centroids[i];
                 double shift = centroids[i].DistanceTo(newCentroid);
+                maxShift = shift > maxShift ? shift : maxShift;
                 centroids[i] = newCentroid;
-                return shift;
-            }).Max();
+            }
+
+            maxShift = maxShift <= tol ? maxShift : (maxShift > double.MaxValue ? double.MaxValue : maxShift);
 
             if (maxShift <= tol) {
                 break;
@@ -99,7 +121,12 @@ internal static class SpatialCompute {
         int[] assignments = [.. Enumerable.Repeat(-1, pts.Length),];
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
-        int[] GetNeighbors(int idx) => [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
+
+        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
+        RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
+        int[] GetNeighbors(int idx) => tree is not null
+            ? (buffer: new List<int>(), search: tree.Search(new Sphere(pts[idx], eps), (_, args) => _ = args.Id != idx ? buffer.Add(args.Id) : -1)) is var _ ? [.. buffer,] : []
+            : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
 
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
@@ -186,15 +213,9 @@ internal static class SpatialCompute {
         _ = tree.Search(searchBox, (_, args) => {
             Vector3d toGeom = centers[args.Id] - origin;
             double dist = toGeom.Length;
-
-            double angle = dist > context.AbsoluteTolerance
-                ? Vector3d.VectorAngle(dir, toGeom / dist)
-                : 0.0;
+            double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
             double weightedDist = dist * (1.0 + (angleWeight * angle));
-
-            if (weightedDist <= maxDist) {
-                results.Add((args.Id, dist, angle));
-            }
+            _ = weightedDist <= maxDist ? results.Add((args.Id, dist, angle)) : 0;
         });
 
         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
@@ -215,17 +236,26 @@ internal static class SpatialCompute {
 
     private static Result<Point3d[]> BuildConvexHull2D(Point3d[] points, IGeometryContext context) {
         Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-        List<Point3d> BuildHalf(Point3d[] sequence) {
-            List<Point3d> hull = [];
-            for (int i = 0; i < sequence.Length; i++) {
-                while (hull.Count >= 2 && CrossProduct2D(hull[^2], hull[^1], sequence[i]) <= context.AbsoluteTolerance) {
-                    hull.RemoveAt(hull.Count - 1);
-                }
-                hull.Add(sequence[i]);
+
+        // Build lower hull (Andrew's monotone chain)
+        List<Point3d> lower = [];
+        for (int i = 0; i < pts.Length; i++) {
+            while (lower.Count >= 2 && CrossProduct2D(lower[^2], lower[^1], pts[i]) <= context.AbsoluteTolerance) {
+                lower.RemoveAt(lower.Count - 1);
             }
-            return hull;
+            lower.Add(pts[i]);
         }
-        (List<Point3d> lower, List<Point3d> upper) = (BuildHalf(pts), BuildHalf([.. pts.AsEnumerable().Reverse(),]));
+
+        // Build upper hull
+        List<Point3d> upper = [];
+        Point3d[] reversed = [.. pts.AsEnumerable().Reverse(),];
+        for (int i = 0; i < reversed.Length; i++) {
+            while (upper.Count >= 2 && CrossProduct2D(upper[^2], upper[^1], reversed[i]) <= context.AbsoluteTolerance) {
+                upper.RemoveAt(upper.Count - 1);
+            }
+            upper.Add(reversed[i]);
+        }
+
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create(value: result)
@@ -279,9 +309,9 @@ internal static class SpatialCompute {
             HashSet<(int, int)> horizon = [];
             foreach ((int a, int b, int c) in visibleFaces) {
                 _ = faces.Remove((a, b, c));
-                AddOrRemoveEdge(horizon, (a, b));
-                AddOrRemoveEdge(horizon, (b, c));
-                AddOrRemoveEdge(horizon, (c, a));
+                _ = horizon.Contains((b, a)) ? horizon.Remove((b, a)) : horizon.Add((a, b));
+                _ = horizon.Contains((c, b)) ? horizon.Remove((c, b)) : horizon.Add((b, c));
+                _ = horizon.Contains((a, c)) ? horizon.Remove((a, c)) : horizon.Add((c, a));
             }
 
             foreach ((int a, int b) in horizon) {
@@ -292,10 +322,6 @@ internal static class SpatialCompute {
 
         return ResultFactory.Create<int[][]>(value: [.. faces.Select(f => new int[] { indexed[f.Item1].Index, indexed[f.Item2].Index, indexed[f.Item3].Index }),]);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddOrRemoveEdge(HashSet<(int, int)> edges, (int a, int b) edge) =>
-        _ = edges.Contains((edge.b, edge.a)) ? edges.Remove((edge.b, edge.a)) : edges.Add(edge);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double TriangleArea(Point3d a, Point3d b, Point3d c) =>
@@ -328,9 +354,9 @@ internal static class SpatialCompute {
             HashSet<(int, int)> polygon = [];
 
             foreach ((int a, int b, int c) in badTriangles) {
-                AddPolygonEdge(polygon, (a, b));
-                AddPolygonEdge(polygon, (b, c));
-                AddPolygonEdge(polygon, (c, a));
+                _ = polygon.Contains((b, a)) ? polygon.Remove((b, a)) : polygon.Add((a, b));
+                _ = polygon.Contains((c, b)) ? polygon.Remove((c, b)) : polygon.Add((b, c));
+                _ = polygon.Contains((a, c)) ? polygon.Remove((a, c)) : polygon.Add((c, a));
                 _ = triangles.Remove((a, b, c));
             }
 
@@ -341,10 +367,6 @@ internal static class SpatialCompute {
 
         return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddPolygonEdge(HashSet<(int, int)> edges, (int a, int b) edge) =>
-        _ = edges.Contains((edge.b, edge.a)) ? edges.Remove((edge.b, edge.a)) : edges.Add(edge);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
@@ -366,9 +388,9 @@ internal static class SpatialCompute {
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
-            : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ComputeVoronoi2D(points: points, triangles: triangles, _: context));
+            : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ComputeVoronoi2D(points: points, triangles: triangles, context: context));
 
-    private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext _) =>
+    private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext context) =>
         ResultFactory.Create(value: triangles.Select(t => Circumcenter2D(points[t[0]], points[t[1]], points[t[2]])).ToArray() is Point3d[] circumcenters
             ? Enumerable.Range(0, points.Length).Select(i =>
                 triangles.Select((t, ti) => (t, ti))
