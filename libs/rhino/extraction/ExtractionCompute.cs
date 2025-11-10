@@ -117,7 +117,7 @@ internal static class ExtractionCompute {
         Vector3d normal1,
         double mean) {
         double dihedralAngle = Math.Abs(Vector3d.VectorAngle(normal0, normal1));
-        bool isSmooth = Math.Abs(dihedralAngle - Math.PI) < (Math.PI - ExtractionConfig.SmoothEdgeAngleThreshold);
+        bool isSmooth = dihedralAngle > ExtractionConfig.SmoothEdgeAngleThreshold;
         bool isSharp = dihedralAngle < ExtractionConfig.SharpEdgeAngleThreshold;
         bool isChamfer = !isSmooth && !isSharp;
 
