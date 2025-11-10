@@ -227,7 +227,7 @@ internal static class SpatialCompute {
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create<Point3d[]>(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Spatial.ClusteringFailed.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+            : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -244,7 +244,7 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
-                : ResultFactory.Create<int[][]>(error: E.Spatial.ClusteringFailed.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
+                : ResultFactory.Create<int[][]>(error: E.Geometry.InvalidGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) {
         (int a, int b) = (0, points.Skip(1).Select((p, i) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: i + 1)).OrderByDescending(x => x.Dist).First().Idx);
@@ -291,7 +291,7 @@ internal static class SpatialCompute {
         return ResultFactory.Create<int[][]>(value: [.. faces.Select(f => new int[] { indexed[f.Item1].Index, indexed[f.Item2].Index, indexed[f.Item3].Index }),]);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddOrRemoveEdge(HashSet<(int, int)> edges, (int a, int b) edge) =>
         _ = edges.Contains((edge.b, edge.a)) ? edges.Remove((edge.b, edge.a)) : edges.Add(edge);
 
@@ -340,7 +340,7 @@ internal static class SpatialCompute {
         return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddPolygonEdge(HashSet<(int, int)> edges, (int a, int b) edge) =>
         _ = edges.Contains((edge.b, edge.a)) ? edges.Remove((edge.b, edge.a)) : edges.Add(edge);
 

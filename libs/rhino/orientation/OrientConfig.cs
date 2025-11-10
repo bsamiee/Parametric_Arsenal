@@ -39,4 +39,14 @@ internal static class OrientConfig {
     internal const int OptimizationMaxIterations = 24;
     /// <summary>Symmetry test tolerance for relative orientation.</summary>
     internal const double SymmetryTestTolerance = 1e-3;
+    /// <summary>Primary score weight 0.4 for orientation criteria 4.</summary>
+    internal const double OrientationScoreWeight1 = 0.4;
+    /// <summary>Secondary score weight 0.4 for orientation criteria 4.</summary>
+    internal const double OrientationScoreWeight2 = 0.4;
+    /// <summary>Tertiary score weight 0.2 for orientation criteria 4.</summary>
+    internal const double OrientationScoreWeight3 = 0.2;
+    /// <summary>Aspect ratio threshold 0.5 for low-profile detection.</summary>
+    internal const double LowProfileAspectRatio = 0.5;
+    /// <summary>Pattern anomaly threshold 0.5 for deviation detection.</summary>
+    internal const double PatternAnomalyThreshold = 0.5;
 }
