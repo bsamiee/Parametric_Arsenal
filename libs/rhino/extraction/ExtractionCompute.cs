@@ -232,25 +232,28 @@ internal static class ExtractionCompute {
     [Pure]
     private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) {
         (Interval u, Interval v) = (surface.Domain(0), surface.Domain(1));
-        double[] squaredDistances = new double[ExtractionConfig.PrimitiveResidualSampleCount];
-
-        for (int i = 0; i < ExtractionConfig.PrimitiveResidualSampleCount; i++) {
-            double uParam = u.ParameterAt(i / (double)(ExtractionConfig.PrimitiveResidualSampleCount - 1));
-            double vParam = v.ParameterAt(i / (double)(ExtractionConfig.PrimitiveResidualSampleCount - 1));
-            Point3d surfacePoint = surface.PointAt(u: uParam, v: vParam);
-            Point3d primitivePoint = type switch {
-                ExtractionConfig.PrimitiveTypePlane when pars.Length >= 6 => frame.ClosestPoint(surfacePoint),
-                ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
-                ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
-                ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: surfacePoint, conePlane: frame, baseRadius: pars[0], height: pars[1]),
-                ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: surfacePoint, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
-                ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(surfacePoint),
-                _ => surfacePoint,
-            };
-            squaredDistances[i] = surfacePoint.DistanceToSquared(primitivePoint);
+        int samplesPerDir = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount));
+        double[] squaredDistances = new double[samplesPerDir * samplesPerDir];
+        int idx = 0;
+        for (int i = 0; i < samplesPerDir; i++) {
+            for (int j = 0; j < samplesPerDir; j++) {
+                double uParam = u.ParameterAt(i / (double)(samplesPerDir - 1));
+                double vParam = v.ParameterAt(j / (double)(samplesPerDir - 1));
+                Point3d surfacePoint = surface.PointAt(u: uParam, v: vParam);
+                Point3d primitivePoint = type switch {
+                    ExtractionConfig.PrimitiveTypePlane when pars.Length >= 6 => frame.ClosestPoint(surfacePoint),
+                    ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
+                    ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
+                    ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: surfacePoint, conePlane: frame, baseRadius: pars[0], height: pars[1]),
+                    ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: surfacePoint, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
+                    ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(surfacePoint),
+                    _ => surfacePoint,
+                };
+                squaredDistances[idx++] = surfacePoint.DistanceToSquared(primitivePoint);
+            }
         }
 
-        return Math.Sqrt(squaredDistances.Sum() / ExtractionConfig.PrimitiveResidualSampleCount);
+        return Math.Sqrt(squaredDistances.Sum() / (samplesPerDir * samplesPerDir));
     }
 
     [Pure]
