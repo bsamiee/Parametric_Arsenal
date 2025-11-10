@@ -11,8 +11,16 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.ToArray() is { Length: > 0 } arr && arr.Aggregate((X: 0.0, Y: 0.0, Z: 0.0), (acc, i) => (acc.X + pts[i].X, acc.Y + pts[i].Y, acc.Z + pts[i].Z)) is (double x, double y, double z)
-            ? new Point3d(x / arr.Length, y / arr.Length, z / arr.Length)
+        indices.ToArray() is { Length: > 0 } arr
+            ? ((Func<Point3d>)(() => {
+                double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
+                for (int i = 0; i < arr.Length; i++) {
+                    sumX += pts[arr[i]].X;
+                    sumY += pts[arr[i]].Y;
+                    sumZ += pts[arr[i]].Z;
+                }
+                return new Point3d(sumX / arr.Length, sumY / arr.Length, sumZ / arr.Length);
+            }))()
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
