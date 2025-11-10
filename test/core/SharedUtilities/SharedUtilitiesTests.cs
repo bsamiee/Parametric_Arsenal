@@ -7,55 +7,55 @@ namespace Arsenal.Core.Tests.SharedUtilities;
 
 /// <summary>Verification tests for shared test utilities demonstrating new capabilities.</summary>
 public sealed class SharedUtilitiesTests {
-    /// <summary>Verifies TestAssert.ForAll with simple property.</summary>
+    /// <summary>Verifies Test.ForAll with simple property.</summary>
     [Fact]
     public void TestAssert_ForAll_VerifiesProperty() =>
-        TestAssert.ForAll(Gen.Int, x => unchecked(x + 0) == x, iter: 50);
+        Test.ForAll(Gen.Int, x => unchecked(x + 0) == x, iter: 50);
 
-    /// <summary>Verifies TestAssert.Exists finds witness.</summary>
+    /// <summary>Verifies Test.Exists finds witness.</summary>
     [Fact]
     public void TestAssert_Exists_FindsWitness() =>
-        TestAssert.Exists(Gen.Int[0, 1000], x => x > 950, maxAttempts: 200);
+        Test.Exists(Gen.Int[0, 1000], x => x > 950, maxAttempts: 200);
 
-    /// <summary>Verifies TestAssert.Implies with logical implication.</summary>
+    /// <summary>Verifies Test.Implies with logical implication.</summary>
     [Fact]
     public void TestAssert_Implies_VerifiesImplication() =>
-        TestAssert.Implies(Gen.Int, x => x > 10, x => x > 0, iter: 50);
+        Test.Implies(Gen.Int, x => x > 10, x => x > 0, iter: 50);
 
-    /// <summary>Verifies TestAssert.Compare with FrozenDictionary dispatch.</summary>
+    /// <summary>Verifies Test.Compare with FrozenDictionary dispatch.</summary>
     [Fact]
     public void TestAssert_Compare_VerifiesComparison() {
-        TestAssert.Compare(5, 10, "LessThan");
-        TestAssert.Compare(10, 5, "GreaterThan");
-        TestAssert.Compare(5, 5, "Equal");
+        Test.Compare(5, 10, "LessThan");
+        Test.Compare(10, 5, "GreaterThan");
+        Test.Compare(5, 5, "Equal");
     }
 
-    /// <summary>Verifies TestAssert.EqualWithin for floating-point tolerance.</summary>
+    /// <summary>Verifies Test.EqualWithin for floating-point tolerance.</summary>
     [Fact]
     public void TestAssert_EqualWithin_VerifiesTolerance() =>
-        TestAssert.EqualWithin(1.0, 1.001, tolerance: 0.01);
+        Test.EqualWithin(1.0, 1.001, tolerance: 0.01);
 
-    /// <summary>Verifies TestAssert.Success for Result validation.</summary>
+    /// <summary>Verifies Test.Success for Result validation.</summary>
     [Fact]
     public void TestAssert_Success_VerifiesResultSuccess() {
         Result<int> result = ResultFactory.Create(value: 42);
-        TestAssert.Success(result, value => value > 0);
+        Test.Success(result, value => value > 0);
     }
 
-    /// <summary>Verifies TestAssert.All for collection assertions.</summary>
+    /// <summary>Verifies Test.All for collection assertions.</summary>
     [Fact]
     public void TestAssert_All_VerifiesCollectionPredicate() =>
-        TestAssert.All([2, 4, 6, 8,], x => x % 2 == 0);
+        Test.All([2, 4, 6, 8,], x => x % 2 == 0);
 
-    /// <summary>Verifies TestAssert.Count for predicate counting.</summary>
+    /// <summary>Verifies Test.Count for predicate counting.</summary>
     [Fact]
     public void TestAssert_Count_VerifiesPredicateCount() =>
-        TestAssert.Count([1, 2, 3, 4, 5,], x => x > 2, expectedCount: 3);
+        Test.Count([1, 2, 3, 4, 5,], x => x > 2, expectedCount: 3);
 
-    /// <summary>Verifies TestAssert.Increasing for ordering.</summary>
+    /// <summary>Verifies Test.Increasing for ordering.</summary>
     [Fact]
     public void TestAssert_Increasing_VerifiesOrder() =>
-        TestAssert.Increasing([1, 2, 3, 4, 5,]);
+        Test.Increasing([1, 2, 3, 4, 5,]);
 
     /// <summary>Verifies TestBench.Measure for performance measurement.</summary>
     [Fact]
@@ -109,13 +109,13 @@ public sealed class SharedUtilitiesTests {
         Test.Law<int>("FunctorIdentity", gen, 50);
     }
 
-    /// <summary>Verifies TestAssert.Combine for assertion composition.</summary>
+    /// <summary>Verifies Test.Combine for assertion composition.</summary>
     [Fact]
     public void TestAssert_Combine_ExecutesAll() =>
-        TestAssert.Combine(() => true, () => 1 + 1 == 2, () => "test".Length == 4);
+        Test.Combine(() => true, () => 1 + 1 == 2, () => "test".Length == 4);
 
-    /// <summary>Verifies TestAssert.ExactlyOne for exclusive OR.</summary>
+    /// <summary>Verifies Test.ExactlyOne for exclusive OR.</summary>
     [Fact]
     public void TestAssert_ExactlyOne_VerifiesExclusiveOr() =>
-        TestAssert.ExactlyOne(() => false, () => true, () => false);
+        Test.ExactlyOne(() => false, () => true, () => false);
 }
