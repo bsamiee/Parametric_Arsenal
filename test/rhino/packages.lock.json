@@ -218,6 +218,11 @@
         "resolved": "2.0.3",
         "contentHash": "pot1I4YOxlWjIb5jmwvvQNbTrZ3lJQ+jUGkGjWE3hEFM0l5gOnBWS+H3qsex68s5cO52g+44vpGzhAt+42vwKg=="
       },
+      "xunit.assert": {
+        "type": "Transitive",
+        "resolved": "2.9.2",
+        "contentHash": "QkNBAQG4pa66cholm28AxijBjrmki98/vsEh4Sx5iplzotvPgpiotcxqJQMRC8d7RV7nIT8ozh97957hDnZwsQ=="
+      },
       "Arsenal.Core": {
         "type": "Project"
       },
@@ -233,7 +238,8 @@
           "Arsenal.Core": "[1.0.0, )",
           "CsCheck": "[4.4.1, )",
           "Microsoft.NET.Test.Sdk": "[18.0.0, )",
-          "xunit.abstractions": "[2.0.3, )"
+          "xunit.abstractions": "[2.0.3, )",
+          "xunit.assert": "[2.9.2, )"
         }
       }
     }
