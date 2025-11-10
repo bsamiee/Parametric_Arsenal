@@ -26,13 +26,14 @@ internal static class SpatialCompute {
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d ExtractCentroid(GeometryBase g) => g switch {
-        Curve c => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(c); return amp?.Centroid ?? c.GetBoundingBox(accurate: false).Center; }))(),
-        Surface s => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(s); return amp?.Centroid ?? s.GetBoundingBox(accurate: false).Center; }))(),
-        Brep b => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(b); return vmp?.Centroid ?? b.GetBoundingBox(accurate: false).Center; }))(),
-        Mesh m => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(m); return vmp?.Centroid ?? m.GetBoundingBox(accurate: false).Center; }))(),
-        _ => g.GetBoundingBox(accurate: false).Center,
-    };
+    private static Point3d ExtractCentroid(GeometryBase g) =>
+        SpatialConfig.CentroidExtractors.TryGetValue(g.GetType(), out Func<GeometryBase, Point3d>? extractor)
+            ? extractor(g)
+            : SpatialConfig.CentroidExtractors.Where(kv => kv.Key.IsInstanceOfType(g))
+                .OrderByDescending(kv => kv.Key, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(static g => g.GetBoundingBox(accurate: false).Center)
+                .First()(g);
 
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         geometry.Length is 0
