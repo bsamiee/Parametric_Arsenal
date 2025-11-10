@@ -16,15 +16,15 @@ internal static class IntersectionCompute {
             : (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
                 (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                 (int n, int pa, int pb) when pa >= n && pb >= n => (geomA, geomB) switch {
-                    (Curve ca, Curve cb) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count).Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) ? Vector3d.VectorAngle(ta, tb) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles && angles.Length > 0 && angles.Average() is double avgAngle
+                    (Curve ca, Curve cb) => Enumerable.Range(0, n)
+                        .Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) && ta.IsValid && tb.IsValid
+                            ? Vector3d.VectorAngle(ta, tb)
+                            : double.NaN)
+                        .Where(a => !double.IsNaN(a))
+                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circMean && (circMean < 0.0 ? circMean + (2.0 * Math.PI) : circMean) is double avgAngle
                         ? ResultFactory.Create(value: (Type: avgAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                         : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                    (Curve c, Surface s) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count && output.ParametersA.Count >= (2 * i) + 1).Select(i => s.NormalAt(output.ParametersA[i * 2], output.ParametersA[(i * 2) + 1]) is Vector3d sn && c.TangentAt(output.ParametersB[i]) is Vector3d ct ? Math.Abs(Vector3d.VectorAngle(sn, ct) - (Math.PI / 2)) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles2 && angles2.Length > 0 && angles2.Average() is double avgAngle2
-                        ? ResultFactory.Create(value: (Type: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles2, IsGrazing: angles2.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle2 < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore))
-                        : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                    (Surface s, Curve c) => Enumerable.Range(0, n).Where(i => i < output.ParametersA.Count && i < output.ParametersB.Count && output.ParametersA.Count >= (2 * i) + 1).Select(i => s.NormalAt(output.ParametersB[i * 2], output.ParametersB[(i * 2) + 1]) is Vector3d sn && c.TangentAt(output.ParametersA[i]) is Vector3d ct ? Math.Abs(Vector3d.VectorAngle(sn, ct) - (Math.PI / 2)) : double.NaN).Where(a => !double.IsNaN(a)).ToArray() is double[] angles3 && angles3.Length > 0 && angles3.Average() is double avgAngle3
-                        ? ResultFactory.Create(value: (Type: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles3, IsGrazing: angles3.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle3 < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore))
-                        : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                    (Curve, Surface) or (Surface, Curve) => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
                     _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
                 },
                 _ => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
@@ -36,20 +36,42 @@ internal static class IntersectionCompute {
             ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext("SearchRadius must exceed tolerance"))
             : (geomA, geomB) switch {
                 (Curve ca, Curve cb) => Math.Max(3, (int)Math.Ceiling(ca.GetLength() / searchRadius)) is int sampleCount
-                    ? Enumerable.Range(0, sampleCount).Select(i => ca.Domain.ParameterAt(i / (double)(sampleCount - 1))).Select(t => ca.PointAt(t)).Select(pt => (PointA: pt, Result: cb.ClosestPoint(pt, out double tb) ? (PointB: cb.PointAt(tb), Distance: pt.DistanceTo(cb.PointAt(tb))) : (PointB: Point3d.Unset, Distance: double.MaxValue))).Where(pair => pair.Result.Distance < searchRadius && pair.Result.Distance > context.AbsoluteTolerance)
-                        .Concat(Enumerable.Range(0, sampleCount).Select(i => cb.Domain.ParameterAt(i / (double)(sampleCount - 1))).Select(t => cb.PointAt(t)).Select(pt => (PointA: pt, Result: ca.ClosestPoint(pt, out double ta) ? (PointB: ca.PointAt(ta), Distance: pt.DistanceTo(ca.PointAt(ta))) : (PointB: Point3d.Unset, Distance: double.MaxValue))).Where(pair => pair.Result.Distance < searchRadius && pair.Result.Distance > context.AbsoluteTolerance))
-                        .ToArray() is (Point3d PointA, (Point3d PointB, double Distance) Result)[] pairs && pairs.Length > 0
-                        ? ResultFactory.Create(value: (pairs.Select(p => p.PointA).ToArray(), pairs.Select(p => p.Result.PointB).ToArray(), pairs.Select(p => p.Result.Distance).ToArray()))
+                    ? Enumerable.Range(0, sampleCount)
+                        .Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(sampleCount - 1))))
+                        .Select(pt => cb.ClosestPoint(pt, out double tb)
+                            ? (PointA: pt, PointB: cb.PointAt(tb), Distance: pt.DistanceTo(cb.PointAt(tb)))
+                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                        .Concat(Enumerable.Range(0, sampleCount)
+                            .Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(sampleCount - 1))))
+                            .Select(pt => ca.ClosestPoint(pt, out double ta)
+                                ? (PointA: ca.PointAt(ta), PointB: pt, Distance: ca.PointAt(ta).DistanceTo(pt))
+                                : (PointA: Point3d.Unset, PointB: pt, Distance: double.MaxValue))
+                            .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance))
+                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
+                        ? ResultFactory.Create(value: (pairs.Select(p => p.PointA).ToArray(), pairs.Select(p => p.PointB).ToArray(), pairs.Select(p => p.Distance).ToArray()))
                         : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                     : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                 (Curve c, Surface s) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount2
-                    ? Enumerable.Range(0, sampleCount2).Select(i => c.Domain.ParameterAt(i / (double)(sampleCount2 - 1))).Select(t => c.PointAt(t)).Select(pt => (PointA: pt, Result: s.ClosestPoint(pt, out double su, out double sv) && (su, sv) is (double u, double v) ? (PointB: s.PointAt(u, v), Distance: pt.DistanceTo(s.PointAt(u, v))) : (PointB: Point3d.Unset, Distance: double.MaxValue))).Where(pair => pair.Result.Distance < searchRadius && pair.Result.Distance > context.AbsoluteTolerance).ToArray() is (Point3d PointA, (Point3d PointB, double Distance) Result)[] pairs2 && pairs2.Length > 0
-                        ? ResultFactory.Create(value: (pairs2.Select(p => p.PointA).ToArray(), pairs2.Select(p => p.Result.PointB).ToArray(), pairs2.Select(p => p.Result.Distance).ToArray()))
+                    ? Enumerable.Range(0, sampleCount2)
+                        .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount2 - 1))))
+                        .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
+                            ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
+                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs2 && pairs2.Length > 0
+                        ? ResultFactory.Create(value: (pairs2.Select(p => p.PointA).ToArray(), pairs2.Select(p => p.PointB).ToArray(), pairs2.Select(p => p.Distance).ToArray()))
                         : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                     : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                 (Surface s, Curve c) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount3
-                    ? Enumerable.Range(0, sampleCount3).Select(i => c.Domain.ParameterAt(i / (double)(sampleCount3 - 1))).Select(t => c.PointAt(t)).Select(pt => (PointA: pt, Result: s.ClosestPoint(pt, out double su, out double sv) && (su, sv) is (double u, double v) ? (PointB: s.PointAt(u, v), Distance: pt.DistanceTo(s.PointAt(u, v))) : (PointB: Point3d.Unset, Distance: double.MaxValue))).Where(pair => pair.Result.Distance < searchRadius && pair.Result.Distance > context.AbsoluteTolerance).ToArray() is (Point3d PointA, (Point3d PointB, double Distance) Result)[] pairs3 && pairs3.Length > 0
-                        ? ResultFactory.Create(value: (pairs3.Select(p => p.PointA).ToArray(), pairs3.Select(p => p.Result.PointB).ToArray(), pairs3.Select(p => p.Result.Distance).ToArray()))
+                    ? Enumerable.Range(0, sampleCount3)
+                        .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount3 - 1))))
+                        .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
+                            ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
+                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs3 && pairs3.Length > 0
+                        ? ResultFactory.Create(value: (pairs3.Select(p => p.PointA).ToArray(), pairs3.Select(p => p.PointB).ToArray(), pairs3.Select(p => p.Distance).ToArray()))
                         : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                     : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                 _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
@@ -59,29 +81,31 @@ internal static class IntersectionCompute {
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
             0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
-            int n => (geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor, Generate3DPerturbationDirections(count: IntersectionConfig.StabilitySampleCount)) switch {
-                (double perturbDist, Vector3d[] directions) => directions.Select(dir => geomA switch {
-                    Curve ca when ca.DuplicateCurve() is Curve caCopy => caCopy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(caCopy, geomB, context, new Intersect.IntersectionOptions()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
-                        ? (Math.Abs(perturbResult.Value.Points.Count - n), (IDisposable?)caCopy)
-                        : (0.0, (IDisposable?)caCopy),
-                    Surface sa when sa.Duplicate() is Surface saCopy => saCopy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(saCopy, geomB, context, new Intersect.IntersectionOptions()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
-                        ? (Math.Abs(perturbResult.Value.Points.Count - n), (IDisposable?)saCopy)
-                        : (0.0, (IDisposable?)saCopy),
-                    _ => (0.0, null),
-                }).ToArray() is (double Delta, IDisposable? Resource)[] perturbResults && perturbResults.Length > 0 && perturbResults.Select(p => { p.Resource?.Dispose(); return (double)p.Delta; }).ToArray() is double[] deltas
-                    ? ResultFactory.Create(value: (Score: 1.0 / (1.0 + deltas.Average()), Sensitivity: deltas.Max() / n, UnstableFlags: Enumerable.Range(0, n).Select(_ => deltas.Any(d => d > 1.0)).ToArray()))
-                    : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
-            },
+            int n => (phiSteps: (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount)), thetaSteps: (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount)))) is (int phiSteps, int thetaSteps)
+                && Enumerable.Range(start: 0, count: phiSteps)
+                    .SelectMany(i => Enumerable.Range(start: 0, count: thetaSteps)
+                        .Select(j => ((Math.PI * i) / phiSteps, ((2.0 * Math.PI) * j) / thetaSteps) is (double phi, double theta)
+                            ? new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi))
+                            : Vector3d.Unset))
+                    .Take(count: IntersectionConfig.StabilitySampleCount)
+                    .ToArray() is Vector3d[] directions && geomA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor is double perturbDist
+                ? geomA switch {
+                    Curve c => directions
+                        .Select(dir => c.DuplicateCurve() is Curve copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
+                            ? (Delta: Math.Abs(perturbResult.Value.Points.Count - n), Resource: copy)
+                            : (Delta: 0.0, Resource: default(Curve)))
+                        .ToArray() is (double Delta, Curve Resource)[] perturbResults && perturbResults.Length > 0 && perturbResults.SelectMany(pr => Enumerable.Repeat(element: pr.Delta, count: 1).Select(d => { pr.Resource?.Dispose(); return d; })).ToArray() is double[] extractedDeltas && extractedDeltas.Length > 0 && extractedDeltas.Average() is double avgDelta && extractedDeltas.Max() is double maxDelta
+                        ? ResultFactory.Create<(double, double, bool[])>(value: (1.0 / (1.0 + avgDelta), maxDelta / n, [.. Enumerable.Range(start: 0, count: n).Select(i => extractedDeltas.Skip(count: i * (extractedDeltas.Length / n)).Take(count: extractedDeltas.Length / n).Any(d => d > 1.0))]))
+                        : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: n)])),
+                    Surface s => directions
+                        .Select(dir => s.Duplicate() is Surface copy && copy.Translate(dir * perturbDist) && IntersectionCore.ExecutePair(copy, geomB, context, new()) is Result<Intersect.IntersectionOutput> perturbResult && perturbResult.IsSuccess
+                            ? (Delta: Math.Abs(perturbResult.Value.Points.Count - n), Resource: copy)
+                            : (Delta: 0.0, Resource: default(Surface)))
+                        .ToArray() is (double Delta, Surface Resource)[] perturbResults && perturbResults.Length > 0 && perturbResults.SelectMany(pr => Enumerable.Repeat(element: pr.Delta, count: 1).Select(d => { pr.Resource?.Dispose(); return d; })).ToArray() is double[] extractedDeltas && extractedDeltas.Length > 0 && extractedDeltas.Average() is double avgDelta && extractedDeltas.Max() is double maxDelta
+                        ? ResultFactory.Create<(double, double, bool[])>(value: (1.0 / (1.0 + avgDelta), maxDelta / n, [.. Enumerable.Range(start: 0, count: n).Select(i => extractedDeltas.Skip(count: i * (extractedDeltas.Length / n)).Take(count: extractedDeltas.Length / n).Any(d => d > 1.0))]))
+                        : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: n)])),
+                    _ => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: n)])),
+                }
+                : ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: n)])),
         };
-
-    private static Vector3d[] Generate3DPerturbationDirections(int count) {
-        int phiSteps = (int)Math.Ceiling(Math.Sqrt(count));
-        int thetaSteps = (int)Math.Ceiling(count / (double)phiSteps);
-        return [.. Enumerable.Range(0, phiSteps).SelectMany(i => Enumerable.Range(0, thetaSteps).Select(j => {
-            double phi = (Math.PI * i) / phiSteps;
-            double theta = ((2 * Math.PI) * j) / thetaSteps;
-            return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
-        })).Take(count),
-        ];
-    }
 }

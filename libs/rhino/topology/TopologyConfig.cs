@@ -38,8 +38,23 @@ internal static class TopologyConfig {
     /// <summary>Near-miss proximity multiplier: 100× tolerance.</summary>
     internal const double NearMissMultiplier = 100.0;
 
+    /// <summary>Maximum edge count for O(n²) near-miss detection. Above this, skip near-miss analysis for performance.</summary>
+    internal const int MaxEdgesForNearMissAnalysis = 100;
+
     /// <summary>Minimum loop length for hole detection.</summary>
     internal const double MinLoopLength = 1e-6;
+
+    /// <summary>Healing strategy: Conservative Repair with 0.1× tolerance.</summary>
+    internal const byte StrategyConservativeRepair = 0;
+
+    /// <summary>Healing strategy: Moderate JoinNakedEdges with 1.0× tolerance.</summary>
+    internal const byte StrategyModerateJoin = 1;
+
+    /// <summary>Healing strategy: Aggressive JoinNakedEdges with 10.0× tolerance.</summary>
+    internal const byte StrategyAggressiveJoin = 2;
+
+    /// <summary>Healing strategy: Combined Repair + JoinNakedEdges.</summary>
+    internal const byte StrategyCombined = 3;
 
     /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
     internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];

@@ -171,9 +171,9 @@ public static class Analysis {
                 EnableDiagnostics = enableDiagnostics,
             });
 
-    /// <summary>Surface quality: curvature distribution, singularities, manufacturing score.</summary>
+    /// <summary>Surface quality: curvature distribution, singularities, uniformity score.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double[] GaussianCurvatures, double[] MeanCurvatures, (double U, double V)[] SingularityLocations, double ManufacturingRating)> AnalyzeSurfaceQuality(
+    public static Result<(double[] GaussianCurvatures, double[] MeanCurvatures, (double U, double V)[] SingularityLocations, double UniformityScore)> AnalyzeSurfaceQuality(
         Surface surface,
         IGeometryContext context) =>
         AnalysisCompute.SurfaceQuality(surface: surface, context: context);
