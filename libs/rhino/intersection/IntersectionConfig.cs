@@ -21,6 +21,15 @@ internal static class IntersectionConfig {
     /// <summary>Stability sample count 8 directions for perturbation testing.</summary>
     internal const int StabilitySampleCount = 8;
 
+    /// <summary>Blend score for tangent intersections 1.0.</summary>
+    internal const double TangentBlendScore = 1.0;
+    /// <summary>Blend score for perpendicular intersections 0.5.</summary>
+    internal const double PerpendicularBlendScore = 0.5;
+    /// <summary>Blend score for tangent curve-surface 0.8.</summary>
+    internal const double CurveSurfaceTangentBlendScore = 0.8;
+    /// <summary>Blend score for perpendicular curve-surface 0.4.</summary>
+    internal const double CurveSurfacePerpendicularBlendScore = 0.4;
+
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(Type, Type), V> ValidationModes =
         new Dictionary<(Type, Type), V> {

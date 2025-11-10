@@ -14,6 +14,12 @@ internal static class ExtractionConfig {
     internal const int PrimitiveSampleCount = 100;
     internal const double SymmetryAngleTolerance = 0.01;
     internal const int PatternMinInstances = 3;
+    /// <summary>Orthogonality threshold 0.1 for dot product in grid basis detection.</summary>
+    internal const double GridOrthogonalityThreshold = 0.1;
+    /// <summary>Grid point validation tolerance 0.1 for integer coordinate deviation.</summary>
+    internal const double GridPointDeviationThreshold = 0.1;
+    /// <summary>Scaling pattern variance threshold 0.1 for ratio consistency.</summary>
+    internal const double ScalingVarianceThreshold = 0.1;
     /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
