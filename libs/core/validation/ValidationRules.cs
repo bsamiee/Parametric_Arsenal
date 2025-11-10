@@ -43,15 +43,16 @@ public static class ValidationRules {
             [V.AreaCentroid] = (["IsClosed",], ["IsPlanar",], E.Validation.CurveNotClosedOrPlanar),
             [V.BoundingBox] = ([], ["GetBoundingBox",], E.Validation.BoundingBoxInvalid),
             [V.MassProperties] = (["IsSolid", "IsClosed",], [], E.Validation.MassPropertiesComputationFailed),
-            [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
+            [V.Topology] = (["IsManifold", "IsClosed", "IsSolid", "IsSurface", "HasNakedEdges",], ["IsManifold", "IsPointInside",], E.Validation.InvalidTopology),
             [V.Degeneracy] = (["IsPeriodic", "IsPolyline",], ["IsShort", "IsSingular", "IsDegenerate", "IsRectangular", "GetLength",], E.Validation.DegenerateGeometry),
             [V.Tolerance] = ([], ["IsPlanar", "IsLinear", "IsArc", "IsCircle", "IsEllipse",], E.Validation.ToleranceExceeded),
-            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], ["IsValidWithLog",], E.Validation.NonManifoldEdges),
+            [V.MeshSpecific] = (["IsManifold", "IsClosed", "HasNgons", "HasVertexColors", "HasVertexNormals", "IsTriangleMesh", "IsQuadMesh",], [], E.Validation.MeshInvalid),
             [V.SurfaceContinuity] = (["IsPeriodic",], ["IsContinuous",], E.Validation.PositionalDiscontinuity),
-            [V.PolycurveStructure] = (["IsValid", "HasGap",], [], E.Validation.PolycurveGaps),
-            [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational",], [], E.Validation.NurbsControlPointCount),
-            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed",], [], E.Validation.ExtrusionProfileInvalid),
+            [V.PolycurveStructure] = (["IsValid", "HasGap", "IsNested",], [], E.Validation.PolycurveGaps),
+            [V.NurbsGeometry] = (["IsValid", "IsPeriodic", "IsRational", "Degree",], [], E.Validation.NurbsControlPointCount),
+            [V.ExtrusionGeometry] = (["IsValid", "IsSolid", "IsClosed", "IsCappedAtTop", "IsCappedAtBottom", "CapCount",], [], E.Validation.ExtrusionProfileInvalid),
             [V.UVDomain] = (["IsValid", "HasNurbsForm",], [], E.Validation.UVDomainSingularity),
+            [V.BrepGranular] = ([], ["IsValidTopology", "IsValidGeometry", "IsValidTolerancesAndFlags",], E.Validation.BrepTopologyInvalid),  // Uses BrepTopologyInvalid for all 3 methods
         }.ToFrozenDictionary();
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
@@ -61,6 +62,7 @@ public static class ValidationRules {
     private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
     private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
     private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
+    private static readonly ConstantExpression _continuityC1 = Expression.Constant(Continuity.C1_continuous);
 
     private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
         .First(static m => string.Equals(m.Name, nameof(Enumerable.Where), StringComparison.Ordinal) && m.GetParameters().Length == 2);
@@ -114,8 +116,16 @@ public static class ValidationRules {
         Expression[] validationExpressions = [.. memberValidations
             .Where(validation => validation.Member is not null and not Type { Name: "Void" })
             .Select<(MemberInfo Member, SystemError Error), Expression>(validation => validation.Member switch {
-                PropertyInfo { PropertyType: Type pt } prop when pt == typeof(bool) =>
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(bool) =>
                     Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), prop)),
+                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
+                        _nullSystemError),
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "Degree", StringComparison.Ordinal) =>
+                    Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(1)),  // RhinoCommon NURBS require degree >= 1
+                        Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
+                        _nullSystemError),
+                PropertyInfo { PropertyType: Type pt, Name: string propName } prop when pt == typeof(int) && string.Equals(propName, "CapCount", StringComparison.Ordinal) =>
+                    Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), prop), Expression.Constant(2)),
                         Expression.Convert(Expression.Constant(validation.Error), typeof(SystemError?)),
                         _nullSystemError),
                 MethodInfo method => Expression.Condition(
@@ -125,6 +135,8 @@ public static class ValidationRules {
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, Expression.Property(context, nameof(IGeometryContext.AbsoluteTolerance)))),
                         ([{ ParameterType: Type pt }], Type rt, _) when rt == typeof(bool) && pt == typeof(bool) =>
                             Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue)),
+                        ([{ ParameterType: Type pt }], Type rt, string name) when rt == typeof(bool) && pt == typeof(Continuity) && string.Equals(name, "IsContinuous", StringComparison.Ordinal) =>
+                            Expression.Not(Expression.Call(Expression.Convert(geometry, runtimeType), method, _continuityC1)),
                         (_, _, string name) when string.Equals(name, "GetBoundingBox", StringComparison.Ordinal) =>
                             Expression.Not(Expression.Property(Expression.Call(Expression.Convert(geometry, runtimeType), method, _constantTrue), "IsValid")),
                         (_, _, string name) when string.Equals(name, "IsPointInside", StringComparison.Ordinal) =>
