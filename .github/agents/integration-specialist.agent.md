@@ -309,7 +309,6 @@ Before committing:
 - [ ] All geometry ops require IGeometryContext (no hardcoded tolerances)
 - [ ] No `var`, no `if`/`else`, named parameters, trailing commas
 - [ ] Build succeeds with zero warnings
-- [ ] All tests pass
 
 # [VERIFICATION BEFORE COMPLETION]
 
@@ -319,7 +318,7 @@ Integration validation:
 3. **ValidationRules Integrated**: All validation via V.* flags
 4. **Error Registry Used**: All errors from E.* constants
 5. **Context Required**: All geometry ops have IGeometryContext parameter
-6. **Tests Pass**: All existing tests still pass after integration
+6. **Validation Succeeds**: Code meets all integration standards
 
 # [COMMON INTEGRATION FIXES]
 

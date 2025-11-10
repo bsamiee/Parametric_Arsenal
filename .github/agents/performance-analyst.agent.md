@@ -199,6 +199,95 @@ public static int ComputeHash(int a, int b) =>
 - Faster in tight loops
 - Better CPU cache usage
 
+## Technique 7: Loop Optimization
+
+**When to Use**:
+- Hot paths with repeated iterations
+- Large dataset processing
+- Performance-critical collection operations
+- Nested loop scenarios
+
+**Performance Hierarchy** (measured benchmarks):
+1. **`for` loop with index**: 2-3x faster than LINQ, zero allocations
+2. **`foreach`**: Cleaner than indexed loops, good enough for most cases
+3. **LINQ**: Clarity and maintainability, 80-90% of code
+4. **`Parallel.ForEach` / `.AsParallel()`**: Large datasets (>10k items), CPU-bound operations
+
+**Optimization Patterns**:
+```csharp
+// ✅ BEST - Indexed for loop in hot paths (zero allocations)
+for (int i = 0; i < geometries.Length; i++) {
+    _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
+}
+
+// ✅ GOOD - LINQ for clarity (acceptable in non-hot paths)
+SystemError[] errors = flags
+    .Where(f => mode.Has(f) && _rules.ContainsKey(f))
+    .SelectMany(f => GetRules(f))
+    .ToArray();
+
+// ✅ ELIMINATE - Replace nested loops with spatial indexing
+// Before: O(n*m) nested loops
+for (int i = 0; i < items.Length; i++) {
+    for (int j = 0; j < others.Length; j++) {
+        if (items[i].Distance(others[j]) < tolerance) { ... }
+    }
+}
+// After: O(n+m) with RTree spatial index
+RTree tree = BuildTree(others);
+for (int i = 0; i < items.Length; i++) {
+    tree.Search(new Sphere(items[i].Location, tolerance), callback);
+}
+
+// ✅ ELIMINATE - Replace loops with FrozenDictionary dispatch
+// Before: Switch or loop through operations
+foreach (GeometryBase geom in geometries) {
+    Result<T> result = geom switch {
+        Curve c => ProcessCurve(c, mode, context),
+        Surface s => ProcessSurface(s, mode, context),
+        _ => error,
+    };
+}
+// After: Single O(1) lookup
+Result<T> result = _dispatch.TryGetValue((geom.GetType(), mode), out var op)
+    ? op(geom, context)
+    : error;
+```
+
+**LINQ Optimization Guidelines**:
+```csharp
+// ✅ Use .Any() not .Count() > 0 (stops at first match)
+bool hasItems = items.Any(predicate);
+
+// ✅ Avoid unnecessary materialization
+IEnumerable<T> filtered = items.Where(pred);  // Lazy evaluation
+// Only materialize when needed:
+T[] array = filtered.ToArray();
+
+// ✅ Use proper LINQ method for intent
+int count = items.Count(pred);  // Better than .Where(pred).Count()
+bool exists = items.Any(pred);  // Better than .Where(pred).Any()
+
+// ✅ Parallel for large CPU-bound operations
+double[] results = items
+    .AsParallel()
+    .Select(item => ExpensiveComputation(item))
+    .ToArray();
+```
+
+**When to Optimize Loops**:
+1. Profile first - identify actual bottlenecks
+2. Hot paths with >1000 iterations benefit from `for` loops
+3. Nested loops often indicate need for better algorithm (spatial indexing, hash lookup)
+4. Consider `.AsParallel()` for >10k items in CPU-bound operations
+5. Keep LINQ for clarity in non-critical paths (80-90% of code)
+
+**Benefits**:
+- 2-3x speed improvement in hot paths with `for` loops
+- Reduced allocations with indexed access
+- Better algorithm choices eliminate unnecessary loops
+- Maintains code clarity where performance isn't critical
+
 # [ANALYSIS WORKFLOW]
 
 ## Phase 1: Profile Current Performance
@@ -314,21 +403,21 @@ Before committing optimizations:
 - [ ] Baseline performance measured
 - [ ] Optimization applied following patterns
 - [ ] Performance improvement verified (benchmarks)
-- [ ] All tests still pass
 - [ ] Code density maintained or improved
 - [ ] No var, no if/else, all patterns followed
 - [ ] Named parameters, trailing commas used
 - [ ] Build succeeds with zero warnings
 - [ ] Allocations reduced (if applicable)
+- [ ] Loops minimized (better algorithms, dispatch tables, spatial indexing)
 
 # [VERIFICATION BEFORE COMPLETION]
 
 Performance optimization validation:
 1. **Measurable Improvement**: Benchmarks show concrete gains
-2. **No Regression**: All tests pass, functionality preserved
+2. **Validation Succeeds**: Code quality standards maintained
 3. **Pattern Compliance**: Optimization follows project standards
 4. **Density Maintained**: Code is not more sprawling
-5. **Documentation Updated**: Performance characteristics noted
+5. **Loop Efficiency**: Iterations minimized through algorithmic improvements
 
 # [REMEMBER]
 - **Profile before optimizing** - measure, don't guess

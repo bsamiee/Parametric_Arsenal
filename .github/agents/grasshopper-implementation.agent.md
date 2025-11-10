@@ -298,6 +298,7 @@ Critical validation:
 3. **Result Integration**: All Result<T> handled with Match pattern
 4. **Context Usage**: IGeometryContext properly obtained from document
 5. **Limits Respected**: Files ≤4, types ≤10, members ≤300 LOC
+6. **Component Quality**: Tested manually in Grasshopper, performs as expected
 
 # [REMEMBER]
 - **Thin wrappers only** - expose `libs/rhino/`, never duplicate logic

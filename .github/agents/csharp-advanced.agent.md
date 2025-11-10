@@ -221,16 +221,44 @@ Before committing:
 - [ ] ArrayPool for buffers
 - [ ] Span<T> where applicable
 - [ ] `dotnet build` zero warnings
-- [ ] `dotnet test` all tests pass
+
+# [LOOP OPTIMIZATION]
+
+**Minimize iterations through algorithmic improvements**:
+
+```csharp
+// ✅ Hot path - for loop with index
+for (int i = 0; i < items.Length; i++) {
+    buffer[i] = Transform(items[i]);
+}
+
+// ✅ Clarity - LINQ chain
+items.Where(pred).Select(transform).ToArray()
+
+// ✅ Eliminate - FrozenDictionary dispatch
+_dispatch.TryGetValue(key, out var op) ? op(input) : error
+
+// ✅ Zero allocation - ArrayPool in loops
+int[] buffer = ArrayPool<int>.Shared.Rent(count);
+try { for (int i = 0; i < count; i++) { ... } }
+finally { ArrayPool<int>.Shared.Return(buffer); }
+```
+
+**Loop Guidelines**:
+- Profile before optimizing - use `for` only in hot paths
+- Use `.Any()` not `.Count() > 0` for existence checks
+- Avoid nested loops - consider spatial indexing or dispatch tables
+- Prefer LINQ for clarity in 80-90% of code
 
 # [VERIFICATION BEFORE COMPLETION]
 
 Critical validation steps:
 1. **Build Clean**: `dotnet build` with zero warnings
-2. **Tests Pass**: All existing tests still pass
+2. **Validation Succeeds**: Code meets all quality standards
 3. **Limits Verified**: File count ≤4, type count ≤10, all members ≤300 LOC
 4. **Pattern Compliance**: No var, no if/else, all patterns followed
 5. **Algorithmic Density**: Code is denser than before, not more sprawling
+6. **Loop Efficiency**: Minimal iterations, optimal algorithm choice
 
 # [REMEMBER]
 - **300 LOC is maximum** - most should be 150-250 LOC

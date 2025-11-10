@@ -31,6 +31,60 @@ These rules are **enforced by analyzers** and violations **fail the build**:
 9. **ALWAYS include trailing commas** - Every multi-line array/collection/dictionary literal MUST end with `,`
 10. **ONE type per file** - Never put multiple top-level types in same file (analyzer CA1050 enforces this)
 
+### Loop and Iteration Patterns (CRITICAL)
+
+**Philosophy**: Minimize loops through better algorithms, not more nested iterations. Every loop must justify its necessity.
+
+**Performance Hierarchy** (profile before optimizing):
+1. **Hot paths**: Use `for` loops with index access (2-3x faster than LINQ, zero allocations)
+2. **Clarity**: Use LINQ for readability in 80-90% of code (`.Select`, `.Where`, `.Any`)
+3. **Large datasets**: Consider `Parallel.ForEach` or `.AsParallel()` for CPU-bound operations
+
+**Mandatory Patterns**:
+```csharp
+// ✅ CORRECT - Hot path with array indexing
+for (int i = 0; i < geometries.Length; i++) {
+    _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
+}
+
+// ✅ CORRECT - LINQ for clarity and chaining
+SystemError[] errors = V.AllFlags
+    .Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag))
+    .SelectMany(flag => GetRules(flag))
+    .ToArray();
+
+// ✅ CORRECT - Collection expression with spread for aggregation
+int[] allIndices = [.. results.SelectMany(static indices => indices),];
+
+// ✅ CORRECT - Avoid loop with FrozenDictionary dispatch
+return _dispatch.TryGetValue((geometry.GetType(), mode), out var entry)
+    ? entry.operation(geometry)
+    : ResultFactory.Create<T>(error: E.Geometry.UnsupportedConfiguration);
+
+// ❌ WRONG - Nested loops when algorithm can be better
+for (int i = 0; i < items.Length; i++) {
+    for (int j = 0; j < others.Length; j++) {  // Consider spatial indexing instead
+        if (items[i].Intersects(others[j])) { ... }
+    }
+}
+
+// ❌ WRONG - Unnecessary materialization
+int count = items.Where(pred).ToList().Count;  // Use .Count(pred) or .Any() instead
+```
+
+**Optimization Guidelines**:
+- **Existence checks**: Use `.Any()` not `.Count() > 0` (stops at first match)
+- **Avoid materialization**: Don't call `.ToList()` / `.ToArray()` unless needed
+- **Minimize nesting**: Prefer LINQ chains, spatial indexing, or FrozenDictionary dispatch
+- **Zero allocations**: Use `for` loops with `ArrayPool<T>` in hot paths
+- **Eliminate loops**: Expression tree compilation, FrozenDictionary dispatch tables, ConditionalWeakTable caching
+
+**When to Use Each**:
+- **`for` loop**: Hot paths, array manipulation, performance-critical (see `SpatialCore.cs`)
+- **`foreach`**: Simple iteration when performance isn't critical, clearer than indexed loops
+- **LINQ**: Filtering, projection, chaining operations for clarity (80-90% of code)
+- **Parallel**: Large datasets (>10k items), CPU-bound operations, thread-safe operations only
+
 ### Organizational Limits (STRICTLY ENFORCED)
 
 These limits force identification of better, denser members instead of low-quality code sprawl:

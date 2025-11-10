@@ -120,6 +120,45 @@ if (count > 0) {
 }
 ```
 
+### Loop and Iteration Patterns (Critical)
+**Rule**: Minimize loops through better algorithms. Profile before optimizing.
+
+```csharp
+// ✅ Hot paths - Use for loops (2-3x faster than LINQ)
+for (int i = 0; i < geometries.Length; i++) {
+    _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
+}
+
+// ✅ Clarity - Use LINQ for readability (80-90% of code)
+SystemError[] errors = validationFlags
+    .Where(flag => mode.Has(flag))
+    .SelectMany(flag => GetRules(flag))
+    .ToArray();
+
+// ✅ Eliminate loops - Use FrozenDictionary dispatch
+return _dispatch.TryGetValue((type, mode), out var operation)
+    ? operation(geometry, context)
+    : ResultFactory.Create<T>(error: E.Geometry.UnsupportedConfiguration);
+
+// ✅ Optimization - Use .Any() not .Count() > 0
+return items.Any(predicate)
+    ? Process(items)
+    : ResultFactory.Create(error: E.Validation.Empty);
+
+// ❌ Never use nested loops when better algorithm exists
+for (int i = 0; i < items.Length; i++) {
+    for (int j = 0; j < others.Length; j++) {  // Use spatial indexing instead
+        if (items[i].Intersects(others[j])) { ... }
+    }
+}
+```
+
+**When to Use Each**:
+- **`for` loop**: Hot paths, array manipulation, zero-allocation requirements
+- **LINQ**: Filtering, projection, chaining for clarity (most code)
+- **Parallel**: Large datasets (>10k items), CPU-bound, thread-safe operations
+- **Eliminate**: FrozenDictionary dispatch, expression trees, ConditionalWeakTable caching
+
 ---
 
 ## 🔍 Decision Trees

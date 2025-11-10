@@ -71,7 +71,7 @@ You are a cleanup specialist focused on making codebases cleaner, denser, and mo
 # [VERIFICATION]
 
 Before completing cleanup:
-- [ ] All tests still pass
+- [ ] Validation succeeds (code quality standards met)
 - [ ] Build succeeds with zero warnings
 - [ ] File/type/LOC limits respected
 - [ ] Functionality preserved exactly

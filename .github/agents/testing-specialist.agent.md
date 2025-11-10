@@ -304,7 +304,7 @@ Before committing tests:
 - [ ] File count: ≤4 per test folder
 - [ ] Type count: ≤10 per test folder
 - [ ] Test methods: ≤300 LOC (ideally 50-150)
-- [ ] All tests pass: `dotnet test`
+- [ ] `dotnet test` succeeds with no failures
 
 # [VERIFICATION BEFORE COMPLETION]
 
