@@ -49,4 +49,10 @@ internal static class OrientConfig {
     internal const double LowProfileAspectRatio = 0.5;
     /// <summary>Pattern anomaly threshold 0.5 for deviation detection.</summary>
     internal const double PatternAnomalyThreshold = 0.5;
+    /// <summary>Sample count 8 for rotation symmetry curve testing.</summary>
+    internal const int RotationSymmetrySampleCount = 8;
+    /// <summary>Minimum score threshold 0.0 for optimization acceptance.</summary>
+    internal const double MinimumOptimizationScore = 0.0;
+    /// <summary>Angle tolerance π/180 (1 degree) for symmetry rotation tests.</summary>
+    internal const double SymmetryAngleToleranceRadians = Math.PI / 180.0;
 }
