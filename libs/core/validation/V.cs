@@ -26,16 +26,17 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static readonly V NurbsGeometry = new(1024);
     public static readonly V ExtrusionGeometry = new(2048);
     public static readonly V UVDomain = new(4096);
-    public static readonly V BrepGranular = new(8192);
+    public static readonly V SelfIntersection = new(8192);
+    public static readonly V BrepGranular = new(16384);
     public static readonly V All = new((ushort)(
         Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
         Topology._flags | Degeneracy._flags | Tolerance._flags |
         MeshSpecific._flags | SurfaceContinuity._flags | PolycurveStructure._flags |
         NurbsGeometry._flags | ExtrusionGeometry._flags | UVDomain._flags |
-        BrepGranular._flags
+        SelfIntersection._flags | BrepGranular._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, BrepGranular,]).ToFrozenSet();
+    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,]).ToFrozenSet();
 
     [Pure] private string DebuggerDisplay => this.ToString();
 
@@ -94,7 +95,8 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             1024 => nameof(NurbsGeometry),
             2048 => nameof(ExtrusionGeometry),
             4096 => nameof(UVDomain),
-            8192 => nameof(BrepGranular),
+            8192 => nameof(SelfIntersection),
+            16384 => nameof(BrepGranular),
             _ => $"Combined({this._flags})",
         };
 }
