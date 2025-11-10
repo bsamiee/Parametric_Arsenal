@@ -1,32 +1,42 @@
 using System.Collections.Frozen;
+using Arsenal.Core.Context;
+using Arsenal.Core.Results;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Configuration constants and parameters for spatial algorithms.</summary>
+/// <summary>Consolidated configuration: 2 comprehensive FrozenDicts + essential constants.</summary>
 internal static class SpatialConfig {
+    // Essential algorithmic constants (cannot be eliminated - used in algorithms)
     internal const int DefaultBufferSize = 2048;
     internal const int LargeBufferSize = 4096;
-
-    /// <summary>K-means convergence: max 100 iterations, tolerance from context.</summary>
     internal const int KMeansMaxIterations = 100;
-
-    /// <summary>K-means++ uses seed 42 for deterministic initialization.</summary>
     internal const int KMeansSeed = 42;
-
-    /// <summary>DBSCAN minimum 4 points to form core cluster.</summary>
     internal const int DBSCANMinPoints = 4;
-
-    /// <summary>Medial axis offset distance multiplier for skeleton computation.</summary>
     internal const double MedialAxisOffsetMultiplier = 10.0;
-
-    /// <summary>DBSCAN uses RTree spatial indexing when point count exceeds this threshold.</summary>
     internal const int DBSCANRTreeThreshold = 100;
 
-    /// <summary>Clustering algorithm identifiers: 0=KMeans++, 1=DBSCAN, 2=Hierarchical.</summary>
-    internal static readonly FrozenDictionary<byte, (int MaxIter, int MinPts)> ClusterParams =
-        new Dictionary<byte, (int, int)> {
-            [0] = (KMeansMaxIterations, 0),
-            [1] = (0, DBSCANMinPoints),
-            [2] = (0, 0),
+    /// <summary>COMPREHENSIVE TYPE EXTRACTORS: Polymorphic dispatch for all type-based operations (centroid, RTree factory, etc).</summary>
+    internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
+        new Dictionary<(string, Type), Func<object, object>> {
+            // Centroid extraction with mass properties - consolidated pattern using inline computation
+            [("Centroid", typeof(Curve))] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [("Centroid", typeof(Surface))] = static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [("Centroid", typeof(Brep))] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [("Centroid", typeof(Mesh))] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [("Centroid", typeof(GeometryBase))] = static g => g is GeometryBase gb ? gb.GetBoundingBox(accurate: false).Center : Point3d.Origin,
+            // RTree factory construction
+            [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
+            [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
+            [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
+            // Clustering algorithm dispatch - semantic key instead of tuple type
+            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
+                ? alg switch {
+                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
+                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
+                    2 => SpatialCompute.HierarchicalAssign(pts, k),
+                    _ => [],
+                }
+                : [],
         }.ToFrozenDictionary();
 }

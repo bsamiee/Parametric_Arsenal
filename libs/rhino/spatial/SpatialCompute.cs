@@ -26,40 +26,39 @@ internal static class SpatialCompute {
             : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d ExtractCentroid(GeometryBase g) => g switch {
-        Curve c => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(c); return amp?.Centroid ?? c.GetBoundingBox(accurate: false).Center; }))(),
-        Surface s => ((Func<Point3d>)(() => { using AreaMassProperties amp = AreaMassProperties.Compute(s); return amp?.Centroid ?? s.GetBoundingBox(accurate: false).Center; }))(),
-        Brep b => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(b); return vmp?.Centroid ?? b.GetBoundingBox(accurate: false).Center; }))(),
-        Mesh m => ((Func<Point3d>)(() => { using VolumeMassProperties vmp = VolumeMassProperties.Compute(m); return vmp?.Centroid ?? m.GetBoundingBox(accurate: false).Center; }))(),
-        _ => g.GetBoundingBox(accurate: false).Center,
-    };
+    private static Point3d ExtractCentroid(GeometryBase g) {
+        Type gType = g.GetType();
+        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
+            ? (Point3d)exactExtractor(g)
+            : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(g)).Value is Func<object, object> fallbackExtractor
+                ? (Point3d)fallbackExtractor(g)
+                : g.GetBoundingBox(accurate: false).Center;
+    }
 
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        geometry.Length is 0
-            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
-            : !SpatialConfig.ClusterParams.TryGetValue(algorithm, out (int maxIter, int minPts) config) || !((algorithm is 0 or 2 && k > 0) || (algorithm is 1 && epsilon > 0))
-                ? ResultFactory.Create<(Point3d, double[])[]>(error: algorithm is 0 or 2 ? E.Spatial.InvalidClusterK : E.Spatial.InvalidEpsilon)
-                : ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, config: config, context: context);
+        geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
+            : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
+            : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
+            : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
+            : ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context);
 
-    private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, (int maxIter, int minPts) config, IGeometryContext context) where T : GeometryBase {
+    private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
         Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
         return (algorithm is 0 or 2) && k > pts.Length
             ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-            : (algorithm switch {
-                0 => KMeansAssign(pts, k, context.AbsoluteTolerance, config.maxIter),
-                1 => DBSCANAssign(pts, epsilon, config.minPts),
-                2 => HierarchicalAssign(pts, k),
-                _ => [],
-            }) is int[] assigns && assigns.Length > 0 && (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int nc && nc > 0
-                ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, nc).Select(c =>
-                    Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c).ToArray() is { Length: > 0 } m
-                        ? (Centroid(m, pts), [.. m.Select(i => pts[i].DistanceTo(Centroid(m, pts))),])
-                        : (Point3d.Origin, Array.Empty<double>())),
-                ])
+            : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
+                ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
+                    ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
+                        int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
+                        Point3d centroid = members.Length > 0 ? Centroid(members, pts) : Point3d.Origin;
+                        double[] distances = members.Length > 0 ? [.. members.Select(i => pts[i].DistanceTo(centroid)),] : [];
+                        return (centroid, distances);
+                    }),])
+                    : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
                 : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
 
-    private static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
+    internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
         Point3d[] centroids = new Point3d[k];
         Random rng = new(SpatialConfig.KMeansSeed);
@@ -134,7 +133,7 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    private static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) {
+    internal static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) {
         int[] assignments = [.. Enumerable.Repeat(-1, pts.Length),];
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
@@ -198,7 +197,7 @@ internal static class SpatialCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int[] HierarchicalAssign(Point3d[] pts, int k) =>
+    internal static int[] HierarchicalAssign(Point3d[] pts, int k) =>
         Enumerable.Range(0, pts.Length - k).Aggregate(Enumerable.Range(0, pts.Length).ToArray(), (a, _) => Enumerable.Range(0, pts.Length).SelectMany(i => Enumerable.Range(i + 1, pts.Length - i - 1).Where(j => a[i] != a[j]).Select(j => (Cluster1: a[i], Cluster2: a[j], Distance: pts[i].DistanceTo(pts[j])))).OrderBy(t => t.Distance).First() is (int c1, int c2, double) ? [.. Enumerable.Range(0, a.Length).Select(i => a[i] == c2 ? c1 : a[i] > c2 ? a[i] - 1 : a[i])] : a);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
