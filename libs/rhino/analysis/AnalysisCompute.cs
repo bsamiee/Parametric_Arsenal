@@ -27,11 +27,14 @@ internal static class AnalysisCompute {
                 double score = avgGaussian < medianGaussian * AnalysisConfig.HighCurvatureMultiplier
                     ? 1.0 - (avgGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))
                     : 0.5;
-                return ResultFactory.Create(value: (
-                    GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(),
-                    MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
-                    Singularities: singularities,
-                    ManufacturingScore: score));
+                int len = curvatures.Length;
+                double[] gaussian = new double[len];
+                double[] mean = new double[len];
+                for (int i = 0; i < len; i++) {
+                    gaussian[i] = curvatures[i].Gaussian;
+                    mean[i] = curvatures[i].Mean;
+                }
+                return ResultFactory.Create(value: (GaussianSamples: gaussian, MeanSamples: mean, Singularities: singularities, ManufacturingScore: score));
             }))()
             : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed);
 
