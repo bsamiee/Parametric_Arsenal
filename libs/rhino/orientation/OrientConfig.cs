@@ -4,7 +4,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Validation modes and thresholds for orientation transformations.</summary>
+/// <summary>Validation modes and thresholds for orientation.</summary>
 internal static class OrientConfig {
     /// <summary>Type-to-validation mode mapping for orientation operations.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
@@ -25,15 +25,15 @@ internal static class OrientConfig {
             [typeof(PointCloud)] = V.None,
         }.ToFrozenDictionary();
 
-    /// <summary>Minimum vector magnitude 1e-8 for non-degenerate directions.</summary>
+    /// <summary>Minimum vector magnitude 1e-8 for non-degenerate direction.</summary>
     internal const double MinVectorLength = 1e-8;
     /// <summary>Parallel detection tolerance 1e-6 for vector alignment.</summary>
     internal const double ParallelThreshold = 1e-6;
-    /// <summary>Minimum 3 points required for best-fit plane.</summary>
+    /// <summary>Minimum 3 points for best-fit plane.</summary>
     internal const int BestFitMinPoints = 3;
     /// <summary>Maximum 1e-3 deviation for best-fit plane residuals.</summary>
     internal const double BestFitResidualThreshold = 1e-3;
-    /// <summary>Minimum 3 instances required for pattern detection.</summary>
+    /// <summary>Minimum 3 instances for pattern detection.</summary>
     internal const int PatternMinInstances = 3;
     /// <summary>Optimization iteration limit for orientation search.</summary>
     internal const int OptimizationMaxIterations = 24;
@@ -49,7 +49,7 @@ internal static class OrientConfig {
     internal const double LowProfileAspectRatio = 0.5;
     /// <summary>Pattern anomaly threshold 0.5 for deviation detection.</summary>
     internal const double PatternAnomalyThreshold = 0.5;
-    /// <summary>Minimum optimization score 0.1 for accepting orientation transforms.</summary>
+    /// <summary>Minimum optimization score 0.1 for accepting transforms.</summary>
     internal const double MinimumOptimizationScore = 0.1;
     /// <summary>Rotation symmetry sample count 36 for 10-degree increments.</summary>
     internal const int RotationSymmetrySampleCount = 36;

@@ -5,9 +5,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Optimization, relative orientation, and pattern alignment algorithms.</summary>
+/// <summary>Optimization, relative orientation, pattern alignment algorithms.</summary>
 internal static class OrientCompute {
-    /// <summary>Optimize orientation for canonical alignment and stability criteria.</summary>
+    /// <summary>Optimize orientation for canonical alignment and stability.</summary>
     /// <param name="brep">Brep geometry to optimize.</param>
     /// <param name="criteria">Optimization criterion: 1=Minimize bounding box (compact packing), 2=Align centroid to bounding center, 3=Maximize bounding box degeneracy (flatness), 4=Canonical position (ground plane + centered + low profile).</param>
     /// <param name="tolerance">Absolute tolerance for geometric comparisons.</param>

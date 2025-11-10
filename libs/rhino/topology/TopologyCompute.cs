@@ -6,7 +6,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Topology diagnosis, healing, and feature extraction algorithms.</summary>
+/// <summary>Topology diagnosis, healing, feature extraction algorithms.</summary>
 internal static class TopologyCompute {
     [Pure]
     internal static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> Diagnose(

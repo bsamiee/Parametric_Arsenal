@@ -7,27 +7,27 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Results;
 
-/// <summary>Factory for creating and manipulating Result instances.</summary>
+/// <summary>Factory for creating and manipulating Result.</summary>
 public static class ResultFactory {
-    /// <summary>True if type is Rhino.Geometry.* (no assembly load).</summary>
+    /// <summary>True if type is Rhino.Geometry.*.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsGeometryType(Type type) =>
         type.FullName?.StartsWith("Rhino.Geometry.", StringComparison.Ordinal) ?? false;
 
-    /// <summary>Adds item to Result list using applicative composition.</summary>
+    /// <summary>Adds item to Result list via applicative composition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> Accumulate<T>(this Result<IReadOnlyList<T>> accumulator, Result<T> item) =>
         accumulator.Apply(item.Map<Func<IReadOnlyList<T>, IReadOnlyList<T>>>(v => list => [.. list, v]));
 
-    /// <summary>Maps IEnumerable elements through Result-returning function.</summary>
+    /// <summary>Maps IEnumerable elements through Result function.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<TOut>> TraverseElements<TIn, TOut>(this Result<IEnumerable<TIn>> result, Func<TIn, Result<TOut>> selector) {
         ArgumentNullException.ThrowIfNull(selector);
-        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: new List<TOut>().AsReadOnly()),
-            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)((List<TOut>)[.. list, val,]).AsReadOnly()))));
+        return result.Bind(items => items.Aggregate(Create<IReadOnlyList<TOut>>(value: []),
+            (acc, item) => acc.Bind(list => selector(item).Map(val => (IReadOnlyList<TOut>)[.. list, val,]))));
     }
 
-    /// <summary>Creates Result via polymorphic dispatch (value/errors/error/deferred/conditionals/nested).</summary>
+    /// <summary>Creates Result via polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Create<T>(
         T? value = default,
@@ -47,7 +47,7 @@ public static class ResultFactory {
             _ => throw new ArgumentException(E.Results.InvalidCreate.Message, nameof(value)),
         };
 
-    /// <summary>Validates Result via polymorphic dispatch (predicate/validation/validations/args for geometry).</summary>
+    /// <summary>Validates Result via polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Validate<T>(
         this Result<T> result,
@@ -73,7 +73,7 @@ public static class ResultFactory {
             _ => result,
         };
 
-    /// <summary>Lifts function into Result context with partial application support.</summary>
+    /// <summary>Lifts function into Result context with partial application.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Lift<TResult>(Delegate func, params object[] args) {
         ArgumentNullException.ThrowIfNull(func);
@@ -82,7 +82,7 @@ public static class ResultFactory {
             (var ar, 0, var nrc, var a) when ar > a.Length && nrc == a.Length =>
                 Create<Func<object[], TResult>>(value: remaining => (TResult)func.DynamicInvoke([.. a, .. remaining])!),
             (var ar, var rc, 0, var a) when ar == a.Length && rc == ar =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => {
                         Type argType = arg.GetType();
                         return argType is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
@@ -95,7 +95,7 @@ public static class ResultFactory {
                     })
                 .Map(values => (TResult)func.DynamicInvoke([.. values])!),
             (var ar, var rc, 0, var a) when rc == a.Length && ar >= 3 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
                         ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
                             (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),
@@ -104,7 +104,7 @@ public static class ResultFactory {
                         } : acc.Map(list => (IReadOnlyList<object>)[.. list, arg,]))
                 .Map(unwrapped => (Func<object[], TResult>)(remaining => (TResult)func.DynamicInvoke([.. unwrapped, .. remaining])!)),
             (var ar, var rc, var nrc, var a) when rc > 0 && nrc > 0 && ar > a.Length =>
-                a.Aggregate(Create<IReadOnlyList<object>>(value: new List<object>().AsReadOnly()),
+                a.Aggregate(Create<IReadOnlyList<object>>(value: []),
                     (acc, arg) => arg.GetType() is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(Result<>) ?
                         ((bool)t.GetProperty(nameof(Result<object>.IsSuccess))!.GetValue(arg)!, t.GetProperty(nameof(Result<object>.Value))!.GetValue(arg), ((IReadOnlyList<SystemError>)t.GetProperty(nameof(Result<object>.Errors))!.GetValue(arg)!).ToArray()) switch {
                             (true, var v, _) when acc.IsSuccess => Create<IReadOnlyList<object>>(value: [.. acc.Value, v!,]),

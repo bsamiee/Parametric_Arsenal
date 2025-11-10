@@ -13,13 +13,13 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Geometry context for validation and tolerance.</summary>
     public required IGeometryContext Context { get; init; }
 
-    /// <summary>Validation mode flags to apply before execution.</summary>
+    /// <summary>Validation mode flags applied before execution.</summary>
     public V ValidationMode { get; init; } = V.None;
 
     /// <summary>Additional validation arguments for ValidationRules.</summary>
     public object[]? ValidationArgs { get; init; }
 
-    /// <summary>Accumulate all errors vs fail-fast (applicative vs monadic).</summary>
+    /// <summary>Accumulate errors vs fail-fast (applicative vs monadic).</summary>
     public bool AccumulateErrors { get; init; }
 
     /// <summary>Transform applied to inputs before operation.</summary>
@@ -28,10 +28,10 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Transform applied to outputs after operation.</summary>
     public Func<TOut, Result<TOut>>? PostTransform { get; init; }
 
-    /// <summary>Predicate to filter inputs before operation.</summary>
+    /// <summary>Input filter predicate.</summary>
     public Func<TIn, bool>? InputFilter { get; init; }
 
-    /// <summary>Predicate to filter outputs after operation.</summary>
+    /// <summary>Output filter predicate.</summary>
     public Func<TOut, bool>? OutputFilter { get; init; }
 
     /// <summary>Enable parallel execution for collections.</summary>
@@ -40,10 +40,10 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Max parallelism (-1 for default).</summary>
     public int MaxDegreeOfParallelism { get; init; } = -1;
 
-    /// <summary>Skip invalid inputs vs fail entire operation.</summary>
+    /// <summary>Skip invalid inputs vs fail operation.</summary>
     public bool SkipInvalid { get; init; }
 
-    /// <summary>Flatten nested Result&lt;Result&lt;T&gt;&gt; automatically.</summary>
+    /// <summary>Flatten nested Result automatically.</summary>
     public bool AutoFlatten { get; init; } = true;
 
     /// <summary>Stop on first error vs process all.</summary>
@@ -52,13 +52,13 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Enable memoization caching.</summary>
     public bool EnableCache { get; init; }
 
-    /// <summary>Prefix for error messages.</summary>
+    /// <summary>Error message prefix.</summary>
     public string? ErrorPrefix { get; init; }
 
     /// <summary>Operation name for diagnostics.</summary>
     public string? OperationName { get; init; }
 
-    /// <summary>Capture timing and allocation diagnostics (DEBUG only).</summary>
+    /// <summary>Capture diagnostics (DEBUG only).</summary>
     public bool EnableDiagnostics { get; init; }
 
     [Pure]

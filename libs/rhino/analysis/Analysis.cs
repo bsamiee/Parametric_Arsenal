@@ -18,7 +18,7 @@ public static class Analysis {
         public Point3d Location { get; }
     }
 
-    /// <summary>Curve differential geometry with derivatives, curvature, frames.</summary>
+    /// <summary>Curve differential geometry: derivatives, curvature, frames.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CurveData(
         Point3d Location,
@@ -34,7 +34,7 @@ public static class Analysis {
         [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Curve @ {this.Location} | κ={this.Curvature:F3} | L={this.Length:F3} | Disc={this.DiscontinuityParameters?.Length.ToString(CultureInfo.InvariantCulture) ?? "0"}");
     }
 
-    /// <summary>Surface differential geometry with Gaussian/mean curvature, singularities.</summary>
+    /// <summary>Surface differential geometry: Gaussian/mean curvature, singularities.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SurfaceData(
         Point3d Location,
@@ -56,7 +56,7 @@ public static class Analysis {
             $"Surface @ {this.Location} | K={this.Gaussian:F3} | H={this.Mean:F3} | A={this.Area:F3}{(this.AtSingularity ? " [singular]" : "")}");
     }
 
-    /// <summary>Brep topology with vertices/edges, manifold state, volume properties.</summary>
+    /// <summary>Brep topology: vertices/edges, manifold state, volume.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BrepData(
         Point3d Location,
@@ -85,7 +85,7 @@ public static class Analysis {
             $"Brep @ {this.Location} | V={this.Volume:F3} | A={this.Area:F3}{(this.IsSolid ? " [solid]" : "")}{(this.IsManifold ? " [manifold]" : "")}");
     }
 
-    /// <summary>Mesh topology with manifold detection, closure state, volume.</summary>
+    /// <summary>Mesh topology: manifold detection, closure, volume.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshData(
         Point3d Location,
@@ -147,7 +147,7 @@ public static class Analysis {
         AnalysisCore.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0, enableDiagnostics: enableDiagnostics)
             .Map(results => (MeshData)results[0]);
 
-    /// <summary>Batch analysis with heterogeneous geometry types.</summary>
+    /// <summary>Batch analysis for heterogeneous geometry types.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IResult>> AnalyzeMultiple<T>(
         IReadOnlyList<T> geometries,

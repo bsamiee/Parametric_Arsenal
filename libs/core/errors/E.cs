@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>Centralized error registry using FrozenDictionary for O(1) lookup.</summary>
+/// <summary>Error registry with O(1) lookup via FrozenDictionary.</summary>
 public static class E {
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {

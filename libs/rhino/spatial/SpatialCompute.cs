@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Dense spatial algorithm implementations with zero duplication.</summary>
+/// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
@@ -100,7 +100,7 @@ internal static class SpatialCompute {
 
         // Lloyd's algorithm with hot-path optimization
         for (int iter = 0; iter < maxIter; iter++) {
-            // Assign to nearest centroid (hot path - use for loops)
+            // Assign to nearest centroid (hot path with for loops)
             for (int i = 0; i < pts.Length; i++) {
                 int nearest = 0;
                 double minDist = pts[i].DistanceTo(centroids[0]);
@@ -138,7 +138,7 @@ internal static class SpatialCompute {
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
 
-        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
+        // Use RTree for large sets (O(log n) vs O(n) linear scan)
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
         int[] GetNeighbors(int idx) {

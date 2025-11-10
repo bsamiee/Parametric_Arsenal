@@ -8,14 +8,14 @@ using Arsenal.Core.Validation;
 
 namespace Arsenal.Core.Diagnostics;
 
-/// <summary>Diagnostic capture engine with ConditionalWeakTable storage for compile-time tracing.</summary>
+/// <summary>Diagnostic capture with ConditionalWeakTable storage for compile-time tracing.</summary>
 public static class DiagnosticCapture {
 #if DEBUG
     private static readonly ActivitySource _activitySource = new("Arsenal.Core", "1.0.0");
     private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
 #endif
 
-    /// <summary>True if diagnostics enabled (DEBUG builds only).</summary>
+    /// <summary>True if diagnostics enabled (DEBUG only).</summary>
     [Pure]
     public static bool IsEnabled =>
 #if DEBUG
@@ -24,7 +24,7 @@ public static class DiagnosticCapture {
         false;
 #endif
 
-    /// <summary>Gets diagnostic metadata for Result (DEBUG builds only).</summary>
+    /// <summary>Gets diagnostic metadata for Result (DEBUG only).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
 #if DEBUG
@@ -38,7 +38,7 @@ public static class DiagnosticCapture {
 #endif
     }
 
-    /// <summary>Clears all diagnostic metadata (DEBUG builds only).</summary>
+    /// <summary>Clears all diagnostic metadata (DEBUG only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #pragma warning disable IDE0022 // Use expression body for method
     public static void Clear() {
@@ -48,7 +48,7 @@ public static class DiagnosticCapture {
     }
 #pragma warning restore IDE0022
 
-    /// <summary>Captures operation diagnostics with timing and allocation tracking (DEBUG builds only).</summary>
+    /// <summary>Captures operation diagnostics with timing and allocation tracking (DEBUG only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Capture<T>(
         this Result<T> result,

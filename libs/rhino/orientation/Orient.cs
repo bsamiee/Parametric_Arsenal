@@ -9,7 +9,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Polymorphic geometry orientation with canonical alignment.</summary>
+/// <summary>Polymorphic geometry orientation and canonical alignment.</summary>
 public static class Orient {
     /// <summary>Canonical orientation mode for world plane alignments.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]

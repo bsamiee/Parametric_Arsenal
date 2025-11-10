@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace Arsenal.Core.Errors;
 
-/// <summary>Immutable error record with domain classification and contextual information.</summary>
+/// <summary>Immutable error with domain classification and context.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly record struct SystemError(ErrorDomain Domain, int Code, string Message) {

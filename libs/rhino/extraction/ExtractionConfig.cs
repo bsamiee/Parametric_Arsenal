@@ -4,19 +4,19 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Configuration constants for semantic extraction: type identifiers, detection thresholds, and validation mode mappings.</summary>
+/// <summary>Configuration for semantic extraction: type IDs, thresholds, validation modes.</summary>
 internal static class ExtractionConfig {
     /// <summary>Epsilon tolerance for zero comparisons and near-zero checks.</summary>
     internal const double Epsilon = 1e-10;
 
-    /// <summary>Feature type identifiers for edge/loop classification (separate from primitive types).</summary>
+    /// <summary>Feature type IDs for edge/loop classification.</summary>
     internal const byte FeatureTypeFillet = 0;
     internal const byte FeatureTypeChamfer = 1;
     internal const byte FeatureTypeHole = 2;
     internal const byte FeatureTypeGenericEdge = 3;
     internal const byte FeatureTypeVariableRadiusFillet = 4;
 
-    /// <summary>Primitive type identifiers for surface classification (separate from feature types).</summary>
+    /// <summary>Primitive type IDs for surface classification.</summary>
     internal const byte PrimitiveTypePlane = 0;
     internal const byte PrimitiveTypeCylinder = 1;
     internal const byte PrimitiveTypeSphere = 2;
@@ -25,13 +25,13 @@ internal static class ExtractionConfig {
     internal const byte PrimitiveTypeTorus = 5;
     internal const byte PrimitiveTypeExtrusion = 6;
 
-    /// <summary>Pattern type identifiers: 0=Linear, 1=Radial, 2=Grid, 3=Scaling.</summary>
+    /// <summary>Pattern type IDs: 0=Linear, 1=Radial, 2=Grid, 3=Scaling.</summary>
     internal const byte PatternTypeLinear = 0;
     internal const byte PatternTypeRadial = 1;
     internal const byte PatternTypeGrid = 2;
     internal const byte PatternTypeScaling = 3;
 
-    /// <summary>Fillet curvature coefficient of variation threshold 0.15 for constant curvature detection.</summary>
+    /// <summary>Fillet curvature variation threshold 0.15 for constant detection.</summary>
     internal const double FilletCurvatureVariationThreshold = 0.15;
     /// <summary>Fillet curvature sample count 5 for edge analysis.</summary>
     internal const int FilletCurvatureSampleCount = 5;
@@ -49,9 +49,9 @@ internal static class ExtractionConfig {
     internal const int PrimitiveResidualSampleCount = 20;
     /// <summary>Pattern minimum instances 3 for detection.</summary>
     internal const int PatternMinInstances = 3;
-    /// <summary>Radial pattern distance variation tolerance 0.05 relative to mean radius.</summary>
+    /// <summary>Radial pattern distance variation 0.05 relative to mean.</summary>
     internal const double RadialDistanceVariationThreshold = 0.05;
-    /// <summary>Radial pattern angle variation tolerance 0.05 radians for uniform spacing.</summary>
+    /// <summary>Radial pattern angle variation 0.05 radians for uniform spacing.</summary>
     internal const double RadialAngleVariationThreshold = 0.05;
     /// <summary>Grid orthogonality threshold 0.1 for dot product in basis detection.</summary>
     internal const double GridOrthogonalityThreshold = 0.1;
@@ -79,7 +79,7 @@ internal static class ExtractionConfig {
             [(11, typeof(Curve))] = V.Standard | V.Degeneracy,
         }.ToFrozenDictionary();
 
-    /// <summary>Gets validation mode with inheritance fallback for (kind, type) pair.</summary>
+    /// <summary>Gets validation mode with fallback for (kind, type) pair.</summary>
     internal static V GetValidationMode(byte kind, Type geometryType) =>
         ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact : ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType)).OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0)).Select(kv => kv.Value).DefaultIfEmpty(V.Standard).First();
 }

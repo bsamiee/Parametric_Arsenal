@@ -4,38 +4,38 @@ using Rhino;
 
 namespace Arsenal.Core.Context;
 
-/// <summary>Contract for tolerance-aware geometry evaluation and unit conversion.</summary>
+/// <summary>Tolerance-aware geometry evaluation and unit conversion.</summary>
 public interface IGeometryContext {
-    /// <summary>Absolute distance tolerance in current Units.</summary>
+    /// <summary>Absolute distance tolerance in current units.</summary>
     public double AbsoluteTolerance { get; }
 
-    /// <summary>Squared absolute distance tolerance for fast distance checks.</summary>
+    /// <summary>Squared absolute tolerance for fast distance checks.</summary>
     public double AbsoluteToleranceSquared { get; }
 
     /// <summary>Relative tolerance for size-dependent checks.</summary>
     public double RelativeTolerance { get; }
 
-    /// <summary>Angular tolerance in radians for computation.</summary>
+    /// <summary>Angular tolerance in radians.</summary>
     public double AngleToleranceRadians { get; }
 
-    /// <summary>Angular tolerance in degrees for UI/display.</summary>
+    /// <summary>Angular tolerance in degrees.</summary>
     public double AngleToleranceDegrees { get; }
 
-    /// <summary>Model unit system for this context.</summary>
+    /// <summary>Model unit system.</summary>
     public UnitSystem Units { get; }
 
-    /// <summary>Converts a length from Units to target units with validation.</summary>
+    /// <summary>Converts length from current units to target units.</summary>
     [Pure] public Result<double> ConvertLength(double value, UnitSystem targetUnits);
 
-    /// <summary>Returns the scale factor to convert from Units to target units.</summary>
+    /// <summary>Scale factor from current units to target units.</summary>
     [Pure] public Result<double> GetLengthScale(UnitSystem targetUnits);
 
-    /// <summary>True if value differences are within absolute tolerance.</summary>
+    /// <summary>True if values differ within absolute tolerance.</summary>
     [Pure] public bool IsWithinAbsoluteTolerance(double a, double b);
 
-    /// <summary>True if angle differences are within angular tolerance.</summary>
+    /// <summary>True if angles differ within angular tolerance.</summary>
     [Pure] public bool IsWithinAngleTolerance(double angleRadians1, double angleRadians2);
 
-    /// <summary>True if squared distance is within squared absolute tolerance.</summary>
+    /// <summary>True if squared distance within squared tolerance.</summary>
     [Pure] public bool IsWithinSquaredTolerance(double squaredDistance);
 }

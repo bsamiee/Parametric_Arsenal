@@ -9,13 +9,13 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Spatial indexing with RTree algorithms and polymorphic dispatch.</summary>
+/// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
-    /// <summary>RTree cache with automatic GC-aware cleanup.</summary>
+    /// <summary>RTree cache with GC-aware cleanup.</summary>
     internal static readonly ConditionalWeakTable<object, RTree> TreeCache = [];
 
-    /// <summary>Spatial query with type-based dispatch and RTree algorithms.</summary>
+    /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
         TInput input,
