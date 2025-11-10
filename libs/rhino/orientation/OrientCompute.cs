@@ -13,13 +13,18 @@ internal static class OrientCompute {
         Brep brep,
         byte criteria,
         double tolerance) =>
-        brep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
-            ? ((Func<Result<(Transform, double, byte[])>>)(() => {
-                using VolumeMassProperties? vmp = brep.IsSolid ? VolumeMassProperties.Compute(brep) : null;
+        !brep.IsValid
+            ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Validation.GeometryInvalid)
+            : brep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
+                ? ((Func<Result<(Transform, double, byte[])>>)(() => {
+                    using VolumeMassProperties? vmp = brep.IsSolid && brep.IsManifold ? VolumeMassProperties.Compute(brep) : null;
                 Plane[] testPlanes = [
                     new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
                     new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
                     new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
+                    new Plane(box.Center, new Vector3d(1, 1, 0) / Math.Sqrt(2), Vector3d.ZAxis),
+                    new Plane(box.Center, new Vector3d(1, 0, 1) / Math.Sqrt(2), Vector3d.YAxis),
+                    new Plane(box.Center, new Vector3d(0, 1, 1) / Math.Sqrt(2), Vector3d.XAxis),
                 ];
 
                 (Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
@@ -28,20 +33,24 @@ internal static class OrientCompute {
                     return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<byte>())
                         : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
                             ? (xf, criteria switch {
-                                1 => 1.0 / (testBox.Diagonal.Length + tolerance),
-                                2 => vmp is not null ? testBox.Center.Z - vmp.Centroid.Z : 0.0,
-                                3 => testBox.IsDegenerate(tolerance) is int deg && deg != 0 ? 1.0 / deg : 0.0,
-                                4 => (testBox.Min.Z >= -tolerance ? 0.5 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? 0.5 : 0.0),
+                                1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
+                                2 => vmp is not null && testBox.Center.Z > tolerance ? Math.Max(0.0, 1.0 - (Math.Abs(testBox.Center.Z - vmp.Centroid.Z) / testBox.Diagonal.Length)) : 0.0,
+                                3 => testBox.IsDegenerate(tolerance) is int deg && deg != 0 ? 1.0 / deg : testBox.Diagonal.Length > tolerance ? 1.0 : 0.0,
+                                4 => (testBox.Min.Z >= -tolerance ? 0.4 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? 0.4 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * 0.5) ? 0.2 : 0.0),
                                 _ => 0.0,
                             }, criteria is >= 1 and <= 4 ? [criteria,] : Array.Empty<byte>())
                             : (Transform.Identity, 0.0, Array.Empty<byte>());
                 }),
                 ];
 
-                (Transform best, double bestScore, byte[] met) = results.OrderByDescending(r => r.Item2).First();
-                return ResultFactory.Create(value: (best, bestScore, met));
-            }))()
-            : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed);
+                (Transform best, double bestScore, byte[] met) = results.Length > 0
+                    ? results.OrderByDescending(r => r.Item2).First()
+                    : (Transform.Identity, 0.0, Array.Empty<byte>());
+                return bestScore > tolerance
+                    ? ResultFactory.Create(value: (best, bestScore, met))
+                    : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
+                }))()
+                : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"));
 
     /// <summary>Compute relative orientation between two geometries.</summary>
     [Pure]
@@ -49,9 +58,11 @@ internal static class OrientCompute {
         GeometryBase geometryA,
         GeometryBase geometryB,
         double tolerance) =>
-        (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
-         OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
-        switch {
+        geometryA is null || geometryB is null
+            ? ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed.WithContext("Null geometry"))
+            : (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
+               OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
+            switch {
             (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
                 (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
                     ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
@@ -81,13 +92,13 @@ internal static class OrientCompute {
         GeometryBase[] geometries,
         double tolerance) =>
         geometries.Length >= OrientConfig.PatternMinInstances
-            ? geometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)).Where(r => r.IsSuccess).Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen
-                ? deltas.All(v => Math.Abs(v.Length - avgLen) / avgLen < tolerance)
-                    ? ResultFactory.Create(value: ((byte)0, centroids.Select((_, i) => Transform.Translation(deltas[0] * i)).ToArray(), Array.Empty<int>(), deltas.Average(v => Math.Abs(v.Length - avgLen))))
-                    : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < tolerance)
-                        ? ResultFactory.Create(value: ((byte)1, Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(2.0 * Math.PI * i / centroids.Length, Vector3d.ZAxis, center)).ToArray(), Array.Empty<int>(), radii.Average(r => Math.Abs(r - avgRadius))))
-                        : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed)
-                : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed)
+            ? geometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)).Where(r => r.IsSuccess).Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen && avgLen > tolerance
+                ? deltas.All(v => avgLen > tolerance && Math.Abs(v.Length - avgLen) / avgLen < tolerance)
+                    ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (0, [.. centroids.Select((_, i) => Transform.Translation(deltas[0] * i)),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= tolerance * 0.5).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
+                    : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > tolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < tolerance)
+                        ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(2.0 * Math.PI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => avgRadius > 0 && Math.Abs(pair.r - avgRadius) / avgRadius >= tolerance * 0.5).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
+                        : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
+                : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
             : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.InsufficientParameters);
 
     private static bool TestReflectionSymmetry(Brep a, Brep b, Plane mirror, double tolerance) =>
