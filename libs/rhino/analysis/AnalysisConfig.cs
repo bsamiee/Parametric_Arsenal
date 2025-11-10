@@ -58,4 +58,6 @@ internal static class AnalysisConfig {
     /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
+
+
 }

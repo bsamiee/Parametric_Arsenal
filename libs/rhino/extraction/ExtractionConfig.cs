@@ -7,6 +7,7 @@ namespace Arsenal.Rhino.Extraction;
 /// <summary>Validation modes for semantic extraction with type inheritance fallback.</summary>
 internal static class ExtractionConfig {
     internal const double FilletG2Threshold = 0.95;
+    internal const double FilletG2AbsoluteTolerance = 0.001;
     internal const double ChamferAngleTolerance = 0.1;
     internal const int MinHoleSides = 16;
     internal const double PrimitiveFitTolerance = 0.001;

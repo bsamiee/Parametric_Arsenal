@@ -96,6 +96,9 @@ public static class E {
             [4100] = "Spatial clustering operation failed",
             [4101] = "K-means k parameter must be positive",
             [4102] = "DBSCAN epsilon parameter must be positive",
+            [4103] = "Cluster count exceeds point count",
+
+            [4105] = "Direction vector is zero-length",
             [4200] = "Medial axis computation failed",
             [4201] = "Non-planar medial axis not supported",
             [4300] = "Proximity field computation failed",
@@ -225,6 +228,9 @@ public static class E {
         public static readonly SystemError ClusteringFailed = Get(4100);
         public static readonly SystemError InvalidClusterK = Get(4101);
         public static readonly SystemError InvalidEpsilon = Get(4102);
+        public static readonly SystemError KExceedsPointCount = Get(4103);
+        public static readonly SystemError DegeneratePointSet = Get(4104);
+        public static readonly SystemError ZeroLengthDirection = Get(4105);
         public static readonly SystemError MedialAxisFailed = Get(4200);
         public static readonly SystemError NonPlanarNotSupported = Get(4201);
         public static readonly SystemError ProximityFieldFailed = Get(4300);

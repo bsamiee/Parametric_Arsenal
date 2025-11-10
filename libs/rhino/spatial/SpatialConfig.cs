@@ -19,6 +19,9 @@ internal static class SpatialConfig {
     /// <summary>Medial axis offset distance multiplier for skeleton computation.</summary>
     internal const double MedialAxisOffsetMultiplier = 10.0;
 
+    /// <summary>DBSCAN uses RTree spatial indexing when point count exceeds this threshold.</summary>
+    internal const int DBSCANRTreeThreshold = 100;
+
     /// <summary>Clustering algorithm identifiers: 0=KMeans++, 1=DBSCAN, 2=Hierarchical.</summary>
     internal static readonly FrozenDictionary<byte, (int MaxIter, int MinPts)> ClusterParams =
         new Dictionary<byte, (int, int)> {
