@@ -51,6 +51,7 @@ internal static class TopologyCore {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] naked => ((Func<Curve[], Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(nakedCurves => {
                     try {
+                        // Ownership transfer: The consumer of Topology.BoundaryLoopData.Loops is responsible for disposing the joined curves.
                         Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                             Loops: [.. joined,],
