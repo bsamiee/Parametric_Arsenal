@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Operations;
@@ -41,19 +42,23 @@ public static class Intersect {
         bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new();
         (Type t1, Type t2) = (typeof(T1), typeof(T2));
-        Type elem = t1 is { IsGenericType: true } t && t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ? t.GetGenericArguments()[0] : t1;
-        V mode = IntersectionConfig.ValidationModes.TryGetValue((t1, t2), out V m1) ? m1 : IntersectionConfig.ValidationModes.TryGetValue((elem, t2), out V m2) ? m2 : V.None;
 
-        return UnifiedOperation.Apply(
-            geometryA,
-            (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item => IntersectionCore.ExecutePair(item, geometryB, context, opts).Map(r => (IReadOnlyList<IntersectionOutput>)[r])),
-            new OperationConfig<object, IntersectionOutput> {
-                Context = context,
-                ValidationMode = mode,
-                AccumulateErrors = true,
-                OperationName = $"Intersect.{t1.Name}.{t2.Name}",
-                EnableDiagnostics = enableDiagnostics,
-            })
+        return IntersectionCore.NormalizeOptions(opts, context)
+            .Bind(normalized => UnifiedOperation.Apply(
+                geometryA,
+                (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item => IntersectionCore.ExecuteWithOptions(
+                        item,
+                        (object)geometryB,
+                        context,
+                        normalized)
+                    .Map(output => (IReadOnlyList<IntersectionOutput>)[output])),
+                new OperationConfig<object, IntersectionOutput> {
+                    Context = context,
+                    ValidationMode = V.None,
+                    AccumulateErrors = true,
+                    OperationName = $"Intersect.{t1.Name}.{t2.Name}",
+                    EnableDiagnostics = enableDiagnostics,
+                }))
         .Map(outputs => outputs.Count switch {
             0 => IntersectionOutput.Empty,
             _ => new IntersectionOutput(
