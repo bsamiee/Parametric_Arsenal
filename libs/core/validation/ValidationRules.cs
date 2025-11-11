@@ -54,9 +54,9 @@ public static class ValidationRules {
     private static readonly MethodInfo _curveSelf = typeof(Intersection).GetMethod(nameof(Intersection.CurveSelf), [typeof(Curve), typeof(double),])!;
     private static readonly MethodInfo _dispose = typeof(IDisposable).GetMethod(name: nameof(IDisposable.Dispose), bindingAttr: BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly, binder: null, types: Type.EmptyTypes, modifiers: null)!;
     private static readonly MethodInfo _surfaceDomain = typeof(Surface).GetMethod(nameof(Surface.Domain), [typeof(int),])!;
-    private static readonly PropertyInfo _intervalLength = typeof(Interval).GetProperty(nameof(Interval.Length))!;
-    private static readonly PropertyInfo _meshFaces = typeof(Mesh).GetProperty(nameof(Mesh.Faces))!;
-    private static readonly PropertyInfo _meshFaceCount = typeof(MeshFaceList).GetProperty(nameof(MeshFaceList.Count))!;
+    private static readonly PropertyInfo _intervalLength = typeof(Interval).GetProperty(nameof(Interval.Length), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
+    private static readonly PropertyInfo _meshFaces = typeof(Mesh).GetProperty(nameof(Mesh.Faces), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
+    private static readonly PropertyInfo _meshFaceCount = typeof(Rhino.Geometry.Collections.MeshFaceList).GetProperty(nameof(Rhino.Geometry.Collections.MeshFaceList.Count), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
 
     private static readonly FrozenDictionary<V, ((string Member, SystemError Error)[] Properties, (string Member, SystemError Error)[] Methods)> _validationRules =
         new Dictionary<V, ((string Member, SystemError Error)[], (string Member, SystemError Error)[])> {
@@ -108,7 +108,7 @@ public static class ValidationRules {
         ];
 
         UnaryExpression errorConst = Expression.Convert(Expression.Constant(default(SystemError)), typeof(SystemError?));
-        Expression[] validationExpressions = [.. memberValidations.Where(v => v.Member is not null and not Type { Name: "Void" }).Select(v => v.Member switch {
+        Expression[] validationExpressions = [.. memberValidations.Where(v => v.Member is not null and not Type { Name: "Void" } || v.Name is "DomainLength" or "FacesCount" or "CurveSelf").Select(v => v.Member switch {
             PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(bool) => Expression.Condition(Expression.Not(Expression.Property(Expression.Convert(geometry, runtimeType), p)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
             PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(int) && string.Equals(pn, "Degree", StringComparison.Ordinal) => Expression.Condition(Expression.LessThan(Expression.Property(Expression.Convert(geometry, runtimeType), p), Expression.Constant(1)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),
             PropertyInfo { PropertyType: Type pt, Name: string pn } p when pt == typeof(int) && string.Equals(pn, "CapCount", StringComparison.Ordinal) => Expression.Condition(Expression.NotEqual(Expression.Property(Expression.Convert(geometry, runtimeType), p), Expression.Constant(2)), Expression.Convert(Expression.Constant(v.Error), typeof(SystemError?)), _nullSystemError),

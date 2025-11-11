@@ -42,12 +42,12 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.Degeneracy | V.SurfaceContinuity,])
             .Bind(validCurve => {
-                (double Parameter, Vector3d Curvature)[] samples = Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
+                (double Parameter, Vector3d Curvature)[] samples = [.. Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
                     .Select(i => validCurve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
                     .Select(t => (Parameter: t, Curvature: validCurve.CurvatureAt(t)))
-                    .Where(pair => pair.Curvature.IsValid)
-                    .ToArray();
-                double[] curvatures = samples.Select(s => s.Curvature.Length).ToArray();
+                    .Where(pair => pair.Curvature.IsValid),
+                ];
+                double[] curvatures = [.. samples.Select(s => s.Curvature.Length)];
                 return samples.Length > 2
                     && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
                     && validCurve.GetLength() is double curveLength

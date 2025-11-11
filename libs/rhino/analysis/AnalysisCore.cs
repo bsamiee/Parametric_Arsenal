@@ -2,10 +2,9 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Context;
-using Arsenal.Core.Diagnostics;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
@@ -85,8 +84,9 @@ internal static class AnalysisCore {
                                 : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed)))(
                                     AreaMassProperties.Compute(brep), VolumeMassProperties.Compute(brep), sf.CurvatureAt(u, v))
                         : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.BrepAnalysisFailed);
-                }),
-                [typeof(Mesh)] = (Modes[typeof(Mesh)], (g, ctx, _, _, vertIdx, _, _) => {
+                }
+                ),
+                [typeof(Mesh)] = (Modes[typeof(Mesh)], (g, _, _, _, vertIdx, _, _) => {
                     Mesh mesh = (Mesh)g;
                     int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
                     Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
@@ -98,7 +98,8 @@ internal static class AnalysisCore {
                                 [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
                                 mesh.IsManifold(topologicalTest: true, out bool _, out bool _), mesh.IsClosed, amp.Area, vmp.Volume))
                             : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.MeshAnalysisFailed)))(AreaMassProperties.Compute(mesh), VolumeMassProperties.Compute(mesh));
-                }),
+                }
+                ),
             };
 
             map[typeof(Extrusion)] = (Modes[typeof(Extrusion)], (g, ctx, _, uv, faceIdx, testPt, order) => ((Extrusion)g).ToBrep() is Brep extrusionBrep
@@ -125,15 +126,15 @@ internal static class AnalysisCore {
             ? UnifiedOperation.Apply(
                 geometry,
                 (Func<object, Result<IReadOnlyList<Analysis.IResult>>>)(item =>
-                    item
-                        .Validate(context: context, mode: strategy.mode)
+                    ResultFactory.Create(value: item)
+                        .Validate(args: [context, strategy.mode,])
                         .Bind(valid =>
                             strategy.compute(valid, context, t, uv, index, testPoint, derivativeOrder)
                                 .Map(result => (IReadOnlyList<Analysis.IResult>)[result])
                         )),
                 new OperationConfig<object, Analysis.IResult> {
                     Context = context,
-                    ValidationMode = strategy.mode,
+                    ValidationMode = V.None,
                     OperationName = $"Analysis.{geometry.GetType().Name}",
                     EnableDiagnostics = enableDiagnostics,
                     AccumulateErrors = false,
