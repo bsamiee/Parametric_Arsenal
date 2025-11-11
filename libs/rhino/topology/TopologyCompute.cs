@@ -109,18 +109,15 @@ internal static class TopologyCompute {
                             ? (true, copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked))
                             : (false, int.MaxValue);
                         bool isImprovement = evaluation.IsValid && evaluation.NakedEdges < originalNakedEdges && evaluation.NakedEdges < bestNakedEdges;
-                        Brep? previousHealed = bestHealed;
-                        byte previousStrategy = bestStrategy;
-                        int previousNakedEdges = bestNakedEdges;
 
-                        (bestHealed, bestStrategy, bestNakedEdges) = (isImprovement, previousHealed) switch {
+                        (bestHealed, bestStrategy, bestNakedEdges) = (isImprovement, bestHealed) switch {
                             (true, Brep? prev) => ((Func<(Brep?, byte, int)>)(() => {
                                 prev?.Dispose();
                                 return (copy, strategy, evaluation.NakedEdges);
                             }))(),
                             (_, Brep? prev) => ((Func<(Brep?, byte, int)>)(() => {
                                 copy.Dispose();
-                                return (prev, previousStrategy, previousNakedEdges);
+                                return (prev, bestStrategy, bestNakedEdges);
                             }))(),
                         };
                     }
