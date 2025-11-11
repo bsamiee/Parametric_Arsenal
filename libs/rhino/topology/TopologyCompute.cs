@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
@@ -90,30 +91,43 @@ internal static class TopologyCompute {
                 .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => ((Func<Result<(Brep, byte, bool)>>)(() => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
+                    int strategyCount = Math.Min(maxStrategy + 1, 4);
+                    Brep? bestHealed = null;
+                    byte bestStrategy = 0;
+                    int bestNakedEdges = int.MaxValue;
 
-                    (byte Strategy, Brep? Healed, int NakedEdges)[] attempts = [.. Enumerable.Range(0, Math.Min(maxStrategy + 1, 4))
-                        .Select(s => {
-                            byte strategy = (byte)s;
-                            Brep copy = validBrep.DuplicateBrep();
-                            bool success = strategy switch {
-                                0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
-                                1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                                2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
-                                _ => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                            };
-                            bool isValid = success && copy.IsValidTopology(out string _);
-                            int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
-                            Brep? result = isValid && nakedEdges < originalNakedEdges
-                                ? copy
-                                : ((Func<Brep?>)(() => { copy.Dispose(); return null; }))();
-                            return (Strategy: strategy, Healed: result, NakedEdges: nakedEdges);
-                        }),
-                    ];
+                    for (int index = 0; index < strategyCount; index++) {
+                        byte strategy = (byte)index;
+                        Brep copy = validBrep.DuplicateBrep();
+                        bool success = strategy switch {
+                            0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
+                            1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
+                            _ => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                        };
+                        (bool IsValid, int NakedEdges) evaluation = success && copy.IsValidTopology(out string _)
+                            ? (true, copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked))
+                            : (false, int.MaxValue);
+                        bool isImprovement = evaluation.IsValid && evaluation.NakedEdges < originalNakedEdges && evaluation.NakedEdges < bestNakedEdges;
+                        Brep? previousHealed = bestHealed;
+                        byte previousStrategy = bestStrategy;
+                        int previousNakedEdges = bestNakedEdges;
 
-                    (byte strategy, Brep? healed, int nakedEdges) = attempts.Where(a => a.Healed is not null).OrderBy(a => a.NakedEdges).FirstOrDefault();
-                    return healed is not null
-                        ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
-                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
+                        (bestHealed, bestStrategy, bestNakedEdges) = (isImprovement, previousHealed) switch {
+                            (true, Brep? prev) => ((Func<(Brep?, byte, int)>)(() => {
+                                prev?.Dispose();
+                                return (copy, strategy, evaluation.NakedEdges);
+                            }))(),
+                            (_, Brep? prev) => ((Func<(Brep?, byte, int)>)(() => {
+                                copy.Dispose();
+                                return (prev, previousStrategy, previousNakedEdges);
+                            }))(),
+                        };
+                    }
+
+                    return bestHealed is Brep healed
+                        ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, bestStrategy, bestNakedEdges < originalNakedEdges))
+                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext(string.Create(CultureInfo.InvariantCulture, $"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed")));
                 }))());
 
     [Pure]
