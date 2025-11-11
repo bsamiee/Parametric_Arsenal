@@ -215,11 +215,11 @@ public static class Orient {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        OrientCompute.ComputeRelative(geometryA, geometryB, context.AbsoluteTolerance);
+        OrientCompute.ComputeRelative(geometryA, geometryB, context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
         GeometryBase[] geometries,
         IGeometryContext context) =>
-        OrientCompute.DetectPattern(geometries, context.AbsoluteTolerance);
+        OrientCompute.DetectPattern(geometries, context);
 }

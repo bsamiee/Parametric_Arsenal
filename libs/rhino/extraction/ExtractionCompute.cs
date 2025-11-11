@@ -103,26 +103,19 @@ internal static class ExtractionCompute {
     private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop) {
         using Curve? c = loop.To3dCurve();
 
-        if (c?.IsClosed is not true) {
-            return (false, 0.0);
-        }
-
-        double area = 0.0;
-        bool isHole = false;
-
-        if (c.TryGetCircle(out Circle circ, tolerance: ExtractionConfig.PrimitiveFitTolerance)) {
-            area = Math.PI * circ.Radius * circ.Radius;
-            isHole = true;
-        } else if (c.TryGetEllipse(out Ellipse ell, tolerance: ExtractionConfig.PrimitiveFitTolerance)) {
-            area = Math.PI * ell.Radius1 * ell.Radius2;
-            isHole = true;
-        } else if (c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides) {
-            using AreaMassProperties? amp = AreaMassProperties.Compute(c);
-            area = amp?.Area ?? 0.0;
-            isHole = true;
-        }
-
-        return (isHole, area);
+        return c switch {
+            null => (false, 0.0),
+            _ when !c.IsClosed => (false, 0.0),
+            _ when c.TryGetCircle(out Circle circ, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+                => (true, Math.PI * circ.Radius * circ.Radius),
+            _ when c.TryGetEllipse(out Ellipse ell, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+                => (true, Math.PI * ell.Radius1 * ell.Radius2),
+            _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
+                true,
+                (using (AreaMassProperties? amp = AreaMassProperties.Compute(c))) ? amp?.Area ?? 0.0 : 0.0
+            ),
+            _ => (false, 0.0),
+        };
     }
 
     private static readonly double[] _zeroResidual = [0.0,];

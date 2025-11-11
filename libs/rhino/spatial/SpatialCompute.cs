@@ -45,12 +45,9 @@ internal static class SpatialCompute {
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
                     : (algorithm is 1 && epsilon <= 0)
                         ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
-                        : geometry.Select(g => ResultFactory.Create(value: g).Validate(args: [context, V.Standard,])).ToArray() switch {
-                            Result<T>[] results when results.All(r => r.IsSuccess) =>
-                                ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context),
-                            Result<T>[] results =>
-                                ResultFactory.Create<(Point3d, double[])[]>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
-                        };
+                        : ResultFactory.Create(value: geometry)
+                            .Ensure(g => g.All(item => item.IsValid), error: E.Validation.GeometryInvalid)
+                            .Bind(validGeometry => ClusterInternal(geometry: validGeometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context));
 
     private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
         Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
@@ -231,12 +228,9 @@ internal static class SpatialCompute {
                 ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection)
                 : maxDist <= context.AbsoluteTolerance
                     ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
-                    : geometry.Select(g => ResultFactory.Create(value: g).Validate(args: [context, V.Standard,])).ToArray() switch {
-                        Result<GeometryBase>[] results when results.All(r => r.IsSuccess) =>
-                            ProximityFieldCompute(geometry: geometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context),
-                        Result<GeometryBase>[] results =>
-                            ResultFactory.Create<(int, double, double)[]>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
-                    };
+                    : ResultFactory.Create(value: geometry)
+                        .Ensure(g => g.All(item => item.IsValid), error: E.Validation.GeometryInvalid)
+                        .Bind(validGeometry => ProximityFieldCompute(geometry: validGeometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context));
 
     private static Result<(int, double, double)[]> ProximityFieldCompute(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
         using RTree tree = new();
@@ -306,7 +300,7 @@ internal static class SpatialCompute {
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+            : ResultFactory.Create<Point3d[]>(error: E.Spatial.CollinearPoints);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -323,7 +317,7 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
-                : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
+                : ResultFactory.Create<int[][]>(error: E.Spatial.CoplanarPoints);
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
