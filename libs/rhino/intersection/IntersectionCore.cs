@@ -245,16 +245,29 @@ internal static class IntersectionCore {
         Type[] chainA = [.. chainAList.Concat(typeA.GetInterfaces()).Distinct()];
         Type[] chainB = [.. chainBList.Concat(typeB.GetInterfaces()).Distinct()];
 
-        return chainA.SelectMany(first => chainB.Select(second => ((first, second), false)))
+        ((Type, Type) Key, bool Swapped, bool Found, IntersectionStrategy Strategy) match = chainA.SelectMany(first => chainB.Select(second => ((first, second), false)))
             .Concat(chainB.SelectMany(first => chainA.Select(second => ((first, second), true))))
             .Select(candidate => {
-                bool match = _strategies.TryGetValue(candidate.Item1, out IntersectionStrategy resolved);
-                return (candidate.Item1, candidate.Item2, match, resolved);
+                bool found = _strategies.TryGetValue(candidate.Item1, out IntersectionStrategy resolved);
+                return (candidate.Item1, candidate.Item2, found, resolved);
             })
-            .FirstOrDefault(match => match.match) switch {
-                ((Type, Type) key, bool swapped, true, IntersectionStrategy strategy) => ResultFactory.Create(value: (strategy, swapped)),
-                _ => ResultFactory.Create<(IntersectionStrategy, bool)>(error: E.Geometry.UnsupportedIntersection.WithContext($"{typeA.Name} × {typeB.Name}")),
-            };
+            .FirstOrDefault(candidate => candidate.Found);
+
+        Func<IntersectionStrategy> adjust = () => {
+            (V ModeA, V ModeB) fallback = (match.Strategy.ModeA, match.Strategy.ModeB);
+            (V ModeA, V ModeB) specific = IntersectionConfig.ValidationModes.TryGetValue((typeA, typeB), out (V ModeA, V ModeB) direct)
+                ? direct
+                : IntersectionConfig.ValidationModes.TryGetValue((typeB, typeA), out (V ModeA, V ModeB) inverse)
+                    ? (inverse.ModeB, inverse.ModeA)
+                    : fallback;
+            V modeA = match.Swapped ? specific.ModeB : specific.ModeA;
+            V modeB = match.Swapped ? specific.ModeA : specific.ModeB;
+            return new IntersectionStrategy(match.Strategy.Executor, modeA, modeB);
+        };
+
+        return match.Found
+            ? ResultFactory.Create(value: (adjust(), match.Swapped))
+            : ResultFactory.Create<(IntersectionStrategy, bool)>(error: E.Geometry.UnsupportedIntersection.WithContext($"{typeA.Name} × {typeB.Name}"));
     }
 
     /// <summary>Normalizes intersection options validating tolerance and MaxHits with context defaults.</summary>
