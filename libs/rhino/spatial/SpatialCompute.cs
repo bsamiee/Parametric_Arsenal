@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -36,11 +37,20 @@ internal static class SpatialCompute {
     }
 
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
-            : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
-            : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
-            : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
-            : ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context);
+        geometry.Length is 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
+            : algorithm is > 2
+                ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
+                : (algorithm is 0 or 2 && k <= 0)
+                    ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
+                    : (algorithm is 1 && epsilon <= 0)
+                        ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
+                        : geometry.Select(g => ResultFactory.Create(value: g).Validate(args: [context, V.Standard,])).ToArray() switch {
+                            Result<T>[] results when results.All(r => r.IsSuccess) =>
+                                ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context),
+                            Result<T>[] results =>
+                                ResultFactory.Create<(Point3d, double[])[]>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
+                        };
 
     private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
         Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
@@ -203,14 +213,16 @@ internal static class SpatialCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
-        brep.Faces.Count is 0
-            ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
-            : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
-                (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
-                (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
-                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve joined && joined.IsClosed && joined.TryGetPlane(out Plane plane, tolerance: tolerance) && joined.Offset(plane: plane, distance: tolerance * SpatialConfig.MedialAxisOffsetMultiplier, tolerance: tolerance, CurveOffsetCornerStyle.Sharp) is { Length: > 0 } offsets && offsets.All(o => o?.IsValid is true) => ResultFactory.Create(value: (offsets, offsets.Select(static c => c.GetLength()).ToArray())),
-                _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
-            };
+        ResultFactory.Create(value: brep)
+            .Validate(args: [context, V.Standard | V.Topology,])
+            .Bind(validBrep => validBrep.Faces.Count is 0
+                ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
+                : (validBrep.Faces.Count is 1 && validBrep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), validBrep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
+                    (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
+                    (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
+                    (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve joined && joined.IsClosed && joined.TryGetPlane(out Plane plane, tolerance: tolerance) && joined.Offset(plane: plane, distance: tolerance * SpatialConfig.MedialAxisOffsetMultiplier, tolerance: tolerance, CurveOffsetCornerStyle.Sharp) is { Length: > 0 } offsets && offsets.All(o => o?.IsValid is true) => ResultFactory.Create(value: (offsets, offsets.Select(static c => c.GetLength()).ToArray())),
+                    _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
+                });
 
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
         geometry.Length is 0
@@ -219,7 +231,12 @@ internal static class SpatialCompute {
                 ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection)
                 : maxDist <= context.AbsoluteTolerance
                     ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
-                    : ProximityFieldCompute(geometry: geometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context);
+                    : geometry.Select(g => ResultFactory.Create(value: g).Validate(args: [context, V.Standard,])).ToArray() switch {
+                        Result<GeometryBase>[] results when results.All(r => r.IsSuccess) =>
+                            ProximityFieldCompute(geometry: geometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context),
+                        Result<GeometryBase>[] results =>
+                            ResultFactory.Create<(int, double, double)[]>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
+                    };
 
     private static Result<(int, double, double)[]> ProximityFieldCompute(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
         using RTree tree = new();

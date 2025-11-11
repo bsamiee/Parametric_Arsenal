@@ -1,6 +1,8 @@
 using System.Diagnostics.Contracts;
+using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
@@ -15,16 +17,17 @@ internal static class OrientCompute {
     internal static Result<(Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
-        double tolerance) =>
-        !brep.IsValid
-            ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Validation.GeometryInvalid)
-            : criteria is < 1 or > 4
+        double tolerance,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: brep)
+            .Validate(args: [context, V.Standard | V.Topology | V.BoundingBox | V.MassProperties,])
+            .Bind(validBrep => criteria is < 1 or > 4
                 ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.InvalidOrientationMode.WithContext($"Criteria must be 1-4, got {criteria}"))
                 : tolerance <= 0.0
                     ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Validation.ToleranceAbsoluteInvalid)
-                    : brep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
+                    : validBrep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
                         ? ((Func<Result<(Transform, double, byte[])>>)(() => {
-                            using VolumeMassProperties? vmp = brep.IsSolid && brep.IsManifold ? VolumeMassProperties.Compute(brep) : null;
+                            using VolumeMassProperties? vmp = validBrep.IsSolid && validBrep.IsManifold ? VolumeMassProperties.Compute(validBrep) : null;
                             Plane[] testPlanes = [
                                 new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
                                 new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
@@ -36,7 +39,7 @@ internal static class OrientCompute {
 
                             (Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
                                 Transform xf = Transform.PlaneToPlane(plane, Plane.WorldXY);
-                                using Brep test = (Brep)brep.Duplicate();
+                                using Brep test = (Brep)validBrep.Duplicate();
                                 return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<byte>())
                                     : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
                                         ? (xf, criteria switch {
@@ -58,7 +61,7 @@ internal static class OrientCompute {
                                 ? ResultFactory.Create(value: (best, bestScore, met))
                                 : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
                         }))()
-                        : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"));
+                        : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));
 
     /// <summary>Compute relative orientation between two geometries.</summary>
     [Pure]

@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
@@ -10,31 +11,39 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Dense intersection analysis algorithms.</summary>
 internal static class IntersectionCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB) =>
+    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) =>
         geomA is null || geomB is null
             ? ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData.WithContext("Geometry is null"))
-            : (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
-                (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-                (int n, int pa, int pb) when pa >= n && pb >= n => (geomA, geomB) switch {
-                    (Curve ca, Curve cb) => Enumerable.Range(0, n)
-                        .Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) && ta.IsValid && tb.IsValid
-                            ? Vector3d.VectorAngle(ta, tb)
-                            : double.NaN)
-                        .Where(a => !double.IsNaN(a))
-                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circMean && (circMean < 0.0 ? circMean + (2.0 * Math.PI) : circMean) is double avgAngle
-                        ? ResultFactory.Create(value: (Type: avgAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
-                        : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                    (Curve, Surface) or (Surface, Curve) => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
-                    _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
-                },
-                _ => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-            };
+            : ResultFactory.Create(value: geomA)
+                .Validate(args: [context, V.Standard,])
+                .Bind(validA => ResultFactory.Create(value: geomB)
+                    .Validate(args: [context, V.Standard,])
+                    .Bind(validB => (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
+                        (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
+                        (int n, int pa, int pb) when pa >= n && pb >= n => (validA, validB) switch {
+                            (Curve ca, Curve cb) => Enumerable.Range(0, n)
+                                .Select(i => (ca.TangentAt(output.ParametersA[i]), cb.TangentAt(output.ParametersB[i])) is (Vector3d ta, Vector3d tb) && ta.IsValid && tb.IsValid
+                                    ? Vector3d.VectorAngle(ta, tb)
+                                    : double.NaN)
+                                .Where(a => !double.IsNaN(a))
+                                .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circMean && (circMean < 0.0 ? circMean + (2.0 * Math.PI) : circMean) is double avgAngle
+                                ? ResultFactory.Create(value: (Type: avgAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(a => a < IntersectionConfig.GrazingAngleThreshold), BlendScore: avgAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
+                                : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                            (Curve, Surface) or (Surface, Curve) => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
+                            _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
+                        },
+                        _ => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
+                    }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) =>
         searchRadius <= context.AbsoluteTolerance
             ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext("SearchRadius must exceed tolerance"))
-            : (geomA, geomB) switch {
+            : ResultFactory.Create(value: geomA)
+                .Validate(args: [context, V.Standard,])
+                .Bind(validA => ResultFactory.Create(value: geomB)
+                    .Validate(args: [context, V.Standard,])
+                    .Bind(validB => (validA, validB) switch {
                 (Curve ca, Curve cb) => Math.Max(3, (int)Math.Ceiling(ca.GetLength() / searchRadius)) is int sampleCount
                     ? Enumerable.Range(0, sampleCount)
                         .Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(sampleCount - 1))))
@@ -74,8 +83,8 @@ internal static class IntersectionCompute {
                         ? ResultFactory.Create(value: (pairs3.Select(p => p.PointA).ToArray(), pairs3.Select(p => p.PointB).ToArray(), pairs3.Select(p => p.Distance).ToArray()))
                         : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                     : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
-            };
+                        _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
+                    }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) =>
