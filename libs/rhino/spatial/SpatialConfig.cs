@@ -57,16 +57,19 @@ internal static class SpatialConfig {
     /// <summary>RTree factories with validation-aware result creation.</summary>
     internal static readonly FrozenDictionary<Type, Func<object, IGeometryContext, Result<RTree>>> RTreeFactories =
         new Dictionary<Type, Func<object, IGeometryContext, Result<RTree>>> {
+            // NOTE: The caller is responsible for disposing the returned RTree instance.
             [typeof(Point3d[])] = static (source, _) => source switch {
                 Point3d[] points when points.Length > 0 => ResultFactory.Create(value: RTree.CreateFromPointArray(points) ?? new RTree()),
                 Point3d[] => ResultFactory.Create(value: new RTree()),
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
             },
+            // NOTE: The caller is responsible for disposing the returned RTree instance.
             [typeof(PointCloud)] = static (source, _) => source switch {
                 PointCloud { Count: > 0 } cloud => ResultFactory.Create(value: RTree.CreatePointCloudTree(cloud) ?? new RTree()),
                 PointCloud => ResultFactory.Create(value: new RTree()),
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
             },
+            // NOTE: The caller is responsible for disposing the returned RTree instance.
             [typeof(Mesh)] = static (source, _) => source switch {
                 Mesh { IsValid: true } mesh => ResultFactory.Create(value: RTree.CreateMeshFaceTree(mesh) ?? new RTree()),
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
