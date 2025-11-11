@@ -208,26 +208,42 @@ internal static class SpatialCompute {
             : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
                 (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
                 (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
-                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: tolerance) => ComputeMedialAxisSkeleton(boundary: boundary, plane: plane, tolerance: tolerance, context: context),
-                _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
+                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: tolerance) && boundary.GetLength() > context.AbsoluteTolerance => ComputeMedialAxisSkeleton(boundary: boundary, plane: plane, tolerance: tolerance, context: context),
+                _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary is not closed, planar, or degenerate")),
             };
 
-    private static Result<(Curve[], double[])> ComputeMedialAxisSkeleton(Curve boundary, Plane plane, double tolerance, IGeometryContext context) =>
-        (boundary.GetLength() / tolerance is double density && (int)Math.Max(50, Math.Min(500, density)) is int sampleCount && Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)).ToArray()) is Point3d[] samples
-            ? VoronoiDiagram2D(points: samples, context: context).Bind(cells =>
-                cells.SelectMany((cell, idx) => cell.Length > 0
-                    ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length], CellIdx: idx))
-                    : [])
-                .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5, edge.CellIdx))
-                .Where(edge => boundary.Contains(edge.Mid, plane, tolerance) is PointContainment.Inside)
-                .GroupBy(edge => (Min: edge.P1.X < edge.P2.X || (edge.P1.X == edge.P2.X && edge.P1.Y < edge.P2.Y) ? edge.P1 : edge.P2, Max: edge.P1.X < edge.P2.X || (edge.P1.X == edge.P2.X && edge.P1.Y < edge.P2.Y) ? edge.P2 : edge.P1))
-                .Select(static g => g.First())
-                .Select(edge => boundary.ClosestPoint(edge.Mid, out double t) ? (Curve: new LineCurve(edge.P1, edge.P2) as Curve, Radius: edge.Mid.DistanceTo(boundary.PointAt(t))) : (null, 0.0))
-                .Where(static pair => pair.Item1 is not null)
-                .ToArray() is (Curve?, double)[] skeleton && skeleton.Length > 0
-                    ? ResultFactory.Create(value: ([.. skeleton.Select(static s => s.Item1!),], [.. skeleton.Select(static s => s.Item2),]))
-                    : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary")))
-            : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary sampling failed"));
+    private static Result<(Curve[], double[])> ComputeMedialAxisSkeleton(Curve boundary, Plane plane, double tolerance, IGeometryContext context) {
+        double length = boundary.GetLength();
+        int sampleCount = (int)Math.Max(50, Math.Min(500, length / tolerance));
+        Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
+        Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
+
+        Point3d To3D(Point3d p2d) { Point3d pt = p2d; _ = pt.Transform(fromPlane); return pt; }
+
+        Point3d[] samples3D = [.. Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)),];
+        Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; _ = pt.Transform(toPlane); return pt; }),];
+
+        return VoronoiDiagram2D(points: samples2D, context: context).Bind(cells =>
+            cells.SelectMany((cell, _) => cell.Length > 0
+                ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length],))
+                : [])
+            .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
+            .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
+            .Where(edge => boundary.Contains(edge.Mid3D, plane, tolerance) is PointContainment.Inside)
+            .GroupBy(edge => (edge.P1, edge.P2) switch {
+                (Point3d p1, Point3d p2) when p1.X < p2.X - context.AbsoluteTolerance || (Math.Abs(p1.X - p2.X) <= context.AbsoluteTolerance && p1.Y < p2.Y - context.AbsoluteTolerance) => (Min: p1, Max: p2),
+                (Point3d p1, Point3d p2) => (Min: p2, Max: p1),
+            })
+            .Select(static g => g.First())
+            .Select(edge => (P1_3D: To3D(edge.P1), P2_3D: To3D(edge.P2), edge.Mid3D))
+            .Select(edge => boundary.ClosestPoint(edge.Mid3D, out double t)
+                ? (Curve: new LineCurve(edge.P1_3D, edge.P2_3D), Radius: edge.Mid3D.DistanceTo(boundary.PointAt(t)))
+                : (null, 0.0))
+            .Where(static pair => pair.Item1 is not null)
+            .ToArray() is (Curve?, double)[] skeleton && skeleton.Length > 0
+                ? ResultFactory.Create<(Curve[], double[])>(value: ([.. skeleton.Select(static s => s.Item1!),], [.. skeleton.Select(static s => s.Item2),]))
+                : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary")));
+    }
 
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
         geometry.Length is 0
