@@ -1,78 +1,309 @@
+using System;
 using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Plane/centroid extraction and transformation via mass properties.</summary>
+/// <summary>Validation-driven orientation dispatch with minimal strategy surface.</summary>
 internal static class OrientCore {
-    internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
-        new Dictionary<Type, Func<object, Result<Plane>>> {
-            [typeof(Curve)] = g => ((Curve)g).FrameAt(((Curve)g).Domain.Mid, out Plane f) && f.IsValid
-                ? ResultFactory.Create(value: f)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            [typeof(Surface)] = g => ((Surface)g) switch {
-                Surface s when s.FrameAt(s.Domain(0).Mid, s.Domain(1).Mid, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(Brep)] = g => ((Brep)g) switch {
-                Brep b when b.IsSolid => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(b); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Brep b when b.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(b); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Brep b => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)),
-            },
-            [typeof(Extrusion)] = g => ((Extrusion)g) switch {
-                Extrusion e when e.IsSolid => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(e); using LineCurve path = e.PathLineCurve(); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, path.TangentAtStart)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(e); using LineCurve path = e.PathLineCurve(); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, path.TangentAtStart)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Extrusion e => ((Func<Result<Plane>>)(() => { using LineCurve path = e.PathLineCurve(); return ResultFactory.Create(value: new Plane(e.GetBoundingBox(accurate: false).Center, path.TangentAtStart)); }))(),
-            },
-            [typeof(Mesh)] = g => ((Mesh)g) switch {
-                Mesh m when m.IsClosed => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(m); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, m.Normals.Count > 0 ? m.Normals[0] : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Mesh m => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(m); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, m.Normals.Count > 0 ? m.Normals[0] : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-            },
-            [typeof(Point3d)] = g => ResultFactory.Create(value: new Plane((Point3d)g, Vector3d.ZAxis)),
-            [typeof(PointCloud)] = g => (PointCloud)g switch {
-                PointCloud pc when pc.Count > 0 => ResultFactory.Create(value: new Plane(pc[0].Location, Vector3d.ZAxis)),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-        }.ToFrozenDictionary();
+    private static readonly FrozenDictionary<Type, (V AdditionalPlaneMode, bool SupportsBestFit)> TypeMetadata = new Dictionary<Type, (V, bool)> {
+        [typeof(Curve)] = (V.None, false),
+        [typeof(NurbsCurve)] = (V.None, false),
+        [typeof(LineCurve)] = (V.None, false),
+        [typeof(ArcCurve)] = (V.None, false),
+        [typeof(PolyCurve)] = (V.None, false),
+        [typeof(PolylineCurve)] = (V.None, false),
+        [typeof(Surface)] = (V.None, false),
+        [typeof(NurbsSurface)] = (V.None, false),
+        [typeof(PlaneSurface)] = (V.None, false),
+        [typeof(Brep)] = (V.MassProperties | V.BoundingBox, false),
+        [typeof(Extrusion)] = (V.MassProperties | V.BoundingBox, false),
+        [typeof(Mesh)] = (V.MassProperties | V.BoundingBox, true),
+        [typeof(PointCloud)] = (V.BoundingBox, true),
+    }.ToFrozenDictionary();
 
-    /// <summary>Centroid extraction via mass properties or bbox.</summary>
-    internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
-        (geometry, useMassProperties) switch {
-            (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Curve curve, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch {
-                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
-                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-            },
-            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-        };
+    private static Result<(V AdditionalPlaneMode, bool SupportsBestFit)> ResolveMetadata(GeometryBase geometry) =>
+        geometry is null
+            ? ResultFactory.Create<(V, bool)>(error: E.Geometry.UnsupportedOrientationType.WithContext("null"))
+            : TypeMetadata.TryGetValue(geometry.GetType(), out (V AdditionalPlaneMode, bool SupportsBestFit) direct)
+                ? ResultFactory.Create(value: direct)
+                : ((Func<Result<(V, bool)>>)(() => {
+                    KeyValuePair<Type, (V AdditionalPlaneMode, bool SupportsBestFit)> match = TypeMetadata.FirstOrDefault(pair => pair.Key.IsInstanceOfType(geometry));
+                    return match.Key is not null
+                        ? ResultFactory.Create(value: match.Value)
+                        : ResultFactory.Create<(V, bool)>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name));
+                }))();
 
-    /// <summary>Transform application with duplication and errors.</summary>
+    internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties, IGeometryContext context) =>
+        ResolveMetadata(geometry)
+            .Bind(_ => {
+                Type runtimeType = geometry.GetType();
+                V configuredMode;
+                V baseMode = OrientConfig.ValidationModes.TryGetValue(runtimeType, out configuredMode) ? configuredMode : V.Standard;
+                V validationMode = baseMode | (useMassProperties ? V.MassProperties : V.BoundingBox);
+
+                return ResultFactory.Create(value: geometry)
+                    .Validate(args: [context, validationMode,])
+                    .Bind(valid => (useMassProperties, valid) switch {
+                        (true, Curve curve) => ((Func<Result<Point3d>>)(() => {
+                            using AreaMassProperties? properties = AreaMassProperties.Compute(curve);
+                            return properties?.Centroid is Point3d centroid
+                                ? ResultFactory.Create(value: centroid)
+                                : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                        }))(),
+                        (true, Surface surface) => ((Func<Result<Point3d>>)(() => {
+                            using AreaMassProperties? properties = AreaMassProperties.Compute(surface);
+                            return properties?.Centroid is Point3d centroid
+                                ? ResultFactory.Create(value: centroid)
+                                : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                        }))(),
+                        (true, Brep brep) => (brep.IsSolid
+                            ? (Func<Result<Point3d>>)(() => {
+                                using VolumeMassProperties? properties = VolumeMassProperties.Compute(brep);
+                                return properties?.Centroid is Point3d centroid
+                                    ? ResultFactory.Create(value: centroid)
+                                    : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                            })
+                            : (Func<Result<Point3d>>)(() => {
+                                using AreaMassProperties? properties = AreaMassProperties.Compute(brep);
+                                return properties?.Centroid is Point3d centroid
+                                    ? ResultFactory.Create(value: centroid)
+                                    : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                            }))(),
+                        (true, Extrusion extrusion) => (extrusion.IsSolid
+                            ? (Func<Result<Point3d>>)(() => {
+                                using VolumeMassProperties? properties = VolumeMassProperties.Compute(extrusion);
+                                return properties?.Centroid is Point3d centroid
+                                    ? ResultFactory.Create(value: centroid)
+                                    : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                            })
+                            : extrusion.IsClosed(0) && extrusion.IsClosed(1)
+                                ? (Func<Result<Point3d>>)(() => {
+                                    using AreaMassProperties? properties = AreaMassProperties.Compute(extrusion);
+                                    return properties?.Centroid is Point3d centroid
+                                        ? ResultFactory.Create(value: centroid)
+                                        : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                                })
+                                : (Func<Result<Point3d>>)(() => extrusion.GetBoundingBox(accurate: true) switch {
+                                    BoundingBox box when box.IsValid => ResultFactory.Create(value: box.Center),
+                                    _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                                }))(),
+                        (true, Mesh mesh) => (mesh.IsClosed
+                            ? (Func<Result<Point3d>>)(() => {
+                                using VolumeMassProperties? properties = VolumeMassProperties.Compute(mesh);
+                                return properties?.Centroid is Point3d centroid
+                                    ? ResultFactory.Create(value: centroid)
+                                    : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                            })
+                            : (Func<Result<Point3d>>)(() => {
+                                using AreaMassProperties? properties = AreaMassProperties.Compute(mesh);
+                                return properties?.Centroid is Point3d centroid
+                                    ? ResultFactory.Create(value: centroid)
+                                    : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+                            }))(),
+                        (_, PointCloud cloud) => cloud.GetBoundingBox(accurate: true) switch {
+                            BoundingBox box when box.IsValid => ResultFactory.Create(value: box.Center),
+                            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                        },
+                        (false, GeometryBase geometryBase) => geometryBase.GetBoundingBox(accurate: true) switch {
+                            BoundingBox box when box.IsValid => ResultFactory.Create(value: box.Center),
+                            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+                        },
+                        _ => ResultFactory.Create<Point3d>(error: E.Geometry.UnsupportedOrientationType.WithContext(runtimeType.Name)),
+                    });
+            });
+
+    internal static Result<Plane> ExtractPlane(GeometryBase geometry, IGeometryContext context) =>
+        ResolveMetadata(geometry)
+            .Bind(metadata => {
+                Type runtimeType = geometry.GetType();
+                V configuredMode;
+                V baseMode = OrientConfig.ValidationModes.TryGetValue(runtimeType, out configuredMode) ? configuredMode : V.Standard;
+                V validationMode = baseMode | metadata.AdditionalPlaneMode;
+
+                return ResultFactory.Create(value: geometry)
+                    .Validate(args: [context, validationMode,])
+                    .Bind(valid => valid switch {
+                        Curve curve => curve.FrameAt(curve.Domain.Mid, out Plane frame) && frame.IsValid
+                            ? ResultFactory.Create(value: frame)
+                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+                        Surface surface => surface.FrameAt(surface.Domain(0).Mid, surface.Domain(1).Mid, out Plane frame) && frame.IsValid
+                            ? ResultFactory.Create(value: frame)
+                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+                        Brep brep => ((Func<Result<Plane>>)(() => {
+                            Vector3d normal = brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis;
+                            bool solid = brep.IsSolid;
+                            bool oriented = brep.SolidOrientation != BrepSolidOrientation.None;
+                            return (solid
+                                ? (Func<Result<Plane>>)(() => {
+                                    using VolumeMassProperties? properties = VolumeMassProperties.Compute(brep);
+                                    return properties?.Centroid is Point3d centroid
+                                        ? ResultFactory.Create(value: new Plane(centroid, normal))
+                                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                })
+                                : oriented
+                                    ? (Func<Result<Plane>>)(() => {
+                                        using AreaMassProperties? properties = AreaMassProperties.Compute(brep);
+                                        return properties?.Centroid is Point3d centroid
+                                            ? ResultFactory.Create(value: new Plane(centroid, normal))
+                                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                    })
+                                    : (Func<Result<Plane>>)(() => {
+                                        BoundingBox box = brep.GetBoundingBox(accurate: true);
+                                        return box.IsValid
+                                            ? ResultFactory.Create(value: new Plane(box.Center, normal))
+                                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                    }))();
+                        }))(),
+                        Extrusion extrusion => ((Func<Result<Plane>>)(() => {
+                            using LineCurve path = extrusion.PathLineCurve();
+                            Vector3d tangent = path.TangentAtStart;
+                            bool solid = extrusion.IsSolid;
+                            bool closed = extrusion.IsClosed(0) && extrusion.IsClosed(1);
+                            return (solid
+                                ? (Func<Result<Plane>>)(() => {
+                                    using VolumeMassProperties? properties = VolumeMassProperties.Compute(extrusion);
+                                    return properties?.Centroid is Point3d centroid
+                                        ? ResultFactory.Create(value: new Plane(centroid, tangent))
+                                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                })
+                                : closed
+                                    ? (Func<Result<Plane>>)(() => {
+                                        using AreaMassProperties? properties = AreaMassProperties.Compute(extrusion);
+                                        return properties?.Centroid is Point3d centroid
+                                            ? ResultFactory.Create(value: new Plane(centroid, tangent))
+                                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                    })
+                                    : (Func<Result<Plane>>)(() => {
+                                        BoundingBox box = extrusion.GetBoundingBox(accurate: true);
+                                        return box.IsValid
+                                            ? ResultFactory.Create(value: new Plane(box.Center, tangent))
+                                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                    }))();
+                        }))(),
+                        Mesh mesh => ((Func<Result<Plane>>)(() => {
+                            Vector3d normal = mesh.Normals.Count > 0 ? mesh.Normals[0] : Vector3d.ZAxis;
+                            bool solid = mesh.IsClosed;
+                            return (solid
+                                ? (Func<Result<Plane>>)(() => {
+                                    using VolumeMassProperties? properties = VolumeMassProperties.Compute(mesh);
+                                    return properties?.Centroid is Point3d centroid
+                                        ? ResultFactory.Create(value: new Plane(centroid, normal))
+                                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                })
+                                : (Func<Result<Plane>>)(() => {
+                                    using AreaMassProperties? properties = AreaMassProperties.Compute(mesh);
+                                    return properties?.Centroid is Point3d centroid
+                                        ? ResultFactory.Create(value: new Plane(centroid, normal))
+                                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                                }))();
+                        }))(),
+                        PointCloud cloud => cloud.Count > 0
+                            ? ResultFactory.Create(value: new Plane(cloud[0].Location, Vector3d.ZAxis))
+                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+                        _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(runtimeType.Name)),
+                    });
+            });
+
+    internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry, IGeometryContext context) =>
+        ResolveMetadata(geometry)
+            .Bind(metadata => metadata.SupportsBestFit
+                ? ((Func<Result<Plane>>)(() => {
+                    Type runtimeType = geometry.GetType();
+                    V configuredMode;
+                    V baseMode = OrientConfig.ValidationModes.TryGetValue(runtimeType, out configuredMode) ? configuredMode : V.Standard;
+                    V validationMode = baseMode | V.Degeneracy;
+
+                    return ResultFactory.Create(value: geometry)
+                        .Validate(args: [context, validationMode,])
+                        .Bind(valid => valid switch {
+                            Mesh mesh => mesh.Vertices.Count >= OrientConfig.BestFitMinPoints && Plane.FitPlaneToPoints(mesh.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
+                                ? ResultFactory.Create(value: plane)
+                                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+                            PointCloud cloud => cloud.Count >= OrientConfig.BestFitMinPoints && Plane.FitPlaneToPoints(cloud.GetPoints(), out Plane plane) == PlaneFitResult.Success
+                                ? ResultFactory.Create(value: plane)
+                                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+                            _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(runtimeType.Name)),
+                        });
+                }))()
+                : ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)));
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
-        (T)geometry.Duplicate() switch {
-            T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-        };
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform transform) where T : GeometryBase =>
+        ResolveMetadata(geometry)
+            .Bind(_ => {
+                GeometryBase? duplicate = geometry switch {
+                    Curve curve => (GeometryBase?)curve.DuplicateCurve(),
+                    Surface surface => surface.DuplicateSurface(),
+                    Brep brep => brep.DuplicateBrep(),
+                    Extrusion extrusion => extrusion.Duplicate(),
+                    Mesh mesh => mesh.DuplicateMesh(),
+                    PointCloud cloud => cloud.Duplicate(),
+                    _ => null,
+                };
 
-    /// <summary>Best-fit plane from point cloud or mesh via PCA.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
-        geometry switch {
-            PointCloud pc when pc.Count > 0 => Plane.FitPlaneToPoints(pc.GetPoints(), out Plane plane) == PlaneFitResult.Success
-                ? ResultFactory.Create(value: plane)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            Mesh m when m.Vertices.Count > 0 => Plane.FitPlaneToPoints(m.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
-                ? ResultFactory.Create(value: plane)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
-        };
+                return duplicate is null
+                    ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed)
+                    : duplicate.Transform(transform)
+                        ? duplicate is T typed
+                            ? ResultFactory.Create(value: (IReadOnlyList<T>)[typed,])
+                            : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name))
+                        : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed);
+            });
+
+    internal static Result<T> FlipGeometry<T>(T geometry) where T : GeometryBase =>
+        ResolveMetadata(geometry)
+            .Bind(_ => geometry switch {
+                Curve curve => ResultFactory.Create(value: curve.DuplicateCurve())
+                    .Bind(duplicate => duplicate is null
+                        ? ResultFactory.Create<T>(error: E.Geometry.TransformFailed)
+                        : duplicate.Reverse()
+                            ? duplicate is T typed
+                                ? ResultFactory.Create(value: typed)
+                                : ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name))
+                            : ResultFactory.Create<T>(error: E.Geometry.TransformFailed)),
+                Brep brep => ResultFactory.Create(value: brep.DuplicateBrep())
+                    .Bind(duplicate => duplicate is null
+                        ? ResultFactory.Create<T>(error: E.Geometry.TransformFailed)
+                        : ((Func<Result<T>>)(() => {
+                            duplicate.Flip();
+                            return duplicate is T typed
+                                ? ResultFactory.Create(value: typed)
+                                : ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name));
+                        }))()),
+                Extrusion extrusion => ResultFactory.Create(value: extrusion.ToBrep())
+                    .Bind(brep => brep is null
+                        ? ResultFactory.Create<T>(error: E.Geometry.TransformFailed)
+                        : ((Func<Result<T>>)(() => {
+                            brep.Flip();
+                            return Extrusion.TryGetExtrusion(brep, out Extrusion? extracted) && extracted is not null
+                                ? extracted is T typed
+                                    ? ResultFactory.Create(value: typed)
+                                    : ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name))
+                                : ResultFactory.Create<T>(error: E.Geometry.TransformFailed);
+                        }))()),
+                Mesh mesh => ResultFactory.Create(value: mesh.DuplicateMesh())
+                    .Bind(duplicate => duplicate is null
+                        ? ResultFactory.Create<T>(error: E.Geometry.TransformFailed)
+                        : ((Func<Result<T>>)(() => {
+                            duplicate.Flip(vertexNormals: true, faceNormals: true, faceOrientation: true);
+                            return duplicate is T typed
+                                ? ResultFactory.Create(value: typed)
+                                : ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name));
+                        }))()),
+                PointCloud cloud => ResultFactory.Create(value: cloud.Duplicate())
+                    .Bind(duplicate => duplicate is null
+                        ? ResultFactory.Create<T>(error: E.Geometry.TransformFailed)
+                        : duplicate is T typed
+                            ? ResultFactory.Create(value: typed)
+                            : ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name))),
+                _ => ResultFactory.Create<T>(error: E.Geometry.UnsupportedOrientationType.WithContext(typeof(T).Name)),
+            });
 }

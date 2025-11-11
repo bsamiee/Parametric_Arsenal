@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -58,140 +59,197 @@ public static class Orient {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToPlane<T>(T geometry, Plane target, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> ToPlane<T>(T geometry, Plane target, IGeometryContext context) where T : GeometryBase {
+        Result<Plane> validatedTarget = ResultFactory.Create(value: target)
+            .Ensure(plane => plane.IsValid, error: E.Geometry.InvalidOrientationPlane);
+
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? extractor) ? extractor(item)
-                    : OrientCore.PlaneExtractors.FirstOrDefault(kv => kv.Key.IsInstanceOfType(item)).Value?.Invoke(item)
-                    ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
-                .Bind(src => !target.IsValid
-                    ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
-                    : OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target)))),
+                validatedTarget.Bind(targetPlane =>
+                    OrientCore.ExtractPlane(item, context)
+                        .Bind(source => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(source, targetPlane))))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+                ValidationMode = baseMode,
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToCanonical<T>(T geometry, Canonical mode, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> ToCanonical<T>(T geometry, Canonical mode, IGeometryContext context) where T : GeometryBase {
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                ((mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
-                    (1, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox box) => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)),
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => ((Func<Result<IReadOnlyList<T>>>)(() => {
+                Type runtimeType = item.GetType();
+                V runtimeConfigured;
+                V runtimeMode = OrientConfig.ValidationModes.TryGetValue(runtimeType, out runtimeConfigured) ? runtimeConfigured : V.Standard;
+                Result<BoundingBox> bounding = ResultFactory.Create(value: item)
+                    .Validate(args: [context, runtimeMode | V.BoundingBox,])
+                    .Map(valid => valid.GetBoundingBox(accurate: true))
+                    .Bind(box => box.IsValid
+                        ? ResultFactory.Create(value: box)
+                        : ResultFactory.Create<BoundingBox>(error: E.Validation.BoundingBoxInvalid));
+
+                Result<Transform> transform = mode.Mode switch {
+                    1 => bounding.Bind(box => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY))),
+                    2 => bounding.Bind(box => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ))),
+                    3 => bounding.Bind(box => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis)))),
+                    4 => bounding.Bind(box => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center))),
+                    5 => OrientCore.ExtractCentroid(item, useMassProperties: true, context).Map(centroid => Transform.Translation(Point3d.Origin - centroid)),
                     _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
-                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
+                };
+
+                return transform.Bind(xform => OrientCore.ApplyTransform(item, xform));
+            }))()),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
-            }).Map(r => r[0]);
+                ValidationMode = baseMode | (mode.Mode is 5 ? V.MassProperties : V.BoundingBox),
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToPoint<T>(T geometry, Point3d target, bool useMass, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> ToPoint<T>(T geometry, Point3d target, bool useMass, IGeometryContext context) where T : GeometryBase {
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                OrientCore.ExtractCentroid(item, useMassProperties: useMass)
-                    .Map(c => Transform.Translation(target - c))
-                    .Bind(x => OrientCore.ApplyTransform(item, x))),
+                OrientCore.ExtractCentroid(item, useMassProperties: useMass, context)
+                    .Map(centroid => Transform.Translation(target - centroid))
+                    .Bind(transform => OrientCore.ApplyTransform(item, transform))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
-            }).Map(r => r[0]);
+                ValidationMode = baseMode | (useMass ? V.MassProperties : V.BoundingBox),
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, Point3d? anchor, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
-                        ((Func<Result<Transform>>)(() => {
-                            Vector3d su = new(s);
-                            Vector3d tu = new(t);
-                            // The outer 'when' clause guarantees Unitize will succeed.
-                            _ = su.Unitize();
-                            _ = tu.Unitize();
-                            Point3d pt = anchor ?? box.Center;
+    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, Point3d? anchor, IGeometryContext context) where T : GeometryBase {
+        Result<Vector3d> resolvedSource = ResultFactory.Create(value: source ?? Vector3d.ZAxis)
+            .Ensure(vector => vector.IsValid, error: E.Geometry.InvalidOrientationVectors)
+            .Ensure(vector => vector.Length > OrientConfig.MinVectorLength, error: E.Geometry.InvalidOrientationVectors)
+            .Bind(vector => {
+                Vector3d normalized = vector;
+                return normalized.Unitize()
+                    ? ResultFactory.Create(value: normalized)
+                    : ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidOrientationVectors);
+            });
 
-                            return Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
-                                ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
-                                    ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
-                                    : ResultFactory.Create(value: Transform.Identity)
-                                : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
-                        }))(),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
-                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
+        Result<Vector3d> resolvedTarget = ResultFactory.Create(value: target)
+            .Ensure(vector => vector.IsValid, error: E.Geometry.InvalidOrientationVectors)
+            .Ensure(vector => vector.Length > OrientConfig.MinVectorLength, error: E.Geometry.InvalidOrientationVectors)
+            .Bind(vector => {
+                Vector3d normalized = vector;
+                return normalized.Unitize()
+                    ? ResultFactory.Create(value: normalized)
+                    : ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidOrientationVectors);
+            });
+
+        return UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => ((Func<Result<IReadOnlyList<T>>>)(() => {
+                Type runtimeType = item.GetType();
+                V runtimeConfigured;
+                V runtimeMode = OrientConfig.ValidationModes.TryGetValue(runtimeType, out runtimeConfigured) ? runtimeConfigured : V.Standard;
+                Result<Point3d> anchorPoint = anchor.HasValue
+                    ? ResultFactory.Create(value: anchor.Value)
+                    : ResultFactory.Create(value: item)
+                        .Validate(args: [context, runtimeMode | V.BoundingBox,])
+                        .Map(valid => valid.GetBoundingBox(accurate: true))
+                        .Bind(box => box.IsValid
+                            ? ResultFactory.Create(value: box.Center)
+                            : ResultFactory.Create<Point3d>(error: E.Validation.BoundingBoxInvalid));
+
+                Result<Transform> transform = resolvedSource.Bind(sourceVector =>
+                    resolvedTarget.Bind(targetVector =>
+                        anchorPoint.Bind(anchorValue => Vector3d.CrossProduct(sourceVector, targetVector).Length < OrientConfig.ParallelThreshold
+                            ? Math.Abs((sourceVector * targetVector) + 1.0) < OrientConfig.ParallelThreshold
+                                ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
+                                : ResultFactory.Create(value: Transform.Identity)
+                            : ResultFactory.Create(value: Transform.Rotation(sourceVector, targetVector, anchorValue)))));
+
+                return transform.Bind(xform => OrientCore.ApplyTransform(item, xform));
+            }))()),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = V.Standard,
-            }).Map(r => r[0]);
+                ValidationMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out V configuredMode) ? configuredMode : V.Standard,
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToBestFit<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> ToBestFit<T>(T geometry, IGeometryContext context) where T : GeometryBase {
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                OrientCore.ExtractBestFitPlane(item)
+                OrientCore.ExtractBestFitPlane(item, context)
                     .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = V.Standard,
-            }).Map(r => r[0]);
+                ValidationMode = baseMode | V.Degeneracy,
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase {
+        Result<Plane> validatedPlane = ResultFactory.Create(value: plane)
+            .Ensure(p => p.IsValid, error: E.Geometry.InvalidOrientationPlane);
+
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                plane.IsValid
-                    ? OrientCore.ApplyTransform(item, Transform.Mirror(plane))
-                    : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
+                validatedPlane.Bind(targetPlane => OrientCore.ApplyTransform(item, Transform.Mirror(targetPlane)))),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+                ValidationMode = baseMode,
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> FlipDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
+    public static Result<T> FlipDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase {
+        V configuredMode;
+        V baseMode = OrientConfig.ValidationModes.TryGetValue(typeof(T), out configuredMode) ? configuredMode : V.Standard;
+
+        return UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                item.Duplicate() switch {
-                    Curve c when c.Reverse() => ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)c,]),
-                    Brep b => ((Func<Result<IReadOnlyList<T>>>)(() => { b.Flip(); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)b,]); }))(),
-                    Extrusion e => e.ToBrep() switch {
-                        Brep br => ((Func<Result<IReadOnlyList<T>>>)(() => { br.Flip(); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)br,]); }))(),
-                        _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                    },
-                    Mesh m => ((Func<Result<IReadOnlyList<T>>>)(() => { m.Flip(vertexNormals: true, faceNormals: true, faceOrientation: true); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)m,]); }))(),
-                    null => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)),
-                }),
+                OrientCore.FlipGeometry(item)
+                    .Map(result => (IReadOnlyList<T>)[result,])),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+                ValidationMode = baseMode,
+            }).Map(result => result[0]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Apply<T>(T geometry, OrientSpec spec, IGeometryContext context) where T : GeometryBase =>
         (spec.TargetPlane, spec.TargetPoint, spec.TargetVector, spec.TargetCurve, spec.TargetSurface) switch {
             (null, null, null, null, null) => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
-            (Plane p, null, null, null, null) when p != default => ToPlane(geometry, p, context),
-            (null, Point3d pt, null, null, null) when pt != default => ToPoint(geometry, pt, useMass: false, context),
-            (null, null, Vector3d v, null, null) when v != default => ToVector(geometry, v, source: null, anchor: null, context),
-            (null, null, null, Curve c, null) => c.FrameAt(spec.CurveParameter, out Plane f) && f.IsValid
-                ? ToPlane(geometry, f, context)
-                : ResultFactory.Create<T>(error: E.Geometry.InvalidCurveParameter),
-            (null, null, null, null, Surface s) => s.FrameAt(spec.SurfaceUV.u, spec.SurfaceUV.v, out Plane f) && f.IsValid
-                ? ToPlane(geometry, f, context)
-                : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV),
+            (Plane targetPlane, null, null, null, null) => ToPlane(geometry, targetPlane, context),
+            (null, Point3d targetPoint, null, null, null) => ToPoint(geometry, targetPoint, useMass: false, context),
+            (null, null, Vector3d targetVector, null, null) => ToVector(geometry, targetVector, source: null, anchor: null, context),
+            (null, null, null, Curve curve, null) => ResultFactory.Create(value: curve)
+                .Validate(args: [context, OrientConfig.ValidationModes.TryGetValue(curve.GetType(), out V curveMode) ? curveMode : V.Standard,])
+                .Bind(validCurve => validCurve.FrameAt(spec.CurveParameter, out Plane frame) && frame.IsValid
+                    ? ToPlane(geometry, frame, context)
+                    : ResultFactory.Create<T>(error: E.Geometry.InvalidCurveParameter)),
+            (null, null, null, null, Surface surface) => ResultFactory.Create(value: surface)
+                .Validate(args: [context, OrientConfig.ValidationModes.TryGetValue(surface.GetType(), out V surfaceMode) ? surfaceMode : V.Standard,])
+                .Bind(validSurface => validSurface.FrameAt(spec.SurfaceUV.u, spec.SurfaceUV.v, out Plane frame) && frame.IsValid
+                    ? ToPlane(geometry, frame, context)
+                    : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV)),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
         };
 
