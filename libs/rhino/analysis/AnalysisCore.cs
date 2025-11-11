@@ -125,8 +125,12 @@ internal static class AnalysisCore {
             ? UnifiedOperation.Apply(
                 geometry,
                 (Func<object, Result<IReadOnlyList<Analysis.IResult>>>)(item =>
-                    strategy.compute(item, context, t, uv, index, testPoint, derivativeOrder)
-                        .Map(result => (IReadOnlyList<Analysis.IResult>)[result])),
+                    item
+                        .Validate(context: context, mode: strategy.mode)
+                        .Bind(valid =>
+                            strategy.compute(valid, context, t, uv, index, testPoint, derivativeOrder)
+                                .Map(result => (IReadOnlyList<Analysis.IResult>)[result])
+                        )),
                 new OperationConfig<object, Analysis.IResult> {
                     Context = context,
                     ValidationMode = strategy.mode,
