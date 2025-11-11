@@ -42,11 +42,13 @@ internal static class OrientCompute {
                                         ? (xf, criteria switch {
                                             1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
                                             2 => vmp is not null && testBox.Diagonal.Length > tolerance ? Math.Max(0.0, 1.0 - (Math.Abs(testBox.Center.Z - vmp.Centroid.Z) / testBox.Diagonal.Length)) : 0.0,
-                                            3 => testBox.IsDegenerate(tolerance) is int deg ? deg switch {
-                                                0 => 0.0,
-                                                >= 1 and <= 3 => deg / 3.0,
-                                                _ => 0.0,
-                                            } : 0.0,
+                                            3 => ((Math.Abs(testBox.Max.X - testBox.Min.X) <= tolerance ? 1 : 0)
+                                                + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
+                                                + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
+                                                    0 => 0.0,
+                                                    int degeneracy and >= 1 and <= 3 => degeneracy / 3.0,
+                                                    _ => 0.0,
+                                                },
                                             4 => (testBox.Min.Z >= -tolerance ? OrientConfig.OrientationScoreWeight1 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientConfig.OrientationScoreWeight2 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientConfig.LowProfileAspectRatio) ? OrientConfig.OrientationScoreWeight3 : 0.0),
                                             _ => 0.0,
                                         }, criteria is >= 1 and <= 4 ? [criteria,] : Array.Empty<byte>())
