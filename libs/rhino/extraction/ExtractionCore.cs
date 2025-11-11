@@ -96,13 +96,14 @@ internal static class ExtractionCore {
                 ? ResultFactory.Create(value: [.. from int u in Enumerable.Range(0, controlPoints.CountU) from int v in Enumerable.Range(0, controlPoints.CountV) let greville = controlPoints.GetGrevillePoint(u, v) select nurbsSurface.PointAt(greville.X, greville.Y),])
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("NURBS surface Greville extraction failed")),
             [(3, typeof(Curve))] = static (geometry, _, _) => geometry is Curve curve && curve.ToNurbsCurve() is NurbsCurve nurbs
-                ? ((Func<NurbsCurve, Result<Point3d[]>>)(n => {
-                    try {
-                        return n.GrevillePoints() is Point3d[] greville ? ResultFactory.Create(value: greville) : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Greville extraction failed"));
-                    } finally {
-                        n.Dispose();
+                ? (
+                    using (nurbs)
+                    {
+                        return nurbs.GrevillePoints() is Point3d[] greville
+                            ? ResultFactory.Create(value: greville)
+                            : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Greville extraction failed"));
                     }
-                }))(nurbs)
+                )
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Unable to convert curve to NURBS")),
             [(3, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && surface.ToNurbsSurface() is NurbsSurface nurbs && nurbs.Points is not null
                 ? ((Func<NurbsSurface, Result<Point3d[]>>)(n => {
