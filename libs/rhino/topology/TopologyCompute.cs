@@ -127,7 +127,7 @@ internal static class TopologyCompute {
 
                     return bestHealed is Brep healed
                         ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, bestStrategy, bestNakedEdges < originalNakedEdges))
-                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext(string.Create(CultureInfo.InvariantCulture, $"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed")));
+                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed"));
                 }))());
 
     [Pure]
