@@ -49,7 +49,6 @@ internal static class AnalysisCompute {
                     .ToArray();
                 double[] curvatures = samples.Select(s => s.Curvature.Length).ToArray();
                 return samples.Length > 2
-                    && curvatures.Length > 2
                     && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
                     && validCurve.GetLength() is double curveLength
                     ? ResultFactory.Create(value: (
