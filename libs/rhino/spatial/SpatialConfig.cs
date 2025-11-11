@@ -1,5 +1,7 @@
 using System.Collections.Frozen;
 using Arsenal.Core.Context;
+using Arsenal.Core.Errors;
+using Arsenal.Core.Results;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -15,27 +17,67 @@ internal static class SpatialConfig {
     internal const double MedialAxisOffsetMultiplier = 10.0;
     internal const int DBSCANRTreeThreshold = 100;
 
-    /// <summary>Type extractors: polymorphic dispatch for centroid, RTree factory, etc.</summary>
-    internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
-        new Dictionary<(string, Type), Func<object, object>> {
-            // Centroid extraction via mass properties
-            [("Centroid", typeof(Curve))] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Surface))] = static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Brep))] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Mesh))] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(GeometryBase))] = static g => g is GeometryBase gb ? gb.GetBoundingBox(accurate: false).Center : Point3d.Origin,
-            // RTree factory construction
-            [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
-            [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
-            [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            // Clustering algorithm dispatch
-            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
-                ? alg switch {
-                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
-                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
-                    2 => SpatialCompute.HierarchicalAssign(pts, k),
-                    _ => [],
-                }
-                : [],
+    /// <summary>Mass-property centroid extractors keyed by geometry type hierarchy.</summary>
+    internal static readonly FrozenDictionary<Type, Func<GeometryBase, Result<Point3d>>> CentroidExtractors =
+        new Dictionary<Type, Func<GeometryBase, Result<Point3d>>> {
+            [typeof(Curve)] = static geometry => geometry switch {
+                Curve { IsValid: true } curve => AreaMassProperties.Compute(curve) switch {
+                    { Centroid: { IsValid: true } centroid } => ResultFactory.Create(value: centroid),
+                    _ => ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext("Curve centroid invalid")),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(Surface)] = static geometry => geometry switch {
+                Surface { IsValid: true } surface => AreaMassProperties.Compute(surface) switch {
+                    { Centroid: { IsValid: true } centroid } => ResultFactory.Create(value: centroid),
+                    _ => ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext("Surface centroid invalid")),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(Brep)] = static geometry => geometry switch {
+                Brep { IsValid: true } brep => VolumeMassProperties.Compute(brep) switch {
+                    { Centroid: { IsValid: true } centroid } => ResultFactory.Create(value: centroid),
+                    _ => ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext("Brep centroid invalid")),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(Mesh)] = static geometry => geometry switch {
+                Mesh { IsValid: true } mesh => VolumeMassProperties.Compute(mesh) switch {
+                    { Centroid: { IsValid: true } centroid } => ResultFactory.Create(value: centroid),
+                    _ => ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext("Mesh centroid invalid")),
+                },
+                _ => ResultFactory.Create<Point3d>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(GeometryBase)] = static geometry => geometry switch {
+                GeometryBase { IsValid: true } baseGeometry => ResultFactory.Create(value: baseGeometry.GetBoundingBox(accurate: true).Center),
+                _ => ResultFactory.Create<Point3d>(error: E.Validation.GeometryInvalid),
+            },
+        }.ToFrozenDictionary();
+
+    /// <summary>RTree factories with validation-aware result creation.</summary>
+    internal static readonly FrozenDictionary<Type, Func<object, IGeometryContext, Result<RTree>>> RTreeFactories =
+        new Dictionary<Type, Func<object, IGeometryContext, Result<RTree>>> {
+            [typeof(Point3d[])] = static (source, _) => source switch {
+                Point3d[] points when points.Length > 0 => ResultFactory.Create(value: RTree.CreateFromPointArray(points) ?? new RTree()),
+                Point3d[] => ResultFactory.Create(value: new RTree()),
+                _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(PointCloud)] = static (source, _) => source switch {
+                PointCloud { Count: > 0 } cloud => ResultFactory.Create(value: RTree.CreatePointCloudTree(cloud) ?? new RTree()),
+                PointCloud => ResultFactory.Create(value: new RTree()),
+                _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
+            },
+            [typeof(Mesh)] = static (source, _) => source switch {
+                Mesh { IsValid: true } mesh => ResultFactory.Create(value: RTree.CreateMeshFaceTree(mesh) ?? new RTree()),
+                _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
+            },
+        }.ToFrozenDictionary();
+
+    /// <summary>Cluster assignment dispatch keyed by algorithm identifier.</summary>
+    internal static readonly FrozenDictionary<byte, Func<(Point3d[] Points, int K, double Epsilon, IGeometryContext Context), Result<int[]>>> ClusterAssigners =
+        new Dictionary<byte, Func<(Point3d[] Points, int K, double Epsilon, IGeometryContext Context), Result<int[]>>> {
+            [0] = static parameters => ResultFactory.Create(value: SpatialCompute.KMeansAssign(parameters.Points, parameters.K, parameters.Context.AbsoluteTolerance, KMeansMaxIterations)),
+            [1] = static parameters => ResultFactory.Create(value: SpatialCompute.DBSCANAssign(parameters.Points, parameters.Epsilon, DBSCANMinPoints)),
+            [2] = static parameters => ResultFactory.Create(value: SpatialCompute.HierarchicalAssign(parameters.Points, parameters.K)),
         }.ToFrozenDictionary();
 }
