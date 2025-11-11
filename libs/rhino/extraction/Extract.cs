@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -49,10 +47,10 @@ public static class Extract {
         internal readonly V ValidationMode;
 
         internal Request(byte kind, object? parameter, bool includeEnds, V validationMode) {
-            Kind = kind;
-            Parameter = parameter;
-            IncludeEnds = includeEnds;
-            ValidationMode = validationMode;
+            this.Kind = kind;
+            this.Parameter = parameter;
+            this.IncludeEnds = includeEnds;
+            this.ValidationMode = validationMode;
         }
     }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -61,17 +59,17 @@ public static class Extract {
 
         Result<Request> requestResult = (spec, context.AbsoluteTolerance) switch {
             (int count, _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            (int count, _) => ResultFactory.Create(value: new Request(10, count, true, ExtractionConfig.GetValidationMode(10, geometryType))),
+            (int count, double tolerance) => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
             ((int count, bool include), _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            ((int count, bool include), _) => ResultFactory.Create(value: new Request(10, count, include, ExtractionConfig.GetValidationMode(10, geometryType))),
+            ((int count, bool include), double tolerance) => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
             (double length, _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
-            (double length, _) => ResultFactory.Create(value: new Request(11, length, true, ExtractionConfig.GetValidationMode(11, geometryType))),
+            (double length, double tolerance) => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
             ((double length, bool include), _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
-            ((double length, bool include), _) => ResultFactory.Create(value: new Request(11, length, include, ExtractionConfig.GetValidationMode(11, geometryType))),
+            ((double length, bool include), double tolerance) => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
             (Vector3d direction, double tolerance) when direction.Length <= tolerance => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection),
-            (Vector3d direction, _) => ResultFactory.Create(value: new Request(12, direction, true, ExtractionConfig.GetValidationMode(12, geometryType))),
-            (Continuity continuity, _) => ResultFactory.Create(value: new Request(13, continuity, true, ExtractionConfig.GetValidationMode(13, geometryType))),
-            (Semantic semantic, _) => ResultFactory.Create(value: new Request(semantic.Kind, null, true, ExtractionConfig.GetValidationMode(semantic.Kind, geometryType))),
+            (Vector3d direction, double tolerance) => ResultFactory.Create(value: new Request(kind: 12, parameter: direction, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(12, geometryType))),
+            (Continuity continuity, double tolerance) => ResultFactory.Create(value: new Request(kind: 13, parameter: continuity, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(13, geometryType))),
+            (Semantic semantic, double tolerance) => ResultFactory.Create(value: new Request(kind: semantic.Kind, parameter: null, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(semantic.Kind, geometryType))),
             _ => ResultFactory.Create<Request>(error: E.Geometry.InvalidExtraction),
         };
 
