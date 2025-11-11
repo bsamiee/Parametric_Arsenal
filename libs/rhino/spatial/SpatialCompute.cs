@@ -1,11 +1,8 @@
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -13,73 +10,53 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Point3d> Centroid(int[] indices, Point3d[] points) {
-        if (indices.Length == 0) {
-            return ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext("Cluster with zero members"));
-        }
-
-        double sumX = 0.0;
-        double sumY = 0.0;
-        double sumZ = 0.0;
-        for (int i = 0; i < indices.Length; i++) {
-            sumX += points[indices[i]].X;
-            sumY += points[indices[i]].Y;
-            sumZ += points[indices[i]].Z;
-        }
-
-        return ResultFactory.Create(value: new Point3d(sumX / indices.Length, sumY / indices.Length, sumZ / indices.Length));
-    }
+    private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
+        indices.ToArray() is { Length: > 0 } arr
+            ? ((Func<Point3d>)(() => {
+                double sumX = 0.0;
+                double sumY = 0.0;
+                double sumZ = 0.0;
+                for (int i = 0; i < arr.Length; i++) {
+                    sumX += pts[arr[i]].X;
+                    sumY += pts[arr[i]].Y;
+                    sumZ += pts[arr[i]].Z;
+                }
+                return new Point3d(sumX / arr.Length, sumY / arr.Length, sumZ / arr.Length);
+            }))()
+            : Point3d.Origin;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Point3d> ExtractCentroid(GeometryBase geometry) {
-        Type? current = geometry.GetType();
-        while (current is not null) {
-            switch (SpatialConfig.CentroidExtractors.TryGetValue(current, out Func<GeometryBase, Result<Point3d>> extractor)) {
-                case true:
-                    return extractor(geometry);
-            }
-            current = current.BaseType;
-        }
-
-        return ResultFactory.Create<Point3d>(error: E.Spatial.ClusteringFailed.WithContext($"Unsupported centroid type: {geometry.GetType().Name}"));
+    private static Point3d ExtractCentroid(GeometryBase g) {
+        Type gType = g.GetType();
+        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
+            ? (Point3d)exactExtractor(g)
+            : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(g)).Value is Func<object, object> fallbackExtractor
+                ? (Point3d)fallbackExtractor(g)
+                : g.GetBoundingBox(accurate: false).Center;
     }
 
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        ResultFactory.Create(value: (Geometry: geometry, Algorithm: algorithm, K: k, Epsilon: epsilon))
-            .Ensure(data => data.Geometry.Length > 0, error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
-            .Ensure(data => data.Algorithm <= 2, error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {data.Algorithm}"))
-            .Ensure(data => !(data.Algorithm is 0 or 2) || data.K > 0, error: E.Spatial.InvalidClusterK)
-            .Ensure(data => data.Algorithm is not 1 || data.Epsilon > context.AbsoluteTolerance, error: E.Spatial.InvalidEpsilon)
-            .Bind(data => ResultFactory.Create(value: data.Geometry)
-                .Traverse(item => ResultFactory.Create(value: (GeometryBase)item).Validate(args: [context, V.Standard | V.Topology,]))
-                .Map(valid => (data, Items: valid.ToArray())))
-            .Bind(payload => ClusterInternal(geometry: payload.Items, algorithm: payload.data.Algorithm, k: payload.data.K, epsilon: payload.data.Epsilon, context: context));
+        geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
+            : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
+            : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
+            : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
+            : ClusterInternal(geometry: geometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context);
 
-    private static Result<(Point3d, double[])[]> ClusterInternal(GeometryBase[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) =>
-        ResultFactory.Create(value: geometry)
-            .Traverse(ExtractCentroid)
-            .Map(validCentroids => validCentroids.ToArray())
-            .Bind(points =>
-                (algorithm is 0 or 2) && k > points.Length
-                    ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.ClusterAssigners.TryGetValue(algorithm, out Func<(Point3d[] Points, int K, double Epsilon, IGeometryContext Context), Result<int[]>> assigner)
-                        ? assigner((points, k, epsilon, context)).Bind(assignments => assignments.Length > 0
-                            ? BuildClusters(points: points, assignments: assignments, algorithm: algorithm, requestedK: k)
-                            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Empty assignments")))
-                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed));
-
-    private static Result<(Point3d, double[])[]> BuildClusters(Point3d[] points, int[] assignments, byte algorithm, int requestedK) {
-        int clusterCount = algorithm == 1 ? assignments.Where(index => index >= 0).DefaultIfEmpty(-1).Max() + 1 : requestedK;
-        return clusterCount <= 0
-            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Non-positive cluster count"))
-            : ResultFactory.Create(value: Enumerable.Range(0, clusterCount))
-                .Traverse(cluster => {
-                    int[] members = [.. Enumerable.Range(0, points.Length).Where(index => assignments[index] == cluster),];
-                    return members.Length == 0
-                        ? ResultFactory.Create<(Point3d, double[])>(error: E.Spatial.ClusteringFailed.WithContext("Empty cluster"))
-                        : Centroid(members, points).Map(center => (center, [.. members.Select(index => points[index].DistanceTo(center)),]));
-                })
-                .Map(clusters => clusters.ToArray());
+    private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
+        Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
+        return (algorithm is 0 or 2) && k > pts.Length
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
+            : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
+                ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
+                    ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
+                        int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
+                        Point3d centroid = members.Length > 0 ? Centroid(members, pts) : Point3d.Origin;
+                        double[] distances = members.Length > 0 ? [.. members.Select(i => pts[i].DistanceTo(centroid)),] : [];
+                        return (centroid, distances);
+                    }),
+                    ])
+                    : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
+                : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
     }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
@@ -105,7 +82,9 @@ internal static class SpatialCompute {
                 sum += distSq[j];
             }
 
-            if (sum > tol && sum > 0.0) {
+            if (sum <= tol || sum <= 0.0) {
+                centroids[i] = pts[rng.Next(pts.Length)];
+            } else {
                 double target = rng.NextDouble() * sum;
                 double cumulative = 0.0;
                 int selectedIdx = pts.Length - 1;
@@ -117,15 +96,12 @@ internal static class SpatialCompute {
                     }
                 }
                 centroids[i] = pts[selectedIdx];
-                continue;
             }
-
-            centroids[i] = pts[rng.Next(pts.Length)];
         }
 
         // Lloyd's algorithm with hot-path optimization
         for (int iter = 0; iter < maxIter; iter++) {
-            // Assign to nearest centroid (hot path with for loops)
+            // Assign to nearest centroid (hot path - use for loops)
             for (int i = 0; i < pts.Length; i++) {
                 int nearest = 0;
                 double minDist = pts[i].DistanceTo(centroids[0]);
@@ -163,7 +139,7 @@ internal static class SpatialCompute {
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
 
-        // Use RTree for large sets (O(log n) vs O(n) linear scan)
+        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
         int[] GetNeighbors(int idx) {
@@ -227,26 +203,23 @@ internal static class SpatialCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
-        ResultFactory.Create(value: brep)
-            .Validate(args: [context, V.Standard | V.Topology,])
-            .Bind(validBrep => validBrep.Faces.Count is 0
-                ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
-                : (validBrep.Faces.Count is 1 && validBrep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), validBrep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
-                    (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
-                    (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
-                    (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve joined && joined.IsClosed && joined.TryGetPlane(out Plane plane, tolerance: tolerance) && joined.Offset(plane: plane, distance: tolerance * SpatialConfig.MedialAxisOffsetMultiplier, tolerance: tolerance, CurveOffsetCornerStyle.Sharp) is { Length: > 0 } offsets && offsets.All(o => o?.IsValid is true) => ResultFactory.Create(value: (offsets, offsets.Select(static c => c.GetLength()).ToArray())),
-                    _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
-                });
+        brep.Faces.Count is 0
+            ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
+            : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
+                (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
+                (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
+                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve joined && joined.IsClosed && joined.TryGetPlane(out Plane plane, tolerance: tolerance) && joined.Offset(plane: plane, distance: tolerance * SpatialConfig.MedialAxisOffsetMultiplier, tolerance: tolerance, CurveOffsetCornerStyle.Sharp) is { Length: > 0 } offsets && offsets.All(o => o?.IsValid is true) => ResultFactory.Create(value: (offsets, offsets.Select(static c => c.GetLength()).ToArray())),
+                _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Not closed planar or offset failed")),
+            };
 
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
-        ResultFactory.Create(value: (Geometry: geometry, Direction: direction, MaxDistance: maxDist, AngleWeight: angleWeight))
-            .Ensure(data => data.Geometry.Length > 0, error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry"))
-            .Ensure(data => data.Direction.Length > context.AbsoluteTolerance, error: E.Spatial.ZeroLengthDirection)
-            .Ensure(data => data.MaxDistance > context.AbsoluteTolerance, error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
-            .Bind(data => ResultFactory.Create(value: data.Geometry)
-                .Traverse(item => ResultFactory.Create(value: item).Validate(args: [context, V.Standard | V.BoundingBox,]))
-                .Map(valid => (data, Items: valid.ToArray())))
-            .Bind(payload => ProximityFieldCompute(geometry: payload.Items, direction: payload.data.Direction, maxDist: payload.data.MaxDistance, angleWeight: payload.data.AngleWeight, context: context));
+        geometry.Length is 0
+            ? ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry"))
+            : direction.Length <= context.AbsoluteTolerance
+                ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection)
+                : maxDist <= context.AbsoluteTolerance
+                    ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
+                    : ProximityFieldCompute(geometry: geometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context);
 
     private static Result<(int, double, double)[]> ProximityFieldCompute(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {
         using RTree tree = new();
@@ -316,7 +289,7 @@ internal static class SpatialCompute {
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Spatial.CollinearPoints);
+            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -333,7 +306,7 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
-                : ResultFactory.Create<int[][]>(error: E.Spatial.CoplanarPoints);
+                : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
