@@ -117,11 +117,9 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Inflection computation failed")),
             [(4, typeof(Curve))] = static (geometry, _, _) => geometry is Curve curve && curve.ToNurbsCurve() is NurbsCurve nurbs
                 ? ((Func<NurbsCurve, Result<Point3d[]>>)(n => {
-                    try {
+                    using (n) {
                         Point3d[]? inflections = n.InflectionPoints();
                         return inflections is not null ? ResultFactory.Create(value: inflections) : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Inflection computation failed"));
-                    } finally {
-                        n.Dispose();
                     }
                 }))(nurbs)
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Unable to convert curve to NurbsCurve")),
