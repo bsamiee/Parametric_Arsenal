@@ -152,25 +152,24 @@ internal static class OrientCompute {
                         Result<Point3d>[] centroidResults = [.. validGeometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)),];
                         return centroidResults.All(r => r.IsSuccess)
                             ? centroidResults.Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen && avgLen > context.AbsoluteTolerance
-                                ? deltas.Length > 0 && new Vector3d(deltas[0]) is Vector3d baseVector && baseVector.Unitize() && deltas.All(v =>
-                                    new Vector3d(v) is Vector3d direction && direction.Unitize()
-                                        && Vector3d.VectorAngle(direction, baseVector) <= context.AngleToleranceRadians
-                                        && Math.Abs(v.Length - avgLen) / avgLen < context.AbsoluteTolerance)
+                                ? deltas.Length > 0 && new Vector3d(deltas[0]) is Vector3d baseVector && baseVector.Unitize()
+                                    && deltas.Select(v => new Vector3d(v)).Select(direction => { direction.Unitize(); return direction; }).ToArray() is Vector3d[] unitizedDirections
+                                    && unitizedDirections.All(direction =>
+                                        Vector3d.VectorAngle(direction, baseVector) <= context.AngleToleranceRadians
+                                        && Math.Abs(direction.Length - avgLen) / avgLen < context.AbsoluteTolerance)
                                     ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (0,
                                         [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Translation(baseVector * (avgLen * i))),],
-                                        [.. deltas.Select((vector, index) => {
-                                            Vector3d candidate = new(vector);
-                                            bool success = candidate.Unitize();
-                                            double angleDifference = success ? Vector3d.VectorAngle(candidate, baseVector) : double.PositiveInfinity;
-                                            return (vector, index, angleDifference);
+                                        [.. unitizedDirections.Select((direction, index) => {
+                                            double angleDifference = Vector3d.VectorAngle(direction, baseVector);
+                                            return (vector: deltas[index], index, angleDifference);
                                         }).Where(entry =>
                                             Math.Abs(entry.vector.Length - avgLen) / avgLen >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)
                                             || entry.angleDifference > (context.AngleToleranceRadians * OrientConfig.PatternAnomalyThreshold)).Select(entry => entry.index),],
                                         deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length
-                                            + deltas.Select(v => {
-                                                Vector3d normalized = new(v);
-                                                return normalized.Unitize() ? Vector3d.VectorAngle(normalized, baseVector) : double.NaN;
-                                            }).Where(angle => !double.IsNaN(angle)).DefaultIfEmpty(0.0).Average()))
+                                            + unitizedDirections.Select(direction => {
+                                                double angle = Vector3d.VectorAngle(direction, baseVector);
+                                                return double.IsNaN(angle) ? 0.0 : angle;
+                                            }).DefaultIfEmpty(0.0).Average()))
                                     : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > context.AbsoluteTolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < context.AbsoluteTolerance)
                                         ? centroids.Select((point, index) => (point, index, vector: point - center)).Select(tuple => (tuple.point, tuple.index, vector: tuple.vector, angle: Math.Atan2(tuple.vector.Y, tuple.vector.X) is double raw && raw < 0.0 ? raw + (2.0 * Math.PI) : raw)).OrderBy(pair => pair.angle).ToArray() is (Point3d point, int index, Vector3d vector, double angle)[] ordered && ordered.Length == centroids.Length
                                             ? (2.0 * Math.PI) / centroids.Length is double expectedSpacing && ordered.Select((entry, idx) => (entry, idx)).ToArray() is ((Point3d point, int index, Vector3d vector, double angle) entry, int idx)[] enumerated
