@@ -57,21 +57,29 @@ internal static class SpatialConfig {
     /// <summary>RTree factories with validation-aware result creation.</summary>
     internal static readonly FrozenDictionary<Type, Func<object, IGeometryContext, Result<RTree>>> RTreeFactories =
         new Dictionary<Type, Func<object, IGeometryContext, Result<RTree>>> {
-            // NOTE: The caller is responsible for disposing the returned RTree instance.
+    /// <summary>
+    /// RTree factories with validation-aware result creation.
+    /// <para>
+    /// <b>Caller is responsible for disposing the returned <see cref="RTree"/> instance.</b>
+    /// </para>
+    /// </summary>
+    internal static readonly FrozenDictionary<Type, Func<object, IGeometryContext, Result<RTree>>> RTreeFactories =
+        new Dictionary<Type, Func<object, IGeometryContext, Result<RTree>>> {
+            // Caller must dispose the returned RTree.
             [typeof(Point3d[])] = static (source, _) => source switch {
-                Point3d[] points when points.Length > 0 => ResultFactory.Create(value: RTree.CreateFromPointArray(points) ?? new RTree()),
-                Point3d[] => ResultFactory.Create(value: new RTree()),
+                Point3d[] points when points.Length > 0 => ResultFactory.Create(value: RTree.CreateFromPointArray(points) ?? new RTree()), // Caller must dispose
+                Point3d[] => ResultFactory.Create(value: new RTree()), // Caller must dispose
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
             },
-            // NOTE: The caller is responsible for disposing the returned RTree instance.
+            // Caller must dispose the returned RTree.
             [typeof(PointCloud)] = static (source, _) => source switch {
-                PointCloud { Count: > 0 } cloud => ResultFactory.Create(value: RTree.CreatePointCloudTree(cloud) ?? new RTree()),
-                PointCloud => ResultFactory.Create(value: new RTree()),
+                PointCloud { Count: > 0 } cloud => ResultFactory.Create(value: RTree.CreatePointCloudTree(cloud) ?? new RTree()), // Caller must dispose
+                PointCloud => ResultFactory.Create(value: new RTree()), // Caller must dispose
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
             },
-            // NOTE: The caller is responsible for disposing the returned RTree instance.
+            // Caller must dispose the returned RTree.
             [typeof(Mesh)] = static (source, _) => source switch {
-                Mesh { IsValid: true } mesh => ResultFactory.Create(value: RTree.CreateMeshFaceTree(mesh) ?? new RTree()),
+                Mesh { IsValid: true } mesh => ResultFactory.Create(value: RTree.CreateMeshFaceTree(mesh) ?? new RTree()), // Caller must dispose
                 _ => ResultFactory.Create<RTree>(error: E.Validation.GeometryInvalid),
             },
         }.ToFrozenDictionary();
