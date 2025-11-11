@@ -85,6 +85,7 @@ internal static class OrientCompute {
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA
                                             && reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
+                                            && bb.Vertices.All(vb => reflectedA.Any(ra => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
                                                 ? (byte)1 : (byte)0
                                         : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid
                                             && ba.Vertices.Select(va => {
@@ -93,17 +94,34 @@ internal static class OrientCompute {
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA2
                                             && reflectedA2.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
+                                            && bb.Vertices.All(vb => reflectedA2.Any(ra => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
                                                 ? (byte)1 : (byte)0,
-                                    (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > context.AbsoluteTolerance => Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).All(i => {
-                                        double t = ca.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1));
-                                        Point3d ptA = ca.PointAt(t);
-                                        Point3d ptB = cb.PointAt(t);
-                                        Vector3d vecA = ptA - pa.Origin;
-                                        Vector3d vecB = ptB - pa.Origin;
-                                        double distA = vecA.Length;
-                                        double distB = vecB.Length;
-                                        return (distA < context.AbsoluteTolerance && distB < context.AbsoluteTolerance) || (Math.Abs(distA - distB) < context.AbsoluteTolerance && Vector3d.VectorAngle(vecA, vecB) < OrientConfig.SymmetryAngleToleranceRadians);
-                                    }) ? (byte)2 : (byte)0,
+                                    (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > context.AbsoluteTolerance => ((Func<byte>)(() => {
+                                        Point3d[] samplesA = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
+                                        Point3d[] samplesB = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
+                                        int[] testIndices = [0, samplesA.Length / 2, samplesA.Length - 1,];
+                                        double[] candidateAngles = [.. testIndices.Select(idx => {
+                                            Vector3d vecA = samplesA[idx] - pa.Origin;
+                                            Vector3d vecB = samplesB[idx] - pa.Origin;
+                                            Vector3d projA = vecA - ((vecA * pa.ZAxis) * pa.ZAxis);
+                                            Vector3d projB = vecB - ((vecB * pa.ZAxis) * pa.ZAxis);
+                                            return projA.Length < context.AbsoluteTolerance || projB.Length < context.AbsoluteTolerance
+                                                ? double.NaN
+                                                : Vector3d.CrossProduct(projA, projB) * pa.ZAxis < 0
+                                                    ? -Vector3d.VectorAngle(projA, projB)
+                                                    : Vector3d.VectorAngle(projA, projB);
+                                        }).Where(a => !double.IsNaN(a))];
+                                        return candidateAngles.Length == 0
+                                            ? (byte)0
+                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < OrientConfig.SymmetryAngleToleranceRadians)
+                                                && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
+                                                && samplesA.Zip(samplesB, (ptA, ptB) => {
+                                                    Point3d rotated = ptA;
+                                                    rotated.Transform(rotation);
+                                                    return rotated.DistanceTo(ptB);
+                                                }).All(dist => dist < context.AbsoluteTolerance)
+                                                    ? (byte)2 : (byte)0;
+                                    }))(),
                                     _ => (byte)0,
                                 }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
                                     double dot when Math.Abs(dot - 1.0) < context.AbsoluteTolerance => (byte)1,

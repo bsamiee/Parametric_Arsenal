@@ -67,12 +67,14 @@ internal static class OrientCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {
-            PointCloud pc when pc.Count > 0 => Plane.FitPlaneToPoints(pc.GetPoints(), out Plane plane) == PlaneFitResult.Success
+            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => Plane.FitPlaneToPoints(pc.GetPoints(), out Plane plane) == PlaneFitResult.Success
                 ? ResultFactory.Create(value: plane)
                 : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            Mesh m when m.Vertices.Count > 0 => Plane.FitPlaneToPoints(m.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
+            PointCloud pc => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {pc.Count}")),
+            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => Plane.FitPlaneToPoints(m.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
                 ? ResultFactory.Create(value: plane)
                 : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            Mesh m => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {m.Vertices.Count}")),
             _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
         };
 }
