@@ -81,11 +81,11 @@ internal static class IntersectionCore {
         };
 
     /// <summary>Point projection handler with direction validation.</summary>
-    private static readonly Func<Point3d[], object, Vector3d?, bool, double, IGeometryContext, Result<Intersect.IntersectionOutput>> ProjectionHandler = (points, targets, direction, withIndices, tolerance, context) =>
+    private static readonly Func<Point3d[], object, Vector3d?, bool, double, IGeometryContext, ValidationMode, Result<Intersect.IntersectionOutput>> ProjectionHandler = (points, targets, direction, withIndices, tolerance, context, validationMode) =>
         direction switch {
             Vector3d dir when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance => (targets, withIndices) switch {
                 (Brep[] breps, bool includeIndices) => ResultFactory.Create<IEnumerable<Brep>>(value: breps)
-                    .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, V.Standard | V.Topology,]))
+                    .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, validationMode,]))
                     .Map(valid => [.. valid])
                     .Bind(validBreps => includeIndices
                         ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
