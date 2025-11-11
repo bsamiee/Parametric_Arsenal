@@ -223,26 +223,30 @@ internal static class SpatialCompute {
         Point3d[] samples3D = [.. Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)),];
         Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; _ = pt.Transform(toPlane); return pt; }),];
 
-        return VoronoiDiagram2D(points: samples2D, context: context).Bind(cells =>
-            cells.SelectMany((cell, _) => cell.Length > 0
-                ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length],))
-                : [])
-            .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
-            .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
-            .Where(edge => boundary.Contains(edge.Mid3D, plane, tolerance) is PointContainment.Inside)
-            .GroupBy(edge => (edge.P1, edge.P2) switch {
-                (Point3d p1, Point3d p2) when p1.X < p2.X - context.AbsoluteTolerance || (Math.Abs(p1.X - p2.X) <= context.AbsoluteTolerance && p1.Y < p2.Y - context.AbsoluteTolerance) => (Min: p1, Max: p2),
-                (Point3d p1, Point3d p2) => (Min: p2, Max: p1),
-            })
-            .Select(static g => g.First())
-            .Select(edge => (P1_3D: To3D(edge.P1), P2_3D: To3D(edge.P2), edge.Mid3D))
-            .Select(edge => boundary.ClosestPoint(edge.Mid3D, out double t)
-                ? (Curve: new LineCurve(edge.P1_3D, edge.P2_3D), Radius: edge.Mid3D.DistanceTo(boundary.PointAt(t)))
-                : (null, 0.0))
-            .Where(static pair => pair.Item1 is not null)
-            .ToArray() is (Curve?, double)[] skeleton && skeleton.Length > 0
+        return VoronoiDiagram2D(points: samples2D, context: context).Bind(cells => {
+            (Curve?, double)[] skeleton = [.. cells
+                .SelectMany((cell, _) => cell.Length > 0
+                    ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length],))
+                    : [])
+                .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
+                .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
+                .Where(edge => boundary.Contains(edge.Mid3D, plane, tolerance) is PointContainment.Inside)
+                .GroupBy(edge => (edge.P1, edge.P2) switch {
+                    (Point3d p1, Point3d p2) when p1.X < p2.X - context.AbsoluteTolerance || (Math.Abs(p1.X - p2.X) <= context.AbsoluteTolerance && p1.Y < p2.Y - context.AbsoluteTolerance) => (Min: p1, Max: p2),
+                    (Point3d p1, Point3d p2) => (Min: p2, Max: p1),
+                })
+                .Select(static g => g.First())
+                .Select(edge => (P1_3D: To3D(edge.P1), P2_3D: To3D(edge.P2), edge.Mid3D))
+                .Select(edge => boundary.ClosestPoint(edge.Mid3D, out double t)
+                    ? (Curve: new LineCurve(edge.P1_3D, edge.P2_3D), Radius: edge.Mid3D.DistanceTo(boundary.PointAt(t)))
+                    : (null, 0.0))
+                .Where(static pair => pair.Item1 is not null),
+            ];
+
+            return skeleton.Length > 0
                 ? ResultFactory.Create<(Curve[], double[])>(value: ([.. skeleton.Select(static s => s.Item1!),], [.. skeleton.Select(static s => s.Item2),]))
-                : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary")));
+                : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary"));
+        });
     }
 
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
