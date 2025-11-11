@@ -107,10 +107,8 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Unable to convert curve to NURBS")),
             [(3, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && surface.ToNurbsSurface() is NurbsSurface nurbs && nurbs.Points is not null
                 ? ((Func<NurbsSurface, Result<Point3d[]>>)(n => {
-                    try {
+                    using (n) {
                         return ResultFactory.Create(value: [.. from int u in Enumerable.Range(0, n.Points.CountU) from int v in Enumerable.Range(0, n.Points.CountV) let greville = n.Points.GetGrevillePoint(u, v) select n.PointAt(greville.X, greville.Y),]);
-                    } finally {
-                        n.Dispose();
                     }
                 }))(nurbs)
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Unable to derive NURBS surface")),
