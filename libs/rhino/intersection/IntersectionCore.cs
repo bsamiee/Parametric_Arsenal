@@ -55,9 +55,10 @@ internal static class IntersectionCore {
     };
 
     /// <summary>Polyline processor with flattening and preservation.</summary>
-    private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = polylines => polylines switch { { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                                                                                                                                            [.. from polyline in polylines from point in polyline select point],
-                                                                                                                                            [], [], [], [], [.. polylines])),
+    private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = polylines => polylines switch { { Length: > 0 }
+        => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+        [.. from polyline in polylines from point in polyline select point],
+        [], [], [], [], [.. polylines])),
         null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
