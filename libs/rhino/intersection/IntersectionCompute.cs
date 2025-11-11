@@ -44,45 +44,45 @@ internal static class IntersectionCompute {
                 .Bind(validA => ResultFactory.Create(value: geomB)
                     .Validate(args: [context, V.Standard,])
                     .Bind(validB => (validA, validB) switch {
-                (Curve ca, Curve cb) => Math.Max(3, (int)Math.Ceiling(ca.GetLength() / searchRadius)) is int sampleCount
-                    ? Enumerable.Range(0, sampleCount)
-                        .Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(sampleCount - 1))))
-                        .Select(pt => cb.ClosestPoint(pt, out double tb)
-                            ? (PointA: pt, PointB: cb.PointAt(tb), Distance: pt.DistanceTo(cb.PointAt(tb)))
-                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
-                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
-                        .Concat(Enumerable.Range(0, sampleCount)
-                            .Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(sampleCount - 1))))
-                            .Select(pt => ca.ClosestPoint(pt, out double ta)
-                                ? (PointA: ca.PointAt(ta), PointB: pt, Distance: ca.PointAt(ta).DistanceTo(pt))
-                                : (PointA: Point3d.Unset, PointB: pt, Distance: double.MaxValue))
-                            .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance))
-                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
-                        ? ResultFactory.Create(value: (pairs.Select(p => p.PointA).ToArray(), pairs.Select(p => p.PointB).ToArray(), pairs.Select(p => p.Distance).ToArray()))
-                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                    : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                (Curve c, Surface s) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount2
-                    ? Enumerable.Range(0, sampleCount2)
-                        .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount2 - 1))))
-                        .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
-                            ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
-                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
-                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
-                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs2 && pairs2.Length > 0
-                        ? ResultFactory.Create(value: (pairs2.Select(p => p.PointA).ToArray(), pairs2.Select(p => p.PointB).ToArray(), pairs2.Select(p => p.Distance).ToArray()))
-                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                    : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                (Surface s, Curve c) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount3
-                    ? Enumerable.Range(0, sampleCount3)
-                        .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount3 - 1))))
-                        .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
-                            ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
-                            : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
-                        .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
-                        .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs3 && pairs3.Length > 0
-                        ? ResultFactory.Create(value: (pairs3.Select(p => p.PointA).ToArray(), pairs3.Select(p => p.PointB).ToArray(), pairs3.Select(p => p.Distance).ToArray()))
-                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                    : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                        (Curve ca, Curve cb) => Math.Max(3, (int)Math.Ceiling(ca.GetLength() / searchRadius)) is int sampleCount
+                            ? Enumerable.Range(0, sampleCount)
+                                .Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(sampleCount - 1))))
+                                .Select(pt => cb.ClosestPoint(pt, out double tb)
+                                    ? (PointA: pt, PointB: cb.PointAt(tb), Distance: pt.DistanceTo(cb.PointAt(tb)))
+                                    : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                                .Concat(Enumerable.Range(0, sampleCount)
+                                    .Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(sampleCount - 1))))
+                                    .Select(pt => ca.ClosestPoint(pt, out double ta)
+                                        ? (PointA: ca.PointAt(ta), PointB: pt, Distance: ca.PointAt(ta).DistanceTo(pt))
+                                        : (PointA: Point3d.Unset, PointB: pt, Distance: double.MaxValue))
+                                    .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance))
+                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
+                                ? ResultFactory.Create(value: (pairs.Select(p => p.PointA).ToArray(), pairs.Select(p => p.PointB).ToArray(), pairs.Select(p => p.Distance).ToArray()))
+                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                        (Curve c, Surface s) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount2
+                            ? Enumerable.Range(0, sampleCount2)
+                                .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount2 - 1))))
+                                .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
+                                    ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
+                                    : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs2 && pairs2.Length > 0
+                                ? ResultFactory.Create(value: (pairs2.Select(p => p.PointA).ToArray(), pairs2.Select(p => p.PointB).ToArray(), pairs2.Select(p => p.Distance).ToArray()))
+                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                        (Surface s, Curve c) => Math.Max(3, (int)Math.Ceiling(c.GetLength() / searchRadius)) is int sampleCount3
+                            ? Enumerable.Range(0, sampleCount3)
+                                .Select(i => c.PointAt(c.Domain.ParameterAt(i / (double)(sampleCount3 - 1))))
+                                .Select(pt => s.ClosestPoint(pt, out double su, out double sv)
+                                    ? (PointA: pt, PointB: s.PointAt(su, sv), Distance: pt.DistanceTo(s.PointAt(su, sv)))
+                                    : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                .Where(pair => pair.Distance < searchRadius && pair.Distance > context.AbsoluteTolerance)
+                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs3 && pairs3.Length > 0
+                                ? ResultFactory.Create(value: (pairs3.Select(p => p.PointA).ToArray(), pairs3.Select(p => p.PointB).ToArray(), pairs3.Select(p => p.Distance).ToArray()))
+                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                         _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
                     }));
 

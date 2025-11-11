@@ -46,7 +46,7 @@ internal static class SpatialCompute {
                     : (algorithm is 1 && epsilon <= 0)
                         ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
                         : ResultFactory.Create(value: geometry)
-                            .Ensure(g => g.All(item => item.IsValid), error: E.Validation.GeometryInvalid)
+                            .Ensure(g => g.All(item => item?.IsValid == true), error: E.Validation.GeometryInvalid)
                             .Bind(validGeometry => ClusterInternal(geometry: validGeometry, algorithm: algorithm, k: k, epsilon: epsilon, context: context));
 
     private static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase {
@@ -229,7 +229,7 @@ internal static class SpatialCompute {
                 : maxDist <= context.AbsoluteTolerance
                     ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
                     : ResultFactory.Create(value: geometry)
-                        .Ensure(g => g.All(item => item.IsValid), error: E.Validation.GeometryInvalid)
+                        .Ensure(g => g.All(item => item?.IsValid == true), error: E.Validation.GeometryInvalid)
                         .Bind(validGeometry => ProximityFieldCompute(geometry: validGeometry, direction: direction, maxDist: maxDist, angleWeight: angleWeight, context: context));
 
     private static Result<(int, double, double)[]> ProximityFieldCompute(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) {

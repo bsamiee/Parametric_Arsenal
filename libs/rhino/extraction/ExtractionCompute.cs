@@ -112,7 +112,7 @@ internal static class ExtractionCompute {
                 => (true, Math.PI * ell.Radius1 * ell.Radius2),
             _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
                 true,
-                (using (AreaMassProperties? amp = AreaMassProperties.Compute(c))) ? amp?.Area ?? 0.0 : 0.0
+                AreaMassProperties.Compute(c) is AreaMassProperties amp && amp.Area is double area ? area : 0.0
             ),
             _ => (false, 0.0),
         };
@@ -259,7 +259,10 @@ internal static class ExtractionCompute {
         geometries.Length < ExtractionConfig.PatternMinInstances
             ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(
                 error: E.Geometry.NoPatternDetected.WithContext($"Need at least {ExtractionConfig.PatternMinInstances.ToString(System.Globalization.CultureInfo.InvariantCulture)} instances"))
-            : DetectPatternType(centers: [.. geometries.Select(g => g.GetBoundingBox(accurate: false).Center),], context: context);
+            : geometries.Any(g => g is null)
+                ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(
+                    error: E.Validation.GeometryInvalid.WithContext("Array contains null geometries"))
+                : DetectPatternType(centers: [.. geometries.Select(g => g.GetBoundingBox(accurate: false).Center),], context: context);
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
         Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[i]).ToArray() is Vector3d[] deltas && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)

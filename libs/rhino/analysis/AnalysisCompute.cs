@@ -70,84 +70,84 @@ internal static class AnalysisCompute {
             .Bind(validMesh => validMesh.Faces.Count == 0
                 ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Validation.GeometryInvalid)
                 : ((Func<Result<(double[], double[], double[], int[], (int, int))>>)(() => {
-                Point3d[] vertices = ArrayPool<Point3d>.Shared.Rent(4);
-                double[] edgeLengths = ArrayPool<double>.Shared.Rent(4);
-                try {
-                    (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, validMesh.Faces.Count).Select(i => {
-                        Point3d center = validMesh.Faces.GetFaceCenter(i);
-                        MeshFace face = validMesh.Faces[i];
-                        bool isQuad = face.IsQuad;
-                        bool validIndices = face.A >= 0 && face.A < validMesh.Vertices.Count
-                            && face.B >= 0 && face.B < validMesh.Vertices.Count
-                            && face.C >= 0 && face.C < validMesh.Vertices.Count
-                            && (!isQuad || (face.D >= 0 && face.D < validMesh.Vertices.Count));
+                    Point3d[] vertices = ArrayPool<Point3d>.Shared.Rent(4);
+                    double[] edgeLengths = ArrayPool<double>.Shared.Rent(4);
+                    try {
+                        (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, validMesh.Faces.Count).Select(i => {
+                            Point3d center = validMesh.Faces.GetFaceCenter(i);
+                            MeshFace face = validMesh.Faces[i];
+                            bool isQuad = face.IsQuad;
+                            bool validIndices = face.A >= 0 && face.A < validMesh.Vertices.Count
+                                && face.B >= 0 && face.B < validMesh.Vertices.Count
+                                && face.C >= 0 && face.C < validMesh.Vertices.Count
+                                && (!isQuad || (face.D >= 0 && face.D < validMesh.Vertices.Count));
 
-                        vertices[0] = validIndices ? (Point3d)validMesh.Vertices[face.A] : center;
-                        vertices[1] = validIndices ? (Point3d)validMesh.Vertices[face.B] : center;
-                        vertices[2] = validIndices ? (Point3d)validMesh.Vertices[face.C] : center;
-                        vertices[3] = validIndices && isQuad ? (Point3d)validMesh.Vertices[face.D] : vertices[0];
+                            vertices[0] = validIndices ? (Point3d)validMesh.Vertices[face.A] : center;
+                            vertices[1] = validIndices ? (Point3d)validMesh.Vertices[face.B] : center;
+                            vertices[2] = validIndices ? (Point3d)validMesh.Vertices[face.C] : center;
+                            vertices[3] = validIndices && isQuad ? (Point3d)validMesh.Vertices[face.D] : vertices[0];
 
-                        int vertCount = isQuad ? 4 : 3;
+                            int vertCount = isQuad ? 4 : 3;
 
-                        // FEA Aspect Ratio: longest/shortest edge (industry standard)
-                        for (int j = 0; j < vertCount; j++) {
-                            edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
-                        }
-                        double minEdge = double.MaxValue;
-                        double maxEdge = double.MinValue;
-                        for (int j = 0; j < vertCount; j++) {
-                            minEdge = Math.Min(minEdge, edgeLengths[j]);
-                            maxEdge = Math.Max(maxEdge, edgeLengths[j]);
-                        }
-                        double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
+                            // FEA Aspect Ratio: longest/shortest edge (industry standard)
+                            for (int j = 0; j < vertCount; j++) {
+                                edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
+                            }
+                            double minEdge = double.MaxValue;
+                            double maxEdge = double.MinValue;
+                            for (int j = 0; j < vertCount; j++) {
+                                minEdge = Math.Min(minEdge, edgeLengths[j]);
+                                maxEdge = Math.Max(maxEdge, edgeLengths[j]);
+                            }
+                            double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
 
-                        // FEA Skewness: angular deviation (90° quads, 60° triangles)
-                        double skewness = isQuad
-                            ? ((double[])[
-                                Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0]),
-                                Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
-                                Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
-                                Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
-                            ]).Max(angle => Math.Abs((angle * (180.0 / Math.PI)) - 90.0)) / 90.0
-                            : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
-                                ? (
-                                    Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI),
-                                    Vector3d.VectorAngle(bc, -ab) * (180.0 / Math.PI),
-                                    Vector3d.VectorAngle(-ac, -bc) * (180.0 / Math.PI)
-                                ) is (double angleA, double angleB, double angleC)
-                                    ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
-                                    : 1.0
-                                : 1.0;
-
-                        // Jacobian: simplified cross-product approximation (full requires isoparametric mapping)
-                        // Measures shape quality via min cross-product / avg edge length²
-                        double jacobian = isQuad
-                            ? edgeLengths.Take(4).Average() is double avgLen && avgLen > context.AbsoluteTolerance
+                            // FEA Skewness: angular deviation (90° quads, 60° triangles)
+                            double skewness = isQuad
                                 ? ((double[])[
-                                    Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
-                                    Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length,
-                                    Vector3d.CrossProduct(vertices[3] - vertices[2], vertices[1] - vertices[2]).Length,
-                                    Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length,
-                                ]).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
-                                : 0.0
-                            : edgeLengths.Take(3).Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
-                                ? Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * triAvgLen * triAvgLen) + context.AbsoluteTolerance)
-                                : 0.0;
+                                    Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0]),
+                                    Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
+                                    Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
+                                    Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
+                                ]).Max(angle => Math.Abs((angle * (180.0 / Math.PI)) - 90.0)) / 90.0
+                                : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
+                                    ? (
+                                        Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI),
+                                        Vector3d.VectorAngle(bc, -ab) * (180.0 / Math.PI),
+                                        Vector3d.VectorAngle(-ac, -bc) * (180.0 / Math.PI)
+                                    ) is (double angleA, double angleB, double angleC)
+                                        ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
+                                        : 1.0
+                                    : 1.0;
 
-                        return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
-                    }),
-                    ];
-                    return metrics.Length > 0
-                        ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (
-                            [.. metrics.Select(m => m.AspectRatio),],
-                            [.. metrics.Select(m => m.Skewness),],
-                            [.. metrics.Select(m => m.Jacobian),],
-                            [.. metrics.Select((m, i) => (m, i)).Where(pair => pair.m.AspectRatio > AnalysisConfig.AspectRatioCritical || pair.m.Skewness > AnalysisConfig.SkewnessCritical || pair.m.Jacobian < AnalysisConfig.JacobianCritical).Select(pair => pair.i),],
-                            (metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioWarning || m.Skewness > AnalysisConfig.SkewnessWarning || m.Jacobian < AnalysisConfig.JacobianWarning), metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioCritical || m.Skewness > AnalysisConfig.SkewnessCritical || m.Jacobian < AnalysisConfig.JacobianCritical))))
-                        : ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Geometry.MeshAnalysisFailed);
-                } finally {
-                    ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
-                    ArrayPool<double>.Shared.Return(edgeLengths, clearArray: true);
-                }
-            }))());
+                            // Jacobian: simplified cross-product approximation (full requires isoparametric mapping)
+                            // Measures shape quality via min cross-product / avg edge length²
+                            double jacobian = isQuad
+                                ? edgeLengths.Take(4).Average() is double avgLen && avgLen > context.AbsoluteTolerance
+                                    ? ((double[])[
+                                        Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
+                                        Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length,
+                                        Vector3d.CrossProduct(vertices[3] - vertices[2], vertices[1] - vertices[2]).Length,
+                                        Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length,
+                                    ]).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
+                                    : 0.0
+                                : edgeLengths.Take(3).Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
+                                    ? Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * triAvgLen * triAvgLen) + context.AbsoluteTolerance)
+                                    : 0.0;
+
+                            return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
+                        }),
+                        ];
+                        return metrics.Length > 0
+                            ? ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(value: (
+                                [.. metrics.Select(m => m.AspectRatio),],
+                                [.. metrics.Select(m => m.Skewness),],
+                                [.. metrics.Select(m => m.Jacobian),],
+                                [.. metrics.Select((m, i) => (m, i)).Where(pair => pair.m.AspectRatio > AnalysisConfig.AspectRatioCritical || pair.m.Skewness > AnalysisConfig.SkewnessCritical || pair.m.Jacobian < AnalysisConfig.JacobianCritical).Select(pair => pair.i),],
+                                (metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioWarning || m.Skewness > AnalysisConfig.SkewnessWarning || m.Jacobian < AnalysisConfig.JacobianWarning), metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioCritical || m.Skewness > AnalysisConfig.SkewnessCritical || m.Jacobian < AnalysisConfig.JacobianCritical))))
+                            : ResultFactory.Create<(double[], double[], double[], int[], (int, int))>(error: E.Geometry.MeshAnalysisFailed);
+                    } finally {
+                        ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
+                        ArrayPool<double>.Shared.Return(edgeLengths, clearArray: true);
+                    }
+                }))());
 }
