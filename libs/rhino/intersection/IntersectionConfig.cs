@@ -72,7 +72,7 @@ internal static class IntersectionConfig {
             (typeof(Point3d[]), typeof(Mesh[]), V.None, V.None),
             (typeof(Ray3d), typeof(GeometryBase[]), V.None, V.None),
         }
-        .SelectMany(p => p.TypeA == p.TypeB
+        .SelectMany<(Type TypeA, Type TypeB, V ModeA, V ModeB), KeyValuePair<(Type, Type), (V ModeA, V ModeB)>>(p => p.TypeA == p.TypeB
             ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
             : [
                 KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),
