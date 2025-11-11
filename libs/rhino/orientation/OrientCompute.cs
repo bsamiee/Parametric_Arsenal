@@ -110,7 +110,8 @@ internal static class OrientCompute {
                                                 : Vector3d.CrossProduct(projA, projB) * pa.ZAxis < 0
                                                     ? -Vector3d.VectorAngle(projA, projB)
                                                     : Vector3d.VectorAngle(projA, projB);
-                                        }).Where(a => !double.IsNaN(a))];
+                                        }).Where(a => !double.IsNaN(a)),
+                                        ];
                                         return candidateAngles.Length == 0
                                             ? (byte)0
                                             : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < OrientConfig.SymmetryAngleToleranceRadians)

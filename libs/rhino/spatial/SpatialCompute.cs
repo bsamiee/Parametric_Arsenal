@@ -218,10 +218,10 @@ internal static class SpatialCompute {
         Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
         Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
 
-        Point3d To3D(Point3d p2d) { Point3d pt = p2d; _ = pt.Transform(fromPlane); return pt; }
+        Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
 
         Point3d[] samples3D = [.. Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)),];
-        Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; _ = pt.Transform(toPlane); return pt; }),];
+        Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; pt.Transform(toPlane); return pt; }),];
 
         return VoronoiDiagram2D(points: samples2D, context: context).Bind(cells => {
             (Curve?, double)[] skeleton = [.. cells
