@@ -14,7 +14,7 @@ namespace Arsenal.Rhino.Spatial;
 internal static class SpatialCore {
     private static readonly Func<object, IGeometryContext, Result<RTree>> _geometryArrayFactory = static (source, _) => source switch {
         GeometryBase[] geometries => {
-            RTree tree = new RTree();
+            RTree tree = new();
             for (int index = 0; index < geometries.Length; index++) {
                 _ = tree.Insert(geometries[index].GetBoundingBox(accurate: true), index);
             }
