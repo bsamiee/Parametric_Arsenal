@@ -18,6 +18,8 @@ public static class E {
             [2002] = "Count parameter must be positive",
             [2003] = "Length parameter must be greater than zero tolerance",
             [2004] = "Direction parameter required for positional extrema",
+            [2005] = "Parameters array must not be empty",
+            [2006] = "Angle threshold must be positive",
             [2200] = "Intersection method not supported for geometry types",
             [2201] = "Intersection computation failed",
             [2202] = "Projection direction vector is invalid or zero-length",
@@ -149,6 +151,8 @@ public static class E {
         public static readonly SystemError InvalidCount = Get(2002);
         public static readonly SystemError InvalidLength = Get(2003);
         public static readonly SystemError InvalidDirection = Get(2004);
+        public static readonly SystemError InvalidParameters = Get(2005);
+        public static readonly SystemError InvalidAngle = Get(2006);
         public static readonly SystemError UnsupportedIntersection = Get(2200);
         public static readonly SystemError IntersectionFailed = Get(2201);
         public static readonly SystemError InvalidProjection = Get(2202);

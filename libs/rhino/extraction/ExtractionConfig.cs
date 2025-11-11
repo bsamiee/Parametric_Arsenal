@@ -59,6 +59,12 @@ internal static class ExtractionConfig {
     internal const double GridPointDeviationThreshold = 0.1;
     /// <summary>Scaling pattern variance threshold 0.1 for ratio consistency.</summary>
     internal const double ScalingVarianceThreshold = 0.1;
+    /// <summary>Feature edge angle threshold 0.524 radians (30°) for sharp edge detection.</summary>
+    internal const double FeatureEdgeAngleThreshold = 0.524;
+    /// <summary>Minimum isocurve count 2 for valid extraction.</summary>
+    internal const int MinIsocurveCount = 2;
+    /// <summary>Maximum isocurve count 100 to prevent memory issues.</summary>
+    internal const int MaxIsocurveCount = 100;
     /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
@@ -90,6 +96,25 @@ internal static class ExtractionConfig {
             [(12, typeof(Brep))] = V.Standard | V.Topology,
             [(13, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(13, typeof(PolyCurve))] = V.Standard | V.Degeneracy,
+            [(20, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(20, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(20, typeof(Brep))] = V.Standard | V.Topology,
+            [(21, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(21, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(22, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(22, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(23, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(23, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(24, typeof(Brep))] = V.Standard | V.Topology,
+            [(30, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(30, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(31, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(31, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(32, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(32, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(33, typeof(Surface))] = V.Standard | V.UVDomain,
+            [(33, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
+            [(34, typeof(Brep))] = V.Standard | V.Topology,
         }.ToFrozenDictionary();
 
     /// <summary>Gets validation mode with fallback for (kind, type) pair.</summary>
