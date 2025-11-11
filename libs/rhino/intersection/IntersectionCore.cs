@@ -29,12 +29,13 @@ internal static class IntersectionCore {
     };
 
     /// <summary>CurveIntersections processor with points and parameters.</summary>
-    private static readonly Func<CurveIntersections?, Curve, Result<Intersect.IntersectionOutput>> IntersectionProcessor = (results, source) => results switch { { Count: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                                                                                                                                                                     [.. from entry in results select entry.PointA],
-                                                                                                                                                                     [.. from entry in results where entry.IsOverlap let trimmed = source.Trim(entry.OverlapA) where trimmed is not null select trimmed],
-                                                                                                                                                                     [.. from entry in results select entry.ParameterA],
-                                                                                                                                                                     [.. from entry in results select entry.ParameterB],
-                                                                                                                                                                     [], [])),
+    private static readonly Func<CurveIntersections?, Curve, Result<Intersect.IntersectionOutput>> IntersectionProcessor = (results, source) => results switch { { Count: > 0 }
+        => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+        [.. from entry in results select entry.PointA],
+        [.. from entry in results where entry.IsOverlap let trimmed = source.Trim(entry.OverlapA) where trimmed is not null select trimmed],
+        [.. from entry in results select entry.ParameterA],
+        [.. from entry in results select entry.ParameterB],
+        [], [])),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };
 
