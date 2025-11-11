@@ -31,8 +31,8 @@ internal static class IntersectionConfig {
     internal const double CurveSurfacePerpendicularBlendScore = 0.4;
 
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
-    internal static readonly FrozenDictionary<(Type, Type), (V ModeA, V ModeB)> ValidationModes = ((Func<FrozenDictionary<(Type, Type), (V ModeA, V ModeB)>>)(() => {
-        (Type TypeA, Type TypeB, V ModeA, V ModeB)[] uniquePairs = [
+    internal static readonly FrozenDictionary<(Type, Type), (V ModeA, V ModeB)> ValidationModes =
+        new (Type TypeA, Type TypeB, V ModeA, V ModeB)[] {
             (typeof(Curve), typeof(Curve), V.Standard | V.Degeneracy, V.Standard | V.Degeneracy),
             (typeof(NurbsCurve), typeof(NurbsCurve), V.Standard | V.Degeneracy | V.NurbsGeometry, V.Standard | V.Degeneracy | V.NurbsGeometry),
             (typeof(PolyCurve), typeof(Curve), V.Standard | V.Degeneracy | V.PolycurveStructure, V.Standard | V.Degeneracy),
@@ -71,12 +71,12 @@ internal static class IntersectionConfig {
             (typeof(Point3d[]), typeof(Brep[]), V.None, V.None),
             (typeof(Point3d[]), typeof(Mesh[]), V.None, V.None),
             (typeof(Ray3d), typeof(GeometryBase[]), V.None, V.None),
-        ];
-        return new Dictionary<(Type, Type), (V ModeA, V ModeB)>([.. uniquePairs
-            .Select(p => new KeyValuePair<(Type, Type), (V, V)>((p.TypeA, p.TypeB), (p.ModeA, p.ModeB))),
-            .. uniquePairs
-            .Where(p => p.TypeA != p.TypeB)
-            .Select(p => new KeyValuePair<(Type, Type), (V, V)>((p.TypeB, p.TypeA), (p.ModeB, p.ModeA))),
-        ]).ToFrozenDictionary();
-    }))();
+        }
+        .SelectMany<(Type TypeA, Type TypeB, V ModeA, V ModeB), KeyValuePair<(Type, Type), (V ModeA, V ModeB)>>(p => p.TypeA == p.TypeB
+            ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
+            : [
+                KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),
+                KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),
+            ])
+        .ToFrozenDictionary();
 }

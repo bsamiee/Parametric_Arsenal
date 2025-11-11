@@ -64,47 +64,64 @@ internal static class IntersectionCompute {
                             .Bind(validA => (modeB == V.None
                                     ? ResultFactory.Create(value: geomB)
                                     : ResultFactory.Create(value: geomB).Validate(args: [context, modeB,]))
-                                .Bind(validB => (validA, validB) switch {
-                                    (Curve curveA, Curve curveB) => Math.Max(3, (int)Math.Ceiling(curveA.GetLength() / searchRadius)) is int samples
-                                        ? Enumerable.Range(0, samples)
-                                            .Select(index => curveA.PointAt(curveA.Domain.ParameterAt(index / (double)(samples - 1))))
-                                            .Select(point => curveB.ClosestPoint(point, out double parameter)
-                                                ? (PointA: point, PointB: curveB.PointAt(parameter), Distance: point.DistanceTo(curveB.PointAt(parameter)))
-                                                : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                            .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
-                                            .Concat(Enumerable.Range(0, samples)
-                                                .Select(index => curveB.PointAt(curveB.Domain.ParameterAt(index / (double)(samples - 1))))
-                                                .Select(point => curveA.ClosestPoint(point, out double parameter)
-                                                    ? (PointA: curveA.PointAt(parameter), PointB: point, Distance: curveA.PointAt(parameter).DistanceTo(point))
-                                                    : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
-                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance))
-                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
-                                            ? ResultFactory.Create(value: (curvePairs.Select(pair => pair.PointA).ToArray(), curvePairs.Select(pair => pair.PointB).ToArray(), curvePairs.Select(pair => pair.Distance).ToArray()))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                    (Curve curve, Surface surface) => Math.Max(3, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int curveSamples
-                                        ? Enumerable.Range(0, curveSamples)
-                                            .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(curveSamples - 1))))
-                                            .Select(point => surface.ClosestPoint(point, out double u, out double v)
-                                                ? (PointA: point, PointB: surface.PointAt(u, v), Distance: point.DistanceTo(surface.PointAt(u, v)))
-                                                : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                            .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
-                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] surfacePairs && surfacePairs.Length > 0
-                                            ? ResultFactory.Create(value: (surfacePairs.Select(pair => pair.PointA).ToArray(), surfacePairs.Select(pair => pair.PointB).ToArray(), surfacePairs.Select(pair => pair.Distance).ToArray()))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                    (Surface surface, Curve curve) => Math.Max(3, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int surfaceSamples
-                                        ? Enumerable.Range(0, surfaceSamples)
-                                            .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(surfaceSamples - 1))))
-                                            .Select(point => surface.ClosestPoint(point, out double u, out double v)
-                                                ? (PointA: point, PointB: surface.PointAt(u, v), Distance: point.DistanceTo(surface.PointAt(u, v)))
-                                                : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                            .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
-                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] mixedPairs && mixedPairs.Length > 0
-                                            ? ResultFactory.Create(value: (mixedPairs.Select(pair => pair.PointA).ToArray(), mixedPairs.Select(pair => pair.PointB).ToArray(), mixedPairs.Select(pair => pair.Distance).ToArray()))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                        : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                    _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
+                                .Bind(validB => {
+                                    (GeometryBase primary, GeometryBase secondary) = (validA, validB) switch {
+                                        (Curve c, Surface s) => (c, s),
+                                        (Surface s, Curve c) => (c, s),
+                                        _ => (validA, validB),
+                                    };
+
+                                    return (primary, secondary) switch {
+                                        (Curve curveA, Curve curveB) => Math.Max(3, (int)Math.Ceiling(curveA.GetLength() / searchRadius)) is int samples
+                                            ? Enumerable.Range(0, samples)
+                                                .Select(index => curveA.PointAt(curveA.Domain.ParameterAt(index / (double)(samples - 1))))
+                                                .Select(point => curveB.ClosestPoint(point, out double parameter)
+                                                    ? (PointA: point, PointB: curveB.PointAt(parameter), Distance: point.DistanceTo(curveB.PointAt(parameter)))
+                                                    : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
+                                                .Concat(Enumerable.Range(0, samples)
+                                                    .Select(index => curveB.PointAt(curveB.Domain.ParameterAt(index / (double)(samples - 1))))
+                                                    .Select(point => curveA.ClosestPoint(point, out double parameter)
+                                                        ? (PointA: curveA.PointAt(parameter), PointB: point, Distance: curveA.PointAt(parameter).DistanceTo(point))
+                                                        : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
+                                                    .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance))
+                                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
+                                                ? ResultFactory.Create(value: ((Func<(Point3d, Point3d, double)[], (Point3d[], Point3d[], double[])>)(p => {
+                                                    Point3d[] pointsA = new Point3d[p.Length];
+                                                    Point3d[] pointsB = new Point3d[p.Length];
+                                                    double[] distances = new double[p.Length];
+                                                    for (int i = 0; i < p.Length; i++) {
+                                                        pointsA[i] = p[i].Item1;
+                                                        pointsB[i] = p[i].Item2;
+                                                        distances[i] = p[i].Item3;
+                                                    }
+                                                    return (pointsA, pointsB, distances);
+                                                }))(curvePairs))
+                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                        (Curve curve, Surface surface) => Math.Max(3, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
+                                            ? Enumerable.Range(0, samples)
+                                                .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(samples - 1))))
+                                                .Select(point => surface.ClosestPoint(point, out double u, out double v)
+                                                    ? (PointA: point, PointB: surface.PointAt(u, v), Distance: point.DistanceTo(surface.PointAt(u, v)))
+                                                    : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
+                                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
+                                                ? ResultFactory.Create(value: ((Func<(Point3d, Point3d, double)[], (Point3d[], Point3d[], double[])>)(p => {
+                                                    Point3d[] pointsA = new Point3d[p.Length];
+                                                    Point3d[] pointsB = new Point3d[p.Length];
+                                                    double[] distances = new double[p.Length];
+                                                    for (int i = 0; i < p.Length; i++) {
+                                                        pointsA[i] = p[i].Item1;
+                                                        pointsB[i] = p[i].Item2;
+                                                        distances[i] = p[i].Item3;
+                                                    }
+                                                    return (pointsA, pointsB, distances);
+                                                }))(pairs))
+                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                        _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
+                                    };
                                 }));
                     });
 
@@ -142,12 +159,24 @@ internal static class IntersectionCompute {
                                     Func<Vector3d, (double Delta, IDisposable? Resource)> sampler = validA switch {
                                         Curve curve => direction => curve.DuplicateCurve() is Curve copy && copy.Translate(direction * perturbationDistance)
                                             ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
-                                                .Map(result => ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy))
+                                                .Map(result => {
+                                                    int pointCount = result.Points.Count;
+                                                    foreach (Curve intersection in result.Curves) {
+                                                        intersection?.Dispose();
+                                                    }
+                                                    return ((double)Math.Abs(pointCount - count), (IDisposable?)copy);
+                                                })
                                                 .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); })
                                             : (double.NaN, null),
                                         Surface surface => direction => surface.Duplicate() is Surface copy && copy.Translate(direction * perturbationDistance)
                                             ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
-                                                .Map(result => ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy))
+                                                .Map(result => {
+                                                    int pointCount = result.Points.Count;
+                                                    foreach (Curve intersection in result.Curves) {
+                                                        intersection?.Dispose();
+                                                    }
+                                                    return ((double)Math.Abs(pointCount - count), (IDisposable?)copy);
+                                                })
                                                 .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); })
                                             : (double.NaN, null),
                                         _ => _ => (double.NaN, null),
