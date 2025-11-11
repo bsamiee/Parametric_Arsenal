@@ -226,7 +226,7 @@ internal static class SpatialCompute {
         return VoronoiDiagram2D(points: samples2D, context: context).Bind(cells => {
             (Curve?, double)[] skeleton = [.. cells
                 .SelectMany((cell, _) => cell.Length > 0
-                    ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length],))
+                    ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length]))
                     : [])
                 .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
                 .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
