@@ -159,12 +159,9 @@ internal static class ExtractionCore {
             [(7, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
                 ? ResultFactory.Create(value: [.. brep.Faces.Select(face => face.DuplicateFace(duplicateMeshes: false) switch {
                     Brep duplicate => ((Func<Brep, Point3d>)(dup => {
-                        try {
-                            Point3d? centroid = AreaMassProperties.Compute(dup)?.Centroid;
-                            return centroid.HasValue && centroid.Value.IsValid ? centroid.Value : Point3d.Unset;
-                        } finally {
-                            dup.Dispose();
-                        }
+                        using Brep _dup = dup;
+                        Point3d? centroid = AreaMassProperties.Compute(_dup)?.Centroid;
+                        return centroid.HasValue && centroid.Value.IsValid ? centroid.Value : Point3d.Unset;
                     }))(duplicate),
                     _ => Point3d.Unset,
                 }).Where(static point => point != Point3d.Unset),])
