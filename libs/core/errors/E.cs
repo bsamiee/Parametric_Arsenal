@@ -101,8 +101,11 @@ public static class E {
             [4101] = "K-means k parameter must be positive",
             [4102] = "DBSCAN epsilon parameter must be positive",
             [4103] = "Cluster count exceeds point count",
-
+            [4104] = "Point set is degenerate or collinear",
             [4105] = "Direction vector is zero-length",
+            [4110] = "Clustering algorithm not recognized",
+            [4111] = "2D operation requires at least 3 points",
+            [4112] = "3D operation requires at least 4 points",
             [4200] = "Medial axis computation failed",
             [4201] = "Non-planar medial axis not supported",
             [4300] = "Proximity field computation failed",
@@ -239,6 +242,9 @@ public static class E {
         public static readonly SystemError KExceedsPointCount = Get(4103);
         public static readonly SystemError DegeneratePointSet = Get(4104);
         public static readonly SystemError ZeroLengthDirection = Get(4105);
+        public static readonly SystemError InvalidAlgorithm = Get(4110);
+        public static readonly SystemError InsufficientPoints2D = Get(4111);
+        public static readonly SystemError InsufficientPoints3D = Get(4112);
         public static readonly SystemError MedialAxisFailed = Get(4200);
         public static readonly SystemError NonPlanarNotSupported = Get(4201);
         public static readonly SystemError ProximityFieldFailed = Get(4300);

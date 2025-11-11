@@ -40,7 +40,7 @@ internal static class SpatialCompute {
         geometry.Length is 0
             ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
             : algorithm is > 2
-                ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
+                ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidAlgorithm.WithContext($"Algorithm {algorithm} not recognized (0=KMeans, 1=DBSCAN, 2=Hierarchical)"))
                 : (algorithm is 0 or 2 && k <= 0)
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
                     : (algorithm is 1 && epsilon <= 0)
@@ -277,9 +277,11 @@ internal static class SpatialCompute {
     /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
-        points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
-            : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance) ? BuildConvexHull2D(points: points, context: context)
-            : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
+        points.Length < 3
+            ? ResultFactory.Create<Point3d[]>(error: E.Spatial.InsufficientPoints2D)
+            : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
+                ? BuildConvexHull2D(points: points, context: context)
+                : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
 
     private static Result<Point3d[]> BuildConvexHull2D(Point3d[] points, IGeometryContext context) {
         Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
@@ -306,7 +308,7 @@ internal static class SpatialCompute {
         Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
         return result.Length >= 3
             ? ResultFactory.Create(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+            : ResultFactory.Create<Point3d[]>(error: E.Spatial.DegeneratePointSet);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -320,10 +322,10 @@ internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
         points.Length < 4
-            ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
+            ? ResultFactory.Create<int[][]>(error: E.Spatial.InsufficientPoints3D)
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
                 ? BuildConvexHull3D(indexed: indexed, initialFaces: initial.Faces, context: context)
-                : ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull3D failed: coplanar or degenerate points"));
+                : ResultFactory.Create<int[][]>(error: E.Spatial.DegeneratePointSet);
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
@@ -385,7 +387,7 @@ internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
-            ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"))
+            ? ResultFactory.Create<int[][]>(error: E.Spatial.InsufficientPoints2D)
             : ComputeDelaunay2D(points: points, context: context);
 
     private static Result<int[][]> ComputeDelaunay2D(Point3d[] points, IGeometryContext context) {
@@ -434,7 +436,7 @@ internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
-            ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
+            ? ResultFactory.Create<Point3d[][]>(error: E.Spatial.InsufficientPoints2D)
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ComputeVoronoi2D(points: points, triangles: triangles, _: context));
 
     private static Result<Point3d[][]> ComputeVoronoi2D(Point3d[] points, int[][] triangles, IGeometryContext _) =>
