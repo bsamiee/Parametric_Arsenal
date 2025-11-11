@@ -114,21 +114,25 @@ internal static class SpatialCore {
         static (treeA, treeB, tolerance, bufferSize) => {
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
+            bool overflow = false;
             try {
-                bool hasIntersections = RTree.SearchOverlaps(treeA, treeB, tolerance, (_, args) => {
-                    bool hasCapacity = count + 1 < buffer.Length;
-                    int index = hasCapacity ? count : buffer.Length - 2;
-                    buffer[index] = args.Id;
-                    buffer[index + 1] = args.IdB;
-                    count = hasCapacity ? count + 2 : count;
+                _ = RTree.SearchOverlaps(treeA, treeB, tolerance, (_, args) => {
+                    if (count + 1 < buffer.Length) {
+                        buffer[count++] = args.Id;
+                        buffer[count++] = args.IdB;
+                    } else {
+                        overflow = true;
+                    }
                 });
-                return hasIntersections
-                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
-                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
+                if (overflow) {
+                    return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.BufferOverflow.WithContext($"BufferSize: {bufferSize}"));
+                }
+                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
             } finally {
                 ArrayPool<int>.Shared.Return(buffer, clearArray: true);
             }
         };
+
 
     /// <summary>(Input, Query) type pairs to (Factory, Mode, BufferSize, Execute) mapping.</summary>
     internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, IGeometryContext, Result<RTree>>? Factory, Func<object, IGeometryContext, Result<object>> QueryValidator, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
