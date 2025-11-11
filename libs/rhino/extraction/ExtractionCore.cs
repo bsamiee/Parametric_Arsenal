@@ -17,9 +17,24 @@ internal static class ExtractionCore {
     private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> _handlers =
         BuildHandlerRegistry();
 
+    /// <summary>(Kind, Type) to curve handler function mapping for O(1) dispatch.</summary>
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> _curveHandlers =
+        BuildCurveHandlerRegistry();
+
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
         ExecuteWithNormalization(geometry, request, context);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Curve>> ExecuteCurves(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
+        _curveHandlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>? handler)
+            ? handler(geometry, request, context).Map(curves => (IReadOnlyList<Curve>)curves)
+            : _curveHandlers.Where(kv => kv.Key.Kind == request.Kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
+                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(static (_, _, _) => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("No curve handler registered")))
+                .First()(geometry, request, context)
+                .Map(curves => (IReadOnlyList<Curve>)curves);
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExecuteWithNormalization(
@@ -210,5 +225,53 @@ internal static class ExtractionCore {
                 }))(),
                 ])
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and continuity")),
+        }.ToFrozenDictionary();
+
+    [Pure]
+    private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> BuildCurveHandlerRegistry() =>
+        new Dictionary<(byte, Type), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> {
+            [(20, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && (surface.Domain(0), surface.Domain(1)) is (Interval u, Interval v)
+                ? ResultFactory.Create<Curve[]>(value: [surface.IsoCurve(direction: 0, constantParameter: u.Min), surface.IsoCurve(direction: 1, constantParameter: v.Max), surface.IsoCurve(direction: 0, constantParameter: u.Max), surface.IsoCurve(direction: 1, constantParameter: v.Min),].Where(c => c is not null).Cast<Curve>().ToArray())
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+            [(20, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
+                ? ResultFactory.Create<Curve[]>(value: [.. brep.DuplicateEdgeCurves(nakedOnly: false),])
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
+            [(21, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && surface.Domain(1) is Interval vDomain
+                ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, 5).Select(i => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(i / 4.0))).Where(c => c is not null).Cast<Curve>(),])
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+            [(22, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && surface.Domain(0) is Interval uDomain
+                ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, 5).Select(i => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(i / 4.0))).Where(c => c is not null).Cast<Curve>(),])
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+            [(23, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && (surface.Domain(0), surface.Domain(1)) is (Interval uDomain, Interval vDomain)
+                ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, 5).Select(i => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(i / 4.0))), .. Enumerable.Range(0, 5).Select(i => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(i / 4.0))),].Where(c => c is not null).Cast<Curve>().ToArray())
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+            [(24, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
+                ? ResultFactory.Create<Curve[]>(value: [.. brep.Edges.Where(edge => edge.AdjacentFaces() is int[] adjacentFaces && adjacentFaces.Length == 2 && edge.PointAt(edge.Domain.ParameterAt(0.5)) is Point3d midPoint && brep.Faces[adjacentFaces[0]].ClosestPoint(testPoint: midPoint, u: out double u0, v: out double v0) && brep.Faces[adjacentFaces[1]].ClosestPoint(testPoint: midPoint, u: out double u1, v: out double v1) && Math.Abs(Vector3d.VectorAngle(brep.Faces[adjacentFaces[0]].NormalAt(u: u0, v: v0), brep.Faces[adjacentFaces[1]].NormalAt(u: u1, v: v1))) < ExtractionConfig.FeatureEdgeAngleThreshold).Select(edge => edge.DuplicateCurve()).Where(c => c is not null).Cast<Curve>(),])
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
+            [(30, typeof(Surface))] = static (geometry, request, _) => geometry is Surface surface && request.Parameter is int count && count >= ExtractionConfig.MinIsocurveCount && count <= ExtractionConfig.MaxIsocurveCount && (surface.Domain(0), surface.Domain(1)) is (Interval uDomain, Interval vDomain)
+                ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(i / (double)(count - 1)))), .. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(i / (double)(count - 1)))),].Where(c => c is not null).Cast<Curve>().ToArray())
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid count or surface")),
+            [(31, typeof(Surface))] = static (geometry, request, _) => geometry is Surface surface && request.Parameter is (int count, byte direction) && count >= ExtractionConfig.MinIsocurveCount && count <= ExtractionConfig.MaxIsocurveCount
+                ? direction switch {
+                    0 => surface.Domain(1) is Interval vDomain ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(i / (double)(count - 1)))).Where(c => c is not null).Cast<Curve>(),]) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("V domain unavailable")),
+                    1 => surface.Domain(0) is Interval uDomain ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(i / (double)(count - 1)))).Where(c => c is not null).Cast<Curve>(),]) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("U domain unavailable")),
+                    2 => (surface.Domain(0), surface.Domain(1)) is (Interval u, Interval v) ? ResultFactory.Create<Curve[]>(value: [.. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 0, constantParameter: v.ParameterAt(i / (double)(count - 1)))), .. Enumerable.Range(0, count).Select(i => surface.IsoCurve(direction: 1, constantParameter: u.ParameterAt(i / (double)(count - 1)))),].Where(c => c is not null).Cast<Curve>().ToArray()) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+                    _ => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidDirection),
+                }
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid parameters")),
+            [(32, typeof(Surface))] = static (geometry, request, _) => geometry is Surface surface && request.Parameter is double[] parameters && (surface.Domain(0), surface.Domain(1)) is (Interval uDomain, Interval vDomain)
+                ? ResultFactory.Create<Curve[]>(value: [.. parameters.Select(t => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(t))), .. parameters.Select(t => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(t))),].Where(c => c is not null).Cast<Curve>().ToArray())
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid parameters or surface")),
+            [(33, typeof(Surface))] = static (geometry, request, _) => geometry is Surface surface && request.Parameter is (double[] parameters, byte direction)
+                ? direction switch {
+                    0 => surface.Domain(1) is Interval vDomain ? ResultFactory.Create<Curve[]>(value: [.. parameters.Select(t => surface.IsoCurve(direction: 0, constantParameter: vDomain.ParameterAt(t))).Where(c => c is not null).Cast<Curve>(),]) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("V domain unavailable")),
+                    1 => surface.Domain(0) is Interval uDomain ? ResultFactory.Create<Curve[]>(value: [.. parameters.Select(t => surface.IsoCurve(direction: 1, constantParameter: uDomain.ParameterAt(t))).Where(c => c is not null).Cast<Curve>(),]) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("U domain unavailable")),
+                    2 => (surface.Domain(0), surface.Domain(1)) is (Interval u, Interval v) ? ResultFactory.Create<Curve[]>(value: [.. parameters.Select(t => surface.IsoCurve(direction: 0, constantParameter: v.ParameterAt(t))), .. parameters.Select(t => surface.IsoCurve(direction: 1, constantParameter: u.ParameterAt(t))),].Where(c => c is not null).Cast<Curve>().ToArray()) : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
+                    _ => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidDirection),
+                }
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid parameters")),
+            [(34, typeof(Brep))] = static (geometry, request, _) => geometry is Brep brep && request.Parameter is double angleThreshold
+                ? ResultFactory.Create<Curve[]>(value: [.. brep.Edges.Where(edge => edge.AdjacentFaces() is int[] adjacentFaces && adjacentFaces.Length == 2 && edge.PointAt(edge.Domain.ParameterAt(0.5)) is Point3d midPoint && brep.Faces[adjacentFaces[0]].ClosestPoint(testPoint: midPoint, u: out double u0, v: out double v0) && brep.Faces[adjacentFaces[1]].ClosestPoint(testPoint: midPoint, u: out double u1, v: out double v1) && Math.Abs(Vector3d.VectorAngle(brep.Faces[adjacentFaces[0]].NormalAt(u: u0, v: v0), brep.Faces[adjacentFaces[1]].NormalAt(u: u1, v: v1))) < angleThreshold).Select(edge => edge.DuplicateCurve()).Where(c => c is not null).Cast<Curve>(),])
+                : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid angle or brep")),
         }.ToFrozenDictionary();
 }
