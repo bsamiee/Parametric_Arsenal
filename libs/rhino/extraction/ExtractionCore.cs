@@ -143,13 +143,14 @@ internal static class ExtractionCore {
             [(6, typeof(Curve))] = static (geometry, _, _) => geometry is Curve curve
                 ? curve.DuplicateSegments() is Curve[] { Length: > 0 } segments
                     ? ((Func<Curve[], Result<Point3d[]>>)(segArray => {
-                        try {
-                            return ResultFactory.Create(value: [.. segArray.Select(segment => segment.PointAtNormalizedLength(0.5)),]);
-                        } finally {
-                            foreach (Curve segment in segArray) {
-                                segment.Dispose();
-                            }
-                        }
+                        return ResultFactory.Create(
+                            value: [
+                                .. segArray.Select(static segment => {
+                                    using Curve s = segment;
+                                    return s.PointAtNormalizedLength(0.5);
+                                }),
+                            ],
+                        );
                     }))(segments)
                     : curve.TryGetPolyline(out Polyline polyline)
                         ? ResultFactory.Create(value: [.. polyline.GetSegments().Where(static line => line.IsValid).Select(static line => line.PointAt(0.5)),])
