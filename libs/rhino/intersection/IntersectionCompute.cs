@@ -1,5 +1,4 @@
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -127,48 +126,46 @@ internal static class IntersectionCompute {
                                 .Bind(normalized => {
                                     int phiSteps = (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount));
                                     int thetaSteps = (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount)));
-                                    Vector3d[] directions = Enumerable.Range(0, phiSteps)
+                                    Vector3d[] directions = [.. Enumerable.Range(0, phiSteps)
                                         .SelectMany(phiIndex => Enumerable.Range(0, thetaSteps)
                                             .Select(thetaIndex => ((Math.PI * phiIndex) / phiSteps, ((2.0 * Math.PI) * thetaIndex) / thetaSteps) is (double phi, double theta)
                                                 ? new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi))
                                                 : Vector3d.Unset))
-                                        .Take(IntersectionConfig.StabilitySampleCount)
-                                        .ToArray();
+                                        .Take(IntersectionConfig.StabilitySampleCount),
+                                    ];
                                     double perturbationDistance = validA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor;
-                                    Result<(double Score, double Sensitivity, bool[] UnstableFlags)> defaultResult = ResultFactory.Create(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
+                                    Result<(double Score, double Sensitivity, bool[] UnstableFlags)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
 
                                     Func<Vector3d, (double Delta, IDisposable? Resource)> sampler = validA switch {
                                         Curve curve => direction => curve.DuplicateCurve() is Curve copy && copy.Translate(direction * perturbationDistance)
                                             ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
-                                                .Map(result => (Math.Abs(result.Points.Count - count), (IDisposable?)copy))
-                                                .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, (IDisposable?)null); })
-                                            : (double.NaN, (IDisposable?)null),
+                                                .Map(result => ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy))
+                                                .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); })
+                                            : (double.NaN, null),
                                         Surface surface => direction => surface.Duplicate() is Surface copy && copy.Translate(direction * perturbationDistance)
                                             ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
-                                                .Map(result => (Math.Abs(result.Points.Count - count), (IDisposable?)copy))
-                                                .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, (IDisposable?)null); })
-                                            : (double.NaN, (IDisposable?)null),
-                                        _ => _ => (double.NaN, (IDisposable?)null),
+                                                .Map(result => ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy))
+                                                .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); })
+                                            : (double.NaN, null),
+                                        _ => _ => (double.NaN, null),
                                     };
 
-                                    (double Delta, IDisposable? Resource)[] perturbations = directions.Select(sampler).ToArray();
+                                    (double Delta, IDisposable? Resource)[] perturbations = [.. directions.Select(sampler)];
                                     try {
-                                        double[] filtered = perturbations.Select(entry => entry.Delta).Where(delta => !double.IsNaN(delta)).ToArray();
-                                        Result<(double Score, double Sensitivity, bool[] UnstableFlags)> outcome = filtered.Length > 0
-                                            ? ResultFactory.Create(value: (
+                                        double[] filtered = [.. perturbations.Select(entry => entry.Delta).Where(delta => !double.IsNaN(delta))];
+                                        return filtered.Length > 0
+                                            ? ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (
                                                 Score: 1.0 / (1.0 + filtered.Average()),
                                                 Sensitivity: filtered.Max() / count,
                                                 UnstableFlags: [.. Enumerable.Range(0, count).Select(index => filtered
                                                     .Skip((int)Math.Round(index * filtered.Length / (double)count))
                                                     .Take((int)Math.Round((index + 1) * filtered.Length / (double)count) - (int)Math.Round(index * filtered.Length / (double)count))
-                                                    .Any(delta => delta > 1.0))]))
+                                                    .Any(delta => delta > 1.0)),
+                                                ]))
                                             : defaultResult;
-
-                                        return outcome;
-                                    }
-                                    finally {
-                                        foreach ((double Delta, IDisposable? Resource) entry in perturbations) {
-                                            entry.Resource?.Dispose();
+                                    } finally {
+                                        foreach ((double Delta, IDisposable? Resource) in perturbations) {
+                                            Resource?.Dispose();
                                         }
                                     }
                                 })));

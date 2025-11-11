@@ -48,7 +48,7 @@ public static class Intersect {
                 geometryA,
                 (Func<object, Result<IReadOnlyList<IntersectionOutput>>>)(item => IntersectionCore.ExecuteWithOptions(
                         item,
-                        (object)geometryB,
+                        geometryB,
                         context,
                         normalized)
                     .Map(output => (IReadOnlyList<IntersectionOutput>)[output])),
