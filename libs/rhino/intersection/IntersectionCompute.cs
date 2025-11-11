@@ -91,9 +91,9 @@ internal static class IntersectionCompute {
                                                     Point3d[] pointsB = new Point3d[p.Length];
                                                     double[] distances = new double[p.Length];
                                                     for (int i = 0; i < p.Length; i++) {
-                                                        pointsA[i] = p[i].PointA;
-                                                        pointsB[i] = p[i].PointB;
-                                                        distances[i] = p[i].Distance;
+                                                        pointsA[i] = p[i].Item1;
+                                                        pointsB[i] = p[i].Item2;
+                                                        distances[i] = p[i].Item3;
                                                     }
                                                     return (pointsA, pointsB, distances);
                                                 }))(curvePairs))
@@ -112,9 +112,9 @@ internal static class IntersectionCompute {
                                                     Point3d[] pointsB = new Point3d[p.Length];
                                                     double[] distances = new double[p.Length];
                                                     for (int i = 0; i < p.Length; i++) {
-                                                        pointsA[i] = p[i].PointA;
-                                                        pointsB[i] = p[i].PointB;
-                                                        distances[i] = p[i].Distance;
+                                                        pointsA[i] = p[i].Item1;
+                                                        pointsB[i] = p[i].Item2;
+                                                        distances[i] = p[i].Item3;
                                                     }
                                                     return (pointsA, pointsB, distances);
                                                 }))(pairs))
