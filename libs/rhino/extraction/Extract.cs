@@ -126,7 +126,7 @@ public static class Extract {
         };
 
         return requestResult.Bind(request =>
-            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Curve>>>)(item => ExtractionCore.ExecuteCurves(item, request, context)), new OperationConfig<T, Curve> { Context = context, ValidationMode = request.ValidationMode, }));
+            UnifiedOperation.Apply(input, item => ExtractionCore.ExecuteCurves(item, request, context), new OperationConfig<T, Curve> { Context = context, ValidationMode = request.ValidationMode, }));
     }
 
     /// <summary>Batch curve extraction with error accumulation and parallelism.</summary>
