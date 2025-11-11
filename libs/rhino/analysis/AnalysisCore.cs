@@ -29,7 +29,7 @@ internal static class AnalysisCore {
                     return amp is not null
                         ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
                             cv.PointAt(param), cv.DerivativeAt(param, order) ?? [], cv.CurvatureAt(param).Length, frame,
-                            cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i * 0.25)),]) ?? [],
+                            cv.GetPerpendicularFrames([.. Enumerable.Range(0, frameSampleCount).Select(i => cv.Domain.ParameterAt(frameSampleCount > 1 ? i / (frameSampleCount - 1.0) : 0.5)),]) ?? [],
                             cv.IsClosed ? cv.TorsionAt(param) : 0, disc,
                             [.. disc.Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                             cv.GetLength(), amp.Centroid))
