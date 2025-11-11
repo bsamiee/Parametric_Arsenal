@@ -70,18 +70,16 @@ internal static class SpatialCompute {
 
     private static Result<(Point3d, double[])[]> BuildClusters(Point3d[] points, int[] assignments, byte algorithm, int requestedK) {
         int clusterCount = algorithm == 1 ? assignments.Where(index => index >= 0).DefaultIfEmpty(-1).Max() + 1 : requestedK;
-        if (clusterCount <= 0) {
-            return ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Non-positive cluster count"));
-        }
-
-        return ResultFactory.Create(value: Enumerable.Range(0, clusterCount))
-            .Traverse(cluster => {
-                int[] members = [.. Enumerable.Range(0, points.Length).Where(index => assignments[index] == cluster),];
-                return members.Length == 0
-                    ? ResultFactory.Create<(Point3d, double[])>(error: E.Spatial.ClusteringFailed.WithContext("Empty cluster"))
-                    : Centroid(members, points).Map(center => (center, [.. members.Select(index => points[index].DistanceTo(center)),]));
-            })
-            .Map(clusters => clusters.ToArray());
+        return clusterCount <= 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Non-positive cluster count"))
+            : ResultFactory.Create(value: Enumerable.Range(0, clusterCount))
+                .Traverse(cluster => {
+                    int[] members = [.. Enumerable.Range(0, points.Length).Where(index => assignments[index] == cluster),];
+                    return members.Length == 0
+                        ? ResultFactory.Create<(Point3d, double[])>(error: E.Spatial.ClusteringFailed.WithContext("Empty cluster"))
+                        : Centroid(members, points).Map(center => (center, [.. members.Select(index => points[index].DistanceTo(center)),]));
+                })
+                .Map(clusters => clusters.ToArray());
     }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
