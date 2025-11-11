@@ -158,8 +158,8 @@ internal static class IntersectionCompute {
                                             Score: 1.0 / (1.0 + filtered.Average()),
                                             Sensitivity: filtered.Max() / count,
                                             UnstableFlags: [.. Enumerable.Range(0, count).Select(index => filtered
-                                                .Skip((int)Math.Round(index * filtered.Length / (double)count))
-                                                .Take((int)Math.Round((index + 1) * filtered.Length / (double)count) - (int)Math.Round(index * filtered.Length / (double)count))
+                                                .Skip((int)Math.Round((double)index * filtered.Length / (double)count))
+                                                .Take((int)Math.Round((double)(index + 1) * filtered.Length / (double)count) - (int)Math.Round((double)index * filtered.Length / (double)count))
                                                 .Any(delta => delta > 1.0))]))
                                         : defaultResult;
 
