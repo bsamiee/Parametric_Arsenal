@@ -117,18 +117,17 @@ internal static class TopologyCore {
             operation: g => (g, edgeIndex) switch {
                 (Brep brep, int idx) when idx >= 0 && idx < brep.Edges.Count => (brep.Edges[idx], brep.Edges[idx].AdjacentFaces().ToArray()) switch {
                     (BrepEdge e, int[] af) when af.Length == 2 => ((Func<Point3d, Result<IReadOnlyList<Topology.AdjacencyData>>>)(edgeMid =>
-                        ((Func<(Vector3d n0, Vector3d n1), Result<IReadOnlyList<Topology.AdjacencyData>>>)(normals =>
-                            ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
+                        {
+                            var n0 = brep.Faces[af[0]].ClosestPoint(edgeMid, out var u0, out var v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset;
+                            var n1 = brep.Faces[af[1]].ClosestPoint(edgeMid, out var u1, out var v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset;
+                            return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
                                 EdgeIndex: idx,
                                 AdjacentFaceIndices: af,
-                                FaceNormals: [normals.n0, normals.n1,],
-                                DihedralAngle: Vector3d.VectorAngle(normals.n0, normals.n1),
+                                FaceNormals: [n0, n1],
+                                DihedralAngle: n0.IsValid && n1.IsValid ? Vector3d.VectorAngle(n0, n1) : 0.0,
                                 IsManifold: e.Valence == EdgeAdjacency.Interior,
-                                IsBoundary: e.Valence == EdgeAdjacency.Naked),])
-                        ))((
-                            brep.Faces[af[0]].ClosestPoint(edgeMid, out double u0, out double v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset,
-                            brep.Faces[af[1]].ClosestPoint(edgeMid, out double u1, out double v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset
-                        ))))(e.PointAt(e.Domain.Mid)),
+                                IsBoundary: e.Valence == EdgeAdjacency.Naked)]);
+                        }))(e.PointAt(e.Domain.Mid)),
                     (BrepEdge e, int[] af) => ((Func<Point3d, Result<IReadOnlyList<Topology.AdjacencyData>>>)(edgeMid =>
                         ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
                             EdgeIndex: idx,
