@@ -49,9 +49,23 @@ internal static class TopologyCore {
         return Execute(input: input, context: context, opType: TopologyConfig.OpType.BoundaryLoops, enableDiagnostics: enableDiagnostics,
             operation: g => GetNakedCurves(geometry: g) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
-                Curve[] naked => Curve.JoinCurves(naked, joinTolerance: tol, preserveDirection: false) switch {
-                    Curve[] joined => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [.. joined,], EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),], LoopLengths: [.. joined.Select(c => c.GetLength()),], IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),], JoinTolerance: tol, FailedJoins: naked.Length - joined.Length),]),
-                },
+                Curve[] naked => ((Func<Curve[], Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(nakedCurves => {
+                    try {
+                        Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
+                        return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
+                            Loops: [.. joined,],
+                            EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
+                            LoopLengths: [.. joined.Select(c => c.GetLength()),],
+                            IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
+                            JoinTolerance: tol,
+                            FailedJoins: nakedCurves.Length - joined.Length),
+                        ]);
+                    } finally {
+                        foreach (Curve sourceCurve in nakedCurves) {
+                            sourceCurve.Dispose();
+                        }
+                    }
+                }))(naked),
             });
 
         static Curve[] GetNakedCurves(object geometry) => geometry switch {

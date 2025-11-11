@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -110,7 +111,14 @@ internal static class TopologyCompute {
                         }),
                     ];
 
-                    (byte strategy, Brep? healed, int nakedEdges) = attempts.Where(a => a.Healed is not null).OrderBy(a => a.NakedEdges).FirstOrDefault();
+                    IEnumerable<(byte Strategy, Brep? Healed, int NakedEdges)> successfulAttempts = attempts.Where(a => a.Healed is not null);
+                    (byte strategy, Brep? healed, int nakedEdges) = successfulAttempts.OrderBy(a => a.NakedEdges).FirstOrDefault();
+                    foreach ((byte Strategy, Brep? Healed, int NakedEdges) attempt in attempts) {
+                        _ = attempt.Healed switch {
+                            Brep other when !ReferenceEquals(other, healed) => ((Func<int>)(() => { other.Dispose(); return 0; }))(),
+                            _ => 0,
+                        };
+                    }
                     return healed is not null
                         ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
                         : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
