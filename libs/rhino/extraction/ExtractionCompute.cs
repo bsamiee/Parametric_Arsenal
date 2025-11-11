@@ -103,15 +103,19 @@ internal static class ExtractionCompute {
     private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop) {
         using Curve? c = loop.To3dCurve();
 
-        return c?.IsClosed is not true
-            ? (false, 0.0)
-            : c.TryGetCircle(out Circle circ, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                ? (true, Math.PI * circ.Radius * circ.Radius)
-                : c.TryGetEllipse(out Ellipse ell, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                    ? (true, Math.PI * ell.Radius1 * ell.Radius2)
-                    : c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides
-                        ? ((Func<(bool, double)>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(c); return (true, amp?.Area ?? 0.0); }))()
-                        : (false, 0.0);
+        return c switch {
+            null => (false, 0.0),
+            _ when !c.IsClosed => (false, 0.0),
+            _ when c.TryGetCircle(out Circle circ, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+                => (true, Math.PI * circ.Radius * circ.Radius),
+            _ when c.TryGetEllipse(out Ellipse ell, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+                => (true, Math.PI * ell.Radius1 * ell.Radius2),
+            _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
+                true,
+                (using (AreaMassProperties? amp = AreaMassProperties.Compute(c))) ? amp?.Area ?? 0.0 : 0.0
+            ),
+            _ => (false, 0.0),
+        };
     }
 
     private static readonly double[] _zeroResidual = [0.0,];
