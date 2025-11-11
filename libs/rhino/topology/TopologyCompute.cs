@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using Arsenal.Core.Context;
@@ -125,6 +126,13 @@ internal static class TopologyCompute {
                     return bestHealed is Brep healed
                         ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, bestStrategy, bestNakedEdges < originalNakedEdges))
                         : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed"));
+                    IEnumerable<(byte Strategy, Brep? Healed, int NakedEdges)> successfulAttempts = attempts.Where(a => a.Healed is not null);
+                    (byte strategy, Brep? healed, int nakedEdges) = successfulAttempts.OrderBy(a => a.NakedEdges).FirstOrDefault();
+                    [.. attempts.Where(a => a.Healed is not null && !ReferenceEquals(a.Healed, healed))]
+                        .ForEach(a => a.Healed!.Dispose());
+                    return healed is not null
+                        ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, strategy, nakedEdges < originalNakedEdges))
+                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {attempts.Length} strategies failed"));
                 }))());
 
     [Pure]
