@@ -13,7 +13,7 @@ internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
-        Func<double[], Result<(byte, double[], bool, double)>> curveSurfaceClassifier = angles => {
+        static Result<(byte, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
             double deviationSum = 0.0;
             bool grazing = false;
             for (int i = 0; i < angles.Length; i++) {
@@ -30,7 +30,7 @@ internal static class IntersectionCompute {
                 ApproachAngles: angles,
                 IsGrazing: grazing,
                 BlendScore: tangent ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore));
-        };
+        }
 
         return geomA is null || geomB is null
             ? ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData.WithContext("Geometry is null"))
