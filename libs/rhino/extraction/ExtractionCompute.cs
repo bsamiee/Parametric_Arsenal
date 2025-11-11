@@ -110,7 +110,10 @@ internal static class ExtractionCompute {
                 => (true, Math.PI * ell.Radius1 * ell.Radius2),
             _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
                 true,
-                AreaMassProperties.Compute(c) is AreaMassProperties amp && amp.Area is double area ? area : 0.0
+                ((Func<double>)(() => {
+                    using AreaMassProperties? massProperties = AreaMassProperties.Compute(c);
+                    return massProperties is { Area: double holeArea } ? holeArea : 0.0;
+                }))()
             ),
             _ => (false, 0.0),
         };

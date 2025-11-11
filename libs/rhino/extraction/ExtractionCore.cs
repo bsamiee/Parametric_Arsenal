@@ -78,19 +78,38 @@ internal static class ExtractionCore {
     private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> BuildHandlerRegistry() =>
         new Dictionary<(byte, Type), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> {
             [(1, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
-                ? VolumeMassProperties.Compute(brep) switch { { Centroid: { IsValid: true } centroid } => ResultFactory.Create<Point3d[]>(value: [centroid, .. brep.Vertices.Select(vertex => vertex.Location),]), _ => ResultFactory.Create<Point3d[]>(value: [.. brep.Vertices.Select(vertex => vertex.Location),]), }
+                ? ((Func<Result<Point3d[]>>)(() => {
+                    using VolumeMassProperties? massProperties = VolumeMassProperties.Compute(brep);
+                    return massProperties is { Centroid: { IsValid: true } centroid }
+                        ? ResultFactory.Create<Point3d[]>(value: [centroid, .. brep.Vertices.Select(vertex => vertex.Location),])
+                        : ResultFactory.Create<Point3d[]>(value: [.. brep.Vertices.Select(vertex => vertex.Location),]);
+                }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
             [(1, typeof(Curve))] = static (geometry, _, _) => geometry is Curve curve
-                ? AreaMassProperties.Compute(curve) switch { { Centroid: { IsValid: true } centroid } => ResultFactory.Create<Point3d[]>(value: [centroid, curve.PointAtStart, curve.PointAtNormalizedLength(0.5), curve.PointAtEnd,]), _ => ResultFactory.Create<Point3d[]>(value: [curve.PointAtStart, curve.PointAtNormalizedLength(0.5), curve.PointAtEnd,]), }
+                ? ((Func<Result<Point3d[]>>)(() => {
+                    using AreaMassProperties? massProperties = AreaMassProperties.Compute(curve);
+                    return massProperties is { Centroid: { IsValid: true } centroid }
+                        ? ResultFactory.Create<Point3d[]>(value: [centroid, curve.PointAtStart, curve.PointAtNormalizedLength(0.5), curve.PointAtEnd,])
+                        : ResultFactory.Create<Point3d[]>(value: [curve.PointAtStart, curve.PointAtNormalizedLength(0.5), curve.PointAtEnd,]);
+                }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve")),
             [(1, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface
-                ? (AreaMassProperties.Compute(surface), surface.Domain(0), surface.Domain(1)) switch {
-                    ( { Centroid: { IsValid: true } centroid }, Interval u, Interval v) => ResultFactory.Create<Point3d[]>(value: [centroid, surface.PointAt(u.Min, v.Min), surface.PointAt(u.Max, v.Min), surface.PointAt(u.Max, v.Max), surface.PointAt(u.Min, v.Max),]),
-                    (_, Interval u, Interval v) => ResultFactory.Create<Point3d[]>(value: [surface.PointAt(u.Min, v.Min), surface.PointAt(u.Max, v.Min), surface.PointAt(u.Max, v.Max), surface.PointAt(u.Min, v.Max),]),
-                }
+                ? ((Func<Result<Point3d[]>>)(() => {
+                    using AreaMassProperties? massProperties = AreaMassProperties.Compute(surface);
+                    Interval uDomain = surface.Domain(0);
+                    Interval vDomain = surface.Domain(1);
+                    return massProperties is { Centroid: { IsValid: true } centroid }
+                        ? ResultFactory.Create<Point3d[]>(value: [centroid, surface.PointAt(uDomain.Min, vDomain.Min), surface.PointAt(uDomain.Max, vDomain.Min), surface.PointAt(uDomain.Max, vDomain.Max), surface.PointAt(uDomain.Min, vDomain.Max),])
+                        : ResultFactory.Create<Point3d[]>(value: [surface.PointAt(uDomain.Min, vDomain.Min), surface.PointAt(uDomain.Max, vDomain.Min), surface.PointAt(uDomain.Max, vDomain.Max), surface.PointAt(uDomain.Min, vDomain.Max),]);
+                }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Surface")),
             [(1, typeof(Mesh))] = static (geometry, _, _) => geometry is Mesh mesh
-                ? VolumeMassProperties.Compute(mesh) switch { { Centroid: { IsValid: true } centroid } => ResultFactory.Create<Point3d[]>(value: [centroid, .. mesh.Vertices.ToPoint3dArray(),]), _ => ResultFactory.Create(value: mesh.Vertices.ToPoint3dArray()), }
+                ? ((Func<Result<Point3d[]>>)(() => {
+                    using VolumeMassProperties? massProperties = VolumeMassProperties.Compute(mesh);
+                    return massProperties is { Centroid: { IsValid: true } centroid }
+                        ? ResultFactory.Create<Point3d[]>(value: [centroid, .. mesh.Vertices.ToPoint3dArray(),])
+                        : ResultFactory.Create(value: mesh.Vertices.ToPoint3dArray());
+                }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Mesh")),
             [(1, typeof(PointCloud))] = static (geometry, _, _) => geometry is PointCloud cloud && cloud.GetPoints() is Point3d[] cloudPoints && cloudPoints.Length > 0
                 ? ResultFactory.Create<Point3d[]>(value: [cloudPoints.Aggregate(Point3d.Origin, static (sum, point) => sum + point) / cloudPoints.Length, .. cloudPoints,])
@@ -176,7 +195,10 @@ internal static class ExtractionCore {
                 ? ResultFactory.Create<Point3d[]>(value: [.. brep.Faces.Select(face => face.DuplicateFace(duplicateMeshes: false) switch {
                     Brep duplicate => ((Func<Brep, Point3d>)(dup => {
                         try {
-                            Point3d? centroid = AreaMassProperties.Compute(dup)?.Centroid;
+                            Point3d? centroid = ((Func<Point3d?>)(() => {
+                                using AreaMassProperties? massProperties = AreaMassProperties.Compute(dup);
+                                return massProperties?.Centroid;
+                            }))();
                             return centroid.HasValue && centroid.Value.IsValid ? centroid.Value : Point3d.Unset;
                         } finally {
                             dup.Dispose();
