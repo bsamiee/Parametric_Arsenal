@@ -48,7 +48,7 @@ internal static class SpatialCompute {
         ResultFactory.Create(value: (Geometry: geometry, Algorithm: algorithm, K: k, Epsilon: epsilon))
             .Ensure(data => data.Geometry.Length > 0, error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
             .Ensure(data => data.Algorithm <= 2, error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {data.Algorithm}"))
-            .Ensure(data => data.Algorithm is 0 or 2 ? data.K > 0 : true, error: E.Spatial.InvalidClusterK)
+            .Ensure(data => !(data.Algorithm is 0 or 2) || data.K > 0, error: E.Spatial.InvalidClusterK)
             .Ensure(data => data.Algorithm is 1 ? data.Epsilon > context.AbsoluteTolerance : true, error: E.Spatial.InvalidEpsilon)
             .Bind(data => ResultFactory.Create(value: data.Geometry)
                 .Traverse(item => ResultFactory.Create(value: (GeometryBase)item).Validate(args: [context, V.Standard | V.Topology,]))
