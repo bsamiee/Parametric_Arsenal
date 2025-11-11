@@ -74,7 +74,7 @@ internal static class AnalysisCore {
                     return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame) &&
                         brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
                         ? ((Func<AreaMassProperties?, VolumeMassProperties?, SurfaceCurvature, Result<Analysis.IResult>>)((amp, vmp, sc) =>
-                            amp is not null && vmp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                            amp is not null && vmp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)
                                 ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
                                     sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
                                     sc.Direction(0), sc.Direction(1), frame, frame.Normal,
