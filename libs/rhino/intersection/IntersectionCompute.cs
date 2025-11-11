@@ -12,8 +12,27 @@ namespace Arsenal.Rhino.Intersection;
 internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) =>
-        geomA is null || geomB is null
+    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+        Func<double[], Result<(byte, double[], bool, double)>> curveSurfaceClassifier = angles => {
+            double deviationSum = 0.0;
+            bool grazing = false;
+            for (int i = 0; i < angles.Length; i++) {
+                double deviation = Math.Abs((Math.PI * 0.5) - angles[i]);
+                deviationSum += deviation;
+                grazing = grazing || deviation <= IntersectionConfig.GrazingAngleThreshold;
+            }
+
+            double averageDeviation = deviationSum / angles.Length;
+            bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
+
+            return ResultFactory.Create(value: (
+                Type: tangent ? (byte)0 : (byte)1,
+                ApproachAngles: angles,
+                IsGrazing: grazing,
+                BlendScore: tangent ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore));
+        };
+
+        return geomA is null || geomB is null
             ? ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData.WithContext("Geometry is null"))
             : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
@@ -29,8 +48,8 @@ internal static class IntersectionCompute {
                                 : ResultFactory.Create(value: geomB).Validate(args: [context, modeB,]))
                             .Bind(validB => (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
                                 (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-                                (int count, int parametersA, int parametersB) when parametersA >= count && parametersB >= count => (validA, validB) switch {
-                                    (Curve curveA, Curve curveB) => Enumerable.Range(0, count)
+                                (int count, int parametersA, int parametersB) => (validA, validB) switch {
+                                    (Curve curveA, Curve curveB) when parametersA >= count && parametersB >= count => Enumerable.Range(0, count)
                                         .Select(index => (curveA.TangentAt(output.ParametersA[index]), curveB.TangentAt(output.ParametersB[index])) is (Vector3d tangentA, Vector3d tangentB) && tangentA.IsValid && tangentB.IsValid
                                             ? Vector3d.VectorAngle(tangentA, tangentB)
                                             : double.NaN)
@@ -38,12 +57,30 @@ internal static class IntersectionCompute {
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && (circularMean < 0.0 ? circularMean + (2.0 * Math.PI) : circularMean) is double averageAngle
                                             ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                                             : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                                    (Curve, Surface) or (Surface, Curve) => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
+                                    (Curve curve, Surface surface) when parametersA >= count => Enumerable.Range(0, count)
+                                        .Select(index => (curve.TangentAt(output.ParametersA[index]), output.Points[index]))
+                                        .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
+                                            ? Vector3d.VectorAngle(tuple.Item1, normal)
+                                            : double.NaN)
+                                        .Where(angle => !double.IsNaN(angle))
+                                        .ToArray() is double[] angles && angles.Length > 0
+                                            ? curveSurfaceClassifier(angles)
+                                            : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                                    (Surface surface, Curve curve) when parametersB >= count => Enumerable.Range(0, count)
+                                        .Select(index => (curve.TangentAt(output.ParametersB[index]), output.Points[index]))
+                                        .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
+                                            ? Vector3d.VectorAngle(tuple.Item1, normal)
+                                            : double.NaN)
+                                        .Where(angle => !double.IsNaN(angle))
+                                        .ToArray() is double[] angles && angles.Length > 0
+                                            ? curveSurfaceClassifier(angles)
+                                            : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                                    _ when parametersA < count || parametersB < count => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                                     _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
                                 },
-                                _ => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                             }));
                 });
+    }
 
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
