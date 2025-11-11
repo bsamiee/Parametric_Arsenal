@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Linq;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
@@ -13,11 +14,9 @@ internal static class ExtractionCompute {
     internal static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeatures(Brep brep, IGeometryContext context) =>
         ResultFactory.Create(value: brep)
             .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
-            .Bind(validBrep => validBrep.Faces.Count is 0
-                ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no faces"))
-                : validBrep.Edges.Count is 0
-                    ? ResultFactory.Create<((byte Type, double Param)[], double Confidence)>(error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no edges"))
-                    : ExtractFeaturesInternal(brep: validBrep));
+            .Ensure(b => b.Faces.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no faces"))
+            .Ensure(b => b.Edges.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no edges"))
+            .Bind(validBrep => ExtractFeaturesInternal(brep: validBrep));
 
     [Pure]
     private static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeaturesInternal(Brep brep) {
@@ -121,36 +120,51 @@ internal static class ExtractionCompute {
     private static readonly double[] _zeroResidual = [0.0,];
 
     [Pure]
-    internal static Result<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry) =>
-        geometry switch {
-            Surface s => ClassifySurface(surface: s) switch {
-                (true, byte type, Plane frame, double[] pars) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
-                    value: ([(Type: type, Frame: frame, Params: pars),], _zeroResidual)),
-                _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
-                    error: E.Geometry.NoPrimitivesDetected),
-            },
-            Brep b when b.Faces.Count is 0 => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
-                error: E.Geometry.DecompositionFailed.WithContext("Brep has no faces")),
-            Brep b => DecomposeBrepFaces(brep: b),
-            _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
-                error: E.Geometry.DecompositionFailed.WithContext($"Unsupported geometry type: {geometry.GetType().Name}")),
-        };
+    internal static Result<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry, IGeometryContext context) =>
+        ResultFactory.Create(value: geometry)
+            .Validate(args: [context, V.Standard | V.BoundingBox,])
+            .Bind(validGeometry => validGeometry switch {
+                Surface surface => ResultFactory.Create(value: surface)
+                    .Validate(args: [context, V.Standard | V.SurfaceContinuity | V.UVDomain,])
+                    .Bind(validSurface => ClassifySurface(surface: validSurface) switch {
+                        (true, byte type, Plane frame, double[] pars) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
+                            value: ([(Type: type, Frame: frame, Params: pars),], _zeroResidual)),
+                        _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
+                            error: E.Geometry.NoPrimitivesDetected),
+                    }),
+                Brep brep => ResultFactory.Create(value: brep)
+                    .Validate(args: [context, V.Standard | V.BrepGranular,])
+                    .Ensure(b => b.Faces.Count > 0, error: E.Geometry.DecompositionFailed.WithContext("Brep has no faces"))
+                    .Bind(validBrep => DecomposeBrepFaces(brep: validBrep, context: context)),
+                GeometryBase other => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
+                    error: E.Geometry.DecompositionFailed.WithContext($"Unsupported geometry type: {other.GetType().Name}")),
+            });
 
     [Pure]
-    private static Result<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)> DecomposeBrepFaces(Brep brep) {
+    private static Result<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)> DecomposeBrepFaces(Brep brep, IGeometryContext context) {
         (bool Success, byte Type, Plane Frame, double[] Params, double Residual)[] classified =
             new (bool, byte, Plane, double[], double)[brep.Faces.Count];
 
         for (int i = 0; i < brep.Faces.Count; i++) {
-            classified[i] = brep.Faces[i].DuplicateSurface() switch {
-                null => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, [], 0.0),
-                Surface surf => ((Func<(bool, byte, Plane, double[], double)>)(() => {
-                    (bool success, byte type, Plane frame, double[] pars) = ClassifySurface(surface: surf);
-                    double residual = success ? ComputeSurfaceResidual(surface: surf, type: type, frame: frame, pars: pars) : 0.0;
-                    surf.Dispose();
-                    return (success, type, frame, pars, residual);
-                }))(),
-            };
+            Surface? duplicate = brep.Faces[i].DuplicateSurface();
+            if (duplicate is null) {
+                return ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
+                    error: E.Geometry.DecompositionFailed.WithContext($"Failed to duplicate face {i.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+            }
+
+            Surface surface = duplicate;
+            Result<Surface> validatedSurface = ResultFactory.Create(value: surface)
+                .Validate(args: [context, V.Standard | V.SurfaceContinuity | V.UVDomain,]);
+
+            if (!validatedSurface.IsSuccess) {
+                surface.Dispose();
+                return ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(errors: validatedSurface.Errors);
+            }
+
+            (bool success, byte type, Plane frame, double[] pars) = ClassifySurface(surface: surface);
+            double residual = success ? ComputeSurfaceResidual(surface: surface, type: type, frame: frame, pars: pars) : 0.0;
+            classified[i] = (success, type, frame, pars, residual);
+            surface.Dispose();
         }
 
         (byte Type, Plane Frame, double[] Params)[] primitives = [.. classified
@@ -256,13 +270,26 @@ internal static class ExtractionCompute {
 
     [Pure]
     internal static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
-        geometries.Length < ExtractionConfig.PatternMinInstances
-            ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(
-                error: E.Geometry.NoPatternDetected.WithContext($"Need at least {ExtractionConfig.PatternMinInstances.ToString(System.Globalization.CultureInfo.InvariantCulture)} instances"))
-            : geometries.Any(g => g is null)
-                ? ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(
-                    error: E.Validation.GeometryInvalid.WithContext("Array contains null geometries"))
-                : DetectPatternType(centers: [.. geometries.Select(g => g.GetBoundingBox(accurate: false).Center),], context: context);
+        ResultFactory.Create(value: geometries)
+            .Ensure(gs => gs.Length >= ExtractionConfig.PatternMinInstances, error: E.Geometry.NoPatternDetected.WithContext($"Need at least {ExtractionConfig.PatternMinInstances.ToString(System.Globalization.CultureInfo.InvariantCulture)} instances"))
+            .Ensure(gs => gs.All(g => g is not null), error: E.Validation.GeometryInvalid.WithContext("Array contains null geometries"))
+            .Bind(gs => {
+                Point3d[] centers = new Point3d[gs.Length];
+
+                for (int i = 0; i < gs.Length; i++) {
+                    GeometryBase geometry = gs[i]!;
+                    Result<GeometryBase> validated = ResultFactory.Create(value: geometry)
+                        .Validate(args: [context, V.Standard | V.BoundingBox,]);
+
+                    if (!validated.IsSuccess) {
+                        return ResultFactory.Create<(byte Type, Transform SymmetryTransform, double Confidence)>(errors: validated.Errors);
+                    }
+
+                    centers[i] = validated.Value.GetBoundingBox(accurate: false).Center;
+                }
+
+                return DetectPatternType(centers: centers, context: context);
+            });
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
         Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[i]).ToArray() is Vector3d[] deltas && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)

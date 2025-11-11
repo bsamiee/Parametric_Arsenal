@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -37,27 +38,49 @@ public static class Extract {
         /// <summary>Topology face centroids via area properties.</summary>
         public static readonly Semantic FaceCentroids = new(7);
     }
+
+    /// <summary>Normalized extraction request computed from heterogeneous specifications.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly struct Request {
+        internal readonly byte Kind;
+        internal readonly object? Parameter;
+        internal readonly bool IncludeEnds;
+
+        internal Request(byte kind, object? parameter, bool includeEnds) {
+            Kind = kind;
+            Parameter = parameter;
+            IncludeEnds = includeEnds;
+        }
+    }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase =>
-        spec switch {
-            int c when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            double l when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            (int c, bool) when c <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidCount),
-            (double l, bool) when l <= 0 => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidLength),
-            Vector3d dir when dir.Length <= context.AbsoluteTolerance => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidDirection),
-            Semantic sem => UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(sem.Kind, typeof(T)), }),
-            int or double or (int, bool) or (double, bool) or Vector3d or Continuity => UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, spec, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = V.Standard, }),
-            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction),
-        };
+        (Result<Request>)((spec, context.AbsoluteTolerance) switch {
+            (int count, _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            (int count, _) => ResultFactory.Create(value: new Request(10, count, true)),
+            ((int count, bool include), _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            ((int count, bool include), _) => ResultFactory.Create(value: new Request(10, count, include)),
+            (double length, _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
+            (double length, _) => ResultFactory.Create(value: new Request(11, length, true)),
+            ((double length, bool include), _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
+            ((double length, bool include), _) => ResultFactory.Create(value: new Request(11, length, include)),
+            (Vector3d direction, double tolerance) when direction.Length <= tolerance => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection),
+            (Vector3d direction, _) => ResultFactory.Create(value: new Request(12, direction, true)),
+            (Continuity continuity, _) => ResultFactory.Create(value: new Request(13, continuity, true)),
+            (Semantic semantic, _) => ResultFactory.Create(value: new Request(semantic.Kind, null, true)),
+            _ => ResultFactory.Create<Request>(error: E.Geometry.InvalidExtraction),
+        })).Bind(request =>
+            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, request, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = ExtractionConfig.GetValidationMode(request.Kind, input.GetType()), }));
 
     /// <summary>Batch point extraction with error accumulation and parallelism.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
         Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];
-        return (accumulateErrors, results.All(r => r.IsSuccess)) switch {
-            (true, true) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
-            (true, false) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
-            (false, _) => results.FirstOrDefault(r => !r.IsSuccess) is { IsSuccess: false } failure ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,]) : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
+        Result<IReadOnlyList<Point3d>>[] failures = [.. results.Where(r => !r.IsSuccess),];
+        return (accumulateErrors, failures.Length) switch {
+            (true, 0) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
+            (true, > 0) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failures.SelectMany(f => f.Errors),]),
+            (false, > 0) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failures[0].Errors,]),
+            (false, 0) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
         };
     }
 
@@ -68,8 +91,8 @@ public static class Extract {
 
     /// <summary>Decompose geometry to best-fit primitives: planes, cylinders, spheres with residuals.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<((byte Type, Plane Frame, double[] Parameters)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry) =>
-        ExtractionCompute.DecomposeToPrimitives(geometry);
+    public static Result<((byte Type, Plane Frame, double[] Parameters)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry, IGeometryContext context) =>
+        ExtractionCompute.DecomposeToPrimitives(geometry, context);
 
     /// <summary>Extract geometric patterns: symmetries, sequences, transformations with confidence.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

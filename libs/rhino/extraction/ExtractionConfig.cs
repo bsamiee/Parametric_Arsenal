@@ -66,20 +66,33 @@ internal static class ExtractionConfig {
             [(1, typeof(Curve))] = V.Standard | V.AreaCentroid,
             [(1, typeof(Surface))] = V.Standard | V.AreaCentroid,
             [(1, typeof(Mesh))] = V.Standard | V.MassProperties,
+            [(1, typeof(Extrusion))] = V.Standard | V.MassProperties,
+            [(1, typeof(SubD))] = V.Standard | V.Topology,
             [(2, typeof(GeometryBase))] = V.BoundingBox,
             [(3, typeof(GeometryBase))] = V.Standard,
             [(4, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(5, typeof(Curve))] = V.Tolerance,
             [(6, typeof(Brep))] = V.Standard | V.Topology,
             [(6, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(6, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(7, typeof(Brep))] = V.Standard | V.Topology,
             [(7, typeof(Mesh))] = V.Standard | V.MeshSpecific,
             [(10, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(10, typeof(Surface))] = V.Standard,
+            [(10, typeof(Brep))] = V.Standard | V.Topology,
+            [(10, typeof(Extrusion))] = V.Standard | V.Topology,
+            [(10, typeof(SubD))] = V.Standard | V.Topology,
             [(11, typeof(Curve))] = V.Standard | V.Degeneracy,
+            [(11, typeof(Surface))] = V.Standard | V.AreaCentroid,
+            [(11, typeof(Brep))] = V.Standard | V.Topology,
+            [(12, typeof(Curve))] = V.Standard | V.Degeneracy,
+            [(12, typeof(Surface))] = V.Standard | V.AreaCentroid,
+            [(12, typeof(Brep))] = V.Standard | V.Topology,
+            [(13, typeof(Curve))] = V.Standard | V.Degeneracy,
+            [(13, typeof(PolyCurve))] = V.Standard | V.Degeneracy,
         }.ToFrozenDictionary();
 
     /// <summary>Gets validation mode with fallback for (kind, type) pair.</summary>
     internal static V GetValidationMode(byte kind, Type geometryType) =>
-        ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact : ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType)).OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0)).Select(kv => kv.Value).DefaultIfEmpty(V.Standard).First();
+        ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact : ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType)).OrderBy(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a == b ? 0 : a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : string.Compare(a.FullName, b.FullName, System.StringComparison.Ordinal))).Select(kv => kv.Value).DefaultIfEmpty(V.Standard).First();
 }
