@@ -251,13 +251,7 @@ internal static class SpatialCompute {
         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
     }
 
-    /// <summary>
-    /// Computes the 2D convex hull of a set of points projected onto the XY plane.
-    /// <para>
-    /// <b>All input points must have the same Z coordinate (i.e., be coplanar in the XY plane).</b>
-    /// If this condition is not met, the result is an error.
-    /// </para>
-    /// </summary>
+    /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
@@ -296,10 +290,7 @@ internal static class SpatialCompute {
     private static double CrossProduct2D(Point3d o, Point3d a, Point3d b) =>
         ((a.X - o.X) * (b.Y - o.Y)) - ((a.Y - o.Y) * (b.X - o.X));
 
-    /// <summary>
-    /// Computes the 3D convex hull of a set of points using incremental algorithm.
-    /// <para>Returns mesh faces as vertex index triples.</para>
-    /// </summary>
+    /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
         points.Length < 4
@@ -361,10 +352,7 @@ internal static class SpatialCompute {
     private static double TetrahedronVolume(Point3d a, Point3d b, Point3d c, Point3d d) =>
         Vector3d.Multiply(Vector3d.CrossProduct(b - a, c - a), d - a) / 6.0;
 
-    /// <summary>
-    /// Computes 2D Delaunay triangulation using Bowyer-Watson incremental algorithm.
-    /// <para>Returns triangle vertex indices as triples for XY-projected points.</para>
-    /// </summary>
+    /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
@@ -410,10 +398,7 @@ internal static class SpatialCompute {
         return det > context.AbsoluteTolerance;
     }
 
-    /// <summary>
-    /// Computes 2D Voronoi diagram from Delaunay triangulation.
-    /// <para>Returns Voronoi cell vertices for each input point.</para>
-    /// </summary>
+    /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3

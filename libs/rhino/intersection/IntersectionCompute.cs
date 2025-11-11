@@ -10,6 +10,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Dense intersection analysis algorithms.</summary>
 internal static class IntersectionCompute {
+    /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) =>
         geomA is null || geomB is null
@@ -44,6 +45,7 @@ internal static class IntersectionCompute {
                             }));
                 });
 
+    /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) =>
         geomA is null || geomB is null
@@ -106,6 +108,7 @@ internal static class IntersectionCompute {
                                 }));
                     });
 
+    /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
