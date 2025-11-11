@@ -101,7 +101,7 @@ public static class E {
             [4101] = "K-means k parameter must be positive",
             [4102] = "DBSCAN epsilon parameter must be positive",
             [4103] = "Cluster count exceeds point count",
-            [4104] = "Point set is degenerate (all points coincident or collinear)",
+            [4104] = "Point set is degenerate (all points coincident)",
             [4105] = "Direction vector is zero-length",
             [4106] = "Input points are collinear",
             [4107] = "Input points are coplanar (3D operation requires non-coplanar)",
