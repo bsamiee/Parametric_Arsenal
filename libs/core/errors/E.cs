@@ -36,6 +36,7 @@ public static class E {
             [2320] = "Surface quality analysis failed",
             [2321] = "Curve fairness analysis failed",
             [2322] = "Mesh FEA quality analysis failed",
+            [2323] = "Surface developability analysis failed",
             [2400] = "Naked edge extraction failed",
             [2401] = "Boundary loop construction failed",
             [2402] = "Non-manifold edge detected",
@@ -167,6 +168,7 @@ public static class E {
         public static readonly SystemError SurfaceQualityFailed = Get(2320);
         public static readonly SystemError CurveFairnessFailed = Get(2321);
         public static readonly SystemError MeshFEAAnalysisFailed = Get(2322);
+        public static readonly SystemError SurfaceDevelopabilityFailed = Get(2323);
         public static readonly SystemError NakedEdgeFailed = Get(2400);
         public static readonly SystemError BoundaryLoopFailed = Get(2401);
         public static readonly SystemError NonManifoldEdge = Get(2402);

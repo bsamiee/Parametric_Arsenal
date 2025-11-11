@@ -61,4 +61,13 @@ internal static class AnalysisConfig {
     /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
+
+    /// <summary>Developability: 64 samples (8×8 grid) for Gaussian curvature distribution.</summary>
+    internal const int DevelopabilitySampleCount = 64;
+
+    /// <summary>Developability score: max|K| threshold for near-developable classification.</summary>
+    internal const double DevelopabilityThreshold = 0.01;
+
+    /// <summary>Principal curvature ratio for cylindrical classification (one ≈0, other ≠0).</summary>
+    internal const double CylindricalRatioThreshold = 100.0;
 }

@@ -191,4 +191,11 @@ public static class Analysis {
         Mesh mesh,
         IGeometryContext context) =>
         AnalysisCompute.MeshForFEA(mesh: mesh, context: context);
+
+    /// <summary>Surface developability: exact check, score, Gaussian distribution, problem regions, classification.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(bool IsExactlyDevelopable, double DevelopabilityScore, double[] GaussianCurvatures, double MaxAbsoluteGaussian, (double U, double V)[] NonDevelopableRegions, string Classification)> AnalyzeSurfaceDevelopability(
+        Surface surface,
+        IGeometryContext context) =>
+        AnalysisCompute.SurfaceDevelopability(surface: surface, context: context);
 }

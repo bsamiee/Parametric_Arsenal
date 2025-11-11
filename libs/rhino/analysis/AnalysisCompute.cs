@@ -145,4 +145,56 @@ internal static class AnalysisCompute {
                     ArrayPool<double>.Shared.Return(edgeLengths, clearArray: true);
                 }
             });
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(bool IsExactlyDevelopable, double DevelopabilityScore, double[] GaussianCurvatures, double MaxAbsoluteGaussian, (double U, double V)[] NonDevelopableRegions, string Classification)> SurfaceDevelopability(
+        Surface surface,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: surface)
+            .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
+            .Bind(validSurface => {
+                bool isExactDevelopable = validSurface.IsDevelopable();
+                int gridSize = (int)Math.Sqrt(AnalysisConfig.DevelopabilitySampleCount);
+                (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
+                    .SelectMany(i => Enumerable.Range(0, gridSize)
+                        .Select(j => (
+                            u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)),
+                            v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
+                ];
+                (double Gaussian, double K1, double K2, (double U, double V) UV)[] curvatures = [.. uvGrid
+                    .Select(uv => (Curvature: validSurface.CurvatureAt(u: uv.u, v: uv.v), UV: uv))
+                    .Where(pair => !double.IsNaN(pair.Curvature.Gaussian) && !double.IsInfinity(pair.Curvature.Gaussian))
+                    .Select(pair => (
+                        Gaussian: pair.Curvature.Gaussian,
+                        K1: pair.Curvature.Kappa(0),
+                        K2: pair.Curvature.Kappa(1),
+                        UV: pair.UV)),
+                ];
+
+                return curvatures.Length > 0
+                    && curvatures.Select(c => Math.Abs(c.Gaussian)).ToArray() is double[] absGaussian
+                    && absGaussian.Max() is double maxAbsK
+                    && curvatures.Select(c => Math.Abs(c.K1)).ToArray() is double[] absK1
+                    && curvatures.Select(c => Math.Abs(c.K2)).ToArray() is double[] absK2
+                    && absK1.Max() is double maxAbsK1
+                    && absK2.Max() is double maxAbsK2
+                    ? ResultFactory.Create(value: (
+                        IsExactlyDevelopable: isExactDevelopable,
+                        DevelopabilityScore: Math.Clamp(1.0 - (maxAbsK / AnalysisConfig.DevelopabilityThreshold), 0.0, 1.0),
+                        GaussianCurvatures: curvatures.Select(c => c.Gaussian).ToArray(),
+                        MaxAbsoluteGaussian: maxAbsK,
+                        NonDevelopableRegions: curvatures
+                            .Where(c => Math.Abs(c.Gaussian) > context.AbsoluteTolerance)
+                            .Select(c => c.UV)
+                            .ToArray(),
+                        Classification: (maxAbsK1 < context.AbsoluteTolerance && maxAbsK2 < context.AbsoluteTolerance)
+                            ? "Planar"
+                            : (maxAbsK1 < context.AbsoluteTolerance || maxAbsK2 < context.AbsoluteTolerance)
+                                ? "Cylindrical"
+                                : (maxAbsK < context.AbsoluteTolerance)
+                                    ? "Conical"
+                                    : "General"))
+                    : ResultFactory.Create<(bool, double, double[], double, (double, double)[], string)>(
+                        error: E.Geometry.SurfaceDevelopabilityFailed.WithContext("No valid curvature samples"));
+            });
 }
