@@ -118,12 +118,12 @@ internal static class TopologyCore {
                 (Brep brep, int idx) when idx >= 0 && idx < brep.Edges.Count => (brep.Edges[idx], brep.Edges[idx].AdjacentFaces().ToArray()) switch {
                     (BrepEdge e, int[] af) when af.Length == 2 => ((Func<Point3d, Result<IReadOnlyList<Topology.AdjacencyData>>>)(edgeMid =>
                         {
-                            var n0 = brep.Faces[af[0]].ClosestPoint(edgeMid, out var u0, out var v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset;
-                            var n1 = brep.Faces[af[1]].ClosestPoint(edgeMid, out var u1, out var v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset;
+                            Vector3d n0 = brep.Faces[af[0]].ClosestPoint(edgeMid, out double u0, out double v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset;
+                            Vector3d n1 = brep.Faces[af[1]].ClosestPoint(edgeMid, out double u1, out double v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset;
                             return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
                                 EdgeIndex: idx,
                                 AdjacentFaceIndices: af,
-                                FaceNormals: [n0, n1],
+                                FaceNormals: [n0, n1,],
                                 DihedralAngle: n0.IsValid && n1.IsValid ? Vector3d.VectorAngle(n0, n1) : 0.0,
                                 IsManifold: e.Valence == EdgeAdjacency.Interior,
                                 IsBoundary: e.Valence == EdgeAdjacency.Naked)]);
@@ -186,11 +186,13 @@ internal static class TopologyCore {
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => brep.Edges[i].Valence switch {
             EdgeAdjacency.Naked => Topology.EdgeContinuityType.Boundary,
             EdgeAdjacency.NonManifold => Topology.EdgeContinuityType.NonManifold,
-            EdgeAdjacency.Interior => brep.Edges[i].IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold)
-                ? Topology.EdgeContinuityType.Smooth
-                : minContinuity >= Continuity.G1_continuous
-                    ? Topology.EdgeContinuityType.Sharp
-                    : Topology.EdgeContinuityType.Interior,
+            EdgeAdjacency.Interior => brep.Edges[i] switch {
+                BrepEdge e when e.IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) && e.EdgeCurve is Curve crv && (crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid)) => Topology.EdgeContinuityType.Curvature,
+                BrepEdge e when e.IsSmoothManifoldEdge(angleToleranceRadians: angleThreshold) => Topology.EdgeContinuityType.Smooth,
+                BrepEdge e when e.EdgeCurve is Curve crv && (crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid)) => Topology.EdgeContinuityType.Smooth,
+                _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
+                _ => Topology.EdgeContinuityType.Interior,
+            },
             _ => Topology.EdgeContinuityType.Sharp,
         }),
         ];
