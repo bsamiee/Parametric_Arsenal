@@ -242,8 +242,8 @@ internal static class IntersectionCore {
             chainBList.Add(current);
         }
 
-        Type[] chainA = [.. chainAList.Concat(chainAList.SelectMany(static baseType => baseType.GetInterfaces())).Distinct()];
-        Type[] chainB = [.. chainBList.Concat(chainBList.SelectMany(static baseType => baseType.GetInterfaces())).Distinct()];
+        Type[] chainA = [.. chainAList.Concat(typeA.GetInterfaces()).Distinct()];
+        Type[] chainB = [.. chainBList.Concat(typeB.GetInterfaces()).Distinct()];
 
         return chainA.SelectMany(first => chainB.Select(second => ((first, second), false)))
             .Concat(chainB.SelectMany(first => chainA.Select(second => ((first, second), true))))
