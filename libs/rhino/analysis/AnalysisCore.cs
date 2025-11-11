@@ -43,7 +43,7 @@ internal static class AnalysisCore {
         (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
         return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame)
             ? ((Func<AreaMassProperties?, SurfaceCurvature, Result<Analysis.IResult>>)((amp, sc) =>
-                amp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian)
+                amp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)
                     ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
                         sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
                         sc.Direction(0), sc.Direction(1), frame, frame.Normal,
