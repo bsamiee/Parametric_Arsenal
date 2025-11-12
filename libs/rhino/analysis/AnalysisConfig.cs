@@ -41,6 +41,9 @@ internal static class AnalysisConfig {
     /// <summary>Singularity proximity threshold 1% of domain.</summary>
     internal const double SingularityProximityFactor = 0.01;
 
+    /// <summary>Brep closest point tolerance multiplier: 100× context tolerance.</summary>
+    internal const double BrepClosestPointToleranceMultiplier = 100.0;
+
     /// <summary>Curve fairness: 50 samples for curvature comb analysis.</summary>
     internal const int CurveFairnessSampleCount = 50;
 
