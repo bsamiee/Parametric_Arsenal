@@ -38,6 +38,26 @@ public readonly struct V(ushort flags) : IEquatable<V> {
 
     public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,]).ToFrozenSet();
 
+    private static readonly FrozenDictionary<ushort, string> _flagNames =
+        new Dictionary<ushort, string> {
+            [0] = nameof(None),
+            [1] = nameof(Standard),
+            [2] = nameof(AreaCentroid),
+            [4] = nameof(BoundingBox),
+            [8] = nameof(MassProperties),
+            [16] = nameof(Topology),
+            [32] = nameof(Degeneracy),
+            [64] = nameof(Tolerance),
+            [128] = nameof(MeshSpecific),
+            [256] = nameof(SurfaceContinuity),
+            [512] = nameof(PolycurveStructure),
+            [1024] = nameof(NurbsGeometry),
+            [2048] = nameof(ExtrusionGeometry),
+            [4096] = nameof(UVDomain),
+            [8192] = nameof(SelfIntersection),
+            [16384] = nameof(BrepGranular),
+        }.ToFrozenDictionary();
+
     [Pure] private string DebuggerDisplay => this.ToString();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -78,25 +98,6 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             : (this._flags & other._flags) == other._flags;
 
     [Pure]
-    public override string ToString() => this._flags == All._flags
-        ? nameof(All)
-        : this._flags switch {
-            0 => nameof(None),
-            1 => nameof(Standard),
-            2 => nameof(AreaCentroid),
-            4 => nameof(BoundingBox),
-            8 => nameof(MassProperties),
-            16 => nameof(Topology),
-            32 => nameof(Degeneracy),
-            64 => nameof(Tolerance),
-            128 => nameof(MeshSpecific),
-            256 => nameof(SurfaceContinuity),
-            512 => nameof(PolycurveStructure),
-            1024 => nameof(NurbsGeometry),
-            2048 => nameof(ExtrusionGeometry),
-            4096 => nameof(UVDomain),
-            8192 => nameof(SelfIntersection),
-            16384 => nameof(BrepGranular),
-            _ => $"Combined({this._flags})",
-        };
+    public override string ToString() =>
+        this._flags == All._flags ? nameof(All) : _flagNames.TryGetValue(this._flags, out string? name) ? name : $"Combined({this._flags})";
 }
