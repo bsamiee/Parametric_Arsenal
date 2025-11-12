@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Diagnostics;
 using Arsenal.Core.Errors;
@@ -103,7 +104,9 @@ public static class UnifiedOperation {
             (IReadOnlyList<TIn> { Count: 0 }, _) => ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
             (IReadOnlyList<TIn> { Count: 1 } list, _) => execute(list[0]),
             (IReadOnlyList<TIn> list, { EnableParallel: true, AccumulateErrors: bool acc, SkipInvalid: bool skip, MaxDegreeOfParallelism: int max }) =>
-                list.AsParallel().WithDegreeOfParallelism(max).Select(execute).Aggregate(
+                (max > 0
+                    ? list.AsParallel().WithDegreeOfParallelism(max).Select(execute)
+                    : list.AsParallel().Select(execute)).Aggregate(
                     ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
                     (a, c) => (acc, skip && !c.IsSuccess) switch {
                         (true, _) => a.Apply(c.Map<Func<IReadOnlyList<TOut>, IReadOnlyList<TOut>>>(items => prev => [.. prev, .. items])),
