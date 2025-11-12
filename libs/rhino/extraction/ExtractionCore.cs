@@ -276,10 +276,9 @@ internal static class ExtractionCore {
         FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
             .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
-                static group => group.Key,
-                group => group.OrderByDescending(static entry => entry.Key.GeometryType, _specificityComparer)
+                static group => group.OrderByDescending(static entry => entry.Key.GeometryType, _specificityComparer)
                     .Select(static entry => (entry.Key.GeometryType, entry.Value))
-                    .ToArray())
+                    .ToArray()
             .ToFrozenDictionary();
         return (map.ToFrozenDictionary(), fallbacks);
     }
