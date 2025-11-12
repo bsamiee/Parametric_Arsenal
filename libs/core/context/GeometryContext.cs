@@ -77,11 +77,11 @@ public sealed record GeometryContext(
         double normalizedRelativeTolerance = relativeTolerance <= 0d ? DefaultRelativeTolerance : relativeTolerance;
         double normalizedAngleToleranceRadians = angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians;
 
-        List<SystemError> invalidParameters = new();
-        if (!RhinoMath.IsValidDouble(normalizedAbsoluteTolerance)) { invalidParameters.Add(E.Validation.ToleranceAbsoluteInvalid); }
-        if (!RhinoMath.IsValidDouble(normalizedRelativeTolerance)) { invalidParameters.Add(E.Validation.ToleranceRelativeInvalid); }
-        if (!RhinoMath.IsValidDouble(normalizedAngleToleranceRadians)) { invalidParameters.Add(E.Validation.ToleranceAngleInvalid); }
-        SystemError[] invalidParametersArray = [.. invalidParameters];
+        SystemError[] invalidParametersArray = [
+            .. !RhinoMath.IsValidDouble(normalizedAbsoluteTolerance) ? (SystemError[])[E.Validation.ToleranceAbsoluteInvalid,] : [],
+            .. !RhinoMath.IsValidDouble(normalizedRelativeTolerance) ? (SystemError[])[E.Validation.ToleranceRelativeInvalid,] : [],
+            .. !RhinoMath.IsValidDouble(normalizedAngleToleranceRadians) ? (SystemError[])[E.Validation.ToleranceAngleInvalid,] : [],
+        ];
 
         return invalidParametersArray is { Length: > 0 } parameterErrors
             ? ResultFactory.Create<GeometryContext>(errors: parameterErrors)

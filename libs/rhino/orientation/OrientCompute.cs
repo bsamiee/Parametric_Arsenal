@@ -127,8 +127,8 @@ internal static class OrientCompute {
                                     }))(),
                                     _ => (byte)0,
                                 }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
-                                    double dot when Math.Abs(dot - 1.0) < angleTolerance => (byte)1,
-                                    double dot when Math.Abs(dot) < angleTolerance => (byte)2,
+                                    double dot when Math.Abs(dot - 1.0) < 1.0 - Math.Cos(angleTolerance) => (byte)1,
+                                    double dot when Math.Abs(dot) < Math.Sin(angleTolerance) => (byte)2,
                                     _ => (byte)3,
                                 }) is (byte symmetry, byte relationship)
                                     ? ResultFactory.Create(value: (xform, twist, tilt, symmetry, relationship))
