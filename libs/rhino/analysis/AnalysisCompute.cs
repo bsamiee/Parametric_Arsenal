@@ -17,7 +17,7 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: surface)
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
-                int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
+                const int gridSize = AnalysisConfig.SurfaceQualityGridDimension;
                 (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
                 ];

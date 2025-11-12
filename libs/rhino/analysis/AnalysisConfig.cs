@@ -35,6 +35,9 @@ internal static class AnalysisConfig {
     /// <summary>Surface quality: 10×10 grid for curvature sampling.</summary>
     internal const int SurfaceQualityGridDimension = 10;
 
+    /// <summary>Surface quality: derived sample count from grid dimensions.</summary>
+    internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
+
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
 
@@ -59,6 +62,7 @@ internal static class AnalysisConfig {
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
 
+    /// <summary>Brep closest point tolerance multiplier 100× for looser matching.</summary>
     /// <summary>Brep closest point tolerance multiplier: 100× absolute tolerance for proximity queries.</summary>
     internal const double BrepClosestPointToleranceMultiplier = 100.0;
 }

@@ -53,6 +53,7 @@ internal static class TopologyConfig {
     /// <summary>Healing strategy: Combined Repair + JoinNakedEdges.</summary>
     internal const byte StrategyCombined = 3;
 
+    /// <summary>Maximum healing strategies available (0-3 inclusive).</summary>
     /// <summary>Maximum number of healing strategies (4 total: Conservative, Moderate, Aggressive, Combined).</summary>
     internal const int MaxHealingStrategies = 4;
 
