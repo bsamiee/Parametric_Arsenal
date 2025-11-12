@@ -108,9 +108,8 @@ public static class Analysis {
         Curve curve,
         IGeometryContext context,
         double? parameter = null,
-        int derivativeOrder = 2,
-        bool enableDiagnostics = false) =>
-        AnalysisCore.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
+        int derivativeOrder = 2) =>
+        AnalysisCore.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
     /// <summary>Surface analysis: derivatives, curvature, frames, singularities.</summary>
@@ -119,9 +118,8 @@ public static class Analysis {
         Surface surface,
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
-        int derivativeOrder = 2,
-        bool enableDiagnostics = false) =>
-        AnalysisCore.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
+        int derivativeOrder = 2) =>
+        AnalysisCore.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
     /// <summary>Brep analysis: surface evaluation, topology, proximity.</summary>
@@ -132,9 +130,8 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int faceIndex = 0,
         Point3d? testPoint = null,
-        int derivativeOrder = 2,
-        bool enableDiagnostics = false) =>
-        AnalysisCore.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder, enableDiagnostics: enableDiagnostics)
+        int derivativeOrder = 2) =>
+        AnalysisCore.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
             .Map(results => (BrepData)results[0]);
 
     /// <summary>Mesh analysis: topology navigation, manifold inspection.</summary>
@@ -142,9 +139,8 @@ public static class Analysis {
     public static Result<MeshData> Analyze(
         Mesh mesh,
         IGeometryContext context,
-        int vertexIndex = 0,
-        bool enableDiagnostics = false) =>
-        AnalysisCore.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0, enableDiagnostics: enableDiagnostics)
+        int vertexIndex = 0) =>
+        AnalysisCore.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0)
             .Map(results => (MeshData)results[0]);
 
     /// <summary>Batch analysis for heterogeneous geometry types.</summary>
@@ -156,19 +152,18 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int? index = null,
         Point3d? testPoint = null,
-        int derivativeOrder = 2,
-        bool enableDiagnostics = false) where T : notnull =>
+        int derivativeOrder = 2) where T : notnull =>
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>
-                AnalysisCore.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder, enableDiagnostics: enableDiagnostics)),
+                AnalysisCore.Execute(item, context, parameter, uvParameter, index, testPoint, derivativeOrder)),
             new OperationConfig<object, IResult> {
                 Context = context,
                 ValidationMode = Core.Validation.V.None,
                 EnableCache = true,
                 AccumulateErrors = false,
                 OperationName = "Analysis.Multiple",
-                EnableDiagnostics = enableDiagnostics,
+                EnableDiagnostics = false,
             });
 
     /// <summary>Surface quality: curvature distribution, singularities, uniformity score.</summary>

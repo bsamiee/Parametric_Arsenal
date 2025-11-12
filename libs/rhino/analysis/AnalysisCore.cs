@@ -134,8 +134,7 @@ internal static class AnalysisCore {
         (double, double)? uv,
         int? index,
         Point3d? testPoint,
-        int derivativeOrder,
-        bool enableDiagnostics = false) =>
+        int derivativeOrder) =>
         _strategies.TryGetValue(geometry.GetType(), out (V mode, Func<object, IGeometryContext, double?, (double, double)?, int?, Point3d?, int, Result<Analysis.IResult>> compute) strategy)
             ? UnifiedOperation.Apply(
                 geometry,
@@ -150,7 +149,7 @@ internal static class AnalysisCore {
                     Context = context,
                     ValidationMode = V.None,
                     OperationName = $"Analysis.{geometry.GetType().Name}",
-                    EnableDiagnostics = enableDiagnostics,
+                    EnableDiagnostics = false,
                     AccumulateErrors = false,
                     EnableCache = false,
                     SkipInvalid = false,
