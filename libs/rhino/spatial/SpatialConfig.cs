@@ -14,6 +14,8 @@ internal static class SpatialConfig {
     internal const int DBSCANMinPoints = 4;
     internal const double MedialAxisOffsetMultiplier = 10.0;
     internal const int DBSCANRTreeThreshold = 100;
+    internal const int MedialAxisMinSampleCount = 50;
+    internal const int MedialAxisMaxSampleCount = 500;
 
     /// <summary>Type extractors: polymorphic dispatch for centroid, RTree factory, etc.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
