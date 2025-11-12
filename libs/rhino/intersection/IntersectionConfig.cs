@@ -11,7 +11,7 @@ internal static class IntersectionConfig {
     internal const double TangentAngleThreshold = 0.08726646259971647;
 
     /// <summary>Grazing angle threshold 15° for crossing vs grazing.</summary>
-    internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
+    internal const double GrazingAngleThreshold = 0.261799;
 
     /// <summary>Near-miss tolerance multiplier 10× context tolerance.</summary>
     internal const double NearMissToleranceMultiplier = 10.0;
