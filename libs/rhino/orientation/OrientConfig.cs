@@ -35,8 +35,6 @@ internal static class OrientConfig {
     internal const double BestFitResidualThreshold = 1e-3;
     /// <summary>Minimum 3 instances for pattern detection.</summary>
     internal const int PatternMinInstances = 3;
-    /// <summary>Optimization iteration limit for orientation search.</summary>
-    internal const int OptimizationMaxIterations = 24;
     /// <summary>Symmetry test tolerance for relative orientation.</summary>
     internal const double SymmetryTestTolerance = 1e-3;
     /// <summary>Primary score weight 0.4 for orientation criteria 4.</summary>
