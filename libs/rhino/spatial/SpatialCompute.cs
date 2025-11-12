@@ -212,8 +212,7 @@ internal static class SpatialCompute {
                 (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: Math.Max(tolerance, context.AbsoluteTolerance), preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: Math.Max(tolerance, context.AbsoluteTolerance)) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<(Curve[], double[])>>)(() => {
                     double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
-                    double clampedSamples = Math.Max((double)SpatialConfig.MedialAxisMinSampleCount, Math.Min((double)SpatialConfig.MedialAxisMaxSampleCount, length / effectiveTolerance));
-                    int sampleCount = (int)clampedSamples;
+                    int sampleCount = (int)Math.Max(SpatialConfig.MedialAxisMinSampleCount, Math.Min(SpatialConfig.MedialAxisMaxSampleCount, length / effectiveTolerance));
                     Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
                     Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
                     Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
