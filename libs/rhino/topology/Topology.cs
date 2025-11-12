@@ -183,34 +183,30 @@ public static class Topology {
     public static Result<NakedEdgeData> GetNakedEdges<T>(
         T geometry,
         IGeometryContext context,
-        bool orderLoops = false,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops, enableDiagnostics: enableDiagnostics);
+        bool orderLoops = false) where T : notnull =>
+        TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops);
 
     /// <summary>Closed boundary loops from naked edges.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<BoundaryLoopData> GetBoundaryLoops<T>(
         T geometry,
         IGeometryContext context,
-        double? tolerance = null,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance, enableDiagnostics: enableDiagnostics);
+        double? tolerance = null) where T : notnull =>
+        TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance);
 
     /// <summary>Non-manifold vertex and edge detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NonManifoldData> GetNonManifoldData<T>(
         T geometry,
-        IGeometryContext context,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteNonManifold(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        IGeometryContext context) where T : notnull =>
+        TopologyCore.ExecuteNonManifold(input: geometry, context: context);
 
     /// <summary>Connected components and adjacency graph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<ConnectivityData> GetConnectivity<T>(
         T geometry,
-        IGeometryContext context,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteConnectivity(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        IGeometryContext context) where T : notnull =>
+        TopologyCore.ExecuteConnectivity(input: geometry, context: context);
 
     /// <summary>Edge classification by continuity type.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -218,35 +214,31 @@ public static class Topology {
         T geometry,
         IGeometryContext context,
         Continuity minimumContinuity = Continuity.G1_continuous,
-        double? angleThreshold = null,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, angleThreshold: angleThreshold, enableDiagnostics: enableDiagnostics);
+        double? angleThreshold = null) where T : notnull =>
+        TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, angleThreshold: angleThreshold);
 
     /// <summary>Face adjacency for specific edge.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<AdjacencyData> GetAdjacency<T>(
         T geometry,
         IGeometryContext context,
-        int edgeIndex,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex, enableDiagnostics: enableDiagnostics);
+        int edgeIndex) where T : notnull =>
+        TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex);
 
     /// <summary>Vertex topology: valence, manifold status.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<VertexData> GetVertexData<T>(
         T geometry,
         IGeometryContext context,
-        int vertexIndex,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteVertexData(input: geometry, context: context, vertexIndex: vertexIndex, enableDiagnostics: enableDiagnostics);
+        int vertexIndex) where T : notnull =>
+        TopologyCore.ExecuteVertexData(input: geometry, context: context, vertexIndex: vertexIndex);
 
     /// <summary>Ngon topology analysis for quad-dominant meshes.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NgonTopologyData> GetNgonTopology<T>(
         T geometry,
-        IGeometryContext context,
-        bool enableDiagnostics = false) where T : notnull =>
-        TopologyCore.ExecuteNgonTopology(input: geometry, context: context, enableDiagnostics: enableDiagnostics);
+        IGeometryContext context) where T : notnull =>
+        TopologyCore.ExecuteNgonTopology(input: geometry, context: context);
 
     /// <summary>Diagnose topology problems with edge gaps, near-misses, repair suggestions.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

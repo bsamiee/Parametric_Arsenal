@@ -37,8 +37,7 @@ public static class Intersect {
         T1 geometryA,
         T2 geometryB,
         IGeometryContext context,
-        IntersectionOptions? options = null,
-        bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
+        IntersectionOptions? options = null) where T1 : notnull where T2 : notnull {
         IntersectionOptions opts = options ?? new IntersectionOptions();
         (Type t1, Type t2) = (typeof(T1), typeof(T2));
 
@@ -56,7 +55,7 @@ public static class Intersect {
                     ValidationMode = V.None,
                     AccumulateErrors = true,
                     OperationName = $"Intersect.{t1.Name}.{t2.Name}",
-                    EnableDiagnostics = enableDiagnostics,
+                    EnableDiagnostics = false,
                 }))
         .Map(outputs => outputs.Count switch {
             0 => IntersectionOutput.Empty,
