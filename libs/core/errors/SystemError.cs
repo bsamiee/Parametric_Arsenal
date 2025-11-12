@@ -10,7 +10,14 @@ namespace Arsenal.Core.Errors;
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly record struct SystemError(byte Domain, int Code, string Message) {
-    [Pure] private string DomainName => E.DomainNames.TryGetValue(this.Domain, out string? name) ? name : "Unknown";
+    [Pure] private string DomainName => this.Domain switch {
+        E.DomainResults => "Results",
+        E.DomainGeometry => "Geometry",
+        E.DomainValidation => "Validation",
+        E.DomainSpatial => "Spatial",
+        E.DomainTopology => "Topology",
+        _ => "Unknown",
+    };
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{this.DomainName}:{this.Code.ToString(CultureInfo.InvariantCulture)}] {this.Message}");
 
     [Pure]

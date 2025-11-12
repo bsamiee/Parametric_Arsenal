@@ -14,17 +14,6 @@ public static class E {
     internal const byte DomainSpatial = 40;
     internal const byte DomainTopology = 50;
 
-    /// <summary>Domain byte to name mapping for display.</summary>
-    internal static readonly FrozenDictionary<byte, string> DomainNames =
-        new Dictionary<byte, string> {
-            [DomainUnknown] = "Unknown",
-            [DomainResults] = "Results",
-            [DomainGeometry] = "Geometry",
-            [DomainValidation] = "Validation",
-            [DomainSpatial] = "Spatial",
-            [DomainTopology] = "Topology",
-        }.ToFrozenDictionary();
-
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
             [1001] = "No value provided",
