@@ -8,7 +8,7 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Validation modes and parameters for intersection operations.</summary>
 internal static class IntersectionConfig {
     /// <summary>Tangent angle threshold 5° for classification.</summary>
-    internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
+    internal const double TangentAngleThreshold = 0.08726646259971647;
 
     /// <summary>Grazing angle threshold 15° for crossing vs grazing.</summary>
     internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
