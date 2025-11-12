@@ -53,6 +53,4 @@ internal static class OrientConfig {
     internal const double MinimumOptimizationScore = 0.1;
     /// <summary>Rotation symmetry sample count 36 for 10-degree increments.</summary>
     internal const int RotationSymmetrySampleCount = 36;
-    /// <summary>Symmetry angle tolerance 0.01 radians for orientation matching.</summary>
-    internal const double SymmetryAngleToleranceRadians = 0.01;
 }

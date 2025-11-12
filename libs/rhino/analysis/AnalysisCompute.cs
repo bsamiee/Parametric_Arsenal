@@ -5,6 +5,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -16,7 +17,7 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: surface)
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
-                int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
+                int gridSize = AnalysisConfig.SurfaceQualityGridDimension;
                 (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
                 ];
@@ -105,12 +106,12 @@ internal static class AnalysisCompute {
                                 Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
                                 Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
                                 Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
-                            ]).Max(angle => Math.Abs((angle * (180.0 / Math.PI)) - 90.0)) / 90.0
+                            ]).Max(angle => Math.Abs(RhinoMath.ToDegrees(angle) - 90.0)) / 90.0
                             : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
                                 ? (
-                                    Vector3d.VectorAngle(ab, ac) * (180.0 / Math.PI),
-                                    Vector3d.VectorAngle(bc, -ab) * (180.0 / Math.PI),
-                                    Vector3d.VectorAngle(-ac, -bc) * (180.0 / Math.PI)
+                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(ab, ac)),
+                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)),
+                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc))
                                 ) is (double angleA, double angleB, double angleC)
                                     ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
                                     : 1.0

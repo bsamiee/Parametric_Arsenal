@@ -18,6 +18,10 @@ public sealed record GeometryContext(
     double RelativeTolerance,
     double AngleToleranceRadians,
     UnitSystem Units) : IGeometryContext {
+    private const double DefaultAbsoluteTolerance = 0.01;
+    private const double DefaultRelativeTolerance = 0.0;
+    private static readonly double DefaultAngleToleranceRadians = RhinoMath.ToRadians(1.0);
+
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Abs={this.AbsoluteTolerance:g6}, Rel={this.RelativeTolerance:g6}, AngRad={this.AngleToleranceRadians:g6}, Units={this.Units}");
 
     /// <summary>Squared absolute tolerance for fast distance checks.</summary>
@@ -44,7 +48,7 @@ public sealed record GeometryContext(
     /// <summary>Creates context with defaults (0.01 abs, 0 rel, 1° angle).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> CreateWithDefaults(UnitSystem units) =>
-        Create(absoluteTolerance: 0.01, relativeTolerance: 0.0, angleToleranceRadians: RhinoMath.ToRadians(1.0), units: units);
+        Create(absoluteTolerance: DefaultAbsoluteTolerance, relativeTolerance: DefaultRelativeTolerance, angleToleranceRadians: DefaultAngleToleranceRadians, units: units);
 
     /// <summary>Creates context from RhinoDoc model tolerances.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -69,7 +73,7 @@ public sealed record GeometryContext(
     /// <summary>Creates validated context with normalization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) =>
-        (!RhinoMath.IsValidDouble(absoluteTolerance <= 0d ? 0.01 : absoluteTolerance) || !RhinoMath.IsValidDouble(relativeTolerance) || !RhinoMath.IsValidDouble(angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians)) ? ResultFactory.Create<GeometryContext>(errors: [E.Validation.ToleranceAbsoluteInvalid,]) :
-        ValidationRules.For(absoluteTolerance <= 0d ? 0.01 : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians) is SystemError[] { Length: > 0 } errors ? ResultFactory.Create<GeometryContext>(errors: errors) :
-        ResultFactory.Create(value: new GeometryContext(absoluteTolerance <= 0d ? 0.01 : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? RhinoMath.ToRadians(1.0) : angleToleranceRadians, units));
+        (!RhinoMath.IsValidDouble(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance) || !RhinoMath.IsValidDouble(relativeTolerance) || !RhinoMath.IsValidDouble(angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians)) ? ResultFactory.Create<GeometryContext>(errors: [E.Validation.ToleranceAbsoluteInvalid,]) :
+        ValidationRules.For(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians) is SystemError[] { Length: > 0 } errors ? ResultFactory.Create<GeometryContext>(errors: errors) :
+        ResultFactory.Create(value: new GeometryContext(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians, units));
 }

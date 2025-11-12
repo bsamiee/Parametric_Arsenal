@@ -3,6 +3,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
@@ -112,7 +113,7 @@ internal static class OrientCompute {
                                         ];
                                         return candidateAngles.Length == 0
                                             ? (byte)0
-                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < OrientConfig.SymmetryAngleToleranceRadians)
+                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < context.AngleToleranceRadians)
                                                 && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;
@@ -151,7 +152,7 @@ internal static class OrientCompute {
                                 ? deltas.All(v => Math.Abs(v.Length - avgLen) / avgLen < context.AbsoluteTolerance)
                                     ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (0, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Translation(deltas[0] * i)),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
                                     : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > context.AbsoluteTolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < context.AbsoluteTolerance)
-                                        ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(2.0 * Math.PI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
+                                        ? ResultFactory.Create<(byte, Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(RhinoMath.TwoPI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
                                         : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
                                 : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
                             : ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(r => !r.IsSuccess)} geometries"));
