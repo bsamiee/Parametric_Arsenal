@@ -120,10 +120,11 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) =>
-        context is null
-            ? new SystemError(code, _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}")
-            : new SystemError(code, _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}").WithContext(context);
+    public static SystemError Get(int code, string? context = null) {
+        string message = _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        SystemError error = new(code, message);
+        return context is null ? error : error.WithContext(context);
+    }
 
     /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {
