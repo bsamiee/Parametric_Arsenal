@@ -53,7 +53,7 @@ internal static class TopologyCore {
                 _ => [],
             })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
-                Curve[] naked => ((Func<Curve[], Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(nakedCurves => {
+                Curve[] nakedCurves => ((Func<Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(() => {
                     try {
                         Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) is Curve[] j ? j : [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
@@ -69,7 +69,7 @@ internal static class TopologyCore {
                             sourceCurve.Dispose();
                         }
                     }
-                }))(naked),
+                }))(),
             });
     }
 
@@ -127,29 +127,27 @@ internal static class TopologyCore {
     internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.Adjacency,
             operation: g => (g, edgeIndex) switch {
-                (Brep brep, int idx) when idx >= 0 && idx < brep.Edges.Count => (brep.Edges[idx], brep.Edges[idx].AdjacentFaces().ToArray()) switch {
-                    (BrepEdge e, int[] af) when af.Length == 2 => ((Func<Point3d, Result<IReadOnlyList<Topology.AdjacencyData>>>)(edgeMid => {
-                        Vector3d n0 = brep.Faces[af[0]].ClosestPoint(edgeMid, out double u0, out double v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset;
-                        Vector3d n1 = brep.Faces[af[1]].ClosestPoint(edgeMid, out double u1, out double v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset;
-                        return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
-                            EdgeIndex: idx,
-                            AdjacentFaceIndices: af,
-                            FaceNormals: [n0, n1,],
-                            DihedralAngle: n0.IsValid && n1.IsValid ? Vector3d.VectorAngle(n0, n1) : 0.0,
-                            IsManifold: e.Valence == EdgeAdjacency.Interior,
-                            IsBoundary: e.Valence == EdgeAdjacency.Naked),
-                        ]);
-                    }))(e.PointAt(e.Domain.Mid)),
-                    (BrepEdge e, int[] af) => ((Func<Point3d, Result<IReadOnlyList<Topology.AdjacencyData>>>)(edgeMid =>
-                        ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
-                            EdgeIndex: idx,
-                            AdjacentFaceIndices: af,
-                            FaceNormals: [.. af.Select(i => brep.Faces[i].ClosestPoint(edgeMid, out double u, out double v) ? brep.Faces[i].NormalAt(u, v) : Vector3d.Unset),],
-                            DihedralAngle: 0.0,
-                            IsManifold: e.Valence == EdgeAdjacency.Interior,
-                            IsBoundary: e.Valence == EdgeAdjacency.Naked),
-                        ])
-                    ))(e.PointAt(e.Domain.Mid)),
+                (Brep brep, int idx) when idx >= 0 && idx < brep.Edges.Count => (brep.Edges[idx], brep.Edges[idx].AdjacentFaces().ToArray(), brep.Edges[idx].PointAt(brep.Edges[idx].Domain.Mid)) switch {
+                    (BrepEdge e, int[] af, Point3d edgeMid) when af.Length == 2 => (
+                        brep.Faces[af[0]].ClosestPoint(edgeMid, out double u0, out double v0) ? brep.Faces[af[0]].NormalAt(u0, v0) : Vector3d.Unset,
+                        brep.Faces[af[1]].ClosestPoint(edgeMid, out double u1, out double v1) ? brep.Faces[af[1]].NormalAt(u1, v1) : Vector3d.Unset) switch {
+                            (Vector3d n0, Vector3d n1) => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
+                                EdgeIndex: idx,
+                                AdjacentFaceIndices: af,
+                                FaceNormals: [n0, n1,],
+                                DihedralAngle: n0.IsValid && n1.IsValid ? Vector3d.VectorAngle(n0, n1) : 0.0,
+                                IsManifold: e.Valence == EdgeAdjacency.Interior,
+                                IsBoundary: e.Valence == EdgeAdjacency.Naked),
+                            ]),
+                        },
+                    (BrepEdge e, int[] af, Point3d edgeMid) => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[new Topology.AdjacencyData(
+                        EdgeIndex: idx,
+                        AdjacentFaceIndices: af,
+                        FaceNormals: [.. af.Select(i => brep.Faces[i].ClosestPoint(edgeMid, out double u, out double v) ? brep.Faces[i].NormalAt(u, v) : Vector3d.Unset),],
+                        DihedralAngle: 0.0,
+                        IsManifold: e.Valence == EdgeAdjacency.Interior,
+                        IsBoundary: e.Valence == EdgeAdjacency.Naked),
+                    ]),
                 },
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => mesh.TopologyEdges.GetConnectedFaces(idx) switch {
@@ -171,7 +169,7 @@ internal static class TopologyCore {
         Array.Fill(componentIds, -1);
         int componentCount = 0;
         for (int seed = 0; seed < faceCount; seed++) {
-            componentCount = componentIds[seed] != -1 ? componentCount : ((Func<int>)(() => {
+            if (componentIds[seed] == -1) {
                 Queue<int> queue = new([seed,]);
                 componentIds[seed] = componentCount;
                 while (queue.Count > 0) {
@@ -181,8 +179,8 @@ internal static class TopologyCore {
                         queue.Enqueue(adjFace);
                     }
                 }
-                return componentCount;
-            }))() + 1;
+                componentCount++;
+            }
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
         IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => {
@@ -238,16 +236,14 @@ internal static class TopologyCore {
     internal static Result<Topology.VertexData> ExecuteVertexData<T>(T input, IGeometryContext context, int vertexIndex) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.VertexData,
             operation: g => (g, vertexIndex) switch {
-                (Brep brep, int idx) when idx >= 0 && idx < brep.Vertices.Count => brep.Vertices[idx].EdgeIndices().ToArray() switch {
-                    int[] edgeIndices => ((Func<Result<IReadOnlyList<Topology.VertexData>>>)(() => {
-                        IReadOnlyList<int> faceIndices = [.. new HashSet<int>(
-                            edgeIndices
-                                .SelectMany(edgeIdx => brep.Edges[edgeIdx].AdjacentFaces())
-                                .Where(faceIdx => faceIdx >= 0)
-                        ),
-                        ];
-                        return ResultFactory.Create(value: (IReadOnlyList<Topology.VertexData>)[new Topology.VertexData(VertexIndex: idx, Location: brep.Vertices[idx].Location, ConnectedEdgeIndices: edgeIndices, ConnectedFaceIndices: faceIndices, Valence: edgeIndices.Length, IsBoundary: edgeIndices.Any(i => brep.Edges[i].Valence == EdgeAdjacency.Naked), IsManifold: edgeIndices.All(i => brep.Edges[i].Valence == EdgeAdjacency.Interior)),]);
-                    }))(),
+                (Brep brep, int idx) when idx >= 0 && idx < brep.Vertices.Count => (brep.Vertices[idx].EdgeIndices().ToArray(), brep.Vertices[idx].Location) switch {
+                    (int[] edgeIndices, Point3d location) => ((IReadOnlyList<int>)[.. new HashSet<int>(
+                        edgeIndices
+                            .SelectMany(edgeIdx => brep.Edges[edgeIdx].AdjacentFaces())
+                            .Where(faceIdx => faceIdx >= 0)
+                    ),]) switch {
+                        IReadOnlyList<int> faceIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.VertexData>)[new Topology.VertexData(VertexIndex: idx, Location: location, ConnectedEdgeIndices: edgeIndices, ConnectedFaceIndices: faceIndices, Valence: edgeIndices.Length, IsBoundary: edgeIndices.Any(i => brep.Edges[i].Valence == EdgeAdjacency.Naked), IsManifold: edgeIndices.All(i => brep.Edges[i].Valence == EdgeAdjacency.Interior)),]),
+                    },
                 },
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.InvalidVertexIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"VertexIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Vertices.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyVertices.Count => (new Point3d(mesh.TopologyVertices[idx]), mesh.TopologyVertices.ConnectedFaces(idx).ToArray(), mesh.TopologyVertices.ConnectedTopologyVertices(idx).ToArray(), Enumerable.Range(0, mesh.TopologyEdges.Count).Where(e => mesh.TopologyEdges.GetTopologyVertices(e) switch { IndexPair verts => verts.I == idx || verts.J == idx }).ToArray()) switch {
@@ -261,29 +257,27 @@ internal static class TopologyCore {
     internal static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology,
             operation: g => g switch {
-                Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NgonTopologyData>>>)(() => {
-                    (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] data = [.. Enumerable.Range(0, mesh.Ngons.Count).Select(index => {
-                        MeshNgon ngon = mesh.Ngons.GetNgon(index);
-                        uint[]? faceList = ngon.FaceIndexList();
-                        uint[]? boundaryEdges = ngon.BoundaryVertexIndexList();
-                        Point3d center = mesh.Ngons.GetNgonCenter(index);
-                        IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
-                        IReadOnlyList<int> boundaries = [.. (boundaryEdges is uint[] be ? be : []).Select(edge => unchecked((int)edge)),];
-                        return (boundaries, faces, center.IsValid ? center : Point3d.Origin, boundaries.Count);
-                    }),
-                    ];
-                    return data.Length == 0
-                        ? ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData([], [], [], [], [], 0, mesh.Faces.Count),])
-                        : ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(
-                            NgonIndices: [.. Enumerable.Range(0, data.Length),],
-                            FaceIndicesPerNgon: [.. data.Select(d => d.Item2),],
-                            BoundaryEdgesPerNgon: [.. data.Select(d => d.Item1),],
-                            NgonCenters: [.. data.Select(d => d.Item3),],
-                            EdgeCountPerNgon: [.. data.Select(d => d.Item4),],
-                            TotalNgons: data.Length,
-                            TotalFaces: mesh.Faces.Count),
-                        ]);
-                }))(),
+                Mesh mesh => ((IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[])[.. Enumerable.Range(0, mesh.Ngons.Count).Select(index => {
+                    MeshNgon ngon = mesh.Ngons.GetNgon(index);
+                    uint[]? faceList = ngon.FaceIndexList();
+                    uint[]? boundaryEdges = ngon.BoundaryVertexIndexList();
+                    Point3d center = mesh.Ngons.GetNgonCenter(index);
+                    IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
+                    IReadOnlyList<int> boundaries = [.. (boundaryEdges is uint[] be ? be : []).Select(edge => unchecked((int)edge)),];
+                    return (boundaries, faces, center.IsValid ? center : Point3d.Origin, boundaries.Count);
+                }),
+                ] switch {
+                    (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] { Length: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData([], [], [], [], [], 0, mesh.Faces.Count),]),
+                    (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] data => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(
+                        NgonIndices: [.. Enumerable.Range(0, data.Length),],
+                        FaceIndicesPerNgon: [.. data.Select(d => d.Item2),],
+                        BoundaryEdgesPerNgon: [.. data.Select(d => d.Item1),],
+                        NgonCenters: [.. data.Select(d => d.Item3),],
+                        EdgeCountPerNgon: [.. data.Select(d => d.Item4),],
+                        TotalNgons: data.Length,
+                        TotalFaces: mesh.Faces.Count),
+                    ]),
+                },
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 }
