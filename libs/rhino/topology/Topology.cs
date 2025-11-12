@@ -18,11 +18,7 @@ public static class Topology {
 
     /// <summary>Edge continuity classification for geometric analysis.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct EdgeContinuityType {
-        internal byte Value { get; }
-
-        public EdgeContinuityType(byte value) => this.Value = value;
-
+    public readonly record struct EdgeContinuityType(byte Value) {
         /// <summary>G0 sharp edge below continuity threshold.</summary>
         public static readonly EdgeContinuityType Sharp = new(0);
         /// <summary>G1 smooth tangent continuity.</summary>
