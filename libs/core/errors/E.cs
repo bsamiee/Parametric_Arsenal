@@ -6,6 +6,13 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Error registry with O(1) lookup via FrozenDictionary.</summary>
 public static class E {
+    internal const byte UnknownDomain = 0;
+    internal const byte ResultsDomain = 1;
+    internal const byte GeometryDomain = 2;
+    internal const byte ValidationDomain = 3;
+    internal const byte SpatialDomain = 4;
+    internal const byte TopologyDomain = 5;
+
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
             [1001] = "No value provided",
@@ -120,20 +127,20 @@ public static class E {
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError Get(int code, string? context = null) {
-        (ErrorDomain domain, string message) = (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-        return context is null ? new SystemError(domain, code, message) : new SystemError(domain, code, message).WithContext(context);
-    }
+    private static byte GetDomain(int code) => code switch {
+        >= 1000 and < 2000 => ResultsDomain,
+        >= 2000 and < 3000 => GeometryDomain,
+        >= 3000 and < 4000 => ValidationDomain,
+        >= 4000 and < 5000 => SpatialDomain,
+        >= 5000 and < 6000 => TopologyDomain,
+        _ => UnknownDomain,
+    };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ErrorDomain GetDomain(int code) => code switch {
-        >= 1000 and < 2000 => ErrorDomain.Results,
-        >= 2000 and < 3000 => ErrorDomain.Geometry,
-        >= 3000 and < 4000 => ErrorDomain.Validation,
-        >= 4000 and < 5000 => ErrorDomain.Spatial,
-        >= 5000 and < 6000 => ErrorDomain.Topology,
-        _ => ErrorDomain.Unknown,
-    };
+    public static SystemError Get(int code, string? context = null) {
+        (byte domain, string message) = (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        return context is null ? new SystemError(domain, code, message) : new SystemError(domain, code, message).WithContext(context);
+    }
 
     /// <summary>Results system errors (1000-1999).</summary>
     public static class Results {
