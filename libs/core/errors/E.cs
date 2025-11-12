@@ -6,6 +6,25 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Error registry with O(1) lookup via FrozenDictionary.</summary>
 public static class E {
+    /// <summary>Domain byte constants (replaces ErrorDomain enum).</summary>
+    internal const byte DomainUnknown = 0;
+    internal const byte DomainResults = 10;
+    internal const byte DomainGeometry = 20;
+    internal const byte DomainValidation = 30;
+    internal const byte DomainSpatial = 40;
+    internal const byte DomainTopology = 50;
+
+    /// <summary>Domain byte to name mapping for display.</summary>
+    internal static readonly FrozenDictionary<byte, string> DomainNames =
+        new Dictionary<byte, string> {
+            [DomainUnknown] = "Unknown",
+            [DomainResults] = "Results",
+            [DomainGeometry] = "Geometry",
+            [DomainValidation] = "Validation",
+            [DomainSpatial] = "Spatial",
+            [DomainTopology] = "Topology",
+        }.ToFrozenDictionary();
+
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
             [1001] = "No value provided",
@@ -121,18 +140,18 @@ public static class E {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SystemError Get(int code, string? context = null) {
-        (ErrorDomain domain, string message) = (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        (byte domain, string message) = (GetDomain(code), _m.TryGetValue(code, out string? msg) ? msg : $"Unknown error code: {code.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
         return context is null ? new SystemError(domain, code, message) : new SystemError(domain, code, message).WithContext(context);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ErrorDomain GetDomain(int code) => code switch {
-        >= 1000 and < 2000 => ErrorDomain.Results,
-        >= 2000 and < 3000 => ErrorDomain.Geometry,
-        >= 3000 and < 4000 => ErrorDomain.Validation,
-        >= 4000 and < 5000 => ErrorDomain.Spatial,
-        >= 5000 and < 6000 => ErrorDomain.Topology,
-        _ => ErrorDomain.Unknown,
+    private static byte GetDomain(int code) => code switch {
+        >= 1000 and < 2000 => DomainResults,
+        >= 2000 and < 3000 => DomainGeometry,
+        >= 3000 and < 4000 => DomainValidation,
+        >= 4000 and < 5000 => DomainSpatial,
+        >= 5000 and < 6000 => DomainTopology,
+        _ => DomainUnknown,
     };
 
     /// <summary>Results system errors (1000-1999).</summary>

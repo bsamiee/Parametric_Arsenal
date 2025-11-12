@@ -105,7 +105,7 @@ public sealed class SharedUtilitiesTests {
     /// <summary>Verifies Test.Law category theory functor identity.</summary>
     [Fact]
     public void TestLaw_Verify_ChecksFunctorIdentity() {
-        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(new Errors.SystemError(Errors.ErrorDomain.Results, 1000, "test")), successWeight: 1, failureWeight: 0);
+        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(new Errors.SystemError(Errors.E.DomainResults, 1000, "test")), successWeight: 1, failureWeight: 0);
         Test.Law<int>("FunctorIdentity", gen, 50);
     }
 

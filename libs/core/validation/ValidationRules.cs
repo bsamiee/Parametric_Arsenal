@@ -58,24 +58,6 @@ public static class ValidationRules {
     private static readonly PropertyInfo _meshFaces = typeof(Mesh).GetProperty(nameof(Mesh.Faces), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
     private static readonly PropertyInfo _meshFaceCount = typeof(Rhino.Geometry.Collections.MeshFaceList).GetProperty(nameof(Rhino.Geometry.Collections.MeshFaceList.Count), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)!;
 
-    private static readonly FrozenDictionary<V, ((string Member, SystemError Error)[] Properties, (string Member, SystemError Error)[] Methods)> _validationRules =
-        new Dictionary<V, ((string Member, SystemError Error)[], (string Member, SystemError Error)[])> {
-            [V.Standard] = ([(Member: "IsValid", Error: E.Validation.GeometryInvalid),], []),
-            [V.AreaCentroid] = ([(Member: "IsClosed", Error: E.Validation.CurveNotClosedOrPlanar),], [(Member: "IsPlanar", Error: E.Validation.CurveNotClosedOrPlanar),]),
-            [V.BoundingBox] = ([], [(Member: "GetBoundingBox", Error: E.Validation.BoundingBoxInvalid),]),
-            [V.MassProperties] = ([(Member: "IsSolid", Error: E.Validation.MassPropertiesComputationFailed), (Member: "IsClosed", Error: E.Validation.MassPropertiesComputationFailed),], []),
-            [V.Topology] = ([(Member: "IsManifold", Error: E.Validation.InvalidTopology), (Member: "IsClosed", Error: E.Validation.InvalidTopology), (Member: "IsSolid", Error: E.Validation.InvalidTopology), (Member: "IsSurface", Error: E.Validation.InvalidTopology), (Member: "HasNakedEdges", Error: E.Validation.InvalidTopology),], [(Member: "IsManifold", Error: E.Validation.InvalidTopology), (Member: "IsPointInside", Error: E.Validation.InvalidTopology),]),
-            [V.Degeneracy] = ([(Member: "IsPeriodic", Error: E.Validation.DegenerateGeometry), (Member: "IsPolyline", Error: E.Validation.DegenerateGeometry),], [(Member: "IsShort", Error: E.Validation.DegenerateGeometry), (Member: "IsSingular", Error: E.Validation.DegenerateGeometry), (Member: "IsDegenerate", Error: E.Validation.DegenerateGeometry), (Member: "IsRectangular", Error: E.Validation.DegenerateGeometry), (Member: "GetLength", Error: E.Validation.DegenerateGeometry),]),
-            [V.Tolerance] = ([], [(Member: "IsPlanar", Error: E.Validation.ToleranceExceeded), (Member: "IsLinear", Error: E.Validation.ToleranceExceeded), (Member: "IsArc", Error: E.Validation.ToleranceExceeded), (Member: "IsCircle", Error: E.Validation.ToleranceExceeded), (Member: "IsEllipse", Error: E.Validation.ToleranceExceeded),]),
-            [V.MeshSpecific] = ([(Member: "IsManifold", Error: E.Validation.MeshInvalid), (Member: "IsClosed", Error: E.Validation.MeshInvalid), (Member: "HasNgons", Error: E.Validation.MeshInvalid), (Member: "HasVertexColors", Error: E.Validation.MeshInvalid), (Member: "HasVertexNormals", Error: E.Validation.MeshInvalid), (Member: "IsTriangleMesh", Error: E.Validation.MeshInvalid), (Member: "IsQuadMesh", Error: E.Validation.MeshInvalid), (Member: "FacesCount", Error: E.Validation.MeshInvalid),], []),
-            [V.SurfaceContinuity] = ([(Member: "IsPeriodic", Error: E.Validation.PositionalDiscontinuity),], [(Member: "IsContinuous", Error: E.Validation.PositionalDiscontinuity),]),
-            [V.PolycurveStructure] = ([(Member: "IsValid", Error: E.Validation.PolycurveGaps), (Member: "HasGap", Error: E.Validation.PolycurveGaps), (Member: "IsNested", Error: E.Validation.PolycurveGaps),], []),
-            [V.NurbsGeometry] = ([(Member: "IsValid", Error: E.Validation.NurbsControlPointCount), (Member: "IsPeriodic", Error: E.Validation.NurbsControlPointCount), (Member: "IsRational", Error: E.Validation.NurbsControlPointCount), (Member: "Degree", Error: E.Validation.NurbsControlPointCount),], []),
-            [V.ExtrusionGeometry] = ([(Member: "IsValid", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsSolid", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsClosed", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsCappedAtTop", Error: E.Validation.ExtrusionProfileInvalid), (Member: "IsCappedAtBottom", Error: E.Validation.ExtrusionProfileInvalid), (Member: "CapCount", Error: E.Validation.ExtrusionProfileInvalid),], []),
-            [V.UVDomain] = ([(Member: "IsValid", Error: E.Validation.UVDomainSingularity), (Member: "HasNurbsForm", Error: E.Validation.UVDomainSingularity), (Member: "DomainLength", Error: E.Validation.UVDomainSingularity),], []),
-            [V.SelfIntersection] = ([], [(Member: "CurveSelf", Error: E.Validation.SelfIntersecting),]),
-            [V.BrepGranular] = ([], [(Member: "IsValidTopology", Error: E.Validation.BrepTopologyInvalid), (Member: "IsValidGeometry", Error: E.Validation.BrepGeometryInvalid), (Member: "IsValidTolerancesAndFlags", Error: E.Validation.BrepTolerancesAndFlagsInvalid),]),
-        }.ToFrozenDictionary();
 
     /// <summary>Gets or compiles cached validator for type and mode.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -101,8 +83,8 @@ public static class ValidationRules {
     [Pure]
     private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
-        (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations = [.. V.AllFlags.Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag)).SelectMany(flag => {
-            ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = _validationRules[flag];
+        (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations = [.. V.AllFlags.Where(flag => mode.Has(flag) && V.ValidationRules.ContainsKey(flag)).SelectMany(flag => {
+            ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = V.ValidationRules[flag];
             return (IEnumerable<(MemberInfo Member, SystemError Error, string Name, byte Kind)>)[.. properties.Select(p => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: p.Member, kind: 1), static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), p.Error, p.Member, (byte)1)), .. methods.Select(m => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: m.Member, kind: 2), static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), m.Error, m.Member, (byte)2)),];
         }),
         ];

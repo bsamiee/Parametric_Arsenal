@@ -10,9 +10,9 @@ namespace Arsenal.Core.Tests.Results;
 /// <summary>Algebraic tests for Result monad with category theory laws, factory polymorphism, and operational semantics.</summary>
 public sealed class ResultAlgebraTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
-        new(ErrorDomain.Results, 1001, "E1"),
-        new(ErrorDomain.Results, 1002, "E2"),
-        new(ErrorDomain.Results, 1003, "E3"));
+        new(E.DomainResults, 1001, "E1"),
+        new(E.DomainResults, 1002, "E2"),
+        new(E.DomainResults, 1003, "E3"));
 
     /// <summary>Verifies functor laws (identity and composition) via property-based testing.</summary>
     [Fact]
@@ -203,8 +203,8 @@ public sealed class ResultAlgebraTests {
     [Fact]
     public void ApplyApplicativeFunctorParallelErrors() {
         (SystemError funcErr, SystemError valErr) = (
-            new(ErrorDomain.Results, 5001, "Function error"),
-            new(ErrorDomain.Results, 5002, "Value error"));
+            new(E.DomainResults, 5001, "Function error"),
+            new(E.DomainResults, 5002, "Value error"));
         Test.RunAll(
             () => Gen.Int.Select(Gen.Int).Run((Action<int, int>)((a, b) => {
                 Result<int> applied = ResultFactory.Create(value: a).Apply(ResultFactory.Create<Func<int, int>>(value: x => unchecked(x + b)));
