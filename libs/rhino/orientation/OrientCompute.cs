@@ -68,9 +68,12 @@ internal static class OrientCompute {
     internal static Result<(Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelative(
         GeometryBase geometryA,
         GeometryBase geometryB,
-        IGeometryContext context) =>
-        (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
-         OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
+        IGeometryContext context) {
+        double symmetryTolerance = Math.Max(context.AbsoluteTolerance, OrientConfig.SymmetryTestTolerance);
+        double angleTolerance = Math.Max(context.AngleToleranceRadians, OrientConfig.SymmetryTestTolerance);
+
+        return (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
+            OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
                 switch {
                     (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
                         (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
@@ -83,8 +86,8 @@ internal static class OrientCompute {
                                                 reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA
-                                            && reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
-                                            && bb.Vertices.All(vb => reflectedA.Any(ra => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
+                                            && reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < symmetryTolerance))
+                                            && bb.Vertices.All(vb => reflectedA.Any(ra => ra.DistanceTo(vb.Location) < symmetryTolerance))
                                                 ? (byte)1 : (byte)0
                                         : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid
                                             && ba.Vertices.Select(va => {
@@ -92,10 +95,10 @@ internal static class OrientCompute {
                                                 reflected.Transform(Transform.Mirror(mirrorPlane: mirror2));
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA2
-                                            && reflectedA2.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
-                                            && bb.Vertices.All(vb => reflectedA2.Any(ra => ra.DistanceTo(vb.Location) < context.AbsoluteTolerance))
+                                            && reflectedA2.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < symmetryTolerance))
+                                            && bb.Vertices.All(vb => reflectedA2.Any(ra => ra.DistanceTo(vb.Location) < symmetryTolerance))
                                                 ? (byte)1 : (byte)0,
-                                    (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > context.AbsoluteTolerance => ((Func<byte>)(() => {
+                                    (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > symmetryTolerance => ((Func<byte>)(() => {
                                         Point3d[] samplesA = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
                                         Point3d[] samplesB = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
                                         int[] testIndices = [0, samplesA.Length / 2, samplesA.Length - 1,];
@@ -104,7 +107,7 @@ internal static class OrientCompute {
                                             Vector3d vecB = samplesB[idx] - pa.Origin;
                                             Vector3d projA = vecA - ((vecA * pa.ZAxis) * pa.ZAxis);
                                             Vector3d projB = vecB - ((vecB * pa.ZAxis) * pa.ZAxis);
-                                            return projA.Length < context.AbsoluteTolerance || projB.Length < context.AbsoluteTolerance
+                                            return projA.Length < symmetryTolerance || projB.Length < symmetryTolerance
                                                 ? double.NaN
                                                 : Vector3d.CrossProduct(projA, projB) * pa.ZAxis < 0
                                                     ? -Vector3d.VectorAngle(projA, projB)
@@ -119,13 +122,13 @@ internal static class OrientCompute {
                                                     Point3d rotated = ptA;
                                                     rotated.Transform(rotation);
                                                     return rotated.DistanceTo(ptB);
-                                                }).All(dist => dist < context.AbsoluteTolerance)
+                                                }).All(dist => dist < symmetryTolerance)
                                                     ? (byte)2 : (byte)0;
                                     }))(),
                                     _ => (byte)0,
                                 }, Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
-                                    double dot when Math.Abs(dot - 1.0) < context.AbsoluteTolerance => (byte)1,
-                                    double dot when Math.Abs(dot) < context.AbsoluteTolerance => (byte)2,
+                                    double dot when Math.Abs(dot - 1.0) < 1.0 - Math.Cos(angleTolerance) => (byte)1,
+                                    double dot when Math.Abs(dot) < Math.Sin(angleTolerance) => (byte)2,
                                     _ => (byte)3,
                                 }) is (byte symmetry, byte relationship)
                                     ? ResultFactory.Create(value: (xform, twist, tilt, symmetry, relationship))
@@ -136,6 +139,7 @@ internal static class OrientCompute {
                     },
                     _ => ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.UnsupportedOrientationType),
                 };
+    }
 
     /// <summary>Detect patterns in geometry array and compute alignment.</summary>
     [Pure]
