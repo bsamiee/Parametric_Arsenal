@@ -152,7 +152,7 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int? index = null,
         Point3d? testPoint = null,
-        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) where T : notnull =>
+        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) where T : GeometryBase =>
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>

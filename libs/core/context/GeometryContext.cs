@@ -72,8 +72,21 @@ public sealed record GeometryContext(
 
     /// <summary>Creates validated context with normalization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) =>
-        (!RhinoMath.IsValidDouble(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance) || !RhinoMath.IsValidDouble(relativeTolerance) || !RhinoMath.IsValidDouble(angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians)) ? ResultFactory.Create<GeometryContext>(errors: [E.Validation.ToleranceAbsoluteInvalid,]) :
-        ValidationRules.For(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians) is SystemError[] { Length: > 0 } errors ? ResultFactory.Create<GeometryContext>(errors: errors) :
-        ResultFactory.Create(value: new GeometryContext(absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance, relativeTolerance, angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians, units));
+    public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) {
+        double normalizedAbsoluteTolerance = absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance;
+        double normalizedRelativeTolerance = relativeTolerance <= 0d ? DefaultRelativeTolerance : relativeTolerance;
+        double normalizedAngleToleranceRadians = angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians;
+
+        SystemError[] invalidParametersArray = [
+            .. !RhinoMath.IsValidDouble(normalizedAbsoluteTolerance) ? (SystemError[])[E.Validation.ToleranceAbsoluteInvalid,] : [],
+            .. !RhinoMath.IsValidDouble(normalizedRelativeTolerance) ? (SystemError[])[E.Validation.ToleranceRelativeInvalid,] : [],
+            .. !RhinoMath.IsValidDouble(normalizedAngleToleranceRadians) ? (SystemError[])[E.Validation.ToleranceAngleInvalid,] : [],
+        ];
+
+        return invalidParametersArray is { Length: > 0 } parameterErrors
+            ? ResultFactory.Create<GeometryContext>(errors: parameterErrors)
+            : ValidationRules.For(normalizedAbsoluteTolerance, normalizedRelativeTolerance, normalizedAngleToleranceRadians) is SystemError[] { Length: > 0 } validationErrors
+                ? ResultFactory.Create<GeometryContext>(errors: validationErrors)
+                : ResultFactory.Create(value: new GeometryContext(normalizedAbsoluteTolerance, normalizedRelativeTolerance, normalizedAngleToleranceRadians, units));
+    }
 }

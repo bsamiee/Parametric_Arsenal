@@ -36,7 +36,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
         SelfIntersection._flags | BrepGranular._flags
     ));
 
-    public static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,];
+    internal static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,];
 
     private static readonly FrozenDictionary<ushort, string> _names =
         new Dictionary<ushort, string> {

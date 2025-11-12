@@ -9,7 +9,7 @@ using Arsenal.Core.Validation;
 namespace Arsenal.Core.Diagnostics;
 
 /// <summary>Diagnostic capture with ConditionalWeakTable storage for compile-time tracing.</summary>
-public static class DiagnosticCapture {
+internal static class DiagnosticCapture {
 #if DEBUG
     private static readonly ActivitySource _activitySource = new("Arsenal.Core", "1.0.0");
     private static readonly ConditionalWeakTable<object, StrongBox<DiagnosticContext>> _metadata = [];
@@ -17,7 +17,7 @@ public static class DiagnosticCapture {
 
     /// <summary>True if diagnostics enabled (DEBUG only).</summary>
     [Pure]
-    public static bool IsEnabled =>
+    internal static bool IsEnabled =>
 #if DEBUG
         true;
 #else
@@ -26,7 +26,7 @@ public static class DiagnosticCapture {
 
     /// <summary>Gets diagnostic metadata for Result (DEBUG only).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
+    internal static bool TryGetDiagnostics<T>(this Result<T> result, [MaybeNullWhen(false)] out DiagnosticContext context) {
 #if DEBUG
         bool found = _metadata.TryGetValue(result, out StrongBox<DiagnosticContext>? box);
         context = found && box is not null ? box.Value! : default;
@@ -41,7 +41,7 @@ public static class DiagnosticCapture {
     /// <summary>Clears all diagnostic metadata (DEBUG only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #pragma warning disable IDE0022 // Use expression body for method
-    public static void Clear() {
+    internal static void Clear() {
 #if DEBUG
         _metadata.Clear();
 #endif
@@ -50,7 +50,7 @@ public static class DiagnosticCapture {
 
     /// <summary>Captures operation diagnostics with timing and allocation tracking (DEBUG only).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Capture<T>(
+    internal static Result<T> Capture<T>(
         this Result<T> result,
         string operation,
         V? validationApplied = null,

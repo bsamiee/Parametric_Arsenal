@@ -33,6 +33,16 @@ internal static class AnalysisCompute {
                     .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
                     .Where(sc => !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)),
                 ];
+                Interval uDomain = validSurface.Domain(0);
+                Interval vDomain = validSurface.Domain(1);
+                double uSpan = Math.Abs(uDomain.Length);
+                double vSpan = Math.Abs(vDomain.Length);
+                double singularityThresholdU = uSpan > context.AbsoluteTolerance
+                    ? uSpan * AnalysisConfig.SingularityProximityFactor
+                    : context.AbsoluteTolerance;
+                double singularityThresholdV = vSpan > context.AbsoluteTolerance
+                    ? vSpan * AnalysisConfig.SingularityProximityFactor
+                    : context.AbsoluteTolerance;
                 return curvatures.Length > 0
                     && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
                     && (gaussianSorted.Length % 2 is 0 ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0 : gaussianSorted[gaussianSorted.Length / 2]) is double medianGaussian
