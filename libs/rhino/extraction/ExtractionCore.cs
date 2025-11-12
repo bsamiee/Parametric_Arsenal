@@ -274,11 +274,11 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and continuity")),
         };
         FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
-            .GroupBy(entry => entry.Key.Kind)
+            .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
-                group => group.Key,
-                group => group.OrderByDescending(entry => entry.Key.GeometryType, _specificityComparer)
-                    .Select(entry => (entry.Key.GeometryType, entry.Value))
+                static group => group.Key,
+                group => group.OrderByDescending(static entry => entry.Key.GeometryType, _specificityComparer)
+                    .Select(static entry => (entry.Key.GeometryType, entry.Value))
                     .ToArray())
             .ToFrozenDictionary();
         return (map.ToFrozenDictionary(), fallbacks);
@@ -333,11 +333,11 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid angle or brep")),
         };
         FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> fallbacks = map
-            .GroupBy(entry => entry.Key.Kind)
+            .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
-                group => group.Key,
-                group => group.OrderByDescending(entry => entry.Key.GeometryType, _specificityComparer)
-                    .Select(entry => (entry.Key.GeometryType, entry.Value))
+                static group => group.Key,
+                group => group.OrderByDescending(static entry => entry.Key.GeometryType, _specificityComparer)
+                    .Select(static entry => (entry.Key.GeometryType, entry.Value))
                     .ToArray())
             .ToFrozenDictionary();
         return (map.ToFrozenDictionary(), fallbacks);
