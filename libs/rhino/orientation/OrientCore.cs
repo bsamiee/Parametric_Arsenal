@@ -67,13 +67,39 @@ internal static class OrientCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {
-            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => Plane.FitPlaneToPoints(pc.GetPoints(), out Plane plane) == PlaneFitResult.Success
-                ? ResultFactory.Create(value: plane)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
+                Point3d[] points = pc.GetPoints();
+                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
+                    ? ((Func<Result<Plane>>)(() => {
+                        double sumSquaredDistances = 0.0;
+                        for (int i = 0; i < points.Length; i++) {
+                            double distance = plane.DistanceTo(points[i]);
+                            sumSquaredDistances += distance * distance;
+                        }
+                        double rms = points.Length > 0 ? Math.Sqrt(sumSquaredDistances / points.Length) : double.PositiveInfinity;
+                        return rms <= OrientConfig.BestFitResidualThreshold
+                            ? ResultFactory.Create(value: plane)
+                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                    }))()
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
             PointCloud pc => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {pc.Count}")),
-            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => Plane.FitPlaneToPoints(m.Vertices.ToPoint3dArray(), out Plane plane) == PlaneFitResult.Success
-                ? ResultFactory.Create(value: plane)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
+            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
+                Point3d[] points = m.Vertices.ToPoint3dArray();
+                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
+                    ? ((Func<Result<Plane>>)(() => {
+                        double sumSquaredDistances = 0.0;
+                        for (int i = 0; i < points.Length; i++) {
+                            double distance = plane.DistanceTo(points[i]);
+                            sumSquaredDistances += distance * distance;
+                        }
+                        double rms = points.Length > 0 ? Math.Sqrt(sumSquaredDistances / points.Length) : double.PositiveInfinity;
+                        return rms <= OrientConfig.BestFitResidualThreshold
+                            ? ResultFactory.Create(value: plane)
+                            : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                    }))()
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
             Mesh m => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {m.Vertices.Count}")),
             _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
         };
