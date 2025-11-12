@@ -10,10 +10,10 @@ namespace Arsenal.Core.Errors;
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly record struct SystemError(byte Domain, int Code, string Message) {
-    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{Domain switch { 1 => "Results", 2 => "Geometry", 3 => "Validation", 4 => "Spatial", 5 => "Topology", _ => "Unknown" }}:{Code.ToString(CultureInfo.InvariantCulture)}] {Message}");
+    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{this.Domain switch { E.ResultsDomain => "Results", E.GeometryDomain => "Geometry", E.ValidationDomain => "Validation", E.SpatialDomain => "Spatial", E.TopologyDomain => "Topology", _ => "Unknown" }}:{this.Code.ToString(CultureInfo.InvariantCulture)}] {this.Message}");
 
     [Pure]
-    public override string ToString() => $"[{Domain switch { 1 => "Results", 2 => "Geometry", 3 => "Validation", 4 => "Spatial", 5 => "Topology", _ => "Unknown" }}:{Code}] {Message}";
+    public override string ToString() => $"[{this.Domain switch { E.ResultsDomain => "Results", E.GeometryDomain => "Geometry", E.ValidationDomain => "Validation", E.SpatialDomain => "Spatial", E.TopologyDomain => "Topology", _ => "Unknown" }}:{this.Code}] {this.Message}";
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SystemError WithContext(string context) =>

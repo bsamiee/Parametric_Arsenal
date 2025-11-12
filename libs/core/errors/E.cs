@@ -6,6 +6,13 @@ namespace Arsenal.Core.Errors;
 
 /// <summary>Error registry with O(1) lookup via FrozenDictionary.</summary>
 public static class E {
+    internal const byte UnknownDomain = 0;
+    internal const byte ResultsDomain = 1;
+    internal const byte GeometryDomain = 2;
+    internal const byte ValidationDomain = 3;
+    internal const byte SpatialDomain = 4;
+    internal const byte TopologyDomain = 5;
+
     private static readonly FrozenDictionary<int, string> _m =
         new Dictionary<int, string> {
             [1001] = "No value provided",
@@ -121,12 +128,12 @@ public static class E {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte GetDomain(int code) => code switch {
-        >= 1000 and < 2000 => 1,
-        >= 2000 and < 3000 => 2,
-        >= 3000 and < 4000 => 3,
-        >= 4000 and < 5000 => 4,
-        >= 5000 and < 6000 => 5,
-        _ => 0,
+        >= 1000 and < 2000 => ResultsDomain,
+        >= 2000 and < 3000 => GeometryDomain,
+        >= 3000 and < 4000 => ValidationDomain,
+        >= 4000 and < 5000 => SpatialDomain,
+        >= 5000 and < 6000 => TopologyDomain,
+        _ => UnknownDomain,
     };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

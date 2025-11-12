@@ -10,9 +10,9 @@ namespace Arsenal.Core.Tests.Results;
 /// <summary>Edge case tests for Result operations covering untested branches and boundary conditions.</summary>
 public sealed class ResultEdgeCaseTests {
     private static readonly (SystemError E1, SystemError E2, SystemError E3) Errors = (
-        new(domain: 1, code: 7001, message: "Edge1"),
-        new(domain: 1, code: 7002, message: "Edge2"),
-        new(domain: 1, code: 7003, message: "Edge3"));
+        new(domain: E.ResultsDomain, code: 7001, message: "Edge1"),
+        new(domain: E.ResultsDomain, code: 7002, message: "Edge2"),
+        new(domain: E.ResultsDomain, code: 7003, message: "Edge3"));
 
     private static readonly int[] TestArray = [1, 2, 3];
 
