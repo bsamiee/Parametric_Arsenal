@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -36,7 +35,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
         SelfIntersection._flags | BrepGranular._flags
     ));
 
-    public static readonly FrozenSet<V> AllFlags = ((V[])[Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,]).ToFrozenSet();
+    public static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,];
 
     [Pure] private string DebuggerDisplay => this.ToString();
 
