@@ -184,18 +184,19 @@ internal static class ExtractionCompute {
         surface.TryGetPlane(out Plane pl, tolerance: context.AbsoluteTolerance)
             ? (true, ExtractionConfig.PrimitiveTypePlane, pl, [pl.OriginX, pl.OriginY, pl.OriginZ,])
             : surface.TryGetCylinder(out Cylinder cyl, tolerance: context.AbsoluteTolerance)
-                && cyl.Radius > context.AbsoluteTolerance
+                && cyl.Radius > RhinoMath.ZeroTolerance
+                && cyl.TotalHeight > RhinoMath.ZeroTolerance
                 ? (true, ExtractionConfig.PrimitiveTypeCylinder, new Plane(cyl.CircleAt(0.0).Center, cyl.Axis), [cyl.Radius, cyl.TotalHeight,])
                 : surface.TryGetSphere(out Sphere sph, tolerance: context.AbsoluteTolerance)
-                    && sph.Radius > context.AbsoluteTolerance
+                    && sph.Radius > RhinoMath.ZeroTolerance
                     ? (true, ExtractionConfig.PrimitiveTypeSphere, new Plane(sph.Center, Vector3d.ZAxis), [sph.Radius,])
                     : surface.TryGetCone(out Cone cone, tolerance: context.AbsoluteTolerance)
-                        && cone.Radius > context.AbsoluteTolerance
-                        && cone.Height > context.AbsoluteTolerance
+                        && cone.Radius > RhinoMath.ZeroTolerance
+                        && cone.Height > RhinoMath.ZeroTolerance
                         ? (true, ExtractionConfig.PrimitiveTypeCone, new Plane(cone.BasePoint, cone.Axis), [cone.Radius, cone.Height, Math.Atan(cone.Radius / cone.Height),])
                         : surface.TryGetTorus(out Torus torus, tolerance: context.AbsoluteTolerance)
-                            && torus.MajorRadius > context.AbsoluteTolerance
-                            && torus.MinorRadius > context.AbsoluteTolerance
+                            && torus.MajorRadius > RhinoMath.ZeroTolerance
+                            && torus.MinorRadius > RhinoMath.ZeroTolerance
                             ? (true, ExtractionConfig.PrimitiveTypeTorus, torus.Plane, [torus.MajorRadius, torus.MinorRadius,])
                             : surface switch {
                                 Extrusion ext when ext.IsValid && ext.PathLineCurve() is LineCurve lc =>
