@@ -21,10 +21,8 @@ internal static class IntersectionCompute {
                 deviationSum += deviation;
                 grazing = grazing || deviation <= IntersectionConfig.GrazingAngleThreshold;
             }
-
             double averageDeviation = deviationSum / angles.Length;
             bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
-
             return ResultFactory.Create(value: (
                 Type: tangent ? (byte)0 : (byte)1,
                 ApproachAngles: angles,
@@ -32,9 +30,7 @@ internal static class IntersectionCompute {
                 BlendScore: tangent ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore));
         }
 
-        return geomA is null || geomB is null
-            ? ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData.WithContext("Geometry is null"))
-            : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
+        return IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
                     (V modeA, V modeB) = entry.Swapped
                         ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
@@ -85,9 +81,7 @@ internal static class IntersectionCompute {
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) =>
-        geomA is null || geomB is null
-            ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InsufficientIntersectionData.WithContext("Geometry is null"))
-            : searchRadius <= context.AbsoluteTolerance
+        searchRadius <= context.AbsoluteTolerance
                 ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext("SearchRadius must exceed tolerance"))
                 : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                     .Bind(entry => {
@@ -128,9 +122,8 @@ internal static class IntersectionCompute {
                                                     Point3d[] pointsB = new Point3d[p.Length];
                                                     double[] distances = new double[p.Length];
                                                     for (int i = 0; i < p.Length; i++) {
-                                                        pointsA[i] = p[i].Item1;
-                                                        pointsB[i] = p[i].Item2;
-                                                        distances[i] = p[i].Item3;
+                                                        (Point3d ptA, Point3d ptB, double dist) = p[i];
+                                                        (pointsA[i], pointsB[i], distances[i]) = (ptA, ptB, dist);
                                                     }
                                                     return (pointsA, pointsB, distances);
                                                 }))(curvePairs))
@@ -149,9 +142,8 @@ internal static class IntersectionCompute {
                                                     Point3d[] pointsB = new Point3d[p.Length];
                                                     double[] distances = new double[p.Length];
                                                     for (int i = 0; i < p.Length; i++) {
-                                                        pointsA[i] = p[i].Item1;
-                                                        pointsB[i] = p[i].Item2;
-                                                        distances[i] = p[i].Item3;
+                                                        (Point3d ptA, Point3d ptB, double dist) = p[i];
+                                                        (pointsA[i], pointsB[i], distances[i]) = (ptA, ptB, dist);
                                                     }
                                                     return (pointsA, pointsB, distances);
                                                 }))(pairs))

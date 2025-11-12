@@ -47,11 +47,14 @@ internal static class TopologyCore {
     internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance, bool enableDiagnostics) where T : notnull {
         double tol = tolerance ?? context.AbsoluteTolerance;
         return Execute(input: input, context: context, opType: TopologyConfig.OpType.BoundaryLoops, enableDiagnostics: enableDiagnostics,
-            operation: g => GetNakedCurves(geometry: g) switch {
+            operation: g => ((Curve[])((object)g switch {
+                Brep brep => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => brep.Edges[i].DuplicateCurve()),],
+                Mesh mesh => [.. (mesh.GetNakedEdges() ?? []).Select(pl => pl.ToNurbsCurve()),],
+                _ => [],
+            })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] naked => ((Func<Curve[], Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(nakedCurves => {
                     try {
-                        // Ownership transfer: The consumer of Topology.BoundaryLoopData.Loops is responsible for disposing the joined curves.
                         Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                             Loops: [.. joined,],
@@ -68,12 +71,6 @@ internal static class TopologyCore {
                     }
                 }))(naked),
             });
-
-        static Curve[] GetNakedCurves(object geometry) => geometry switch {
-            Brep brep => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => brep.Edges[i].DuplicateCurve()),],
-            Mesh mesh => [.. (mesh.GetNakedEdges() ?? []).Select(pl => pl.ToNurbsCurve()),],
-            _ => [],
-        };
     }
 
     [Pure]
@@ -95,9 +92,9 @@ internal static class TopologyCore {
                                         VertexIndices: [],
                                         Valences: [.. nm.Select(t => t.Faces.Length),],
                                         Locations: [.. nm.Select(t => new Point3d(
-                                            (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) / 2.0,
-                                            (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) / 2.0,
-                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) / 2.0)),
+                                            (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) * 0.5,
+                                            (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) * 0.5,
+                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) * 0.5)),
                                         ],
                                         IsManifold: isManifold && nm.Length == 0,
                                         IsOrientable: oriented,

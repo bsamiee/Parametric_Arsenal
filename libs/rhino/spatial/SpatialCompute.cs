@@ -9,47 +9,40 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d Centroid(IEnumerable<int> indices, Point3d[] pts) =>
-        indices.ToArray() is { Length: > 0 } arr
-            ? ((Func<Point3d>)(() => {
-                double sumX = 0.0;
-                double sumY = 0.0;
-                double sumZ = 0.0;
-                for (int i = 0; i < arr.Length; i++) {
-                    sumX += pts[arr[i]].X;
-                    sumY += pts[arr[i]].Y;
-                    sumZ += pts[arr[i]].Z;
-                }
-                return new Point3d(sumX / arr.Length, sumY / arr.Length, sumZ / arr.Length);
-            }))()
-            : Point3d.Origin;
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d ExtractCentroid(GeometryBase g) {
-        Type gType = g.GetType();
-        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
-            ? (Point3d)exactExtractor(g)
-            : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(g)).Value is Func<object, object> fallbackExtractor
-                ? (Point3d)fallbackExtractor(g)
-                : g.GetBoundingBox(accurate: false).Center;
-    }
-
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
             : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
             : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
             : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
             : ((Func<Result<(Point3d, double[])[]>>)(() => {
-                Point3d[] pts = [.. geometry.Select(ExtractCentroid),];
+                Point3d[] pts = new Point3d[geometry.Length];
+                for (int i = 0; i < geometry.Length; i++) {
+                    Type gType = geometry[i].GetType();
+                    pts[i] = SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
+                        ? (Point3d)exactExtractor(geometry[i])
+                        : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(geometry[i])).Value is Func<object, object> fallbackExtractor
+                            ? (Point3d)fallbackExtractor(geometry[i])
+                            : geometry[i].GetBoundingBox(accurate: false).Center;
+                }
                 return (algorithm is 0 or 2) && k > pts.Length
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
                     : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
                         ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
                             ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
-                                Point3d centroid = members.Length > 0 ? Centroid(members, pts) : Point3d.Origin;
-                                double[] distances = members.Length > 0 ? [.. members.Select(i => pts[i].DistanceTo(centroid)),] : [];
+                                if (members.Length is 0) {
+                                    return (Point3d.Origin, Array.Empty<double>());
+                                }
+                                double sumX = 0.0;
+                                double sumY = 0.0;
+                                double sumZ = 0.0;
+                                for (int m = 0; m < members.Length; m++) {
+                                    sumX += pts[members[m]].X;
+                                    sumY += pts[members[m]].Y;
+                                    sumZ += pts[members[m]].Z;
+                                }
+                                Point3d centroid = new(sumX / members.Length, sumY / members.Length, sumZ / members.Length);
+                                double[] distances = [.. members.Select(i => pts[i].DistanceTo(centroid)),];
                                 return (centroid, distances);
                             }),
                             ])
@@ -284,7 +277,7 @@ internal static class SpatialCompute {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
-                        while (lower.Count >= 2 && CrossProduct2D(lower[^2], lower[^1], pts[i]) <= context.AbsoluteTolerance) {
+                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= context.AbsoluteTolerance) {
                             lower.RemoveAt(lower.Count - 1);
                         }
                         lower.Add(pts[i]);
@@ -292,7 +285,7 @@ internal static class SpatialCompute {
                     List<Point3d> upper = [];
                     Point3d[] reversed = [.. pts.AsEnumerable().Reverse(),];
                     for (int i = 0; i < reversed.Length; i++) {
-                        while (upper.Count >= 2 && CrossProduct2D(upper[^2], upper[^1], reversed[i]) <= context.AbsoluteTolerance) {
+                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (reversed[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (reversed[i].X - upper[^2].X))) <= context.AbsoluteTolerance) {
                             upper.RemoveAt(upper.Count - 1);
                         }
                         upper.Add(reversed[i]);
@@ -303,10 +296,6 @@ internal static class SpatialCompute {
                         : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
                 }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CrossProduct2D(Point3d o, Point3d a, Point3d b) =>
-        ((a.X - o.X) * (b.Y - o.Y)) - ((a.Y - o.Y) * (b.X - o.X));
 
     /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -319,9 +308,9 @@ internal static class SpatialCompute {
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
-        points.Where((_, i) => i >= 2).Select((p, i) => (Area: TriangleArea(points[a].Point, points[b].Point, p.Point), Idx: i + 2))
+        points.Where((_, i) => i >= 2).Select((p, i) => (Area: Vector3d.CrossProduct(points[b].Point - points[a].Point, p.Point - points[a].Point).Length * 0.5, Idx: i + 2))
             .Where(x => x.Area > context.AbsoluteTolerance).OrderByDescending(x => x.Area).FirstOrDefault() is (double, int c) && c > 1 &&
-        points.Where((_, i) => i >= 3).Select((p, i) => (Vol: TetrahedronVolume(points[a].Point, points[b].Point, points[c].Point, p.Point), Idx: i + 3))
+        points.Where((_, i) => i >= 3).Select((p, i) => (Vol: Vector3d.Multiply(Vector3d.CrossProduct(points[b].Point - points[a].Point, points[c].Point - points[a].Point), p.Point - points[a].Point) / 6.0, Idx: i + 3))
             .Where(x => Math.Abs(x.Vol) > context.AbsoluteTolerance).OrderByDescending(x => Math.Abs(x.Vol)).FirstOrDefault() is (double v, int d) && d > 2
             ? (true, v > 0 ? [(a, b, c), (a, c, d), (a, d, b), (b, d, c),] : [(a, c, b), (a, d, c), (a, b, d), (b, c, d),])
             : (false, []);
@@ -361,14 +350,6 @@ internal static class SpatialCompute {
 
         return ResultFactory.Create<int[][]>(value: [.. faces.Select(f => new int[] { indexed[f.Item1].Index, indexed[f.Item2].Index, indexed[f.Item3].Index }),]);
     }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double TriangleArea(Point3d a, Point3d b, Point3d c) =>
-        Vector3d.CrossProduct(b - a, c - a).Length * 0.5;
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double TetrahedronVolume(Point3d a, Point3d b, Point3d c, Point3d d) =>
-        Vector3d.Multiply(Vector3d.CrossProduct(b - a, c - a), d - a) / 6.0;
 
     /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -416,7 +397,15 @@ internal static class SpatialCompute {
         points.Length < 3
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ((Func<Result<Point3d[][]>>)(() => {
-                Point3d[] circumcenters = [.. triangles.Select(t => Circumcenter2D(points[t[0]], points[t[1]], points[t[2]]))];
+                Point3d[] circumcenters = new Point3d[triangles.Length];
+                for (int ti = 0; ti < triangles.Length; ti++) {
+                    (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
+                    double d = 2.0 * ((a.X * (b.Y - c.Y)) + (b.X * (c.Y - a.Y)) + (c.X * (a.Y - b.Y)));
+                    double aSq = (a.X * a.X) + (a.Y * a.Y);
+                    double bSq = (b.X * b.X) + (b.Y * b.Y);
+                    double cSq = (c.X * c.X) + (c.Y * c.Y);
+                    circumcenters[ti] = new Point3d(((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / d, ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / d, a.Z);
+                }
                 return ResultFactory.Create(value: Enumerable.Range(0, points.Length).Select(i => {
                     Point3d[] cell = [.. triangles.Select((t, ti) => (t, ti)).Where(p => p.t.Contains(i)).Select(p => circumcenters[p.ti])];
                     return cell.Length > 0
@@ -424,15 +413,4 @@ internal static class SpatialCompute {
                         : Array.Empty<Point3d>();
                 }).ToArray());
             }))());
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d Circumcenter2D(Point3d a, Point3d b, Point3d c) {
-        double d = 2.0 * ((a.X * (b.Y - c.Y)) + (b.X * (c.Y - a.Y)) + (c.X * (a.Y - b.Y)));
-        double aSq = (a.X * a.X) + (a.Y * a.Y);
-        double bSq = (b.X * b.X) + (b.Y * b.Y);
-        double cSq = (c.X * c.X) + (c.Y * c.Y);
-        double ux = ((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / d;
-        double uy = ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / d;
-        return new Point3d(ux, uy, a.Z);
-    }
 }

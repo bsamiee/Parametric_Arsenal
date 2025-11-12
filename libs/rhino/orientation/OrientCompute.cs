@@ -68,12 +68,8 @@ internal static class OrientCompute {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        geometryA is null || geometryB is null
-            ? ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed.WithContext("Null geometry"))
-            : !geometryA.IsValid || !geometryB.IsValid
-                ? ResultFactory.Create<(Transform, double, double, byte, byte)>(error: E.Validation.GeometryInvalid)
-                : (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
-                   OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
+        (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
+         OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
                 switch {
                     (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
                         (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
@@ -145,10 +141,8 @@ internal static class OrientCompute {
     internal static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectPattern(
         GeometryBase[] geometries,
         IGeometryContext context) =>
-        geometries is null
-            ? ResultFactory.Create<(byte, Transform[], int[], double)>(error: E.Geometry.InsufficientParameters.WithContext("Geometries array is null"))
-            : ResultFactory.Create(value: geometries)
-                .Ensure(g => g.All(item => item?.IsValid == true), error: E.Validation.GeometryInvalid)
+        ResultFactory.Create(value: geometries)
+            .Ensure(g => g.All(item => item?.IsValid == true), error: E.Validation.GeometryInvalid)
                 .Bind(validGeometries => validGeometries.Length >= OrientConfig.PatternMinInstances
                     ? ((Func<Result<(byte, Transform[], int[], double)>>)(() => {
                         Result<Point3d>[] centroidResults = [.. validGeometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)),];
