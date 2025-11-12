@@ -116,7 +116,7 @@ internal static class OrientCompute {
                                         ];
                                         return candidateAngles.Length == 0
                                             ? (byte)0
-                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < angleTolerance)
+                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < Math.Max(context.AngleToleranceRadians, OrientConfig.SymmetryTestTolerance))
                                                 && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;

@@ -25,6 +25,16 @@ internal static class AnalysisCompute {
                     .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
                     .Where(sc => !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)),
                 ];
+                Interval uDomain = validSurface.Domain(0);
+                Interval vDomain = validSurface.Domain(1);
+                double uSpan = Math.Abs(uDomain.Length);
+                double vSpan = Math.Abs(vDomain.Length);
+                double singularityThresholdU = uSpan > context.AbsoluteTolerance
+                    ? uSpan * AnalysisConfig.SingularityProximityFactor
+                    : context.AbsoluteTolerance;
+                double singularityThresholdV = vSpan > context.AbsoluteTolerance
+                    ? vSpan * AnalysisConfig.SingularityProximityFactor
+                    : context.AbsoluteTolerance;
                 return curvatures.Length > 0
                     && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
                     && (gaussianSorted.Length % 2 is 0 ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0 : gaussianSorted[gaussianSorted.Length / 2]) is double medianGaussian
@@ -33,7 +43,10 @@ internal static class AnalysisCompute {
                     ? ResultFactory.Create(value: (
                         GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(),
                         MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
-                        Singularities: uvGrid.Where(uv => validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)).ToArray(),
+                        Singularities: uvGrid.Where(uv =>
+                            validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
+                            || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
+                            || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV).ToArray(),
                         UniformityScore: Math.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             });
