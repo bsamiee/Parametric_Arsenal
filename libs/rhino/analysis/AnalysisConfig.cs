@@ -34,8 +34,6 @@ internal static class AnalysisConfig {
 
     /// <summary>Surface quality grid dimension: 10×10 grid for UV sampling.</summary>
     internal const int SurfaceQualityGridDimension = 10;
-    /// <summary>Surface quality: 10×10 grid for curvature sampling.</summary>
-    internal const int SurfaceQualityGridDimension = 10;
 
     /// <summary>Surface quality: derived sample count from grid dimensions.</summary>
     internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
@@ -69,8 +67,4 @@ internal static class AnalysisConfig {
     /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
-
-    /// <summary>Brep closest point tolerance multiplier 100× for looser matching.</summary>
-    /// <summary>Brep closest point tolerance multiplier: 100× absolute tolerance for proximity queries.</summary>
-    internal const double BrepClosestPointToleranceMultiplier = 100.0;
 }

@@ -20,6 +20,7 @@ public static class E {
             [1002] = "Invalid Create parameters",
             [1003] = "Invalid validation parameters",
             [1004] = "Invalid Lift parameters",
+            [1005] = "Cannot access value in error state or error in success state",
 
             // Geometry Operation Errors (2000-2999)
             // Extraction Operations (2000-2006)
@@ -126,6 +127,7 @@ public static class E {
 
             // Topology Analysis Errors (5000-5999)
             [5001] = "Topology diagnosis failed",
+            [5002] = "Topology is too complex for diagnosis",
             [5010] = "Topology healing failed",
             [5020] = "Topological feature extraction failed",
         }.ToFrozenDictionary();
@@ -152,6 +154,7 @@ public static class E {
         public static readonly SystemError InvalidCreate = Get(1002);
         public static readonly SystemError InvalidValidate = Get(1003);
         public static readonly SystemError InvalidLift = Get(1004);
+        public static readonly SystemError InvalidAccess = Get(1005);
     }
 
     /// <summary>Geometry errors (2000-2999).</summary>
@@ -266,6 +269,7 @@ public static class E {
     /// <summary>Topology analysis errors (5000-5999).</summary>
     public static class Topology {
         public static readonly SystemError DiagnosisFailed = Get(5001);
+        public static readonly SystemError TopologyTooComplex = Get(5002);
         public static readonly SystemError HealingFailed = Get(5010);
         public static readonly SystemError FeatureExtractionFailed = Get(5020);
     }
