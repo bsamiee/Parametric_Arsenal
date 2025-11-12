@@ -29,12 +29,12 @@ internal static class AnalysisCompute {
                 Interval vDomain = validSurface.Domain(1);
                 double uSpan = Math.Abs(uDomain.Length);
                 double vSpan = Math.Abs(vDomain.Length);
-                double singularityThresholdU = uSpan > context.AbsoluteTolerance
-                    ? uSpan * AnalysisConfig.SingularityProximityFactor
-                    : context.AbsoluteTolerance;
-                double singularityThresholdV = vSpan > context.AbsoluteTolerance
-                    ? vSpan * AnalysisConfig.SingularityProximityFactor
-                    : context.AbsoluteTolerance;
+                double singularityThresholdU = Math.Min(
+                    Math.Max(uSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
+                    uSpan * 0.1);
+                double singularityThresholdV = Math.Min(
+                    Math.Max(vSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
+                    vSpan * 0.1);
                 return curvatures.Length > 0
                     && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
                     && (gaussianSorted.Length % 2 is 0 ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0 : gaussianSorted[gaussianSorted.Length / 2]) is double medianGaussian
