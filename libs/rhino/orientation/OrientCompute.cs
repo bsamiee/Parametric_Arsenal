@@ -100,7 +100,13 @@ internal static class OrientCompute {
                                                 ? (byte)1 : (byte)0,
                                     (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > symmetryTolerance => ((Func<byte>)(() => {
                                         Point3d[] samplesA = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
-                                        Point3d[] samplesB = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
+                                        Point3d[] samplesBOriginal = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
+                                        Transform alignBToA = Transform.PlaneToPlane(pb, pa);
+                                        Point3d[] samplesB = [.. samplesBOriginal.Select(point => {
+                                            Point3d aligned = point;
+                                            aligned.Transform(alignBToA);
+                                            return aligned;
+                                        }),];
                                         int[] testIndices = [0, samplesA.Length / 2, samplesA.Length - 1,];
                                         double[] candidateAngles = [.. testIndices.Select(idx => {
                                             Vector3d vecA = samplesA[idx] - pa.Origin;
