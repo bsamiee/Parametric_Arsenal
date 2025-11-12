@@ -38,6 +38,9 @@ internal static class AnalysisConfig {
     /// <summary>Surface quality: derived sample count from grid dimensions.</summary>
     internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
 
+    /// <summary>Fraction of the domain treated as boundary proximity.</summary>
+    internal const double SingularityBoundaryFraction = 0.1;
+
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
 
