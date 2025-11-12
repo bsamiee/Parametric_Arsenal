@@ -89,7 +89,7 @@ public static class Extract {
         };
 
         return requestResult.Bind(request =>
-            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, request, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = request.ValidationMode, }));
+            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Point3d>>>)(item => ExtractionCore.Execute(item, request, context)), new OperationConfig<T, Point3d> { Context = context, ValidationMode = request.ValidationMode, EnableDiagnostics = false, }));
     }
 
     /// <summary>Batch point extraction with error accumulation and parallelism.</summary>
@@ -126,7 +126,7 @@ public static class Extract {
         };
 
         return requestResult.Bind(request =>
-            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Curve>>>)(item => ExtractionCore.ExecuteCurves(item, request, context)), new OperationConfig<T, Curve> { Context = context, ValidationMode = request.ValidationMode, }));
+            UnifiedOperation.Apply(input, (Func<T, Result<IReadOnlyList<Curve>>>)(item => ExtractionCore.ExecuteCurves(item, request, context)), new OperationConfig<T, Curve> { Context = context, ValidationMode = request.ValidationMode, EnableDiagnostics = false, }));
     }
 
     /// <summary>Batch curve extraction with error accumulation and parallelism.</summary>

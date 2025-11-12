@@ -71,6 +71,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -90,6 +91,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -103,6 +105,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,6 +134,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -143,6 +147,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -156,6 +161,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -177,6 +183,7 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -208,6 +215,7 @@ public static class Orient {
             config: new OperationConfig<Brep, (Transform, double, byte[])> {
                 Context = context,
                 ValidationMode = V.Standard | V.Topology,
+                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
