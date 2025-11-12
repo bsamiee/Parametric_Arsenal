@@ -103,9 +103,8 @@ internal static class OrientCompute {
                                         Point3d[] samplesBOriginal = [.. Enumerable.Range(0, OrientConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientConfig.RotationSymmetrySampleCount - 1))))];
                                         Transform alignBToA = Transform.PlaneToPlane(pb, pa);
                                         Point3d[] samplesB = [.. samplesBOriginal.Select(point => {
-                                            Point3d aligned = point;
-                                            aligned.Transform(alignBToA);
-                                            return aligned;
+                                            point.Transform(alignBToA);
+                                            return point;
                                         }),];
                                         int[] testIndices = [0, samplesA.Length / 2, samplesA.Length - 1,];
                                         double[] candidateAngles = [.. testIndices.Select(idx => {
