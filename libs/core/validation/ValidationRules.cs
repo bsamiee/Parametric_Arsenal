@@ -16,27 +16,7 @@ namespace Arsenal.Core.Validation;
 public static class ValidationRules {
     /// <summary>Cache key for validator lookups.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
-        public readonly Type Type = type;
-        public readonly V Mode = mode;
-        public readonly string? Member = member;
-        public readonly byte Kind = kind;
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(CacheKey left, CacheKey right) => left.Equals(right);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(CacheKey left, CacheKey right) => !left.Equals(right);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
-    }
+    private readonly record struct CacheKey(Type Type, V Mode = default, string? Member = null, byte Kind = 0);
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
     private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
