@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Diagnostics;
 using Arsenal.Core.Errors;
