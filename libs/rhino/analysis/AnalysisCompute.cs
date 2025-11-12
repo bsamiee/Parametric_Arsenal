@@ -113,10 +113,7 @@ internal static class AnalysisCompute {
                                     RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)),
                                     RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc))
                                 ) is (double angleA, double angleB, double angleC)
-                                    ? ((Func<double>)(() => {
-                                        double idealTriangleAngle = 180.0 / 3.0;
-                                        return Math.Max(Math.Abs(angleA - idealTriangleAngle), Math.Max(Math.Abs(angleB - idealTriangleAngle), Math.Abs(angleC - idealTriangleAngle))) / idealTriangleAngle;
-                                    }))()
+                                    ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
                                     : 1.0
                                 : 1.0;
 

@@ -36,7 +36,7 @@ internal static class AnalysisConfig {
     internal const int SurfaceQualityGridDimension = 10;
 
     /// <summary>Surface quality: derived sample count from grid dimensions.</summary>
-    internal static readonly int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
+    internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
 
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
