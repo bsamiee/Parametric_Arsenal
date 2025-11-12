@@ -119,14 +119,14 @@ internal static class AnalysisCompute {
                                 Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
                                 Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
                                 Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
-                            ]).Max(angle => Math.Abs(RhinoMath.ToDegrees(angle) - 90.0)) / 90.0
+                            ]).Max(angle => Math.Abs(RhinoMath.ToDegrees(angle) - AnalysisConfig.QuadIdealAngleDegrees)) / AnalysisConfig.QuadIdealAngleDegrees
                             : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
                                 ? (
                                     RhinoMath.ToDegrees(Vector3d.VectorAngle(ab, ac)),
                                     RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)),
                                     RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc))
                                 ) is (double angleA, double angleB, double angleC)
-                                    ? Math.Max(Math.Abs(angleA - 60.0), Math.Max(Math.Abs(angleB - 60.0), Math.Abs(angleC - 60.0))) / 60.0
+                                    ? Math.Max(Math.Abs(angleA - AnalysisConfig.TriangleIdealAngleDegrees), Math.Max(Math.Abs(angleB - AnalysisConfig.TriangleIdealAngleDegrees), Math.Abs(angleC - AnalysisConfig.TriangleIdealAngleDegrees))) / AnalysisConfig.TriangleIdealAngleDegrees
                                     : 1.0
                                 : 1.0;
 

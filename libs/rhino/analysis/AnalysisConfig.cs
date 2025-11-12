@@ -47,6 +47,9 @@ internal static class AnalysisConfig {
     /// <summary>Singularity proximity threshold 1% of domain.</summary>
     internal const double SingularityProximityFactor = 0.01;
 
+    /// <summary>Maximum singularity proximity factor 10% of domain span.</summary>
+    internal const double MaxSingularityProximityFactor = 0.1;
+
     /// <summary>Brep closest point tolerance multiplier: 100× context tolerance.</summary>
     internal const double BrepClosestPointToleranceMultiplier = 100.0;
 
@@ -70,4 +73,10 @@ internal static class AnalysisConfig {
     /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
+
+    /// <summary>Ideal interior angle for equilateral triangle in degrees.</summary>
+    internal const double TriangleIdealAngleDegrees = 60.0;
+
+    /// <summary>Ideal interior angle for square/rectangle in degrees.</summary>
+    internal const double QuadIdealAngleDegrees = 90.0;
 }
