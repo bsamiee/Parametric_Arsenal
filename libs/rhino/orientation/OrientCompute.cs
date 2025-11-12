@@ -57,7 +57,7 @@ internal static class OrientCompute {
                             }),
                             ];
 
-                            return results.MaxBy(r => r.Item2) is (Transform best, double bestScore, byte[] met) && bestScore > 0.0
+                            return results.MaxBy(r => r.Item2) is (Transform best, double bestScore, byte[] met) && bestScore >= OrientConfig.MinimumOptimizationScore
                                 ? ResultFactory.Create(value: (best, bestScore, met))
                                 : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
                         }))()
@@ -113,7 +113,7 @@ internal static class OrientCompute {
                                         ];
                                         return candidateAngles.Length == 0
                                             ? (byte)0
-                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < context.AngleToleranceRadians)
+                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < Math.Max(context.AngleToleranceRadians, OrientConfig.SymmetryTestTolerance))
                                                 && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;
