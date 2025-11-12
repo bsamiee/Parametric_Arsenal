@@ -43,7 +43,7 @@ public static class ValidationRules {
     private static readonly ConstantExpression _nullSystemError = Expression.Constant(null, typeof(SystemError?));
     private static readonly ConstantExpression _constantTrue = Expression.Constant(true);
     private static readonly ConstantExpression _constantFalse = Expression.Constant(false);
-    private static readonly ConstantExpression _originPoint = Expression.Constant(new Point3d(0, 0, 0));
+    private static readonly ConstantExpression _originPoint = Expression.Constant(Point3d.Origin);
     private static readonly ConstantExpression _continuityC1 = Expression.Constant(Continuity.C1_continuous);
     private static readonly ConstantExpression _nullCurveIntersections = Expression.Constant(null, typeof(CurveIntersections));
     private static readonly MethodInfo _enumerableWhere = typeof(Enumerable).GetMethods()
