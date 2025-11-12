@@ -35,14 +35,8 @@ internal static class AnalysisConfig {
     /// <summary>Surface quality: 10×10 grid for curvature sampling.</summary>
     internal const int SurfaceQualityGridDimension = 10;
 
-    /// <summary>Surface quality: grid dimension squared = 100 samples for curvature distribution.</summary>
-    internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
-
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
-
-    /// <summary>Singularity proximity threshold 1% of domain.</summary>
-    internal const double SingularityProximityFactor = 0.01;
 
     /// <summary>Curve fairness: 50 samples for curvature comb analysis.</summary>
     internal const int CurveFairnessSampleCount = 50;
