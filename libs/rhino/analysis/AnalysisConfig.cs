@@ -41,9 +41,6 @@ internal static class AnalysisConfig {
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
 
-    /// <summary>Singularity proximity threshold 1% of domain.</summary>
-    internal const double SingularityProximityFactor = 0.01;
-
     /// <summary>Curve fairness: 50 samples for curvature comb analysis.</summary>
     internal const int CurveFairnessSampleCount = 50;
 
