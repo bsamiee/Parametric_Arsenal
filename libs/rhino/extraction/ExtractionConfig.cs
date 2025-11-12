@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
@@ -34,10 +35,10 @@ internal static class ExtractionConfig {
     internal const int FilletCurvatureSampleCount = 5;
     /// <summary>G2 continuity angle tolerance 0.01 radians for smooth edge detection.</summary>
     internal const double G2ContinuityTolerance = 0.01;
-    /// <summary>Chamfer dihedral angle range: sharp edge below 0.349 radians (20°).</summary>
-    internal const double SharpEdgeAngleThreshold = 0.349;
-    /// <summary>Chamfer dihedral angle range: smooth edge above 2.967 radians (170°).</summary>
-    internal const double SmoothEdgeAngleThreshold = 2.967;
+    /// <summary>Chamfer dihedral angle range: sharp edge below 20° in radians.</summary>
+    internal static readonly double SharpEdgeAngleThreshold = RhinoMath.ToRadians(20.0);
+    /// <summary>Chamfer dihedral angle range: smooth edge above 170° in radians.</summary>
+    internal static readonly double SmoothEdgeAngleThreshold = RhinoMath.ToRadians(170.0);
     /// <summary>Minimum hole polyline sides 16 for circular approximation.</summary>
     internal const int MinHolePolySides = 16;
     /// <summary>Primitive residual sample count 20 for RMS distance calculation.</summary>
@@ -54,8 +55,8 @@ internal static class ExtractionConfig {
     internal const double GridPointDeviationThreshold = 0.1;
     /// <summary>Scaling pattern variance threshold 0.1 for ratio consistency.</summary>
     internal const double ScalingVarianceThreshold = 0.1;
-    /// <summary>Feature edge angle threshold 0.524 radians (30°) for sharp edge detection.</summary>
-    internal const double FeatureEdgeAngleThreshold = 0.524;
+    /// <summary>Feature edge angle threshold 30° in radians for sharp edge detection.</summary>
+    internal static readonly double FeatureEdgeAngleThreshold = RhinoMath.ToRadians(30.0);
     /// <summary>Minimum isocurve count 2 for valid extraction.</summary>
     internal const int MinIsocurveCount = 2;
     /// <summary>Maximum isocurve count 100 to prevent memory issues.</summary>

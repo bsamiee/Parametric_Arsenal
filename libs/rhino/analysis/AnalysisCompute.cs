@@ -23,7 +23,7 @@ internal static class AnalysisCompute {
                 ];
                 SurfaceCurvature[] curvatures = [.. uvGrid
                     .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
-                    .Where(sc => !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)),
+                    .Where(sc => RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)),
                 ];
                 Interval uDomain = validSurface.Domain(0);
                 Interval vDomain = validSurface.Domain(1);
