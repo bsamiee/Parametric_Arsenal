@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -9,6 +10,17 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
+    private static readonly IComparer<Type> _typeSpecificity = Comparer<Type>.Create(static (left, right) =>
+        left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
+
+    private static readonly (Type GeometryType, Func<object, object> Extractor)[] _centroidFallbacks =
+        [.. SpatialConfig.TypeExtractors
+            .Where(static kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal))
+            .OrderByDescending(static kv => kv.Key.GeometryType, _typeSpecificity)
+            .Select(static kv => (kv.Key.GeometryType, kv.Value)),
+        ];
+
+    private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
             : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
@@ -17,12 +29,10 @@ internal static class SpatialCompute {
             : ((Func<Result<(Point3d, double[])[]>>)(() => {
                 Point3d[] pts = new Point3d[geometry.Length];
                 for (int i = 0; i < geometry.Length; i++) {
-                    Type gType = geometry[i].GetType();
-                    pts[i] = SpatialConfig.TypeExtractors.TryGetValue(("Centroid", gType), out Func<object, object>? exactExtractor)
-                        ? (Point3d)exactExtractor(geometry[i])
-                        : SpatialConfig.TypeExtractors.FirstOrDefault(kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal) && kv.Key.GeometryType.IsInstanceOfType(geometry[i])).Value is Func<object, object> fallbackExtractor
-                            ? (Point3d)fallbackExtractor(geometry[i])
-                            : geometry[i].GetBoundingBox(accurate: false).Center;
+                    GeometryBase current = geometry[i];
+                    Type geometryType = current.GetType();
+                    Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
+                    pts[i] = (Point3d)extractor(current);
                 }
                 return (algorithm is 0 or 2) && k > pts.Length
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
@@ -413,4 +423,17 @@ internal static class SpatialCompute {
                         : Array.Empty<Point3d>();
                 }).ToArray());
             }))());
+
+    private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
+        int match = Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(geometryType));
+        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", geometryType), out Func<object, object>? exact) switch {
+            true => exact!,
+            _ => match switch {
+                >= 0 => _centroidFallbacks[match].Extractor,
+                _ => static geometry => geometry is GeometryBase baseGeometry
+                    ? baseGeometry.GetBoundingBox(accurate: false).Center
+                    : Point3d.Origin,
+            },
+        };
+    }
 }

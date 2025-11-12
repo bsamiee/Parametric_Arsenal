@@ -39,7 +39,7 @@ public static class Intersect {
         IGeometryContext context,
         IntersectionOptions? options = null,
         bool enableDiagnostics = false) where T1 : notnull where T2 : notnull {
-        IntersectionOptions opts = options ?? new();
+        IntersectionOptions opts = options ?? new IntersectionOptions();
         (Type t1, Type t2) = (typeof(T1), typeof(T2));
 
         return IntersectionCore.NormalizeOptions(opts, context)

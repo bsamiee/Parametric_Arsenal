@@ -94,7 +94,7 @@ public static class ValidationRules {
                     .. (!(RhinoMath.IsValidDouble(angleToleranceRadians) && angleToleranceRadians is > RhinoMath.Epsilon and <= RhinoMath.TwoPI) ?
                     [E.Validation.ToleranceAngleInvalid] : Array.Empty<SystemError>()),
                 ],
-            _ => throw new ArgumentException(E.Results.InvalidValidate.Message, nameof(args)),
+            _ => [E.Results.InvalidValidate.WithContext(nameof(args)),],
         };
 
     /// <summary>Compiles zero-allocation validator via expression trees.</summary>

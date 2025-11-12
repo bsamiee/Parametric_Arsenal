@@ -49,13 +49,13 @@ internal static class TopologyCore {
         return Execute(input: input, context: context, opType: TopologyConfig.OpType.BoundaryLoops, enableDiagnostics: enableDiagnostics,
             operation: g => ((Curve[])((object)g switch {
                 Brep brep => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => brep.Edges[i].DuplicateCurve()),],
-                Mesh mesh => [.. (mesh.GetNakedEdges() ?? []).Select(pl => pl.ToNurbsCurve()),],
+                Mesh mesh => [.. (mesh.GetNakedEdges() is Polyline[] naked ? naked : []).Select(pl => pl.ToNurbsCurve()),],
                 _ => [],
             })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] naked => ((Func<Curve[], Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(nakedCurves => {
                     try {
-                        Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
+                        Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) is Curve[] j ? j : [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                             Loops: [.. joined,],
                             EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
@@ -267,8 +267,8 @@ internal static class TopologyCore {
                         uint[]? faceList = ngon.FaceIndexList();
                         uint[]? boundaryEdges = ngon.BoundaryVertexIndexList();
                         Point3d center = mesh.Ngons.GetNgonCenter(index);
-                        IReadOnlyList<int> faces = [.. (faceList ?? []).Select(face => unchecked((int)face)),];
-                        IReadOnlyList<int> boundaries = [.. (boundaryEdges ?? []).Select(edge => unchecked((int)edge)),];
+                        IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
+                        IReadOnlyList<int> boundaries = [.. (boundaryEdges is uint[] be ? be : []).Select(edge => unchecked((int)edge)),];
                         return (boundaries, faces, center.IsValid ? center : Point3d.Origin, boundaries.Count);
                     }),
                     ];

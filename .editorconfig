@@ -846,6 +846,17 @@ dotnet_diagnostic.CS8714.severity = error                                      #
 # FILE-SPECIFIC OVERRIDES
 # ====================================================================
 
+# --------------------------------------------------------------------
+# Library exception guardrails
+# --------------------------------------------------------------------
+[libs/core/**/*.cs]
+dotnet_diagnostic.CA1065.severity = error
+dotnet_diagnostic.CA2201.severity = error
+
+[libs/rhino/**/*.cs]
+dotnet_diagnostic.CA1065.severity = error
+dotnet_diagnostic.CA2201.severity = error
+
 [libs/core/operations/UnifiedOperation.cs]
 dotnet_diagnostic.MA0051.severity = none                                       # 90-line method allowed
 

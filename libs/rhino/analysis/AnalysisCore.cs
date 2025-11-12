@@ -26,10 +26,12 @@ internal static class AnalysisCore {
             return cv.FrameAt(param, out Plane frame)
                 ? ((Func<Result<Analysis.IResult>>)(() => {
                     using AreaMassProperties? amp = AreaMassProperties.Compute(cv);
+                    Vector3d[] derivatives = cv.DerivativeAt(param, order) is Vector3d[] d ? d : [];
+                    Plane[] frames = cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5)),]) is Plane[] pf ? pf : [];
                     return amp is not null
                         ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
-                            cv.PointAt(param), cv.DerivativeAt(param, order) ?? [], cv.CurvatureAt(param).Length, frame,
-                            cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5)),]) ?? [],
+                            cv.PointAt(param), derivatives, cv.CurvatureAt(param).Length, frame,
+                            frames,
                             cv.IsClosed ? cv.TorsionAt(param) : 0, disc,
                             [.. disc.Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                             cv.GetLength(), amp.Centroid))

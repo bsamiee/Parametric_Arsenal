@@ -48,10 +48,10 @@ public sealed record GeometryContext(
 
     /// <summary>Creates context from RhinoDoc model tolerances.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<GeometryContext> FromDocument(RhinoDoc doc) {
-        ArgumentNullException.ThrowIfNull(doc);
-        return Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
-    }
+    public static Result<GeometryContext> FromDocument(RhinoDoc? doc) =>
+        doc is null
+            ? ResultFactory.Create<GeometryContext>(error: E.Results.NoValueProvided.WithContext("RhinoDoc"))
+            : Create(absoluteTolerance: doc.ModelAbsoluteTolerance, relativeTolerance: doc.ModelRelativeTolerance, angleToleranceRadians: doc.ModelAngleToleranceRadians, units: doc.ModelUnitSystem);
 
     /// <summary>Scale factor from current units to target units.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

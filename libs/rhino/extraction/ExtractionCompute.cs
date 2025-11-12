@@ -158,7 +158,7 @@ internal static class ExtractionCompute {
                             : ClassifySurface(surface: surface) switch {
                                 (true, byte type, Plane frame, double[] pars) =>
                                     (true, type, frame, pars, ComputeSurfaceResidual(surface: surface, type: type, frame: frame, pars: pars), null),
-                                var classification => (classification.Success, classification.Type, classification.Frame, classification.Params, 0.0, null),
+                                (bool Success, byte Type, Plane Frame, double[] Params) classification => (classification.Success, classification.Type, classification.Frame, classification.Params, 0.0, null),
                             };
                     }
                 }))(),

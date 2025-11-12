@@ -74,7 +74,8 @@ public static class DiagnosticCapture {
             .SetTag("validation", validationApplied?.ToString() ?? "None")
             .SetTag("cache_hit", cacheHit?.ToString() ?? "N/A")
             .Dispose();
-        _metadata.AddOrUpdate(result, new StrongBox<DiagnosticContext>(ctx));
+        StrongBox<DiagnosticContext> box = _metadata.GetValue(result, static _ => new StrongBox<DiagnosticContext>(default));
+        box.Value = ctx;
         return result;
 #else
         _ = operation; _ = validationApplied; _ = cacheHit; _ = callerMember; _ = callerFile; _ = callerLine;

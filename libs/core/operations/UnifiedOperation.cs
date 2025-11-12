@@ -10,7 +10,7 @@ namespace Arsenal.Core.Operations;
 
 /// <summary>Polymorphic operation engine with validation, caching, and parallelism.</summary>
 public static class UnifiedOperation {
-    private static readonly ThreadLocal<ConcurrentDictionary<(object, Type), object>> _threadCache = new(() => new());
+    private static readonly ConditionalWeakTable<object, ConcurrentDictionary<(Type Operation, Type Output), object>> _cache = [];
 
     /// <summary>Applies operation with validation, caching, and parallelism.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -19,7 +19,7 @@ public static class UnifiedOperation {
         object operation,
         OperationConfig<TIn, TOut> config,
         ConcurrentDictionary<(object, Type), object>? externalCache = null) where TIn : notnull {
-        ConcurrentDictionary<(object, Type), object> cache = externalCache ?? (config.EnableCache ? _threadCache.Value! : new());
+        Type operationType = operation.GetType();
 
         Result<IReadOnlyList<TOut>> resolveOp(TIn item) => operation switch {
             Func<TIn, Result<IReadOnlyList<TOut>>> op => op(item),
@@ -35,13 +35,10 @@ public static class UnifiedOperation {
             (Func<TIn, bool> pred, Func<TIn, Result<IReadOnlyList<TOut>>> op) =>
                 pred(item) ? op(item) : ResultFactory.Create(value: (IReadOnlyList<TOut>)[]),
             _ => ResultFactory.Create<IReadOnlyList<TOut>>(
-                error: E.Validation.UnsupportedOperationType.WithContext($"Type: {operation.GetType()}")),
+                error: E.Validation.UnsupportedOperationType.WithContext($"Type: {operationType}")),
         };
 
         Result<IReadOnlyList<TOut>> execute(TIn item) {
-            (object, Type) key = (item, operation.GetType());
-            bool cacheHit = cache.TryGetValue(key, out object? cached) && config.EnableCache;
-
             Result<IReadOnlyList<TOut>> instrument(Result<IReadOnlyList<TOut>> r, bool hit) =>
                 config.EnableDiagnostics && config.OperationName is not null
                     ? r.Capture(config.OperationName, validationApplied: config.ValidationMode, cacheHit: hit)
@@ -70,13 +67,36 @@ public static class UnifiedOperation {
                         }),
                 });
 
-            return cacheHit
-                ? instrument((Result<IReadOnlyList<TOut>>)cached!, hit: true)
-                : instrument((Result<IReadOnlyList<TOut>>)cache.AddOrUpdate(
-                    key,
-                    static (_, state) => state,
-                    static (_, existing, state) => state.config.EnableCache ? existing : state.computed,
-                    (config, computed: compute())), hit: false);
+            (Result<IReadOnlyList<TOut>> Result, bool Hit) AcquireFromExternal(ConcurrentDictionary<(object, Type), object> dictionary) {
+                object cacheKey = item!;
+                (object, Type) key = (cacheKey, operationType);
+                return dictionary.TryGetValue(key, out object? stored)
+                    ? ((Result<IReadOnlyList<TOut>>)stored!, true)
+                    : ((Result<IReadOnlyList<TOut>>)dictionary.GetOrAdd(
+                        key,
+                        static (_, factory) => factory(),
+                        compute), false);
+            }
+
+            (Result<IReadOnlyList<TOut>> Result, bool Hit) AcquireFromInternal() {
+                object cacheKey = item!;
+                ConcurrentDictionary<(Type Operation, Type Output), object> dictionary = _cache.GetValue(cacheKey, static _ => new ConcurrentDictionary<(Type, Type), object>());
+                (Type Operation, Type Output) key = (operationType, typeof(TOut));
+                return dictionary.TryGetValue(key, out object? stored)
+                    ? ((Result<IReadOnlyList<TOut>>)stored!, true)
+                    : ((Result<IReadOnlyList<TOut>>)dictionary.GetOrAdd(
+                        key,
+                        static (_, factory) => factory(),
+                        compute), false);
+            }
+
+            (Result<IReadOnlyList<TOut>> Result, bool Hit) resolved = externalCache is not null
+                ? AcquireFromExternal(externalCache)
+                : config.EnableCache
+                    ? AcquireFromInternal()
+                    : (compute(), false);
+
+            return instrument(resolved.Result, resolved.Hit);
         }
 
         return (input, config) switch {
@@ -101,7 +121,7 @@ public static class UnifiedOperation {
                         (_, true) => a,
                         _ => a.Bind(prev => c.Map(items => (IReadOnlyList<TOut>)[.. prev, .. items])),
                     }),
-            (IEnumerable<TIn> enumerable, _) => Apply((TIn)(object)enumerable.ToList(), operation, config, cache),
+            (IEnumerable<TIn> enumerable, _) => Apply((TIn)(object)enumerable.ToList(), operation, config, externalCache),
             _ => execute(input),
         };
     }

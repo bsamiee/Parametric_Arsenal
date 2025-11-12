@@ -13,13 +13,22 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Point extraction with FrozenDictionary dispatch and normalization.</summary>
 internal static class ExtractionCore {
+    private static readonly IComparer<Type> _specificityComparer = Comparer<Type>.Create(static (a, b) =>
+        a == b ? 0 : a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0);
+
     /// <summary>(Kind, Type) to handler function mapping for O(1) dispatch.</summary>
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> _handlers =
-        BuildHandlerRegistry();
+    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) _pointRegistry = BuildHandlerRegistry();
+
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> _handlers = _pointRegistry.Map;
+    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> _handlerFallbacks = _pointRegistry.Fallbacks;
 
     /// <summary>(Kind, Type) to curve handler function mapping for O(1) dispatch.</summary>
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> _curveHandlers =
-        BuildCurveHandlerRegistry();
+    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) _curveRegistry = BuildCurveHandlerRegistry();
+
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> _curveHandlers = _curveRegistry.Map;
+    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> _curveHandlerFallbacks = _curveRegistry.Fallbacks;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
@@ -29,12 +38,9 @@ internal static class ExtractionCore {
     internal static Result<IReadOnlyList<Curve>> ExecuteCurves(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
         _curveHandlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>? handler)
             ? handler(geometry, request, context).Map(curves => (IReadOnlyList<Curve>)curves)
-            : _curveHandlers.Where(kv => kv.Key.Kind == request.Kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(static (_, _, _) => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("No curve handler registered")))
-                .First()(geometry, request, context)
-                .Map(curves => (IReadOnlyList<Curve>)curves);
+            : _curveHandlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]? fallbacks)
+                ? InvokeFallback(geometry, request, context, fallbacks)
+                : ResultFactory.Create<IReadOnlyList<Curve>>(error: E.Geometry.InvalidExtraction.WithContext("No curve handler registered"));
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExecuteWithNormalization(
@@ -51,16 +57,14 @@ internal static class ExtractionCore {
             ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Normalization failed"))
             : ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
                 GeometryBase normalized = candidate;
-                try {
-                    V mode = ExtractionConfig.GetValidationMode(request.Kind, normalized.GetType());
-                    return ResultFactory.Create(value: normalized)
-                        .Validate(args: mode == V.None ? null : [context, mode,])
-                        .Bind(_ => DispatchExtraction(normalized, request, context).Map(points => (IReadOnlyList<Point3d>)points));
-                } finally {
-                    if (shouldDispose && normalized is IDisposable d) {
-                        d.Dispose();
-                    }
-                }
+                V mode = ExtractionConfig.GetValidationMode(request.Kind, normalized.GetType());
+                Result<IReadOnlyList<Point3d>> result = ResultFactory.Create(value: normalized)
+                    .Validate(args: mode == V.None ? null : [context, mode,])
+                    .Bind(_ => DispatchExtraction(normalized, request, context).Map(points => (IReadOnlyList<Point3d>)points));
+                return (shouldDispose, normalized) switch {
+                    (true, IDisposable disposable) => result.Tap(onSuccess: _ => disposable.Dispose(), onFailure: _ => disposable.Dispose()),
+                    _ => result,
+                };
             }))();
     }
 
@@ -68,15 +72,36 @@ internal static class ExtractionCore {
     private static Result<Point3d[]> DispatchExtraction(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
         _handlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>? handler)
             ? handler(geometry, request, context)
-            : _handlers.Where(kv => kv.Key.Kind == request.Kind && kv.Key.GeometryType.IsInstanceOfType(geometry))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(static (_, _, _) => ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("No handler registered")))
-                .First()(geometry, request, context);
+            : _handlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]? fallbacks)
+                ? InvokeFallback(geometry, request, context, fallbacks)
+                : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("No handler registered"));
+
+    private static Result<IReadOnlyList<Curve>> InvokeFallback(
+        GeometryBase geometry,
+        Extract.Request request,
+        IGeometryContext context,
+        (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[] fallbacks) {
+        int match = Array.FindIndex(fallbacks, candidate => candidate.GeometryType.IsInstanceOfType(geometry));
+        return match >= 0
+            ? fallbacks[match].Handler(geometry, request, context).Map(curves => (IReadOnlyList<Curve>)curves)
+            : ResultFactory.Create<IReadOnlyList<Curve>>(error: E.Geometry.InvalidExtraction.WithContext("No curve handler registered"));
+    }
+
+    private static Result<Point3d[]> InvokeFallback(
+        GeometryBase geometry,
+        Extract.Request request,
+        IGeometryContext context,
+        (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[] fallbacks) {
+        int match = Array.FindIndex(fallbacks, candidate => candidate.GeometryType.IsInstanceOfType(geometry));
+        return match >= 0
+            ? fallbacks[match].Handler(geometry, request, context)
+            : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("No handler registered"));
+    }
 
     [Pure]
-    private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> BuildHandlerRegistry() =>
-        new Dictionary<(byte, Type), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> {
+    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) BuildHandlerRegistry() {
+        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> map = new() {
             [(1, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
                 ? ((Func<Result<Point3d[]>>)(() => {
                     using VolumeMassProperties? massProperties = VolumeMassProperties.Compute(brep);
@@ -247,11 +272,22 @@ internal static class ExtractionCore {
                 }))(),
                 ])
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and continuity")),
-        }.ToFrozenDictionary();
+        };
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
+            .GroupBy(entry => entry.Key.Kind)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(entry => entry.Key.GeometryType, _specificityComparer)
+                    .Select(entry => (entry.Key.GeometryType, entry.Value))
+                    .ToArray())
+            .ToFrozenDictionary();
+        return (map.ToFrozenDictionary(), fallbacks);
+    }
 
     [Pure]
-    private static FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> BuildCurveHandlerRegistry() =>
-        new Dictionary<(byte, Type), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> {
+    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) BuildCurveHandlerRegistry() {
+        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> map = new() {
             [(20, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && (surface.Domain(0), surface.Domain(1)) is (Interval u, Interval v) && new Curve?[] { surface.IsoCurve(direction: 0, constantParameter: u.Min), surface.IsoCurve(direction: 1, constantParameter: v.Min), surface.IsoCurve(direction: 0, constantParameter: u.Max), surface.IsoCurve(direction: 1, constantParameter: v.Max), } is Curve?[] curves
                 ? ResultFactory.Create<Curve[]>(value: [.. curves.OfType<Curve>(),])
                 : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
@@ -295,5 +331,15 @@ internal static class ExtractionCore {
             [(34, typeof(Brep))] = static (geometry, request, _) => geometry is Brep brep && request.Parameter is double angleThreshold
                 ? ResultFactory.Create<Curve[]>(value: [.. brep.Edges.Where(edge => edge.AdjacentFaces() is int[] adjacentFaces && adjacentFaces.Length == 2 && edge.PointAt(edge.Domain.ParameterAt(0.5)) is Point3d midPoint && brep.Faces[adjacentFaces[0]].ClosestPoint(testPoint: midPoint, u: out double u0, v: out double v0) && brep.Faces[adjacentFaces[1]].ClosestPoint(testPoint: midPoint, u: out double u1, v: out double v1) && Math.Abs(Vector3d.VectorAngle(brep.Faces[adjacentFaces[0]].NormalAt(u: u0, v: v0), brep.Faces[adjacentFaces[1]].NormalAt(u: u1, v: v1))) >= angleThreshold).Select(edge => edge.DuplicateCurve()).OfType<Curve>()])
                 : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid angle or brep")),
-        }.ToFrozenDictionary();
+        };
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> fallbacks = map
+            .GroupBy(entry => entry.Key.Kind)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(entry => entry.Key.GeometryType, _specificityComparer)
+                    .Select(entry => (entry.Key.GeometryType, entry.Value))
+                    .ToArray())
+            .ToFrozenDictionary();
+        return (map.ToFrozenDictionary(), fallbacks);
+    }
 }
