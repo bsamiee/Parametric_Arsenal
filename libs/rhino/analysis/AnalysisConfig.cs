@@ -32,14 +32,11 @@ internal static class AnalysisConfig {
     /// <summary>Sample 5 perpendicular frames along curve domain.</summary>
     internal const int CurveFrameSampleCount = 5;
 
-    /// <summary>Surface quality: 100 samples for curvature distribution.</summary>
-    internal const int SurfaceQualitySampleCount = 100;
+    /// <summary>Surface quality: 10×10 grid for curvature sampling.</summary>
+    internal const int SurfaceQualityGridDimension = 10;
 
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
-
-    /// <summary>Singularity proximity threshold 1% of domain.</summary>
-    internal const double SingularityProximityFactor = 0.01;
 
     /// <summary>Curve fairness: 50 samples for curvature comb analysis.</summary>
     internal const int CurveFairnessSampleCount = 50;
@@ -61,4 +58,7 @@ internal static class AnalysisConfig {
     /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
     internal const double JacobianWarning = 0.3;
     internal const double JacobianCritical = 0.1;
+
+    /// <summary>Brep closest point tolerance multiplier: 100× absolute tolerance for proximity queries.</summary>
+    internal const double BrepClosestPointToleranceMultiplier = 100.0;
 }

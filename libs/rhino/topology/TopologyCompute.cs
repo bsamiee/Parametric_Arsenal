@@ -76,7 +76,7 @@ internal static class TopologyCompute {
                 .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => ((Func<Result<(Brep, byte, bool)>>)(() => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
-                    int strategyCount = Math.Min(maxStrategy + 1, 4);
+                    int strategyCount = Math.Min(maxStrategy + 1, TopologyConfig.MaxHealingStrategies);
                     Brep? bestHealed = null;
                     byte bestStrategy = 0;
                     int bestNakedEdges = int.MaxValue;

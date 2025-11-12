@@ -79,7 +79,7 @@ internal static class AnalysisCore {
                     (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                     Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
                     return sf.Evaluate(u, v, order, out Point3d _, out Vector3d[] derivs) && sf.FrameAt(u, v, out Plane frame) &&
-                        brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * 100, out Vector3d _)
+                        brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, ctx.AbsoluteTolerance * AnalysisConfig.BrepClosestPointToleranceMultiplier, out Vector3d _)
                         ? ((Func<Result<Analysis.IResult>>)(() => {
                             SurfaceCurvature sc = sf.CurvatureAt(u, v);
                             using AreaMassProperties? amp = AreaMassProperties.Compute(brep);

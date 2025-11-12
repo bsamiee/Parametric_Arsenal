@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
@@ -140,7 +141,7 @@ public static class Topology {
             : this.IsManifold
                 ? string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Edge[{this.EdgeIndex}]: Manifold | Angle={this.DihedralAngle * 180.0 / Math.PI:F1}°")
+                    $"Edge[{this.EdgeIndex}]: Manifold | Angle={RhinoMath.ToDegrees(this.DihedralAngle):F1}°")
                 : string.Create(CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: NonManifold (valence={this.AdjacentFaceIndices.Count})");
     }
 
