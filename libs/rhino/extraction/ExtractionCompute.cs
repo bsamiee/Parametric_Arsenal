@@ -211,7 +211,7 @@ internal static class ExtractionCompute {
                 surface.PointAt(u: u.ParameterAt(i / (double)(samplesPerDir - 1)), v: v.ParameterAt(j / (double)(samplesPerDir - 1))) is Point3d sp
                     ? sp.DistanceToSquared(type switch {
                         ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(sp),
-                        ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: sp, cylinderPlane: frame, radius: pars[0]),
+                        ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: sp, cylinderPlane: frame, radius: pars[0], height: pars.Length > 1 ? pars[1] : 0.0),
                         ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: sp, center: frame.Origin, radius: pars[0]),
                         ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: sp, conePlane: frame, baseRadius: pars[0], height: pars[1]),
                         ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: sp, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
@@ -222,14 +222,18 @@ internal static class ExtractionCompute {
             : 0.0;
 
     [Pure]
-    private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) {
+    private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius, double height) {
         Vector3d toPoint = point - cylinderPlane.Origin;
         double axisProjection = Vector3d.Multiply(toPoint, cylinderPlane.ZAxis);
-        Point3d axisPoint = cylinderPlane.Origin + (cylinderPlane.ZAxis * axisProjection);
+        double clampedProjection = height > RhinoMath.ZeroTolerance
+            ? Math.Clamp(axisProjection, 0.0, height)
+            : axisProjection;
+        Point3d axisPoint = cylinderPlane.Origin + (cylinderPlane.ZAxis * clampedProjection);
         Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * radius)
-            : axisPoint + (cylinderPlane.XAxis * radius);
+        Vector3d basis = radialDir.Length > RhinoMath.ZeroTolerance ? radialDir : cylinderPlane.XAxis;
+        Vector3d normalized = basis.Length > RhinoMath.ZeroTolerance ? basis / basis.Length : cylinderPlane.XAxis;
+        double targetRadius = radius > RhinoMath.ZeroTolerance ? radius : 0.0;
+        return axisPoint + (normalized * targetRadius);
     }
 
     [Pure]
@@ -244,12 +248,18 @@ internal static class ExtractionCompute {
     private static Point3d ProjectPointToCone(Point3d point, Plane conePlane, double baseRadius, double height) {
         Vector3d toPoint = point - conePlane.Origin;
         double axisProjection = Vector3d.Multiply(toPoint, conePlane.ZAxis);
-        double coneRadius = baseRadius * (1.0 - (axisProjection / height));
-        Point3d axisPoint = conePlane.Origin + (conePlane.ZAxis * axisProjection);
+        double clampedProjection = height > RhinoMath.ZeroTolerance
+            ? Math.Clamp(axisProjection, 0.0, height)
+            : axisProjection;
+        double coneRadius = height > RhinoMath.ZeroTolerance
+            ? baseRadius * (1.0 - (clampedProjection / height))
+            : baseRadius;
+        double clampedRadius = coneRadius > 0.0 ? coneRadius : 0.0;
+        Point3d axisPoint = conePlane.Origin + (conePlane.ZAxis * clampedProjection);
         Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
-            : axisPoint + (conePlane.XAxis * coneRadius);
+        Vector3d basis = radialDir.Length > RhinoMath.ZeroTolerance ? radialDir : conePlane.XAxis;
+        Vector3d normalized = basis.Length > RhinoMath.ZeroTolerance ? basis / basis.Length : conePlane.XAxis;
+        return axisPoint + (normalized * clampedRadius);
     }
 
     [Pure]
