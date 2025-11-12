@@ -187,7 +187,7 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Unable to convert curve to NurbsCurve")),
             [(5, typeof(Curve))] = static (geometry, _, context) => geometry is Curve curve && context.AbsoluteTolerance is double tolerance
                 ? curve.TryGetCircle(out Circle circle, tolerance)
-                    ? ResultFactory.Create<Point3d[]>(value: [circle.PointAt(0), circle.PointAt(Math.PI / 2), circle.PointAt(Math.PI), circle.PointAt(3 * Math.PI / 2),])
+                    ? ResultFactory.Create<Point3d[]>(value: [circle.PointAt(0), circle.PointAt(RhinoMath.HalfPI), circle.PointAt(Math.PI), circle.PointAt(3 * RhinoMath.HalfPI),])
                     : curve.TryGetEllipse(out Ellipse ellipse, tolerance)
                         ? ResultFactory.Create<Point3d[]>(value: [ellipse.Center + (ellipse.Plane.XAxis * ellipse.Radius1), ellipse.Center + (ellipse.Plane.YAxis * ellipse.Radius2), ellipse.Center - (ellipse.Plane.XAxis * ellipse.Radius1), ellipse.Center - (ellipse.Plane.YAxis * ellipse.Radius2),])
                         : curve.TryGetPolyline(out Polyline polyline)
