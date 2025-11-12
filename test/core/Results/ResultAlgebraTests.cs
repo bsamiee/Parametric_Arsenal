@@ -309,26 +309,24 @@ public sealed class ResultAlgebraTests {
             Assert.Equal(99, ResultFactory.Create<int>(error: err).OnError(_ => ResultFactory.Create(value: 99)).Value)), 50),
         () => Assert.Contains(Errors.E1, ResultFactory.Create<int>(error: Errors.E1).Map(x => x * 2).Bind(x => ResultFactory.Create(value: x + 10)).Ensure(x => x > 0, Errors.E2).Errors));
 
-    /// <summary>Verifies null argument handling via exception patterns.</summary>
+    /// <summary>Verifies null argument handling via Result monad error returns.</summary>
     [Fact]
     public void NullArgumentExceptionPatterns() {
         (Result<int> success, Result<int> failure) = (ResultFactory.Create(value: 42), ResultFactory.Create<int>(error: Errors.E1));
         Test.RunAll(
-            () => Assert.Throws<ArgumentNullException>(() => success.Map((Func<int, int>)null!)),
-            () => Assert.Throws<ArgumentNullException>(() => success.Bind((Func<int, Result<int>>)null!)),
-            () => Assert.Throws<ArgumentNullException>(() => success.Match(null!, _ => 0)),
-            () => Assert.Throws<ArgumentNullException>(() => success.Ensure(null!, Errors.E1)),
-            () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Lift<int>(null!, 1, 2)),
-            () => Assert.Throws<ArgumentNullException>(() => ResultFactory.Create<IEnumerable<int>>(value: [1, 2]).TraverseElements((Func<int, Result<int>>)null!)),
-            () => Assert.Throws<InvalidOperationException>(() => failure.Value),
+            () => Assert.False(success.Map((Func<int, int>)null!).IsSuccess),
+            () => Assert.False(success.Bind((Func<int, Result<int>>)null!).IsSuccess),
+            () => Assert.Equal(default!, success.Match(null!, _ => 0)),
+            () => Assert.False(success.Ensure(null!, Errors.E1).IsSuccess),
+            () => Assert.False(((Result<int>)ResultFactory.Lift<int>(null!, 1, 2)).IsSuccess),
+            () => Assert.False(ResultFactory.Create<IEnumerable<int>>(value: [1, 2]).TraverseElements((Func<int, Result<int>>)null!).IsSuccess),
+            () => Assert.Equal(default!, failure.Value),
             () => Assert.NotEmpty(failure.Errors));
     }
 
-    /// <summary>Verifies Lift arity mismatch detection with ArgumentException.</summary>
+    /// <summary>Verifies Lift arity mismatch detection with Result errors.</summary>
     [Fact]
     public void LiftArityMismatchExceptions() => Test.RunAll(
-        () => Assert.Throws<ArgumentException>(() =>
-            ResultFactory.Lift<int>((Func<int, int, int>)((x, y) => x + y), [ResultFactory.Create(value: 1)])),
-        () => Assert.Throws<ArgumentException>(() =>
-            ResultFactory.Lift<int>((Func<int, int, int>)((x, y) => x + y), [1, 2, 3])));
+        () => Assert.False(((Result<int>)ResultFactory.Lift<int>((Func<int, int, int>)((x, y) => x + y), [ResultFactory.Create(value: 1)])).IsSuccess),
+        () => Assert.False(((Result<int>)ResultFactory.Lift<int>((Func<int, int, int>)((x, y) => x + y), [1, 2, 3])).IsSuccess));
 }
