@@ -77,13 +77,13 @@ public sealed record GeometryContext(
         double normalizedRelativeTolerance = relativeTolerance <= 0d ? DefaultRelativeTolerance : relativeTolerance;
         double normalizedAngleToleranceRadians = angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians;
 
-        SystemError[] invalidParameters = [
-            .. (!RhinoMath.IsValidDouble(normalizedAbsoluteTolerance) ? new SystemError[] { E.Validation.ToleranceAbsoluteInvalid, } : System.Array.Empty<SystemError>()),
-            .. (!RhinoMath.IsValidDouble(normalizedRelativeTolerance) ? new SystemError[] { E.Validation.ToleranceRelativeInvalid, } : System.Array.Empty<SystemError>()),
-            .. (!RhinoMath.IsValidDouble(normalizedAngleToleranceRadians) ? new SystemError[] { E.Validation.ToleranceAngleInvalid, } : System.Array.Empty<SystemError>()),
-        ];
+        List<SystemError> invalidParameters = new();
+        if (!RhinoMath.IsValidDouble(normalizedAbsoluteTolerance)) { invalidParameters.Add(E.Validation.ToleranceAbsoluteInvalid); }
+        if (!RhinoMath.IsValidDouble(normalizedRelativeTolerance)) { invalidParameters.Add(E.Validation.ToleranceRelativeInvalid); }
+        if (!RhinoMath.IsValidDouble(normalizedAngleToleranceRadians)) { invalidParameters.Add(E.Validation.ToleranceAngleInvalid); }
+        SystemError[] invalidParametersArray = [.. invalidParameters];
 
-        return invalidParameters is { Length: > 0 } parameterErrors
+        return invalidParametersArray is { Length: > 0 } parameterErrors
             ? ResultFactory.Create<GeometryContext>(errors: parameterErrors)
             : ValidationRules.For(normalizedAbsoluteTolerance, normalizedRelativeTolerance, normalizedAngleToleranceRadians) is SystemError[] { Length: > 0 } validationErrors
                 ? ResultFactory.Create<GeometryContext>(errors: validationErrors)
