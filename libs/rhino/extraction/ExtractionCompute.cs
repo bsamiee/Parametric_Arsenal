@@ -3,6 +3,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
@@ -15,10 +16,10 @@ internal static class ExtractionCompute {
             .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
             .Ensure(b => b.Faces.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no faces"))
             .Ensure(b => b.Edges.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no edges"))
-            .Bind(validBrep => ExtractFeaturesInternal(brep: validBrep));
+            .Bind(validBrep => ExtractFeaturesInternal(brep: validBrep, context: context));
 
     [Pure]
-    private static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeaturesInternal(Brep brep) {
+    private static Result<((byte Type, double Param)[] Features, double Confidence)> ExtractFeaturesInternal(Brep brep, IGeometryContext context) {
         BrepEdge[] validEdges = [.. brep.Edges.Where(e => e.EdgeCurve is not null),];
         (byte Type, double Param)[] edgeFeatures = new (byte, double)[validEdges.Length];
 
@@ -28,7 +29,7 @@ internal static class ExtractionCompute {
 
         (byte Type, double Param)[] holeFeatures = [.. brep.Loops
             .Where(l => l.LoopType == BrepLoopType.Inner)
-            .Select(l => ClassifyHole(loop: l))
+            .Select(l => ClassifyHole(loop: l, context: context))
             .Where(h => h.IsHole)
             .Select(h => (Type: ExtractionConfig.FeatureTypeHole, Param: h.Area)),
         ];
@@ -58,8 +59,8 @@ internal static class ExtractionCompute {
         double tMin,
         double tMax) =>
         (curvatures.Average(), !edge.GetNextDiscontinuity(continuityType: Continuity.G2_locus_continuous, t0: tMin, t1: tMax, t: out double _)) is (double mean, bool isG2)
-            && Math.Sqrt(curvatures.Sum(k => (k - mean) * (k - mean)) / curvatures.Length) / (mean > ExtractionConfig.Epsilon ? mean : 1.0) is double coeffVar
-            && isG2 && coeffVar < ExtractionConfig.FilletCurvatureVariationThreshold && mean > ExtractionConfig.Epsilon
+            && Math.Sqrt(curvatures.Sum(k => (k - mean) * (k - mean)) / curvatures.Length) / (mean > RhinoMath.ZeroTolerance ? mean : 1.0) is double coeffVar
+            && isG2 && coeffVar < ExtractionConfig.FilletCurvatureVariationThreshold && mean > RhinoMath.ZeroTolerance
                 ? (Type: ExtractionConfig.FeatureTypeFillet, Param: 1.0 / mean)
                 : ClassifyEdgeByDihedral(edge: edge, brep: brep, mean: mean);
 
@@ -92,21 +93,21 @@ internal static class ExtractionCompute {
 
         return isChamfer
             ? (Type: ExtractionConfig.FeatureTypeChamfer, Param: dihedralAngle)
-            : mean > ExtractionConfig.Epsilon
+            : mean > RhinoMath.ZeroTolerance
                 ? (Type: ExtractionConfig.FeatureTypeVariableRadiusFillet, Param: 1.0 / mean)
                 : (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: edge.EdgeCurve.GetLength());
     }
 
     [Pure]
-    private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop) {
+    private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop, IGeometryContext context) {
         using Curve? c = loop.To3dCurve();
 
         return c switch {
             null => (false, 0.0),
             _ when !c.IsClosed => (false, 0.0),
-            _ when c.TryGetCircle(out Circle circ, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+            _ when c.TryGetCircle(out Circle circ, tolerance: context.AbsoluteTolerance)
                 => (true, Math.PI * circ.Radius * circ.Radius),
-            _ when c.TryGetEllipse(out Ellipse ell, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+            _ when c.TryGetEllipse(out Ellipse ell, tolerance: context.AbsoluteTolerance)
                 => (true, Math.PI * ell.Radius1 * ell.Radius2),
             _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
                 true,
@@ -128,7 +129,7 @@ internal static class ExtractionCompute {
             .Bind(validGeometry => validGeometry switch {
                 Surface surface => ResultFactory.Create(value: surface)
                     .Validate(args: [context, V.Standard | V.SurfaceContinuity | V.UVDomain,])
-                    .Bind(validSurface => ClassifySurface(surface: validSurface) switch {
+                    .Bind(validSurface => ClassifySurface(surface: validSurface, context: context) switch {
                         (true, byte type, Plane frame, double[] pars) => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
                             value: ([(Type: type, Frame: frame, Params: pars),], _zeroResidual)),
                         _ => ResultFactory.Create<((byte Type, Plane Frame, double[] Params)[] Primitives, double[] Residuals)>(
@@ -155,7 +156,7 @@ internal static class ExtractionCompute {
                         SystemError? firstError = validatedSurface.Errors.Count > 0 ? validatedSurface.Errors[0] : null;
                         return !validatedSurface.IsSuccess
                             ? (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, Array.Empty<double>(), 0.0, firstError)
-                            : ClassifySurface(surface: surface) switch {
+                            : ClassifySurface(surface: surface, context: context) switch {
                                 (true, byte type, Plane frame, double[] pars) =>
                                     (true, type, frame, pars, ComputeSurfaceResidual(surface: surface, type: type, frame: frame, pars: pars), null),
                                 (bool Success, byte Type, Plane Frame, double[] Params) classification => (classification.Success, classification.Type, classification.Frame, classification.Params, 0.0, null),
@@ -179,22 +180,22 @@ internal static class ExtractionCompute {
                     error: E.Geometry.NoPrimitivesDetected.WithContext("No faces classified as primitives")));
 
     [Pure]
-    private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurface(Surface surface) =>
-        surface.TryGetPlane(out Plane pl, tolerance: ExtractionConfig.PrimitiveFitTolerance)
+    private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurface(Surface surface, IGeometryContext context) =>
+        surface.TryGetPlane(out Plane pl, tolerance: context.AbsoluteTolerance)
             ? (true, ExtractionConfig.PrimitiveTypePlane, pl, [pl.OriginX, pl.OriginY, pl.OriginZ,])
-            : surface.TryGetCylinder(out Cylinder cyl, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                && cyl.Radius > ExtractionConfig.PrimitiveFitTolerance
+            : surface.TryGetCylinder(out Cylinder cyl, tolerance: context.AbsoluteTolerance)
+                && cyl.Radius > context.AbsoluteTolerance
                 ? (true, ExtractionConfig.PrimitiveTypeCylinder, new Plane(cyl.CircleAt(0.0).Center, cyl.Axis), [cyl.Radius, cyl.TotalHeight,])
-                : surface.TryGetSphere(out Sphere sph, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                    && sph.Radius > ExtractionConfig.PrimitiveFitTolerance
+                : surface.TryGetSphere(out Sphere sph, tolerance: context.AbsoluteTolerance)
+                    && sph.Radius > context.AbsoluteTolerance
                     ? (true, ExtractionConfig.PrimitiveTypeSphere, new Plane(sph.Center, Vector3d.ZAxis), [sph.Radius,])
-                    : surface.TryGetCone(out Cone cone, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                        && cone.Radius > ExtractionConfig.PrimitiveFitTolerance
-                        && cone.Height > ExtractionConfig.PrimitiveFitTolerance
+                    : surface.TryGetCone(out Cone cone, tolerance: context.AbsoluteTolerance)
+                        && cone.Radius > context.AbsoluteTolerance
+                        && cone.Height > context.AbsoluteTolerance
                         ? (true, ExtractionConfig.PrimitiveTypeCone, new Plane(cone.BasePoint, cone.Axis), [cone.Radius, cone.Height, Math.Atan(cone.Radius / cone.Height),])
-                        : surface.TryGetTorus(out Torus torus, tolerance: ExtractionConfig.PrimitiveFitTolerance)
-                            && torus.MajorRadius > ExtractionConfig.PrimitiveFitTolerance
-                            && torus.MinorRadius > ExtractionConfig.PrimitiveFitTolerance
+                        : surface.TryGetTorus(out Torus torus, tolerance: context.AbsoluteTolerance)
+                            && torus.MajorRadius > context.AbsoluteTolerance
+                            && torus.MinorRadius > context.AbsoluteTolerance
                             ? (true, ExtractionConfig.PrimitiveTypeTorus, torus.Plane, [torus.MajorRadius, torus.MinorRadius,])
                             : surface switch {
                                 Extrusion ext when ext.IsValid && ext.PathLineCurve() is LineCurve lc =>
@@ -225,7 +226,7 @@ internal static class ExtractionCompute {
         double axisProjection = Vector3d.Multiply(toPoint, cylinderPlane.ZAxis);
         Point3d axisPoint = cylinderPlane.Origin + (cylinderPlane.ZAxis * axisProjection);
         Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > ExtractionConfig.Epsilon
+        return radialDir.Length > RhinoMath.ZeroTolerance
             ? axisPoint + ((radialDir / radialDir.Length) * radius)
             : axisPoint + (cylinderPlane.XAxis * radius);
     }
@@ -233,7 +234,7 @@ internal static class ExtractionCompute {
     [Pure]
     private static Point3d ProjectPointToSphere(Point3d point, Point3d center, double radius) {
         Vector3d dir = point - center;
-        return dir.Length > ExtractionConfig.Epsilon
+        return dir.Length > RhinoMath.ZeroTolerance
             ? center + ((dir / dir.Length) * radius)
             : center + new Vector3d(radius, 0, 0);
     }
@@ -245,7 +246,7 @@ internal static class ExtractionCompute {
         double coneRadius = baseRadius * (1.0 - (axisProjection / height));
         Point3d axisPoint = conePlane.Origin + (conePlane.ZAxis * axisProjection);
         Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > ExtractionConfig.Epsilon
+        return radialDir.Length > RhinoMath.ZeroTolerance
             ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
             : axisPoint + (conePlane.XAxis * coneRadius);
     }
@@ -254,11 +255,11 @@ internal static class ExtractionCompute {
     private static Point3d ProjectPointToTorus(Point3d point, Plane torusPlane, double majorRadius, double minorRadius) {
         Vector3d toPoint = point - torusPlane.Origin;
         Vector3d radialInPlane = toPoint - (torusPlane.ZAxis * Vector3d.Multiply(toPoint, torusPlane.ZAxis));
-        Point3d majorCirclePoint = radialInPlane.Length > ExtractionConfig.Epsilon
+        Point3d majorCirclePoint = radialInPlane.Length > RhinoMath.ZeroTolerance
             ? torusPlane.Origin + ((radialInPlane / radialInPlane.Length) * majorRadius)
             : torusPlane.Origin + (torusPlane.XAxis * majorRadius);
         Vector3d toMinor = point - majorCirclePoint;
-        return toMinor.Length > ExtractionConfig.Epsilon
+        return toMinor.Length > RhinoMath.ZeroTolerance
             ? majorCirclePoint + ((toMinor / toMinor.Length) * minorRadius)
             : majorCirclePoint + (torusPlane.ZAxis * minorRadius);
     }
@@ -316,14 +317,14 @@ internal static class ExtractionCompute {
     [Pure]
     private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) {
         Vector3d v1 = (points[0] - centroid);
-        v1 = v1.Length > ExtractionConfig.Epsilon ? v1 / v1.Length : Vector3d.XAxis;
+        v1 = v1.Length > RhinoMath.ZeroTolerance ? v1 / v1.Length : Vector3d.XAxis;
 
         for (int i = 1; i < points.Length; i++) {
             Vector3d v2 = (points[i] - centroid);
-            v2 = v2.Length > ExtractionConfig.Epsilon ? v2 / v2.Length : Vector3d.YAxis;
+            v2 = v2.Length > RhinoMath.ZeroTolerance ? v2 / v2.Length : Vector3d.YAxis;
             Vector3d normal = Vector3d.CrossProduct(v1, v2);
 
-            if (normal.Length > ExtractionConfig.Epsilon) {
+            if (normal.Length > RhinoMath.ZeroTolerance) {
                 return normal / normal.Length;
             }
         }

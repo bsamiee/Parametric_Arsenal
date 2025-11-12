@@ -32,9 +32,6 @@ internal static class TopologyConfig {
     /// <summary>G2 curvature threshold ratio: 10% of angle tolerance.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
 
-    /// <summary>Edge gap tolerance multiplier for diagnosis.</summary>
-    internal const double EdgeGapTolerance = 1e-2;
-
     /// <summary>Near-miss proximity multiplier: 100× tolerance.</summary>
     internal const double NearMissMultiplier = 100.0;
 

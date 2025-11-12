@@ -6,9 +6,6 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Configuration for semantic extraction: type IDs, thresholds, validation modes.</summary>
 internal static class ExtractionConfig {
-    /// <summary>Epsilon tolerance for zero comparisons and near-zero checks.</summary>
-    internal const double Epsilon = 1e-10;
-
     /// <summary>Feature type IDs for edge/loop classification.</summary>
     internal const byte FeatureTypeFillet = 0;
     internal const byte FeatureTypeChamfer = 1;
@@ -43,8 +40,6 @@ internal static class ExtractionConfig {
     internal const double SmoothEdgeAngleThreshold = 2.967;
     /// <summary>Minimum hole polyline sides 16 for circular approximation.</summary>
     internal const int MinHolePolySides = 16;
-    /// <summary>Primitive fit tolerance 0.001 for TryGet* methods.</summary>
-    internal const double PrimitiveFitTolerance = 0.001;
     /// <summary>Primitive residual sample count 20 for RMS distance calculation.</summary>
     internal const int PrimitiveResidualSampleCount = 20;
     /// <summary>Pattern minimum instances 3 for detection.</summary>
