@@ -17,7 +17,7 @@ internal static class IntersectionCompute {
             double deviationSum = 0.0;
             bool grazing = false;
             for (int i = 0; i < angles.Length; i++) {
-                double deviation = Math.Abs((Math.PI * 0.5) - angles[i]);
+                double deviation = Math.Abs(RhinoMath.HalfPI - angles[i]);
                 deviationSum += deviation;
                 grazing = grazing || deviation <= IntersectionConfig.GrazingAngleThreshold;
             }

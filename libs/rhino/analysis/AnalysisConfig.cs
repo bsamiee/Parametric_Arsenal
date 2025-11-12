@@ -32,8 +32,11 @@ internal static class AnalysisConfig {
     /// <summary>Sample 5 perpendicular frames along curve domain.</summary>
     internal const int CurveFrameSampleCount = 5;
 
+    /// <summary>Surface quality grid dimension: 10×10 grid for UV sampling.</summary>
+    internal const int SurfaceQualityGridDimension = 10;
+
     /// <summary>Surface quality: 100 samples for curvature distribution.</summary>
-    internal const int SurfaceQualitySampleCount = 100;
+    internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
 
     /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
