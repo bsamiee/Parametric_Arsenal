@@ -18,8 +18,16 @@ internal static class AnalysisCompute {
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
                 int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
+                Interval uDomain = validSurface.Domain(0);
+                Interval vDomain = validSurface.Domain(1);
+                double uThreshold = Math.Abs(uDomain.Length) * AnalysisConfig.SingularityProximityFactor;
+                double vThreshold = Math.Abs(vDomain.Length) * AnalysisConfig.SingularityProximityFactor;
+                Func<(double u, double v), bool> singularityDetector = uv =>
+                    validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
+                        || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= uThreshold
+                        || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= vThreshold;
                 (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
-                    .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
+                    .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: uDomain.ParameterAt(i / (gridSize - 1.0)), v: vDomain.ParameterAt(j / (gridSize - 1.0))))),
                 ];
                 SurfaceCurvature[] curvatures = [.. uvGrid
                     .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
@@ -33,7 +41,7 @@ internal static class AnalysisCompute {
                     ? ResultFactory.Create(value: (
                         GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(),
                         MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
-                        Singularities: uvGrid.Where(uv => validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)).ToArray(),
+                        Singularities: uvGrid.Where(singularityDetector.Invoke).ToArray(),
                         UniformityScore: Math.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             });

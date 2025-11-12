@@ -108,7 +108,7 @@ public static class Analysis {
         Curve curve,
         IGeometryContext context,
         double? parameter = null,
-        int derivativeOrder = 2) =>
+        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) =>
         AnalysisCore.Execute(curve, context, t: parameter, uv: null, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (CurveData)results[0]);
 
@@ -118,7 +118,7 @@ public static class Analysis {
         Surface surface,
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
-        int derivativeOrder = 2) =>
+        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) =>
         AnalysisCore.Execute(surface, context, t: null, uv: uvParameter, index: null, testPoint: null, derivativeOrder: derivativeOrder)
             .Map(results => (SurfaceData)results[0]);
 
@@ -130,7 +130,7 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int faceIndex = 0,
         Point3d? testPoint = null,
-        int derivativeOrder = 2) =>
+        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) =>
         AnalysisCore.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
             .Map(results => (BrepData)results[0]);
 
@@ -152,7 +152,7 @@ public static class Analysis {
         (double u, double v)? uvParameter = null,
         int? index = null,
         Point3d? testPoint = null,
-        int derivativeOrder = 2) where T : notnull =>
+        int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) where T : notnull =>
         UnifiedOperation.Apply(
             geometries,
             (Func<object, Result<IReadOnlyList<IResult>>>)(item =>

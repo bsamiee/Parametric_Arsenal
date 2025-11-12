@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -81,9 +82,10 @@ internal static class IntersectionCompute {
 
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) =>
-        searchRadius <= context.AbsoluteTolerance
-                ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext("SearchRadius must exceed tolerance"))
+    internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
+        double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
+        return searchRadius <= minDistance
+                ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance × {IntersectionConfig.NearMissToleranceMultiplier}")))
                 : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                     .Bind(entry => {
                         (V modeA, V modeB) = entry.Swapped
@@ -110,13 +112,13 @@ internal static class IntersectionCompute {
                                                 .Select(point => curveB.ClosestPoint(point, out double parameter)
                                                     ? (PointA: point, PointB: curveB.PointAt(parameter), Distance: point.DistanceTo(curveB.PointAt(parameter)))
                                                     : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
+                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .Concat(Enumerable.Range(0, samples)
                                                     .Select(index => curveB.PointAt(curveB.Domain.ParameterAt(index / (double)(samples - 1))))
                                                     .Select(point => curveA.ClosestPoint(point, out double parameter)
                                                         ? (PointA: curveA.PointAt(parameter), PointB: point, Distance: curveA.PointAt(parameter).DistanceTo(point))
                                                         : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
-                                                    .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance))
+                                                    .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance))
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
                                                 ? ResultFactory.Create(value: ((Func<(Point3d, Point3d, double)[], (Point3d[], Point3d[], double[])>)(p => {
                                                     Point3d[] pointsA = new Point3d[p.Length];
@@ -136,7 +138,7 @@ internal static class IntersectionCompute {
                                                 .Select(point => surface.ClosestPoint(point, out double u, out double v)
                                                     ? (PointA: point, PointB: surface.PointAt(u, v), Distance: point.DistanceTo(surface.PointAt(u, v)))
                                                     : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > context.AbsoluteTolerance)
+                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
                                                 ? ResultFactory.Create(value: ((Func<(Point3d, Point3d, double)[], (Point3d[], Point3d[], double[])>)(p => {
                                                     Point3d[] pointsA = new Point3d[p.Length];
@@ -154,6 +156,7 @@ internal static class IntersectionCompute {
                                     };
                                 }));
                     });
+    }
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
