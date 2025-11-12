@@ -74,7 +74,7 @@ public sealed record GeometryContext(
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<GeometryContext> Create(double absoluteTolerance, double relativeTolerance, double angleToleranceRadians, UnitSystem units) {
         double normalizedAbsoluteTolerance = absoluteTolerance <= 0d ? DefaultAbsoluteTolerance : absoluteTolerance;
-        double normalizedRelativeTolerance = relativeTolerance;
+        double normalizedRelativeTolerance = relativeTolerance <= 0d ? DefaultRelativeTolerance : relativeTolerance;
         double normalizedAngleToleranceRadians = angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians;
 
         SystemError[] invalidParameters = [
