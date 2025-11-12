@@ -10,7 +10,7 @@ namespace Arsenal.Core.Diagnostics;
 /// <summary>Zero-allocation observability with compile-time toggleable tracing.</summary>
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
-public readonly record struct DiagnosticContext(
+internal readonly record struct DiagnosticContext(
     string Operation,
     TimeSpan Elapsed,
     long Allocations,

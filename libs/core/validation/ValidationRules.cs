@@ -13,7 +13,7 @@ using Rhino.Geometry.Intersect;
 namespace Arsenal.Core.Validation;
 
 /// <summary>Validation via compiled expression trees with caching.</summary>
-public static class ValidationRules {
+internal static class ValidationRules {
     /// <summary>Cache key for validator lookups.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     private readonly record struct CacheKey(Type Type, V Mode = default, string? Member = null, byte Kind = 0);
@@ -64,7 +64,7 @@ public static class ValidationRules {
 
     /// <summary>Validation errors for tolerance values.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
+    internal static SystemError[] For<T>(T input, params object[] args) where T : notnull =>
         (typeof(T), input, args) switch {
             (Type t, double absoluteTolerance, [double relativeTolerance, double angleToleranceRadians]) when t == typeof(double) =>
                 [.. (!(RhinoMath.IsValidDouble(absoluteTolerance) && absoluteTolerance > RhinoMath.ZeroTolerance) ?
