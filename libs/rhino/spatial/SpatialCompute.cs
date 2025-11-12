@@ -209,9 +209,11 @@ internal static class SpatialCompute {
             : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
                 (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
                 (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
-                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: tolerance, preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: tolerance) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<(Curve[], double[])>>)(() => {
+                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: Math.Max(tolerance, context.AbsoluteTolerance), preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: Math.Max(tolerance, context.AbsoluteTolerance)) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<(Curve[], double[])>>)(() => {
+                    double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
-                    int sampleCount = (int)Math.Max(50, Math.Min(500, length / tolerance));
+                    double clampedSamples = Math.Max((double)SpatialConfig.MedialAxisMinSampleCount, Math.Min((double)SpatialConfig.MedialAxisMaxSampleCount, length / effectiveTolerance));
+                    int sampleCount = (int)clampedSamples;
                     Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
                     Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
                     Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
@@ -224,7 +226,7 @@ internal static class SpatialCompute {
                                 : [])
                             .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
                             .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
-                            .Where(edge => boundary.Contains(edge.Mid3D, plane, tolerance) is PointContainment.Inside)
+                            .Where(edge => boundary.Contains(edge.Mid3D, plane, effectiveTolerance) is PointContainment.Inside)
                             .GroupBy(edge => (edge.P1, edge.P2) switch {
                                 (Point3d p1, Point3d p2) when p1.X < p2.X - context.AbsoluteTolerance || (Math.Abs(p1.X - p2.X) <= context.AbsoluteTolerance && p1.Y < p2.Y - context.AbsoluteTolerance) => (Min: p1, Max: p2),
                                 (Point3d p1, Point3d p2) => (Min: p2, Max: p1),
