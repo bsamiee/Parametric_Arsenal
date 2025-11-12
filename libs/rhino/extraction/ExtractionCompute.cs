@@ -278,7 +278,6 @@ internal static class ExtractionCompute {
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
         Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[i]).ToArray() is Vector3d[] deltas
-            && deltas.Length > 0
             && deltas[0].Length > context.AbsoluteTolerance
             && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeLinear, SymmetryTransform: Transform.Translation(deltas[0]), Confidence: 1.0))
