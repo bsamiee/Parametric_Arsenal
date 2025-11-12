@@ -222,7 +222,7 @@ internal static class IntersectionCore {
                 int hits => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits.WithContext(hits.ToString(CultureInfo.InvariantCulture))),
                 _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits),
             }),
-        }.ToFrozenDictionary(entry => entry.Key, entry => {
+        }.ToFrozenDictionary(static entry => entry.Key, entry => {
             (V ModeA, V ModeB) = IntersectionConfig.ValidationModes.TryGetValue(entry.Key, out (V ModeA, V ModeB) found)
                 ? found
                 : (V.None, V.None);
