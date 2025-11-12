@@ -43,9 +43,6 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Skip invalid inputs vs fail operation.</summary>
     public bool SkipInvalid { get; init; }
 
-    /// <summary>Flatten nested Result automatically.</summary>
-    public bool AutoFlatten { get; init; } = true;
-
     /// <summary>Stop on first error vs process all.</summary>
     public bool ShortCircuit { get; init; } = true;
 
