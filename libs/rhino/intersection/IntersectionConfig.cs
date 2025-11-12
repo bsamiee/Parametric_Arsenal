@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
@@ -7,10 +8,10 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Validation modes and parameters for intersection operations.</summary>
 internal static class IntersectionConfig {
     /// <summary>Tangent angle threshold 5° for classification.</summary>
-    internal const double TangentAngleThreshold = 0.087266;
+    internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
 
     /// <summary>Grazing angle threshold 15° for crossing vs grazing.</summary>
-    internal const double GrazingAngleThreshold = 0.261799;
+    internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
 
     /// <summary>Near-miss tolerance multiplier 10× context tolerance.</summary>
     internal const double NearMissToleranceMultiplier = 10.0;
