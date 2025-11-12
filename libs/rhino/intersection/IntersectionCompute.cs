@@ -85,7 +85,7 @@ internal static class IntersectionCompute {
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
-                ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance × {IntersectionConfig.NearMissToleranceMultiplier}")))
+                ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance * {IntersectionConfig.NearMissToleranceMultiplier}")))
                 : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                     .Bind(entry => {
                         (V modeA, V modeB) = entry.Swapped
