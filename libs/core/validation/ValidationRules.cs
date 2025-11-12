@@ -16,27 +16,7 @@ namespace Arsenal.Core.Validation;
 public static class ValidationRules {
     /// <summary>Cache key for validator lookups.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    private readonly struct CacheKey(Type type, V mode = default, string? member = null, byte kind = 0) : IEquatable<CacheKey> {
-        public readonly Type Type = type;
-        public readonly V Mode = mode;
-        public readonly string? Member = member;
-        public readonly byte Kind = kind;
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(CacheKey left, CacheKey right) => left.Equals(right);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(CacheKey left, CacheKey right) => !left.Equals(right);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => HashCode.Combine(this.Type, this.Mode, this.Member, this.Kind);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override bool Equals(object? obj) => obj is CacheKey other && this.Equals(other);
-
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(CacheKey other) => (this.Type, this.Mode, this.Member, this.Kind).Equals((other.Type, other.Mode, other.Member, other.Kind));
-    }
+    private readonly record struct CacheKey(Type Type, V Mode = default, string? Member = null, byte Kind = 0);
 
     private static readonly ConcurrentDictionary<CacheKey, Func<object, IGeometryContext, SystemError[]>> _validatorCache = new();
     private static readonly ConcurrentDictionary<CacheKey, MemberInfo> _memberCache = new();
@@ -103,7 +83,7 @@ public static class ValidationRules {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
         (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations = [.. V.AllFlags.Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag)).SelectMany(flag => {
             ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = _validationRules[flag];
-            return (IEnumerable<(MemberInfo Member, SystemError Error, string Name, byte Kind)>)[.. properties.Select(p => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: p.Member, kind: 1), static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), p.Error, p.Member, (byte)1)), .. methods.Select(m => (_memberCache.GetOrAdd(new CacheKey(type: runtimeType, mode: default, member: m.Member, kind: 2), static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), m.Error, m.Member, (byte)2)),];
+            return (IEnumerable<(MemberInfo Member, SystemError Error, string Name, byte Kind)>)[.. properties.Select(p => (_memberCache.GetOrAdd(new CacheKey(Type: runtimeType, Mode: default, Member: p.Member, Kind: 1), static (key, type) => (type.GetProperty(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), p.Error, p.Member, (byte)1)), .. methods.Select(m => (_memberCache.GetOrAdd(new CacheKey(Type: runtimeType, Mode: default, Member: m.Member, Kind: 2), static (key, type) => (type.GetMethod(key.Member!) ?? (MemberInfo)typeof(void)), runtimeType), m.Error, m.Member, (byte)2)),];
         }),
         ];
 

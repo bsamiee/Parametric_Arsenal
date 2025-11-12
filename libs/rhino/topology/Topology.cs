@@ -19,9 +19,7 @@ public static class Topology {
 
     /// <summary>Edge continuity classification for geometric analysis.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly struct EdgeContinuityType(byte value) : IEquatable<EdgeContinuityType> {
-        internal readonly byte Value = value;
-
+    public readonly record struct EdgeContinuityType(byte Value) {
         /// <summary>G0 sharp edge below continuity threshold.</summary>
         public static readonly EdgeContinuityType Sharp = new(0);
         /// <summary>G1 smooth tangent continuity.</summary>
@@ -34,17 +32,6 @@ public static class Topology {
         public static readonly EdgeContinuityType Boundary = new(4);
         /// <summary>Non-manifold edge valence &gt; 2.</summary>
         public static readonly EdgeContinuityType NonManifold = new(5);
-
-        /// <summary>Value equality.</summary>
-        public bool Equals(EdgeContinuityType other) => this.Value == other.Value;
-        /// <summary>Value-based hash.</summary>
-        public override int GetHashCode() => this.Value;
-        /// <summary>Object equality.</summary>
-        public override bool Equals(object? obj) => obj is EdgeContinuityType other && this.Equals(other);
-        /// <summary>Equality operator.</summary>
-        public static bool operator ==(EdgeContinuityType left, EdgeContinuityType right) => left.Equals(right);
-        /// <summary>Inequality operator.</summary>
-        public static bool operator !=(EdgeContinuityType left, EdgeContinuityType right) => !left.Equals(right);
     }
 
     /// <summary>Naked edge data: curves, indices, valences.</summary>
