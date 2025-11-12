@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
@@ -11,20 +10,10 @@ namespace Arsenal.Core.Errors;
 [StructLayout(LayoutKind.Auto)]
 [DebuggerDisplay("{DebuggerDisplay}")]
 public readonly record struct SystemError(byte Domain, int Code, string Message) {
-    private static readonly FrozenDictionary<byte, string> _domainNames =
-        new Dictionary<byte, string> {
-            [0] = "Unknown",
-            [1] = "Results",
-            [2] = "Geometry",
-            [3] = "Validation",
-            [4] = "Spatial",
-            [5] = "Topology",
-        }.ToFrozenDictionary();
-
-    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{(_domainNames.TryGetValue(this.Domain, out string? n) ? n : "Unknown")}:{this.Code.ToString(CultureInfo.InvariantCulture)}] {this.Message}");
+    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"[{Domain switch { 1 => "Results", 2 => "Geometry", 3 => "Validation", 4 => "Spatial", 5 => "Topology", _ => "Unknown" }}:{Code.ToString(CultureInfo.InvariantCulture)}] {Message}");
 
     [Pure]
-    public override string ToString() => $"[{(_domainNames.TryGetValue(this.Domain, out string? n) ? n : "Unknown")}:{this.Code}] {this.Message}";
+    public override string ToString() => $"[{Domain switch { 1 => "Results", 2 => "Geometry", 3 => "Validation", 4 => "Spatial", 5 => "Topology", _ => "Unknown" }}:{Code}] {Message}";
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SystemError WithContext(string context) =>
