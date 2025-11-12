@@ -51,4 +51,6 @@ internal static class OrientConfig {
     internal const double MinimumOptimizationScore = 0.1;
     /// <summary>Rotation symmetry sample count 36 for 10-degree increments.</summary>
     internal const int RotationSymmetrySampleCount = 36;
+    /// <summary>Maximum degeneracy dimensions (X, Y, Z axes = 3) for flatness scoring.</summary>
+    internal const int MaxDegeneracyDimensions = 3;
 }

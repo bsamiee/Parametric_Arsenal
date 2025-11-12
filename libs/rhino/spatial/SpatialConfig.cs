@@ -16,6 +16,11 @@ internal static class SpatialConfig {
     internal const int DBSCANRTreeThreshold = 100;
     internal const int MedialAxisMinSampleCount = 50;
     internal const int MedialAxisMaxSampleCount = 500;
+    internal const double DelaunaySuperTriangleScale = 2.0;
+    internal const double DelaunaySuperTriangleCenterWeight = 0.5;
+    internal const double TriangleAreaDivisor = 2.0;
+    internal const double TetrahedronVolumeDivisor = 6.0;
+    internal const double CircumcenterDeterminantFactor = 2.0;
 
     /// <summary>Type extractors: polymorphic dispatch for centroid, RTree factory, etc.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =

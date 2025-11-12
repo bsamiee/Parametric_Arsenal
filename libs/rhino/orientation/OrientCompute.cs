@@ -47,7 +47,7 @@ internal static class OrientCompute {
                                                 + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
                                                 + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
                                                     0 => 0.0,
-                                                    int degeneracy and >= 1 and <= 3 => degeneracy / 3.0,
+                                                    int degeneracy and >= 1 and <= 3 => degeneracy / (double)OrientConfig.MaxDegeneracyDimensions,
                                                     _ => 0.0,
                                                 },
                                             4 => (testBox.Min.Z >= -tolerance ? OrientConfig.OrientationScoreWeight1 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientConfig.OrientationScoreWeight2 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientConfig.LowProfileAspectRatio) ? OrientConfig.OrientationScoreWeight3 : 0.0),
