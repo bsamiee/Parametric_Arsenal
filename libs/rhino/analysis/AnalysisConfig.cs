@@ -63,5 +63,6 @@ internal static class AnalysisConfig {
     internal const double JacobianCritical = 0.1;
 
     /// <summary>Brep closest point tolerance multiplier 100× for looser matching.</summary>
+    /// <summary>Brep closest point tolerance multiplier: 100× absolute tolerance for proximity queries.</summary>
     internal const double BrepClosestPointToleranceMultiplier = 100.0;
 }
