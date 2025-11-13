@@ -28,7 +28,11 @@ internal static class AnalysisCore {
                 ? ((Func<Result<Analysis.IResult>>)(() => {
                     using AreaMassProperties? amp = AreaMassProperties.Compute(cv);
                     Vector3d[] derivatives = cv.DerivativeAt(param, order) is Vector3d[] d ? d : [];
-                    Plane[] frames = cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5)),]) is Plane[] pf ? pf : [];
+                    double[] frameParams = new double[AnalysisConfig.CurveFrameSampleCount];
+                    for (int i = 0; i < AnalysisConfig.CurveFrameSampleCount; i++) {
+                        frameParams[i] = cv.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5);
+                    }
+                    Plane[] frames = cv.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
                     return amp is not null
                         ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
                             cv.PointAt(param), derivatives, cv.CurvatureAt(param).Length, frame,
