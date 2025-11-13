@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -60,5 +61,5 @@ internal static class AnalysisConfig {
 
     /// <summary>Ideal interior angles for element types.</summary>
     internal const double TriangleIdealAngleDegrees = 60.0;
-    internal const double QuadIdealAngleDegrees = 90.0;
+    internal static readonly double QuadIdealAngleDegrees = RhinoMath.ToDegrees(RhinoMath.HalfPI);
 }
