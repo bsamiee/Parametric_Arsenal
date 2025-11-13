@@ -18,7 +18,7 @@ internal static class AnalysisCompute {
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
                 int gridSize = Math.Max(AnalysisConfig.MinimumGridSize, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
-                double gridStep = AnalysisConfig.ScoreMaximum / (gridSize - AnalysisConfig.ScoreMaximum);
+                double gridStep = 1.0 / (gridSize - 1.0);
                 (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i * gridStep), v: validSurface.Domain(1).ParameterAt(j * gridStep)))),
                 ];
@@ -48,8 +48,8 @@ internal static class AnalysisCompute {
                         MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
                         Singularities: uvGrid.Where(uv =>
                             validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
-                            || (uDomain.NormalizedParameterAt(uv.u) is double uNorm && (uNorm <= AnalysisConfig.SingularityBoundaryFraction || uNorm >= (AnalysisConfig.ScoreMaximum - AnalysisConfig.SingularityBoundaryFraction)))
-                            || (vDomain.NormalizedParameterAt(uv.v) is double vNorm && (vNorm <= AnalysisConfig.SingularityBoundaryFraction || vNorm >= (AnalysisConfig.ScoreMaximum - AnalysisConfig.SingularityBoundaryFraction)))).ToArray(),
+                            || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
+                            || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV).ToArray(),
                         UniformityScore: RhinoMath.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(AnalysisConfig.ScoreMinimum, AnalysisConfig.ScoreMaximum - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? AnalysisConfig.ScoreMaximum : AnalysisConfig.ScoreMinimum, AnalysisConfig.ScoreMinimum, AnalysisConfig.ScoreMaximum)))
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             });
