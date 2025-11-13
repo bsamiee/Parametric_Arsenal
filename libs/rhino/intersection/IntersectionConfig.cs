@@ -7,33 +7,6 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Validation modes and parameters for intersection operations using RhinoDoc tolerances via GeometryContext.FromDocument(doc).</summary>
 internal static class IntersectionConfig {
-    /// <summary>Angle threshold for tangent intersection classification.</summary>
-    internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
-
-    /// <summary>Angle threshold for grazing intersection classification.</summary>
-    internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
-
-    /// <summary>Tolerance multiplier for near-miss detection threshold.</summary>
-    internal const double NearMissToleranceMultiplier = 10.0;
-
-    /// <summary>Geometry size factor for stability perturbation distance.</summary>
-    internal const double StabilityPerturbationFactor = 0.001;
-
-    /// <summary>Spherical sample count for stability perturbation analysis.</summary>
-    internal const int StabilitySampleCount = 8;
-
-    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
-    internal const int MaxNearMissSamples = 1000;
-
-    /// <summary>Blend quality score for tangent curve-curve intersections.</summary>
-    internal const double TangentBlendScore = 1.0;
-    /// <summary>Blend quality score for perpendicular curve-curve intersections.</summary>
-    internal const double PerpendicularBlendScore = 0.5;
-    /// <summary>Blend quality score for tangent curve-surface intersections.</summary>
-    internal const double CurveSurfaceTangentBlendScore = 0.8;
-    /// <summary>Blend quality score for perpendicular curve-surface intersections.</summary>
-    internal const double CurveSurfacePerpendicularBlendScore = 0.4;
-
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(Type, Type), (V ModeA, V ModeB)> ValidationModes =
         new (Type TypeA, Type TypeB, V ModeA, V ModeB)[] {
@@ -80,4 +53,24 @@ internal static class IntersectionConfig {
             ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
             : [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)), KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),])
         .ToFrozenDictionary();
+
+    /// <summary>Angle thresholds for intersection classification.</summary>
+    internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
+    internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
+
+    /// <summary>Tolerance multiplier for near-miss detection threshold.</summary>
+    internal const double NearMissToleranceMultiplier = 10.0;
+
+    /// <summary>Stability analysis parameters.</summary>
+    internal const double StabilityPerturbationFactor = 0.001;
+    internal const int StabilitySampleCount = 8;
+
+    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
+    internal const int MaxNearMissSamples = 1000;
+
+    /// <summary>Blend quality scores for intersection types.</summary>
+    internal const double TangentBlendScore = 1.0;
+    internal const double PerpendicularBlendScore = 0.5;
+    internal const double CurveSurfaceTangentBlendScore = 0.8;
+    internal const double CurveSurfacePerpendicularBlendScore = 0.4;
 }
