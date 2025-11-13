@@ -23,60 +23,63 @@ internal static class AnalysisConfig {
             [typeof(Mesh)] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
-    /// <summary>Maximum 20 C1/C2 discontinuities per curve.</summary>
+    /// <summary>Maximum discontinuity count per curve for C1/C2 detection.</summary>
     internal const int MaxDiscontinuities = 20;
 
-    /// <summary>Default derivative order 2 for position/tangent/curvature.</summary>
+    /// <summary>Default derivative order for position, tangent, and curvature computation.</summary>
     internal const int DefaultDerivativeOrder = 2;
 
-    /// <summary>Sample 5 perpendicular frames along curve domain.</summary>
+    /// <summary>Number of perpendicular frames sampled along curve domain.</summary>
     internal const int CurveFrameSampleCount = 5;
 
-    /// <summary>Surface quality grid dimension: 10×10 grid for UV sampling.</summary>
+    /// <summary>Grid dimension for surface quality UV sampling (10×10).</summary>
     internal const int SurfaceQualityGridDimension = 10;
 
-    /// <summary>Surface quality: derived sample count from grid dimensions.</summary>
+    /// <summary>Total surface quality sample count derived from grid dimensions.</summary>
     internal const int SurfaceQualitySampleCount = SurfaceQualityGridDimension * SurfaceQualityGridDimension;
 
-    /// <summary>Fraction of the domain treated as boundary proximity.</summary>
+    /// <summary>Domain fraction defining boundary proximity for singularity detection.</summary>
     internal const double SingularityBoundaryFraction = 0.1;
 
-    /// <summary>High curvature threshold 5× median for anomaly detection.</summary>
+    /// <summary>High curvature threshold as multiplier of median for anomaly detection.</summary>
     internal const double HighCurvatureMultiplier = 5.0;
 
-    /// <summary>Singularity proximity threshold 1% of domain.</summary>
+    /// <summary>Singularity proximity threshold as domain fraction.</summary>
     internal const double SingularityProximityFactor = 0.01;
 
-    /// <summary>Maximum singularity proximity factor 10% of domain span.</summary>
+    /// <summary>Maximum singularity proximity as domain span fraction.</summary>
     internal const double MaxSingularityProximityFactor = 0.1;
 
-    /// <summary>Brep closest point tolerance multiplier: 100× context tolerance.</summary>
+    /// <summary>Brep closest point tolerance multiplier relative to context.</summary>
     internal const double BrepClosestPointToleranceMultiplier = 100.0;
 
-    /// <summary>Curve fairness: 50 samples for curvature comb analysis.</summary>
+    /// <summary>Sample count for curve fairness curvature comb analysis.</summary>
     internal const int CurveFairnessSampleCount = 50;
 
-    /// <summary>Inflection sharpness threshold 0.5 for curvature sign change.</summary>
+    /// <summary>Threshold for detecting sharp inflection points via curvature change.</summary>
     internal const double InflectionSharpnessThreshold = 0.5;
 
-    /// <summary>Smoothness sensitivity 10.0 for curvature variation.</summary>
+    /// <summary>Sensitivity factor for smoothness scoring via curvature variation.</summary>
     internal const double SmoothnessSensitivity = 10.0;
 
-    /// <summary>Mesh FEA: aspect ratio warning 3.0, critical 10.0.</summary>
+    /// <summary>Aspect ratio warning threshold for mesh FEA quality.</summary>
     internal const double AspectRatioWarning = 3.0;
+    /// <summary>Aspect ratio critical threshold for mesh FEA quality.</summary>
     internal const double AspectRatioCritical = 10.0;
 
-    /// <summary>Skewness warning 0.5, critical 0.85.</summary>
+    /// <summary>Skewness warning threshold for mesh FEA quality.</summary>
     internal const double SkewnessWarning = 0.5;
+    /// <summary>Skewness critical threshold for mesh FEA quality.</summary>
     internal const double SkewnessCritical = 0.85;
 
-    /// <summary>Jacobian warning 0.3, critical 0.1.</summary>
+    /// <summary>Jacobian warning threshold for mesh FEA quality.</summary>
     internal const double JacobianWarning = 0.3;
+    /// <summary>Jacobian critical threshold for mesh FEA quality.</summary>
     internal const double JacobianCritical = 0.1;
 
-    /// <summary>Ideal interior angle for equilateral triangle in degrees.</summary>
+    /// <summary>Ideal interior angle for equilateral triangle elements.</summary>
     internal const double TriangleIdealAngleDegrees = 60.0;
 
-    /// <summary>Ideal interior angle for square/rectangle in degrees.</summary>
+    /// <summary>Ideal interior angle for quad elements.</summary>
     internal const double QuadIdealAngleDegrees = 90.0;
 }

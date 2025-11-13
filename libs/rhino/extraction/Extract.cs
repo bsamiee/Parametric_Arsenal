@@ -11,49 +11,37 @@ namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Polymorphic point extraction from geometry.</summary>
 public static class Extract {
-    /// <summary>Semantic extraction mode for point operations.</summary>
+    /// <summary>Semantic extraction mode discriminating point/curve operation types.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct Semantic(byte kind) {
         internal readonly byte Kind = kind;
 
         /// <summary>Centroids and vertices via mass properties.</summary>
         public static readonly Semantic Analytical = new(1);
-
-        /// <summary>Geometric extrema: endpoints, corners, bbox vertices.</summary>
+        /// <summary>Geometric extrema including endpoints, corners, and bounding box vertices.</summary>
         public static readonly Semantic Extremal = new(2);
-
-        /// <summary>NURBS Greville points from knot vectors.</summary>
+        /// <summary>NURBS Greville points computed from knot vectors.</summary>
         public static readonly Semantic Greville = new(3);
-
-        /// <summary>Curve inflection where curvature sign changes.</summary>
+        /// <summary>Curve inflection points where curvature changes sign.</summary>
         public static readonly Semantic Inflection = new(4);
-
-        /// <summary>Circle/ellipse quadrant points (0°, 90°, 180°, 270°).</summary>
+        /// <summary>Circle/ellipse quadrant points at cardinal angles.</summary>
         public static readonly Semantic Quadrant = new(5);
-
-        /// <summary>Topology edge midpoints for Brep/Mesh/polycurve.</summary>
+        /// <summary>Topology edge midpoints for Brep, Mesh, and polycurve structures.</summary>
         public static readonly Semantic EdgeMidpoints = new(6);
-
-        /// <summary>Topology face centroids via area properties.</summary>
+        /// <summary>Topology face centroids computed via area properties.</summary>
         public static readonly Semantic FaceCentroids = new(7);
-
-        /// <summary>Boundary curves: outer loop and holes.</summary>
-        public static readonly Semantic Boundary = new(20);
-
-        /// <summary>U-direction isocurves at parameters.</summary>
-        public static readonly Semantic IsocurveU = new(21);
-
-        /// <summary>V-direction isocurves at parameters.</summary>
-        public static readonly Semantic IsocurveV = new(22);
-
-        /// <summary>Both U and V isocurves at parameters.</summary>
-        public static readonly Semantic IsocurveUV = new(23);
-
-        /// <summary>Sharp feature curves (edge angle threshold).</summary>
-        public static readonly Semantic FeatureEdges = new(24);
-
-        /// <summary>Osculating frames (perpendicular frames) along curve at parameters.</summary>
+        /// <summary>Osculating frames sampled along curve via perpendicular frame computation.</summary>
         public static readonly Semantic OsculatingFrames = new(8);
+        /// <summary>Boundary curves including outer loop and inner holes.</summary>
+        public static readonly Semantic Boundary = new(20);
+        /// <summary>U-direction isocurves extracted at specified parameters.</summary>
+        public static readonly Semantic IsocurveU = new(21);
+        /// <summary>V-direction isocurves extracted at specified parameters.</summary>
+        public static readonly Semantic IsocurveV = new(22);
+        /// <summary>Combined U and V isocurves extracted at specified parameters.</summary>
+        public static readonly Semantic IsocurveUV = new(23);
+        /// <summary>Sharp feature curves detected via edge angle threshold.</summary>
+        public static readonly Semantic FeatureEdges = new(24);
     }
 
     /// <summary>Normalized extraction request computed from heterogeneous specifications.</summary>
@@ -143,17 +131,17 @@ public static class Extract {
         };
     }
 
-    /// <summary>Extract design features: fillets, chamfers, holes, bosses with confidence scores.</summary>
+    /// <summary>Extracts design features (fillets, chamfers, holes) with confidence scoring.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<((byte Type, double Parameter)[] Features, double Confidence)> ExtractDesignFeatures(Brep brep, IGeometryContext context) =>
         ExtractionCompute.ExtractFeatures(brep, context);
 
-    /// <summary>Decompose geometry to best-fit primitives: planes, cylinders, spheres with residuals.</summary>
+    /// <summary>Decomposes geometry into best-fit primitives with residual measurements.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<((byte Type, Plane Frame, double[] Parameters)[] Primitives, double[] Residuals)> DecomposeToPrimitives(GeometryBase geometry, IGeometryContext context) =>
         ExtractionCompute.DecomposeToPrimitives(geometry, context);
 
-    /// <summary>Extract geometric patterns: symmetries, sequences, transformations with confidence.</summary>
+    /// <summary>Extracts geometric patterns (linear, radial, grid, scaling) with symmetry transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
         ExtractionCompute.ExtractPatterns(geometries, context: context);

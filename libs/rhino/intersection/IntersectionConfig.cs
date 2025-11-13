@@ -7,34 +7,34 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Validation modes and parameters for intersection operations using RhinoDoc tolerances via GeometryContext.FromDocument(doc).</summary>
 internal static class IntersectionConfig {
-    /// <summary>Tangent angle threshold 5° for classification.</summary>
+    /// <summary>Angle threshold for tangent intersection classification.</summary>
     internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
 
-    /// <summary>Grazing angle threshold 15° for crossing vs grazing.</summary>
+    /// <summary>Angle threshold for grazing intersection classification.</summary>
     internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
 
-    /// <summary>Near-miss tolerance multiplier 10× context tolerance.</summary>
+    /// <summary>Tolerance multiplier for near-miss detection threshold.</summary>
     internal const double NearMissToleranceMultiplier = 10.0;
 
-    /// <summary>Stability perturbation distance 0.1% of geometry size.</summary>
+    /// <summary>Geometry size factor for stability perturbation distance.</summary>
     internal const double StabilityPerturbationFactor = 0.001;
 
-    /// <summary>Stability sample count 8 directions for perturbation.</summary>
+    /// <summary>Spherical sample count for stability perturbation analysis.</summary>
     internal const int StabilitySampleCount = 8;
 
-    /// <summary>Maximum near-miss sample count 1000 vertices for mesh near-miss detection.</summary>
+    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
     internal const int MaxNearMissSamples = 1000;
 
-    /// <summary>Maximum clash event count 10000 for mesh clash detection.</summary>
+    /// <summary>Maximum clash event count for mesh clash detection.</summary>
     internal const int MaxClashEvents = 10000;
 
-    /// <summary>Blend score for tangent intersections 1.0.</summary>
+    /// <summary>Blend quality score for tangent curve-curve intersections.</summary>
     internal const double TangentBlendScore = 1.0;
-    /// <summary>Blend score for perpendicular intersections 0.5.</summary>
+    /// <summary>Blend quality score for perpendicular curve-curve intersections.</summary>
     internal const double PerpendicularBlendScore = 0.5;
-    /// <summary>Blend score for tangent curve-surface 0.8.</summary>
+    /// <summary>Blend quality score for tangent curve-surface intersections.</summary>
     internal const double CurveSurfaceTangentBlendScore = 0.8;
-    /// <summary>Blend score for perpendicular curve-surface 0.4.</summary>
+    /// <summary>Blend quality score for perpendicular curve-surface intersections.</summary>
     internal const double CurveSurfacePerpendicularBlendScore = 0.4;
 
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>

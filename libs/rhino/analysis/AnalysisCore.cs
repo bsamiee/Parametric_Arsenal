@@ -17,7 +17,8 @@ internal static class AnalysisCore {
         double param = t ?? cv.Domain.Mid;
         double[] buffer = ArrayPool<double>.Shared.Rent(AnalysisConfig.MaxDiscontinuities);
         try {
-            (int discCount, double s) = (0, cv.Domain.Min);
+            int discCount = 0;
+            double s = cv.Domain.Min;
             while (discCount < AnalysisConfig.MaxDiscontinuities && cv.GetNextDiscontinuity(Continuity.C1_continuous, s, cv.Domain.Max, out double td)) {
                 buffer[discCount++] = td;
                 s = td + ctx.AbsoluteTolerance;
