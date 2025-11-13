@@ -208,14 +208,18 @@ internal static class ExtractionCompute {
     private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) {
         (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
         int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
-        SurfaceCurvature[] curvatures = [.. from int i in Enumerable.Range(0, sampleCount)
-                                            from int j in Enumerable.Range(0, sampleCount)
-                                            let u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5)
-                                            let v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5)
-                                            let curv = surface.CurvatureAt(u: u, v: v)
-                                            where curv is not null
-                                            select curv,
-        ];
+        List<SurfaceCurvature> curvaturesList = [];
+        for (int i = 0; i < sampleCount; i++) {
+            for (int j = 0; j < sampleCount; j++) {
+                double u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5);
+                double v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5);
+                SurfaceCurvature? curv = surface.CurvatureAt(u: u, v: v);
+                if (curv is not null) {
+                    curvaturesList.Add(curv);
+                }
+            }
+        }
+        SurfaceCurvature[] curvatures = [.. curvaturesList,];
 
         return curvatures.Length < ExtractionConfig.MinCurvatureSamples
             ? (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, [])
@@ -337,7 +341,14 @@ internal static class ExtractionCompute {
                 .Bind(centers => DetectPatternType(centers: [.. centers], context: context)));
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
-        Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[i]).ToArray() is Vector3d[] deltas
+        ((Func<Vector3d[]>)(() => {
+            Vector3d[] deltas = new Vector3d[centers.Length - 1];
+            for (int i = 0; i < deltas.Length; i++) {
+                deltas[i] = centers[i + 1] - centers[i];
+            }
+            return deltas;
+        }))() is Vector3d[] deltas
+            && deltas.Length > 0
             && deltas[0].Length > context.AbsoluteTolerance
             && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeLinear, SymmetryTransform: Transform.Translation(deltas[0]), Confidence: 1.0))
@@ -367,15 +378,19 @@ internal static class ExtractionCompute {
         Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
             : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? (v1 / v1.Length) is Vector3d v1n
-                    ? Enumerable.Range(1, points.Length - 1)
-                        .Select(i => (points[i] - centroid))
-                        .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
-                        .Select(v2 => Vector3d.CrossProduct(v1n, v2))
-                        .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d n && n.Length > RhinoMath.ZeroTolerance
-                            ? n / n.Length
-                            : Vector3d.ZAxis
-                    : Vector3d.ZAxis
+                ? ((Func<Vector3d>)(() => {
+                    Vector3d v1n = v1 / v1.Length;
+                    for (int i = 1; i < points.Length; i++) {
+                        Vector3d v2 = points[i] - centroid;
+                        if (v2.Length > RhinoMath.ZeroTolerance) {
+                            Vector3d normal = Vector3d.CrossProduct(v1n, v2);
+                            if (normal.Length > RhinoMath.ZeroTolerance) {
+                                return normal / normal.Length;
+                            }
+                        }
+                    }
+                    return Vector3d.ZAxis;
+                }))()
                 : Vector3d.ZAxis;
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
