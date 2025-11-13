@@ -379,14 +379,15 @@ internal static class ExtractionCompute {
         Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
             : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? Enumerable.Range(1, points.Length - 1)
-                    .Select(i => (points[i] - centroid))
-                    .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
-                    .Select(v2 => Vector3d.CrossProduct(v1, v2))
-                    .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d n && n.Length > RhinoMath.ZeroTolerance
-                        ? n / n.Length
-                        : Vector3d.ZAxis
-                : Vector3d.ZAxis;
+                ? (v1 / v1.Length) is Vector3d v1n
+                    ? Enumerable.Range(1, points.Length - 1)
+                        .Select(i => (points[i] - centroid))
+                        .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
+                        .Select(v2 => Vector3d.CrossProduct(v1n, v2))
+                        .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d n && n.Length > RhinoMath.ZeroTolerance
+                            ? n / n.Length
+                            : Vector3d.ZAxis
+                    : Vector3d.ZAxis
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
         (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)
