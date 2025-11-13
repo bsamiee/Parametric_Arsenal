@@ -70,7 +70,7 @@ internal static class OrientCore {
             PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
                 Point3d[] points = pc.GetPoints();
                 return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? Math.Sqrt(points.Sum(p => Math.Pow(plane.DistanceTo(p), 2)) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
+                    ? Math.Sqrt(points.Sum(p => { double d = plane.DistanceTo(p); return d * d; }) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
                         ? ResultFactory.Create(value: plane)
                         : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
                     : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
@@ -79,7 +79,7 @@ internal static class OrientCore {
             Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
                 Point3d[] points = m.Vertices.ToPoint3dArray();
                 return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? Math.Sqrt(points.Sum(p => Math.Pow(plane.DistanceTo(p), 2)) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
+                    ? Math.Sqrt(points.Sum(p => { double d = plane.DistanceTo(p); return d * d; }) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
                         ? ResultFactory.Create(value: plane)
                         : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
                     : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
