@@ -367,22 +367,18 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
-    private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) {
-        Vector3d v1 = (points[0] - centroid);
-        v1 = v1.Length > RhinoMath.ZeroTolerance ? v1 / v1.Length : Vector3d.XAxis;
-
-        for (int i = 1; i < points.Length; i++) {
-            Vector3d v2 = (points[i] - centroid);
-            v2 = v2.Length > RhinoMath.ZeroTolerance ? v2 / v2.Length : Vector3d.YAxis;
-            Vector3d normal = Vector3d.CrossProduct(v1, v2);
-
-            if (normal.Length > RhinoMath.ZeroTolerance) {
-                return normal / normal.Length;
-            }
-        }
-
-        return Vector3d.ZAxis;
-    }
+    private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) =>
+        Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
+            ? bestFit.Normal
+            : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
+                ? Enumerable.Range(1, points.Length - 1)
+                    .Select(i => (points[i] - centroid))
+                    .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
+                    .Select(v2 => Vector3d.CrossProduct(v1, v2))
+                    .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d n && n.Length > RhinoMath.ZeroTolerance
+                        ? n / n.Length
+                        : Vector3d.ZAxis
+                : Vector3d.ZAxis;
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
         (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)
