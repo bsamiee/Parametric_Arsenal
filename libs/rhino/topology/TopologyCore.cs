@@ -26,12 +26,12 @@ internal static class TopologyCore {
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NakedEdges,
             operation: g => g switch {
                 Brep { Edges.Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
-                Brep brep => Enumerable.Range(0, brep.Edges.Count)
-                    .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
-                    .Select(i => (Index: i, Curve: brep.Edges[i].DuplicateCurve(), Length: brep.Edges[i].GetLength()))
-                    .ToArray() switch {
-                        (int Index, Curve Curve, double Length)[] edges => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [.. edges.Select(e => e.Curve),], EdgeIndices: [.. edges.Select(e => e.Index),], Valences: [.. edges.Select(_ => 1),], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: edges.Sum(e => e.Length)),]),
+                Brep brep => brep.DuplicateNakedEdgeCurves(nakedOuter: true, nakedInner: true) switch {
+                    null => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: 0.0),]),
+                    Curve[] nakedCurves => (Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).ToArray(), nakedCurves.Sum(c => c.GetLength())) switch {
+                        (int[] indices, double totalLength) => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: nakedCurves, EdgeIndices: indices, Valences: [.. indices.Select(_ => 1),], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: totalLength),]),
                     },
+                },
                 Mesh mesh => Enumerable.Range(0, mesh.TopologyEdges.Count)
                     .Select(i => (Index: i, Faces: mesh.TopologyEdges.GetConnectedFaces(i), Vertices: mesh.TopologyEdges.GetTopologyVertices(i)))
                     .Where(t => t.Faces.Length == 1)
@@ -109,7 +109,23 @@ internal static class TopologyCore {
     internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.Connectivity,
             operation: g => g switch {
-                Brep brep => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
+                Brep brep => brep.GetConnectedComponents() switch {
+                    null or { Length: 0 } => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
+                    Brep[] { Length: 1 } => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
+                    Brep[] components => ((Func<Result<IReadOnlyList<Topology.ConnectivityData>>>)(() => {
+                        try {
+                            IReadOnlyList<IReadOnlyList<int>> componentIndices = [.. components.Select((_, i) => (IReadOnlyList<int>)[.. Enumerable.Range(i, 1),]),];
+                            IReadOnlyList<int> componentSizes = [.. components.Select(c => c.Faces.Count),];
+                            IReadOnlyList<BoundingBox> componentBounds = [.. components.Select(c => c.GetBoundingBox(accurate: false)),];
+                            FrozenDictionary<int, IReadOnlyList<int>> adjacencyGraph = Enumerable.Range(0, brep.Faces.Count).ToFrozenDictionary(keySelector: fIdx => fIdx, elementSelector: fIdx => (IReadOnlyList<int>)[.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]);
+                            return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: componentIndices, ComponentSizes: componentSizes, ComponentBounds: componentBounds, TotalComponents: components.Length, IsFullyConnected: components.Length == 1, AdjacencyGraph: adjacencyGraph),]);
+                        } finally {
+                            foreach (Brep component in components) {
+                                component.Dispose();
+                            }
+                        }
+                    }))(),
+                },
                 Mesh mesh => ComputeConnectivity(_: mesh, faceCount: mesh.Faces.Count, getAdjacent: fIdx => mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0), getBounds: fIdx => mesh.Faces[fIdx] switch { MeshFace face => face.IsQuad ? new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C], mesh.Vertices[face.D],]) : new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C],]) }, getAdjacentForGraph: fIdx => [.. mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),]),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.ConnectivityData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
