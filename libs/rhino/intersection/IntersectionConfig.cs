@@ -75,9 +75,6 @@ internal static class IntersectionConfig {
         }
         .SelectMany<(Type TypeA, Type TypeB, V ModeA, V ModeB), KeyValuePair<(Type, Type), (V ModeA, V ModeB)>>(static p => p.TypeA == p.TypeB
             ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
-            : [
-                KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),
-                KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),
-            ])
+            : [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)), KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),])
         .ToFrozenDictionary();
 }
