@@ -1,10 +1,12 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Operation types and validation dispatch for topology.</summary>
+/// <summary>Operation types, validation dispatch, and healing configuration for topology.</summary>
+[Pure]
 internal static class TopologyConfig {
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
@@ -29,16 +31,16 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>G2 curvature threshold ratio: 10% of angle tolerance.</summary>
+    /// <summary>G2 curvature detection at 10% of angle tolerance.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
 
-    /// <summary>Near-miss proximity multiplier: 100× tolerance.</summary>
+    /// <summary>Near-miss proximity detection at 100× absolute tolerance.</summary>
     internal const double NearMissMultiplier = 100.0;
 
-    /// <summary>Maximum edge count for O(n²) near-miss detection. Above this, skip near-miss analysis for performance.</summary>
+    /// <summary>Maximum 100 edges for O(n²) near-miss analysis before skipping.</summary>
     internal const int MaxEdgesForNearMissAnalysis = 100;
 
-    /// <summary>Minimum loop length for hole detection.</summary>
+    /// <summary>Minimum loop length 1e-6 for hole classification.</summary>
     internal const double MinLoopLength = 1e-6;
 
     /// <summary>Healing strategy: Conservative Repair with 0.1× tolerance.</summary>

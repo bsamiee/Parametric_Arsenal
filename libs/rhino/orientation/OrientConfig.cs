@@ -1,12 +1,14 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Validation modes and thresholds for orientation.</summary>
+/// <summary>Validation modes, thresholds, and configuration for orientation operations.</summary>
+[Pure]
 internal static class OrientConfig {
-    /// <summary>Type-to-validation mode mapping for orientation operations.</summary>
+    /// <summary>Type-specific validation mode dispatch for orientation operations.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
@@ -25,32 +27,32 @@ internal static class OrientConfig {
             [typeof(PointCloud)] = V.None,
         }.ToFrozenDictionary();
 
-    /// <summary>Minimum vector magnitude 1e-8 for non-degenerate direction.</summary>
+    /// <summary>Minimum vector length 1e-8 for non-degenerate direction checks.</summary>
     internal const double MinVectorLength = 1e-8;
-    /// <summary>Parallel detection tolerance 1e-6 for vector alignment.</summary>
+    /// <summary>Parallel threshold 1e-6 for vector alignment detection.</summary>
     internal const double ParallelThreshold = 1e-6;
-    /// <summary>Minimum 3 points for best-fit plane.</summary>
+    /// <summary>Minimum 3 points required for best-fit plane computation.</summary>
     internal const int BestFitMinPoints = 3;
-    /// <summary>Maximum 1e-3 deviation for best-fit plane residuals.</summary>
+    /// <summary>Maximum 1e-3 RMS deviation for acceptable best-fit plane quality.</summary>
     internal const double BestFitResidualThreshold = 1e-3;
-    /// <summary>Minimum 3 instances for pattern detection.</summary>
+    /// <summary>Minimum 3 instances required for pattern detection algorithms.</summary>
     internal const int PatternMinInstances = 3;
-    /// <summary>Symmetry test tolerance for relative orientation.</summary>
+    /// <summary>Symmetry tolerance 1e-3 for relative orientation analysis.</summary>
     internal const double SymmetryTestTolerance = 1e-3;
-    /// <summary>Primary score weight 0.4 for orientation criteria 4.</summary>
+    /// <summary>Weight 0.4 for ground contact score in canonical positioning.</summary>
     internal const double OrientationScoreWeight1 = 0.4;
-    /// <summary>Secondary score weight 0.4 for orientation criteria 4.</summary>
+    /// <summary>Weight 0.4 for origin alignment score in canonical positioning.</summary>
     internal const double OrientationScoreWeight2 = 0.4;
-    /// <summary>Tertiary score weight 0.2 for orientation criteria 4.</summary>
+    /// <summary>Weight 0.2 for low-profile score in canonical positioning.</summary>
     internal const double OrientationScoreWeight3 = 0.2;
-    /// <summary>Aspect ratio threshold 0.5 for low-profile detection.</summary>
+    /// <summary>Aspect ratio 0.5 threshold for low-profile geometry detection.</summary>
     internal const double LowProfileAspectRatio = 0.5;
-    /// <summary>Pattern anomaly threshold 0.5 for deviation detection.</summary>
+    /// <summary>Anomaly threshold 0.5 for pattern deviation classification.</summary>
     internal const double PatternAnomalyThreshold = 0.5;
-    /// <summary>Minimum optimization score 0.1 for accepting transforms.</summary>
+    /// <summary>Minimum score 0.1 for accepting optimization transforms.</summary>
     internal const double MinimumOptimizationScore = 0.1;
-    /// <summary>Rotation symmetry sample count 36 for 10-degree increments.</summary>
+    /// <summary>Sample count 36 for 10-degree rotation symmetry testing.</summary>
     internal const int RotationSymmetrySampleCount = 36;
-    /// <summary>Maximum degeneracy dimensions (X, Y, Z axes = 3) for flatness scoring.</summary>
+    /// <summary>Maximum 3 degenerate dimensions for flatness scoring.</summary>
     internal const int MaxDegeneracyDimensions = 3;
 }
