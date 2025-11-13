@@ -51,11 +51,18 @@ internal static class SpatialCore {
                 (Point3d[] needles, double distanceLimit) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distanceLimit, kNearest: nearest, distLimited: limited),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
             }
-            : (i, q, _, b) => ExecuteRangeSearch(tree: factory(i), queryShape: q, bufferSize: b);
+            : (i, q, _, b) => {
+                using RTree tree = factory(i);
+                return ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b);
+            };
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
         (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
-            ? ExecuteOverlapSearch(tree1: _meshFactory(m1), tree2: _meshFactory(m2), tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)
+            ? ((Func<Result<IReadOnlyList<int>>>)(() => {
+                using RTree tree1 = _meshFactory(m1);
+                using RTree tree2 = _meshFactory(m2);
+                return ExecuteOverlapSearch(tree1: tree1, tree2: tree2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b);
+            }))()
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
     /// <summary>Builds RTree from geometry array with bounding box insertion.</summary>

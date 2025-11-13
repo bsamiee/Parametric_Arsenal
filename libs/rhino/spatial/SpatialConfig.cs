@@ -18,9 +18,6 @@ internal static class SpatialConfig {
     internal const int MedialAxisMaxSampleCount = 500;
     internal const double DelaunaySuperTriangleScale = 2.0;
     internal const double DelaunaySuperTriangleCenterWeight = 0.5;
-    internal const double TriangleAreaDivisor = 2.0;
-    internal const double TetrahedronVolumeDivisor = 6.0;
-    internal const double CircumcenterDeterminantFactor = 2.0;
 
     /// <summary>Type extractors: polymorphic dispatch for centroid, RTree factory, etc.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
@@ -31,10 +28,10 @@ internal static class SpatialConfig {
             [("Centroid", typeof(Brep))] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
             [("Centroid", typeof(Mesh))] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
             [("Centroid", typeof(GeometryBase))] = static g => g is GeometryBase gb ? gb.GetBoundingBox(accurate: false).Center : Point3d.Origin,
-            // RTree factory construction
-            [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) is RTree tree ? tree : new RTree(),
-            [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) is RTree tree ? tree : new RTree(),
-            [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) is RTree tree ? tree : new RTree(),
+            // RTree factory construction - SDK methods properly initialize RTrees
+            [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
+            [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
+            [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
             // Clustering algorithm dispatch - semantic key instead of tuple type
             [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
                 ? alg switch {
