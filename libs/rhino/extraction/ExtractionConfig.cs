@@ -116,4 +116,5 @@ internal static class ExtractionConfig {
     internal const int MinIsocurveCount = 2;
     internal const int MaxIsocurveCount = 100;
     internal const int DefaultOsculatingFrameCount = 10;
+    internal const int BoundaryIsocurveCount = 5;
 }
