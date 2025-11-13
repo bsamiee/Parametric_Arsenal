@@ -22,6 +22,12 @@ internal static class IntersectionConfig {
     /// <summary>Stability sample count 8 directions for perturbation.</summary>
     internal const int StabilitySampleCount = 8;
 
+    /// <summary>Maximum near-miss sample count 1000 vertices for mesh near-miss detection.</summary>
+    internal const int MaxNearMissSamples = 1000;
+
+    /// <summary>Maximum clash event count 10000 for mesh clash detection.</summary>
+    internal const int MaxClashEvents = 10000;
+
     /// <summary>Blend score for tangent intersections 1.0.</summary>
     internal const double TangentBlendScore = 1.0;
     /// <summary>Blend score for perpendicular intersections 0.5.</summary>
