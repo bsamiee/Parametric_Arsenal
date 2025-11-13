@@ -28,10 +28,7 @@ internal static class OrientConfig {
         }.ToFrozenDictionary();
 
     /// <summary>Tolerance and threshold constants for orientation analysis.</summary>
-    internal const double MinVectorLength = 1e-8;
-    internal const double ParallelThreshold = 1e-6;
     internal const double BestFitResidualThreshold = 1e-3;
-    internal const double SymmetryTestTolerance = 1e-3;
     internal const double LowProfileAspectRatio = 0.5;
     internal const double PatternAnomalyThreshold = 0.5;
 

@@ -26,13 +26,19 @@ internal static class OrientCompute {
                     : validBrep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
                         ? ((Func<Result<(Transform, double, byte[])>>)(() => {
                             using VolumeMassProperties? vmp = validBrep.IsSolid && validBrep.IsManifold ? VolumeMassProperties.Compute(validBrep) : null;
+                            Vector3d diag1 = new(1, 1, 0);
+                            Vector3d diag2 = new(1, 0, 1);
+                            Vector3d diag3 = new(0, 1, 1);
+                            _ = diag1.Unitize();
+                            _ = diag2.Unitize();
+                            _ = diag3.Unitize();
                             Plane[] testPlanes = [
                                 new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
                                 new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
                                 new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
-                                new Plane(box.Center, new Vector3d(1, 1, 0) / Math.Sqrt(2), Vector3d.ZAxis),
-                                new Plane(box.Center, new Vector3d(1, 0, 1) / Math.Sqrt(2), Vector3d.YAxis),
-                                new Plane(box.Center, new Vector3d(0, 1, 1) / Math.Sqrt(2), Vector3d.XAxis),
+                                new Plane(box.Center, diag1, Vector3d.ZAxis),
+                                new Plane(box.Center, diag2, Vector3d.YAxis),
+                                new Plane(box.Center, diag3, Vector3d.XAxis),
                             ];
 
                             (Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
@@ -68,8 +74,8 @@ internal static class OrientCompute {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) {
-        double symmetryTolerance = Math.Max(context.AbsoluteTolerance, OrientConfig.SymmetryTestTolerance);
-        double angleTolerance = Math.Max(context.AngleToleranceRadians, OrientConfig.SymmetryTestTolerance);
+        double symmetryTolerance = context.AbsoluteTolerance;
+        double angleTolerance = context.AngleToleranceRadians;
 
         return (OrientCore.PlaneExtractors.TryGetValue(geometryA.GetType(), out Func<object, Result<Plane>>? extA),
             OrientCore.PlaneExtractors.TryGetValue(geometryB.GetType(), out Func<object, Result<Plane>>? extB))
@@ -78,7 +84,7 @@ internal static class OrientCompute {
                         (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
                             ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                                 ? ((geometryA, geometryB) switch {
-                                    (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > OrientConfig.MinVectorLength
+                                    (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
                                         ? new Plane(pa.Origin, pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
                                             && ba.Vertices.Select(va => {
                                                 Point3d reflected = va.Location;
@@ -115,7 +121,7 @@ internal static class OrientCompute {
                                         ];
                                         return candidateAngles.Length == 0
                                             ? (byte)0
-                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < Math.Max(context.AngleToleranceRadians, OrientConfig.SymmetryTestTolerance))
+                                            : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < context.AngleToleranceRadians)
                                                 && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;
