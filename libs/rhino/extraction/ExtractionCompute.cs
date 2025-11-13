@@ -209,12 +209,12 @@ internal static class ExtractionCompute {
         (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
         int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
         SurfaceCurvature[] curvatures = [.. from int i in Enumerable.Range(0, sampleCount)
-            from int j in Enumerable.Range(0, sampleCount)
-            let u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5)
-            let v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5)
-            let curv = surface.CurvatureAt(u: u, v: v)
-            where curv is not null
-            select curv,
+                                            from int j in Enumerable.Range(0, sampleCount)
+                                            let u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5)
+                                            let v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5)
+                                            let curv = surface.CurvatureAt(u: u, v: v)
+                                            where curv is not null
+                                            select curv,
         ];
 
         return curvatures.Length < ExtractionConfig.MinCurvatureSamples
@@ -227,7 +227,10 @@ internal static class ExtractionCompute {
         Surface surface,
         SurfaceCurvature[] curvatures) {
         int n = curvatures.Length;
-        double gaussianSum = 0.0, gaussianSumSq = 0.0, meanSum = 0.0, meanSumSq = 0.0;
+        double gaussianSum = 0.0;
+        double gaussianSumSq = 0.0;
+        double meanSum = 0.0;
+        double meanSumSq = 0.0;
         for (int i = 0; i < n; i++) {
             double g = curvatures[i].Gaussian;
             double m = curvatures[i].Mean;
@@ -388,6 +391,7 @@ internal static class ExtractionCompute {
                             ? n / n.Length
                             : Vector3d.ZAxis
                     : Vector3d.ZAxis
+                : Vector3d.ZAxis;
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
         (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)
