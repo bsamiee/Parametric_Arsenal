@@ -9,17 +9,6 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
 [Pure]
 internal static class SpatialConfig {
-    internal const int DefaultBufferSize = 2048;
-    internal const int LargeBufferSize = 4096;
-    internal const int KMeansMaxIterations = 100;
-    internal const int KMeansSeed = 42;
-    internal const int DBSCANMinPoints = 4;
-    internal const int DBSCANRTreeThreshold = 100;
-    internal const int MedialAxisMinSampleCount = 50;
-    internal const int MedialAxisMaxSampleCount = 500;
-    internal const double DelaunaySuperTriangleScale = 2.0;
-    internal const double DelaunaySuperTriangleCenterWeight = 0.5;
-
     /// <summary>Polymorphic type extractors for centroids, RTree factories, and clustering dispatch.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
         new Dictionary<(string, Type), Func<object, object>> {
@@ -40,4 +29,24 @@ internal static class SpatialConfig {
                 }
                 : [],
         }.ToFrozenDictionary();
+
+    /// <summary>Buffer sizes for RTree spatial query operations.</summary>
+    internal const int DefaultBufferSize = 2048;
+    internal const int LargeBufferSize = 4096;
+
+    /// <summary>K-means clustering algorithm parameters.</summary>
+    internal const int KMeansMaxIterations = 100;
+    internal const int KMeansSeed = 42;
+
+    /// <summary>DBSCAN clustering algorithm parameters.</summary>
+    internal const int DBSCANMinPoints = 4;
+    internal const int DBSCANRTreeThreshold = 100;
+
+    /// <summary>Medial axis sampling bounds for planar boundary analysis.</summary>
+    internal const int MedialAxisMinSampleCount = 50;
+    internal const int MedialAxisMaxSampleCount = 500;
+
+    /// <summary>Delaunay triangulation super-triangle construction parameters.</summary>
+    internal const double DelaunaySuperTriangleScale = 2.0;
+    internal const double DelaunaySuperTriangleCenterWeight = 0.5;
 }
