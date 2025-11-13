@@ -51,7 +51,7 @@ internal static class AnalysisCore {
             ? ((Func<Result<Analysis.IResult>>)(() => {
                 SurfaceCurvature sc = sf.CurvatureAt(u, v);
                 using AreaMassProperties? amp = AreaMassProperties.Compute(sf);
-                return amp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)
+                return amp is not null && RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)
                     ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.SurfaceData(
                         sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
                         sc.Direction(0), sc.Direction(1), frame, frame.Normal,
@@ -86,7 +86,7 @@ internal static class AnalysisCore {
                             SurfaceCurvature sc = sf.CurvatureAt(u, v);
                             using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
                             using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                            return amp is not null && vmp is not null && !double.IsNaN(sc.Gaussian) && !double.IsInfinity(sc.Gaussian) && !double.IsNaN(sc.Mean) && !double.IsInfinity(sc.Mean)
+                            return amp is not null && vmp is not null && RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)
                                 ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.BrepData(
                                     sf.PointAt(u, v), derivs, sc.Gaussian, sc.Mean, sc.Kappa(0), sc.Kappa(1),
                                     sc.Direction(0), sc.Direction(1), frame, frame.Normal,
