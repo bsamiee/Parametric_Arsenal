@@ -86,11 +86,15 @@ public static class Extract {
     /// <summary>Batch point extraction with error accumulation and parallelism.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Point3d>>> PointsMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
-        Result<IReadOnlyList<Point3d>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Points(item, spec, context)),];
-        return (accumulateErrors, results.All(r => r.IsSuccess)) switch {
-            (true, true) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
-            (true, false) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
-            (false, _) => results.FirstOrDefault(r => !r.IsSuccess) is { IsSuccess: false } failure ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,]) : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(r => r.Value),]),
+        Result<IReadOnlyList<Point3d>>[] results = enableParallel
+            ? [.. geometries.AsParallel().Select(item => Points(item, spec, context)),]
+            : [.. geometries.Select(item => Points(item, spec, context)),];
+        return (accumulateErrors, results.All(static r => r.IsSuccess)) switch {
+            (true, true) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(static r => r.Value),]),
+            (true, false) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. results.Where(static r => !r.IsSuccess).SelectMany(static r => r.Errors),]),
+            (false, _) => results.FirstOrDefault(static r => !r.IsSuccess) is { IsSuccess: false } failure
+                ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Point3d>>>(errors: [.. failure.Errors,])
+                : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Point3d>>)[.. results.Select(static r => r.Value),]),
         };
     }
 
@@ -123,11 +127,15 @@ public static class Extract {
     /// <summary>Batch curve extraction with error accumulation and parallelism.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IReadOnlyList<Curve>>> CurvesMultiple<T>(IReadOnlyList<T> geometries, object spec, IGeometryContext context, bool accumulateErrors = true, bool enableParallel = false) where T : GeometryBase {
-        Result<IReadOnlyList<Curve>>[] results = [.. (enableParallel ? geometries.AsParallel() : geometries.AsEnumerable()).Select(item => Curves(item, spec, context)),];
-        return (accumulateErrors, results.All(r => r.IsSuccess)) switch {
-            (true, true) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Curve>>)[.. results.Select(r => r.Value),]),
-            (true, false) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Curve>>>(errors: [.. results.Where(r => !r.IsSuccess).SelectMany(r => r.Errors),]),
-            (false, _) => results.FirstOrDefault(r => !r.IsSuccess) is { IsSuccess: false } failure ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Curve>>>(errors: [.. failure.Errors,]) : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Curve>>)[.. results.Select(r => r.Value),]),
+        Result<IReadOnlyList<Curve>>[] results = enableParallel
+            ? [.. geometries.AsParallel().Select(item => Curves(item, spec, context)),]
+            : [.. geometries.Select(item => Curves(item, spec, context)),];
+        return (accumulateErrors, results.All(static r => r.IsSuccess)) switch {
+            (true, true) => ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Curve>>)[.. results.Select(static r => r.Value),]),
+            (true, false) => ResultFactory.Create<IReadOnlyList<IReadOnlyList<Curve>>>(errors: [.. results.Where(static r => !r.IsSuccess).SelectMany(static r => r.Errors),]),
+            (false, _) => results.FirstOrDefault(static r => !r.IsSuccess) is { IsSuccess: false } failure
+                ? ResultFactory.Create<IReadOnlyList<IReadOnlyList<Curve>>>(errors: [.. failure.Errors,])
+                : ResultFactory.Create(value: (IReadOnlyList<IReadOnlyList<Curve>>)[.. results.Select(static r => r.Value),]),
         };
     }
 
