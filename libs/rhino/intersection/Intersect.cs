@@ -57,16 +57,15 @@ public static class Intersect {
                     OperationName = $"Intersect.{t1.Name}.{t2.Name}",
                     EnableDiagnostics = false,
                 }))
-        .Map(outputs => outputs.Count switch {
-            0 => IntersectionOutput.Empty,
-            _ => new IntersectionOutput(
+        .Map(outputs => outputs.Count == 0
+            ? IntersectionOutput.Empty
+            : new IntersectionOutput(
                 [.. outputs.SelectMany(output => output.Points)],
                 [.. outputs.SelectMany(output => output.Curves)],
                 [.. outputs.SelectMany(output => output.ParametersA)],
                 [.. outputs.SelectMany(output => output.ParametersB)],
                 [.. outputs.SelectMany(output => output.FaceIndices)],
-                [.. outputs.SelectMany(output => output.Sections)]),
-        });
+                [.. outputs.SelectMany(output => output.Sections)]));
     }
 
     /// <summary>Classify intersection: 0=tangent, 1=transverse, 2=unknown with approach angles.</summary>
