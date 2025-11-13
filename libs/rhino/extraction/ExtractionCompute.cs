@@ -201,8 +201,57 @@ internal static class ExtractionCompute {
                             : surface switch {
                                 Extrusion ext when ext.IsValid && ext.PathLineCurve() is LineCurve lc =>
                                     (true, ExtractionConfig.PrimitiveTypeExtrusion, new Plane(ext.PathStart, lc.Line.Direction), [lc.Line.Length,]),
-                                _ => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+                                _ => ClassifySurfaceByCurvature(surface: surface),
                             };
+
+    [Pure]
+    private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) {
+        (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
+        int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
+        SurfaceCurvature[] curvatures = [.. from int i in Enumerable.Range(0, sampleCount)
+            from int j in Enumerable.Range(0, sampleCount)
+            let u = uDomain.ParameterAt(i / (double)(sampleCount - 1))
+            let v = vDomain.ParameterAt(j / (double)(sampleCount - 1))
+            let curv = surface.CurvatureAt(u: u, v: v)
+            where curv is not null
+            select curv,
+        ];
+
+        return curvatures.Length < ExtractionConfig.MinCurvatureSamples
+            ? (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, [])
+            : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures);
+    }
+
+    [Pure]
+    private static (bool Success, byte Type, Plane Frame, double[] Params) TestPrincipalCurvatureConstancy(
+        Surface surface,
+        SurfaceCurvature[] curvatures) {
+        double[] gaussianCurvatures = [.. curvatures.Select(static c => c.Gaussian),];
+        double[] meanCurvatures = [.. curvatures.Select(static c => c.Mean),];
+        double gaussianMean = gaussianCurvatures.Average();
+        double meanMean = meanCurvatures.Average();
+        double gaussianVar = gaussianCurvatures.Sum(g => (g - gaussianMean) * (g - gaussianMean)) / gaussianCurvatures.Length;
+        double meanVar = meanCurvatures.Sum(m => (m - meanMean) * (m - meanMean)) / meanCurvatures.Length;
+        bool gaussianConstant = Math.Abs(gaussianMean) > RhinoMath.ZeroTolerance
+            ? gaussianVar / (gaussianMean * gaussianMean) < ExtractionConfig.CurvatureVariationThreshold
+            : gaussianVar < RhinoMath.SqrtEpsilon;
+        bool meanConstant = Math.Abs(meanMean) > RhinoMath.ZeroTolerance
+            ? meanVar / (meanMean * meanMean) < ExtractionConfig.CurvatureVariationThreshold
+            : meanVar < RhinoMath.SqrtEpsilon;
+
+        return (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon) switch {
+            (true, _, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypePlane, frame, [frame.OriginX, frame.OriginY, frame.OriginZ,])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            (false, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypeCylinder, frame, [1.0 / meanMean, surface.GetBoundingBox(accurate: false).Diagonal.Length,])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypeSphere, frame, [1.0 / Math.Sqrt(Math.Abs(gaussianMean)),])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            _ => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+        };
+    }
 
     [Pure]
     private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) =>

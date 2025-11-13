@@ -51,6 +51,9 @@ public static class Extract {
 
         /// <summary>Sharp feature curves (edge angle threshold).</summary>
         public static readonly Semantic FeatureEdges = new(24);
+
+        /// <summary>Osculating frames (perpendicular frames) along curve at parameters.</summary>
+        public static readonly Semantic OsculatingFrames = new(8);
     }
 
     /// <summary>Normalized extraction request computed from heterogeneous specifications.</summary>
