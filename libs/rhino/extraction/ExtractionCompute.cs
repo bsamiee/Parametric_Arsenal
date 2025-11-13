@@ -226,12 +226,20 @@ internal static class ExtractionCompute {
     private static (bool Success, byte Type, Plane Frame, double[] Params) TestPrincipalCurvatureConstancy(
         Surface surface,
         SurfaceCurvature[] curvatures) {
-        double[] gaussianCurvatures = [.. curvatures.Select(static c => c.Gaussian),];
-        double[] meanCurvatures = [.. curvatures.Select(static c => c.Mean),];
-        double gaussianMean = gaussianCurvatures.Average();
-        double meanMean = meanCurvatures.Average();
-        double gaussianVar = gaussianCurvatures.Sum(g => (g - gaussianMean) * (g - gaussianMean)) / gaussianCurvatures.Length;
-        double meanVar = meanCurvatures.Sum(m => (m - meanMean) * (m - meanMean)) / meanCurvatures.Length;
+        int n = curvatures.Length;
+        double gaussianSum = 0.0, gaussianSumSq = 0.0, meanSum = 0.0, meanSumSq = 0.0;
+        for (int i = 0; i < n; i++) {
+            double g = curvatures[i].Gaussian;
+            double m = curvatures[i].Mean;
+            gaussianSum += g;
+            gaussianSumSq += g * g;
+            meanSum += m;
+            meanSumSq += m * m;
+        }
+        double gaussianMean = gaussianSum / n;
+        double meanMean = meanSum / n;
+        double gaussianVar = (gaussianSumSq / n) - (gaussianMean * gaussianMean);
+        double meanVar = (meanSumSq / n) - (meanMean * meanMean);
         bool gaussianConstant = Math.Abs(gaussianMean) > RhinoMath.ZeroTolerance
             ? gaussianVar / (gaussianMean * gaussianMean) < ExtractionConfig.CurvatureVariationThreshold
             : gaussianVar < RhinoMath.SqrtEpsilon;
