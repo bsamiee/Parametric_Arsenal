@@ -5,7 +5,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Validation modes and parameters for intersection operations.</summary>
+/// <summary>Validation modes and parameters for intersection operations. 
+/// Context tolerances should be created from RhinoDoc via GeometryContext.FromDocument(doc) 
+/// to tie intersection thresholds to ModelAbsoluteTolerance and ModelAngleToleranceRadians.</summary>
 internal static class IntersectionConfig {
     /// <summary>Tangent angle threshold 5° for classification.</summary>
     internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
