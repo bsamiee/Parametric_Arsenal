@@ -4,6 +4,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
@@ -73,7 +74,7 @@ internal static class TopologyCompute {
                 .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => ((Func<Result<(Brep, byte, bool)>>)(() => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
-                    int strategyCount = Math.Min(maxStrategy + 1, TopologyConfig.MaxHealingStrategies);
+                    int strategyCount = RhinoMath.Clamp(maxStrategy + 1, 0, TopologyConfig.MaxHealingStrategies);
                     Brep? bestHealed = null;
                     byte bestStrategy = 0;
                     int bestNakedEdges = int.MaxValue;

@@ -88,10 +88,7 @@ internal static class TopologyCore {
                                         EdgeIndices: [.. nm.Select(t => t.Index),],
                                         VertexIndices: [],
                                         Valences: [.. nm.Select(t => t.Faces.Length),],
-                                        Locations: [.. nm.Select(t => new Point3d(
-                                            (mesh.TopologyVertices[t.Vertices.I].X + mesh.TopologyVertices[t.Vertices.J].X) * 0.5,
-                                            (mesh.TopologyVertices[t.Vertices.I].Y + mesh.TopologyVertices[t.Vertices.J].Y) * 0.5,
-                                            (mesh.TopologyVertices[t.Vertices.I].Z + mesh.TopologyVertices[t.Vertices.J].Z) * 0.5)),
+                                        Locations: [.. nm.Select(t => Point3d.Add(mesh.TopologyVertices[t.Vertices.I], mesh.TopologyVertices[t.Vertices.J]) / 2.0),
                                         ],
                                         IsManifold: isManifold && nm.Length == 0,
                                         IsOrientable: oriented,
