@@ -42,8 +42,8 @@ internal static class IntersectionCore {
     /// <summary>Handles two-point intersection results with distance threshold validation and deduplication.</summary>
     private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersect.IntersectionOutput>> TwoPointHandler = (count, first, second, tolerance, parameters) =>
         (count, first.DistanceTo(second) > tolerance) switch {
-            (> 1, true) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first, second], [], parameters ?? [], [], [], [])),
-            (> 0, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])),
+            ( > 1, true) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first, second], [], parameters ?? [], [], [], [])),
+            ( > 0, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])),
             _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
         };
 
@@ -55,10 +55,9 @@ internal static class IntersectionCore {
     };
 
     /// <summary>Processes polyline arrays flattening points while preserving original polyline structures.</summary>
-    private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = polylines => polylines switch {
-        { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-            [.. nonNullPolylines.SelectMany(polyline => polyline)],
-            [], [], [], [], [.. nonNullPolylines])),
+    private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = polylines => polylines switch { { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+                                                                                                                                            [.. nonNullPolylines.SelectMany(polyline => polyline)],
+                                                                                                                                            [], [], [], [], [.. nonNullPolylines])),
         null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
         _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
     };

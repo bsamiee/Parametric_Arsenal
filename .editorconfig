@@ -136,7 +136,6 @@ dotnet_diagnostic.IDE0161.severity = error                                     #
 dotnet_diagnostic.IDE0170.severity = error                                     # Simplify property pattern
 dotnet_diagnostic.IDE0180.severity = error                                     # Use tuple swap
 dotnet_diagnostic.IDE0190.severity = error                                     # Use collection expression for array
-dotnet_diagnostic.IDE0200.severity = none                                      # Lambda can be removed
 dotnet_diagnostic.IDE0211.severity = error                                     # Use collection expression for empty
 dotnet_diagnostic.IDE0220.severity = error                                     # Add explicit cast
 dotnet_diagnostic.IDE0230.severity = error                                     # Use UTF-8 string literal

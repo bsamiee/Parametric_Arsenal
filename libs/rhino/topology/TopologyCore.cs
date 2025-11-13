@@ -262,7 +262,8 @@ internal static class TopologyCore {
                         edgeIndices
                             .SelectMany(edgeIdx => brep.Edges[edgeIdx].AdjacentFaces())
                             .Where(faceIdx => faceIdx >= 0)
-                    ),]) switch {
+                    ),
+                    ]) switch {
                         IReadOnlyList<int> faceIndices => ResultFactory.Create(value: (IReadOnlyList<Topology.VertexData>)[new Topology.VertexData(VertexIndex: idx, Location: location, ConnectedEdgeIndices: edgeIndices, ConnectedFaceIndices: faceIndices, Valence: edgeIndices.Length, IsBoundary: edgeIndices.Any(i => brep.Edges[i].Valence == EdgeAdjacency.Naked), IsManifold: edgeIndices.All(i => brep.Edges[i].Valence == EdgeAdjacency.Interior)),]),
                     },
                 },

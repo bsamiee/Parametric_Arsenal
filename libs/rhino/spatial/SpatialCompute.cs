@@ -420,7 +420,8 @@ internal static class SpatialCompute {
                     return cell.Length > 0
                         ? [.. cell.OrderBy(p => Math.Atan2(p.Y - cell.Average(c => c.Y), p.X - cell.Average(c => c.X)))]
                         : [];
-                })),]);
+                })),
+                ]);
             }))());
 
     private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
