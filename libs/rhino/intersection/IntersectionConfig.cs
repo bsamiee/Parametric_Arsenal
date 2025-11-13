@@ -25,9 +25,6 @@ internal static class IntersectionConfig {
     /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
     internal const int MaxNearMissSamples = 1000;
 
-    /// <summary>Maximum clash event count for mesh clash detection.</summary>
-    internal const int MaxClashEvents = 10000;
-
     /// <summary>Blend quality score for tangent curve-curve intersections.</summary>
     internal const double TangentBlendScore = 1.0;
     /// <summary>Blend quality score for perpendicular curve-curve intersections.</summary>

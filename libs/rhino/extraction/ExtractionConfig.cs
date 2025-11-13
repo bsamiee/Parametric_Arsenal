@@ -46,8 +46,6 @@ internal static class ExtractionConfig {
     internal const double FilletCurvatureVariationThreshold = 0.15;
     /// <summary>Sample count for fillet edge curvature analysis.</summary>
     internal const int FilletCurvatureSampleCount = 5;
-    /// <summary>Angle tolerance for G2 continuity detection in smooth edges.</summary>
-    internal const double G2ContinuityTolerance = 0.01;
     /// <summary>Dihedral angle threshold for sharp edge classification.</summary>
     internal static readonly double SharpEdgeAngleThreshold = RhinoMath.ToRadians(20.0);
     /// <summary>Dihedral angle threshold for smooth edge classification.</summary>

@@ -47,9 +47,6 @@ internal static class AnalysisConfig {
     /// <summary>Singularity proximity threshold as domain fraction.</summary>
     internal const double SingularityProximityFactor = 0.01;
 
-    /// <summary>Maximum singularity proximity as domain span fraction.</summary>
-    internal const double MaxSingularityProximityFactor = 0.1;
-
     /// <summary>Brep closest point tolerance multiplier relative to context.</summary>
     internal const double BrepClosestPointToleranceMultiplier = 100.0;
 
