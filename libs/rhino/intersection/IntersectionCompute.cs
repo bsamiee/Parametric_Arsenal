@@ -29,6 +29,17 @@ internal static class IntersectionCompute {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
+        static Result<(byte, double[], bool, double)> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersect.IntersectionOutput output, int count, double[] parameters) =>
+            Enumerable.Range(0, count)
+                .Select(index => (curve.TangentAt(parameters[index]), output.Points[index]))
+                .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
+                    ? Vector3d.VectorAngle(tuple.Item1, normal)
+                    : double.NaN)
+                .Where(angle => !double.IsNaN(angle))
+                .ToArray() is double[] angles && angles.Length > 0
+                    ? curveSurfaceClassifier(angles)
+                    : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed);
+
         return IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
                     (V modeA, V modeB) = entry.Swapped
@@ -48,24 +59,8 @@ internal static class IntersectionCompute {
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && (circularMean < 0.0 ? circularMean + RhinoMath.TwoPI : circularMean) is double averageAngle
                                             ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                                             : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                                    (Curve curve, Surface surface) when parametersA >= count => Enumerable.Range(0, count)
-                                        .Select(index => (curve.TangentAt(output.ParametersA[index]), output.Points[index]))
-                                        .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
-                                            ? Vector3d.VectorAngle(tuple.Item1, normal)
-                                            : double.NaN)
-                                        .Where(angle => !double.IsNaN(angle))
-                                        .ToArray() is double[] angles && angles.Length > 0
-                                            ? curveSurfaceClassifier(angles)
-                                            : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
-                                    (Surface surface, Curve curve) when parametersB >= count => Enumerable.Range(0, count)
-                                        .Select(index => (curve.TangentAt(output.ParametersB[index]), output.Points[index]))
-                                        .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
-                                            ? Vector3d.VectorAngle(tuple.Item1, normal)
-                                            : double.NaN)
-                                        .Where(angle => !double.IsNaN(angle))
-                                        .ToArray() is double[] angles && angles.Length > 0
-                                            ? curveSurfaceClassifier(angles)
-                                            : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                                    (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA]),
+                                    (Surface surface, Curve curve) when parametersB >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersB]),
                                     _ when parametersA < count || parametersB < count => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                                     _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
                                 },
