@@ -428,22 +428,20 @@ internal static class ExtractionCompute {
         }
 
         double uLen = u.Length;
-        return uLen <= context.AbsoluteTolerance
-            ? (Vector3d.Zero, Vector3d.Zero, false)
-            : ((Func<(Vector3d U, Vector3d V, bool Success)>)(() => {
-                Vector3d uDir = u / uLen;
-                for (int i = 0; i < candidates.Length; i++) {
-                    Vector3d candidate = candidates[i];
-                    double candidateLen = candidate.Length;
-                    if (candidateLen > context.AbsoluteTolerance
-                        && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
-                        return (u, candidate, true);
-                    }
-                }
-                return (Vector3d.Zero, Vector3d.Zero, false);
-            }))();
-    }
+        if (uLen <= context.AbsoluteTolerance)
+            return (Vector3d.Zero, Vector3d.Zero, false);
 
+        Vector3d uDir = u / uLen;
+        for (int i = 0; i < candidates.Length; i++) {
+            Vector3d candidate = candidates[i];
+            double candidateLen = candidate.Length;
+            if (candidateLen > context.AbsoluteTolerance
+                && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
+                return (u, candidate, true);
+            }
+        }
+        return (Vector3d.Zero, Vector3d.Zero, false);
+    }
     private static bool IsGridPoint(Vector3d vector, Vector3d u, Vector3d v, IGeometryContext context) {
         double uLen = u.Length;
         double vLen = v.Length;
