@@ -201,22 +201,34 @@ internal static class SpatialCompute {
     internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
         int[] assignments = [.. Enumerable.Range(0, pts.Length),];
         int targetClusters = pts.Length - k;
+        int[] clusterRepresentatives = [.. Enumerable.Range(0, pts.Length),];
 
         for (int iteration = 0; iteration < targetClusters; iteration++) {
-            (int c1, int c2, double minDist) = (0, 0, double.MaxValue);
+            (int repr1, int repr2, double minDist) = (0, 1, double.MaxValue);
 
             for (int i = 0; i < pts.Length; i++) {
+                int cluster1 = assignments[i];
+                if (cluster1 != clusterRepresentatives[cluster1]) {
+                    continue;
+                }
+
                 for (int j = i + 1; j < pts.Length; j++) {
-                    if (assignments[i] == assignments[j]) {
+                    int cluster2 = assignments[j];
+                    if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
                         continue;
                     }
-                    double dist = pts[i].DistanceTo(pts[j]);
-                    (c1, c2, minDist) = dist < minDist ? (assignments[i], assignments[j], dist) : (c1, c2, minDist);
+
+                    double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
+                    (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
                 }
             }
 
             for (int i = 0; i < assignments.Length; i++) {
-                assignments[i] = assignments[i] == c2 ? c1 : assignments[i] > c2 ? assignments[i] - 1 : assignments[i];
+                assignments[i] = assignments[i] == repr2 ? repr1 : assignments[i] > repr2 ? assignments[i] - 1 : assignments[i];
+            }
+
+            if (repr2 < clusterRepresentatives.Length) {
+                clusterRepresentatives[repr2] = clusterRepresentatives[repr1];
             }
         }
 

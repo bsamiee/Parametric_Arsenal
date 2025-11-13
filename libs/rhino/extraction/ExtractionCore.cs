@@ -107,8 +107,8 @@ internal static class ExtractionCore {
                 ? ((Func<Result<Point3d[]>>)(() => {
                     using VolumeMassProperties? massProperties = VolumeMassProperties.Compute(brep);
                     return massProperties is { Centroid: { IsValid: true } centroid }
-                        ? ResultFactory.Create<Point3d[]>(value: [centroid, .. brep.Vertices.Select(vertex => vertex.Location),])
-                        : ResultFactory.Create<Point3d[]>(value: [.. brep.Vertices.Select(vertex => vertex.Location),]);
+                        ? ResultFactory.Create<Point3d[]>(value: [centroid, .. brep.Vertices.Select(static vertex => vertex.Location),])
+                        : ResultFactory.Create<Point3d[]>(value: [.. brep.Vertices.Select(static vertex => vertex.Location),]);
                 }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
             [(1, typeof(Curve))] = static (geometry, _, _) => geometry is Curve curve
@@ -198,7 +198,7 @@ internal static class ExtractionCore {
                                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Quadrant extraction unsupported"))
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Quadrant extraction requires curve")),
             [(6, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
-                ? ResultFactory.Create<Point3d[]>(value: [.. brep.Edges.Select(edge => edge.PointAtNormalizedLength(0.5)),])
+                ? ResultFactory.Create<Point3d[]>(value: [.. brep.Edges.Select(static edge => edge.PointAtNormalizedLength(0.5)),])
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
             [(6, typeof(Mesh))] = static (geometry, _, _) => geometry is Mesh mesh
                 ? ResultFactory.Create<Point3d[]>(value: [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(index => mesh.TopologyEdges.EdgeLine(index)).Where(static line => line.IsValid).Select(static line => line.PointAt(0.5)),])
@@ -239,7 +239,7 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Mesh")),
             [(10, typeof(Curve))] = static (geometry, request, _) => geometry is Curve curve && request.Parameter is int count
                 ? curve.DivideByCount(count, request.IncludeEnds) is double[] parameters
-                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(curve.PointAt),])
+                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(t => curve.PointAt(t)),])
                     : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("DivideByCount failed"))
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and integer count")),
             [(10, typeof(Surface))] = static (geometry, request, _) => geometry is Surface surface && request.Parameter is int density && density > 0 && (surface.Domain(0), surface.Domain(1)) is (Interval uDomain, Interval vDomain)
@@ -250,7 +250,7 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Brep")),
             [(11, typeof(Curve))] = static (geometry, request, _) => geometry is Curve curve && request.Parameter is double length && length > 0
                 ? curve.DivideByLength(length, request.IncludeEnds) is double[] parameters
-                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(curve.PointAt),])
+                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(t => curve.PointAt(t)),])
                     : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("DivideByLength failed"))
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and positive length")),
             [(11, typeof(Surface))] = static (geometry, _, _) => geometry is Surface
@@ -258,7 +258,7 @@ internal static class ExtractionCore {
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Surface")),
             [(12, typeof(Curve))] = static (geometry, request, _) => geometry is Curve curve && request.Parameter is Vector3d direction
                 ? curve.ExtremeParameters(direction) is double[] parameters
-                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(curve.PointAt),])
+                    ? ResultFactory.Create<Point3d[]>(value: [.. parameters.Select(t => curve.PointAt(t)),])
                     : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Extreme parameter computation failed"))
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and direction")),
             [(13, typeof(Curve))] = static (geometry, request, _) => geometry is Curve curve && request.Parameter is Continuity continuity

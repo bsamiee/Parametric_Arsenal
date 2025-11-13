@@ -60,12 +60,12 @@ public static class Intersect {
         .Map(outputs => outputs.Count == 0
             ? IntersectionOutput.Empty
             : new IntersectionOutput(
-                [.. outputs.SelectMany(output => output.Points)],
-                [.. outputs.SelectMany(output => output.Curves)],
-                [.. outputs.SelectMany(output => output.ParametersA)],
-                [.. outputs.SelectMany(output => output.ParametersB)],
-                [.. outputs.SelectMany(output => output.FaceIndices)],
-                [.. outputs.SelectMany(output => output.Sections)]));
+                [.. outputs.SelectMany(static output => output.Points)],
+                [.. outputs.SelectMany(static output => output.Curves)],
+                [.. outputs.SelectMany(static output => output.ParametersA)],
+                [.. outputs.SelectMany(static output => output.ParametersB)],
+                [.. outputs.SelectMany(static output => output.FaceIndices)],
+                [.. outputs.SelectMany(static output => output.Sections)]));
     }
 
     /// <summary>Classifies intersection type (tangent/transverse/unknown) via approach angle analysis.</summary>
