@@ -112,7 +112,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && RhinoMath.IsValidDouble(s.Length) && s.Length > RhinoMath.ZeroTolerance && RhinoMath.IsValidDouble(t.Length) && t.Length > RhinoMath.ZeroTolerance =>
+                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
                         ((Func<Result<Transform>>)(() => {
                             Vector3d su = new(s);
                             Vector3d tu = new(t);
