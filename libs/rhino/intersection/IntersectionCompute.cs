@@ -178,7 +178,7 @@ internal static class IntersectionCompute {
                                     Vector3d[] directions = [.. Enumerable.Range(0, phiSteps)
                                         .SelectMany(phiIndex => Enumerable.Range(0, thetaSteps)
                                             .Select(thetaIndex => {
-                                                (double phi, double theta) = ((RhinoMath.HalfPI * 2.0 * phiIndex) / phiSteps, (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
+                                                (double phi, double theta) = ((Math.PI * phiIndex) / phiSteps, (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
                                                 return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
                                             }))
                                         .Take(IntersectionConfig.StabilitySampleCount),
