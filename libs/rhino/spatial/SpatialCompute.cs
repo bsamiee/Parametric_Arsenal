@@ -40,20 +40,16 @@ internal static class SpatialCompute {
                         ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
                             ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
-                                if (members.Length is 0) {
-                                    return (Point3d.Origin, Array.Empty<double>());
-                                }
-                                double sumX = 0.0;
-                                double sumY = 0.0;
-                                double sumZ = 0.0;
-                                for (int m = 0; m < members.Length; m++) {
-                                    sumX += pts[members[m]].X;
-                                    sumY += pts[members[m]].Y;
-                                    sumZ += pts[members[m]].Z;
-                                }
-                                Point3d centroid = new(sumX / members.Length, sumY / members.Length, sumZ / members.Length);
-                                double[] distances = [.. members.Select(i => pts[i].DistanceTo(centroid)),];
-                                return (centroid, distances);
+                                return members.Length is 0
+                                    ? (Point3d.Origin, [])
+                                    : ((Func<(Point3d, double[])>)(() => {
+                                        Point3d sum = Point3d.Origin;
+                                        for (int m = 0; m < members.Length; m++) {
+                                            sum += pts[members[m]];
+                                        }
+                                        Point3d centroid = sum / members.Length;
+                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
+                                    }))();
                             }),
                             ])
                             : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
@@ -122,8 +118,7 @@ internal static class SpatialCompute {
             double maxShift = 0.0;
             for (int i = 0; i < k; i++) {
                 Point3d newCentroid = clusters[i].Count > 0 ? clusters[i].Sum / clusters[i].Count : centroids[i];
-                double shift = centroids[i].DistanceTo(newCentroid);
-                maxShift = shift > maxShift ? shift : maxShift;
+                maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
                 centroids[i] = newCentroid;
             }
 
@@ -286,20 +281,20 @@ internal static class SpatialCompute {
             : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
                 ? ((Func<Result<Point3d[]>>)(() => {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+                    static double Cross2D(Point3d o, Point3d a, Point3d b) => ((a.X - o.X) * (b.Y - o.Y)) - ((a.Y - o.Y) * (b.X - o.X));
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
-                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= context.AbsoluteTolerance) {
+                        while (lower.Count >= 2 && Cross2D(lower[^2], lower[^1], pts[i]) <= context.AbsoluteTolerance) {
                             lower.RemoveAt(lower.Count - 1);
                         }
                         lower.Add(pts[i]);
                     }
                     List<Point3d> upper = [];
-                    Point3d[] reversed = [.. pts.AsEnumerable().Reverse(),];
-                    for (int i = 0; i < reversed.Length; i++) {
-                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (reversed[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (reversed[i].X - upper[^2].X))) <= context.AbsoluteTolerance) {
+                    for (int i = pts.Length - 1; i >= 0; i--) {
+                        while (upper.Count >= 2 && Cross2D(upper[^2], upper[^1], pts[i]) <= context.AbsoluteTolerance) {
                             upper.RemoveAt(upper.Count - 1);
                         }
-                        upper.Add(reversed[i]);
+                        upper.Add(pts[i]);
                     }
                     Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
                     return result.Length >= 3
@@ -348,9 +343,10 @@ internal static class SpatialCompute {
             HashSet<(int, int)> horizon = [];
             foreach ((int a, int b, int c) in visibleFaces) {
                 _ = faces.Remove((a, b, c));
-                _ = horizon.Contains((b, a)) ? horizon.Remove((b, a)) : horizon.Add((a, b));
-                _ = horizon.Contains((c, b)) ? horizon.Remove((c, b)) : horizon.Add((b, c));
-                _ = horizon.Contains((a, c)) ? horizon.Remove((a, c)) : horizon.Add((c, a));
+                void Toggle((int, int) edge, (int, int) reverse) => _ = horizon.Remove(reverse) || horizon.Add(edge);
+                Toggle((a, b), (b, a));
+                Toggle((b, c), (c, b));
+                Toggle((c, a), (a, c));
             }
 
             foreach ((int a, int b) in horizon) {
@@ -378,9 +374,10 @@ internal static class SpatialCompute {
                     (int, int, int)[] badTriangles = [.. triangles.Where(t => IsInCircumcircle(allPoints[t.Item1], allPoints[t.Item2], allPoints[t.Item3], points[i], context)),];
                     HashSet<(int, int)> polygon = [];
                     foreach ((int a, int b, int c) in badTriangles) {
-                        _ = polygon.Contains((b, a)) ? polygon.Remove((b, a)) : polygon.Add((a, b));
-                        _ = polygon.Contains((c, b)) ? polygon.Remove((c, b)) : polygon.Add((b, c));
-                        _ = polygon.Contains((a, c)) ? polygon.Remove((a, c)) : polygon.Add((c, a));
+                        void Toggle((int, int) edge, (int, int) reverse) => _ = polygon.Remove(reverse) || polygon.Add(edge);
+                        Toggle((a, b), (b, a));
+                        Toggle((b, c), (c, b));
+                        Toggle((c, a), (a, c));
                         _ = triangles.Remove((a, b, c));
                     }
                     foreach ((int a, int b) in polygon) {
@@ -417,12 +414,12 @@ internal static class SpatialCompute {
                     double cSq = (c.X * c.X) + (c.Y * c.Y);
                     circumcenters[ti] = new Point3d(((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / d, ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / d, a.Z);
                 }
-                return ResultFactory.Create(value: Enumerable.Range(0, points.Length).Select(i => {
-                    Point3d[] cell = [.. triangles.Select((t, ti) => (t, ti)).Where(p => p.t.Contains(i)).Select(p => circumcenters[p.ti])];
+                return ResultFactory.Create<Point3d[][]>(value: [.. Enumerable.Range(0, points.Length).Select((Func<int, Point3d[]>)(i => {
+                    Point3d[] cell = [.. Enumerable.Range(0, triangles.Length).Where(ti => triangles[ti].Contains(i)).Select(ti => circumcenters[ti])];
                     return cell.Length > 0
                         ? [.. cell.OrderBy(p => Math.Atan2(p.Y - cell.Average(c => c.Y), p.X - cell.Average(c => c.X)))]
-                        : Array.Empty<Point3d>();
-                }).ToArray());
+                        : [];
+                })),]);
             }))());
 
     private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
