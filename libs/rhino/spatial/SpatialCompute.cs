@@ -178,8 +178,11 @@ internal static class SpatialCompute {
                 int[] curNeighbors = GetNeighbors(cur);
 
                 if (curNeighbors.Length >= minPts) {
-                    foreach (int nb in curNeighbors.Where(nb => assignments[nb] == -1)) {
-                        queue.Enqueue(nb);
+                    for (int ni = 0; ni < curNeighbors.Length; ni++) {
+                        int nb = curNeighbors[ni];
+                        if (assignments[nb] == -1) {
+                            queue.Enqueue(nb);
+                        }
                     }
                 }
 
@@ -195,8 +198,30 @@ internal static class SpatialCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[] HierarchicalAssign(Point3d[] pts, int k) =>
-        Enumerable.Range(0, pts.Length - k).Aggregate(Enumerable.Range(0, pts.Length).ToArray(), (a, _) => Enumerable.Range(0, pts.Length).SelectMany(i => Enumerable.Range(i + 1, pts.Length - i - 1).Where(j => a[i] != a[j]).Select(j => (Cluster1: a[i], Cluster2: a[j], Distance: pts[i].DistanceTo(pts[j])))).OrderBy(t => t.Distance).First() is (int c1, int c2, double) ? [.. Enumerable.Range(0, a.Length).Select(i => a[i] == c2 ? c1 : a[i] > c2 ? a[i] - 1 : a[i])] : a);
+    internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
+        int[] assignments = [.. Enumerable.Range(0, pts.Length),];
+        int targetClusters = pts.Length - k;
+
+        for (int iteration = 0; iteration < targetClusters; iteration++) {
+            (int c1, int c2, double minDist) = (0, 0, double.MaxValue);
+
+            for (int i = 0; i < pts.Length; i++) {
+                for (int j = i + 1; j < pts.Length; j++) {
+                    if (assignments[i] == assignments[j]) {
+                        continue;
+                    }
+                    double dist = pts[i].DistanceTo(pts[j]);
+                    (c1, c2, minDist) = dist < minDist ? (assignments[i], assignments[j], dist) : (c1, c2, minDist);
+                }
+            }
+
+            for (int i = 0; i < assignments.Length; i++) {
+                assignments[i] = assignments[i] == c2 ? c1 : assignments[i] > c2 ? assignments[i] - 1 : assignments[i];
+            }
+        }
+
+        return assignments;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
@@ -415,13 +440,24 @@ internal static class SpatialCompute {
                     double cSq = (c.X * c.X) + (c.Y * c.Y);
                     circumcenters[ti] = new Point3d(((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / d, ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / d, a.Z);
                 }
-                return ResultFactory.Create<Point3d[][]>(value: [.. Enumerable.Range(0, points.Length).Select((Func<int, Point3d[]>)(i => {
-                    Point3d[] cell = [.. Enumerable.Range(0, triangles.Length).Where(ti => triangles[ti].Contains(i)).Select(ti => circumcenters[ti])];
-                    return cell.Length > 0
-                        ? [.. cell.OrderBy(p => Math.Atan2(p.Y - cell.Average(c => c.Y), p.X - cell.Average(c => c.X)))]
+                Point3d[][] cells = new Point3d[points.Length][];
+                for (int i = 0; i < points.Length; i++) {
+                    List<Point3d> cell = [];
+                    for (int ti = 0; ti < triangles.Length; ti++) {
+                        if (triangles[ti].Contains(i)) {
+                            cell.Add(circumcenters[ti]);
+                        }
+                    }
+
+                    cells[i] = cell.Count > 0
+                        ? ((Func<Point3d[]>)(() => {
+                            double centerX = cell.Average(c => c.X);
+                            double centerY = cell.Average(c => c.Y);
+                            return [.. cell.OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX)),];
+                        }))()
                         : [];
-                })),
-                ]);
+                }
+                return ResultFactory.Create<Point3d[][]>(value: cells);
             }))());
 
     private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
