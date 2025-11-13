@@ -60,7 +60,7 @@ internal static class TopologyConfig {
     internal const byte StrategyComponentJoin = 5;
 
     /// <summary>Maximum number of healing strategies (6 total: Conservative, Moderate, Aggressive, Combined, Targeted, Component).</summary>
-    internal const int MaxHealingStrategies = 4;
+    internal const int MaxHealingStrategies = 6;
 
     /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
     internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];
