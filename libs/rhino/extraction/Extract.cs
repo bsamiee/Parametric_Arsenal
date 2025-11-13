@@ -72,19 +72,19 @@ public static class Extract {
     public static Result<IReadOnlyList<Point3d>> Points<T>(T input, object spec, IGeometryContext context) where T : GeometryBase {
         Type geometryType = input.GetType();
 
-        Result<Request> requestResult = (spec, context.AbsoluteTolerance) switch {
-            (int count, _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            (int count, double tolerance) => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
-            ((int count, bool include), _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            ((int count, bool include), double tolerance) => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
-            (double length, _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
-            (double length, double tolerance) => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
-            ((double length, bool include), _) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
-            ((double length, bool include), double tolerance) => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
-            (Vector3d direction, double tolerance) when direction.Length <= tolerance => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection),
-            (Vector3d direction, double tolerance) => ResultFactory.Create(value: new Request(kind: 12, parameter: direction, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(12, geometryType))),
-            (Continuity continuity, double tolerance) => ResultFactory.Create(value: new Request(kind: 13, parameter: continuity, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(13, geometryType))),
-            (Semantic semantic, double tolerance) => ResultFactory.Create(value: new Request(kind: semantic.Kind, parameter: null, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(semantic.Kind, geometryType))),
+        Result<Request> requestResult = spec switch {
+            int count when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            int count => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
+            (int count, bool include) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            (int count, bool include) => ResultFactory.Create(value: new Request(kind: 10, parameter: count, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(10, geometryType))),
+            double length when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
+            double length => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
+            (double length, bool include) when length <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidLength),
+            (double length, bool include) => ResultFactory.Create(value: new Request(kind: 11, parameter: length, includeEnds: include, validationMode: ExtractionConfig.GetValidationMode(11, geometryType))),
+            Vector3d direction when direction.Length <= context.AbsoluteTolerance => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection),
+            Vector3d direction => ResultFactory.Create(value: new Request(kind: 12, parameter: direction, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(12, geometryType))),
+            Continuity continuity => ResultFactory.Create(value: new Request(kind: 13, parameter: continuity, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(13, geometryType))),
+            Semantic semantic => ResultFactory.Create(value: new Request(kind: semantic.Kind, parameter: null, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(semantic.Kind, geometryType))),
             _ => ResultFactory.Create<Request>(error: E.Geometry.InvalidExtraction),
         };
 
@@ -108,20 +108,20 @@ public static class Extract {
     public static Result<IReadOnlyList<Curve>> Curves<T>(T input, object spec, IGeometryContext context) where T : GeometryBase {
         Type geometryType = input.GetType();
 
-        Result<Request> requestResult = (spec, context.AbsoluteTolerance) switch {
-            (int count, _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            (int count, _) => ResultFactory.Create(value: new Request(kind: 30, parameter: count, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: 30, geometryType))),
-            ((int count, byte direction), _) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
-            ((int count, byte direction), _) when direction > 2 => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection.WithContext("Direction must be 0(U), 1(V), or 2(Both)")),
-            ((int count, byte direction), _) => ResultFactory.Create(value: new Request(kind: 31, parameter: (count, direction), includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: 31, geometryType))),
-            (double[] parameters, _) when parameters.Length == 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidParameters.WithContext("Parameters array is empty")),
-            (double[] parameters, _) => ResultFactory.Create(value: new Request(kind: 32, parameter: parameters, includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 32, geometryType))),
-            ((double[] parameters, byte direction), _) when parameters.Length == 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidParameters.WithContext("Parameters array is empty")),
-            ((double[] parameters, byte direction), _) when direction > 2 => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection.WithContext("Direction must be 0(U), 1(V), or 2(Both)")),
-            ((double[] parameters, byte direction), _) => ResultFactory.Create(value: new Request(kind: 33, parameter: (parameters, direction), includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 33, geometryType))),
-            (double angleThreshold, _) when angleThreshold <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidAngle.WithContext("Angle threshold must be positive")),
-            (double angleThreshold, _) => ResultFactory.Create(value: new Request(kind: 34, parameter: angleThreshold, includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 34, geometryType))),
-            (Semantic semantic, _) => ResultFactory.Create(value: new Request(kind: semantic.Kind, parameter: null, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: semantic.Kind, geometryType))),
+        Result<Request> requestResult = spec switch {
+            int count when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            int count => ResultFactory.Create(value: new Request(kind: 30, parameter: count, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: 30, geometryType))),
+            (int count, byte direction) when count <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidCount),
+            (int count, byte direction) when direction > 2 => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection.WithContext("Direction must be 0(U), 1(V), or 2(Both)")),
+            (int count, byte direction) => ResultFactory.Create(value: new Request(kind: 31, parameter: (count, direction), includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: 31, geometryType))),
+            double[] parameters when parameters.Length == 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidParameters.WithContext("Parameters array is empty")),
+            double[] parameters => ResultFactory.Create(value: new Request(kind: 32, parameter: parameters, includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 32, geometryType))),
+            (double[] parameters, byte direction) when parameters.Length == 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidParameters.WithContext("Parameters array is empty")),
+            (double[] parameters, byte direction) when direction > 2 => ResultFactory.Create<Request>(error: E.Geometry.InvalidDirection.WithContext("Direction must be 0(U), 1(V), or 2(Both)")),
+            (double[] parameters, byte direction) => ResultFactory.Create(value: new Request(kind: 33, parameter: (parameters, direction), includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 33, geometryType))),
+            double angleThreshold when angleThreshold <= 0 => ResultFactory.Create<Request>(error: E.Geometry.InvalidAngle.WithContext("Angle threshold must be positive")),
+            double angleThreshold => ResultFactory.Create(value: new Request(kind: 34, parameter: angleThreshold, includeEnds: false, validationMode: ExtractionConfig.GetValidationMode(kind: 34, geometryType))),
+            Semantic semantic => ResultFactory.Create(value: new Request(kind: semantic.Kind, parameter: null, includeEnds: true, validationMode: ExtractionConfig.GetValidationMode(kind: semantic.Kind, geometryType))),
             _ => ResultFactory.Create<Request>(error: E.Geometry.InvalidExtraction.WithContext("Unsupported curve extraction specification")),
         };
 
