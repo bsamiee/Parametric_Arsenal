@@ -27,13 +27,15 @@ internal static class AnalysisCompute {
                 ];
                 Interval uDomain = validSurface.Domain(0);
                 Interval vDomain = validSurface.Domain(1);
-                double uSpan = Math.Abs(uDomain.Length);
-                double vSpan = Math.Abs(vDomain.Length);
-                double singularityThresholdU = Math.Min(
-                    Math.Max(uSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
+                double uSpan = uDomain.Length;
+                double vSpan = vDomain.Length;
+                double singularityThresholdU = RhinoMath.Clamp(
+                    uSpan * AnalysisConfig.SingularityProximityFactor,
+                    RhinoMath.SqrtEpsilon,
                     uSpan * AnalysisConfig.SingularityBoundaryFraction);
-                double singularityThresholdV = Math.Min(
-                    Math.Max(vSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
+                double singularityThresholdV = RhinoMath.Clamp(
+                    vSpan * AnalysisConfig.SingularityProximityFactor,
+                    RhinoMath.SqrtEpsilon,
                     vSpan * AnalysisConfig.SingularityBoundaryFraction);
                 return curvatures.Length > 0
                     && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
@@ -47,7 +49,7 @@ internal static class AnalysisCompute {
                             validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
                             || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
                             || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV).ToArray(),
-                        UniformityScore: Math.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
+                        UniformityScore: RhinoMath.Clamp(medianGaussian > context.AbsoluteTolerance ? (1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             });
 
@@ -66,7 +68,7 @@ internal static class AnalysisCompute {
                     && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
                     && validCurve.GetLength() is double curveLength
                     ? ResultFactory.Create(value: (
-                        SmoothnessScore: Math.Clamp(1.0 / (1.0 + (avgDiff * AnalysisConfig.SmoothnessSensitivity)), 0.0, 1.0),
+                        SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * AnalysisConfig.SmoothnessSensitivity)), 0.0, 1.0),
                         CurvatureSamples: curvatures,
                         InflectionPoints: Enumerable.Range(1, curvatures.Length - 2)
                             .Where(i => Math.Abs((curvatures[i] - curvatures[i - 1]) - (curvatures[i + 1] - curvatures[i])) > AnalysisConfig.InflectionSharpnessThreshold || ((curvatures[i] - curvatures[i - 1]) * (curvatures[i + 1] - curvatures[i])) < 0)
@@ -102,14 +104,13 @@ internal static class AnalysisCompute {
 
                         int vertCount = isQuad ? 4 : 3;
 
-                        for (int j = 0; j < vertCount; j++) {
-                            edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
-                        }
                         double minEdge = double.MaxValue;
                         double maxEdge = double.MinValue;
                         for (int j = 0; j < vertCount; j++) {
-                            minEdge = Math.Min(minEdge, edgeLengths[j]);
-                            maxEdge = Math.Max(maxEdge, edgeLengths[j]);
+                            double length = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
+                            edgeLengths[j] = length;
+                            minEdge = length < minEdge ? length : minEdge;
+                            maxEdge = length > maxEdge ? length : maxEdge;
                         }
                         double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
 

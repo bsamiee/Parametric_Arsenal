@@ -351,31 +351,16 @@ internal static class ExtractionCompute {
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
         Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
-        double[] distances = new double[centers.Length];
-
-        for (int i = 0; i < centers.Length; i++) {
-            distances[i] = centroid.DistanceTo(centers[i]);
-        }
-
-        double meanDistance = distances.Average();
-        bool allDistancesEqual = meanDistance > context.AbsoluteTolerance
-            && distances.All(d => Math.Abs(d - meanDistance) / meanDistance < ExtractionConfig.RadialDistanceVariationThreshold);
-
-        return !allDistancesEqual
-            ? ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected)
-            : ComputeRadialPattern(centers: centers, centroid: centroid, _: meanDistance, __: context);
-    }
-
-    private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> ComputeRadialPattern(
-        Point3d[] centers,
-        Point3d centroid,
-        double _,
-        IGeometryContext __) =>
-        (centers.Select(c => c - centroid).ToArray(), ComputeBestFitPlaneNormal(points: centers, centroid: centroid)) is (Vector3d[] radii, Vector3d normal)
+        double meanDistance = centers.Average(c => centroid.DistanceTo(c));
+        return meanDistance > context.AbsoluteTolerance
+            && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
+            && (centers.Select(c => c - centroid).ToArray(), ComputeBestFitPlaneNormal(points: centers, centroid: centroid)) is (Vector3d[] radii, Vector3d normal)
             && Enumerable.Range(0, radii.Length - 1).Select(i => Vector3d.VectorAngle(radii[i], radii[i + 1])).ToArray() is double[] angles
-            && angles.Average() is double meanAngle && angles.All(a => Math.Abs(a - meanAngle) < ExtractionConfig.RadialAngleVariationThreshold)
+            && angles.Average() is double meanAngle
+            && angles.All(a => RhinoMath.EpsilonEquals(a, meanAngle, ExtractionConfig.RadialAngleVariationThreshold))
                 ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeRadial, SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid), Confidence: 0.9))
                 : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
+    }
 
     [Pure]
     private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) =>

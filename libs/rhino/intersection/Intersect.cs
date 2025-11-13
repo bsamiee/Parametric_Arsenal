@@ -10,7 +10,7 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Polymorphic intersection with automatic type-based dispatch.</summary>
 public static class Intersect {
-    /// <summary>Intersection options: tolerance, projection, output format.</summary>
+    /// <summary>Intersection operation options controlling tolerance, projection, and output formatting.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionOptions(
         double? Tolerance = null,
@@ -19,7 +19,7 @@ public static class Intersect {
         bool WithIndices = false,
         bool Sorted = false);
 
-    /// <summary>Intersection result: points, curves, parameters, indices.</summary>
+    /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionOutput(
         IReadOnlyList<Point3d> Points,
@@ -28,10 +28,10 @@ public static class Intersect {
         IReadOnlyList<double> ParametersB,
         IReadOnlyList<int> FaceIndices,
         IReadOnlyList<Polyline> Sections) {
-        /// <summary>Empty result with zero-length collections.</summary>
+        /// <summary>Empty result with zero-length collections for non-intersecting geometries.</summary>
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
     }
-    /// <summary>Type-detected intersection with validation and collection handling.</summary>
+    /// <summary>Executes type-detected intersection with automatic validation and collection aggregation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IntersectionOutput> Execute<T1, T2>(
         T1 geometryA,
@@ -68,7 +68,7 @@ public static class Intersect {
                 [.. outputs.SelectMany(output => output.Sections)]));
     }
 
-    /// <summary>Classify intersection: 0=tangent, 1=transverse, 2=unknown with approach angles.</summary>
+    /// <summary>Classifies intersection type (tangent/transverse/unknown) via approach angle analysis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> ClassifyIntersection(
         IntersectionOutput output,
@@ -77,7 +77,7 @@ public static class Intersect {
         IGeometryContext context) =>
         IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB, context: context);
 
-    /// <summary>Find near-misses within tolerance band: (pointsA[], pointsB[], distances[]).</summary>
+    /// <summary>Finds near-miss locations within tolerance band via closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] LocationsA, Point3d[] LocationsB, double[] Distances)> FindNearMisses(
         GeometryBase geometryA,
@@ -86,7 +86,7 @@ public static class Intersect {
         IGeometryContext context) =>
         IntersectionCompute.FindNearMisses(geomA: geometryA, geomB: geometryB, searchRadius: searchRadius, context: context);
 
-    /// <summary>Analyze stability via perturbation: (score, sensitivity, unstable flags[]).</summary>
+    /// <summary>Analyzes intersection stability via spherical perturbation sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double StabilityScore, double PerturbationSensitivity, bool[] UnstableFlags)> AnalyzeStability(
         IntersectionOutput baseIntersection,

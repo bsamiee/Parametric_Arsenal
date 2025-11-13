@@ -74,15 +74,8 @@ internal static class IntersectionCompute {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        static (Point3d[], Point3d[], double[]) toArrays((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
-            Point3d[] pointsA = new Point3d[pairs.Length];
-            Point3d[] pointsB = new Point3d[pairs.Length];
-            double[] distances = new double[pairs.Length];
-            for (int i = 0; i < pairs.Length; i++) {
-                (pointsA[i], pointsB[i], distances[i]) = pairs[i];
-            }
-            return (pointsA, pointsB, distances);
-        }
+        static (Point3d[], Point3d[], double[]) toArrays((Point3d PointA, Point3d PointB, double Distance)[] pairs) =>
+            ([.. pairs.Select(p => p.PointA)], [.. pairs.Select(p => p.PointB)], [.. pairs.Select(p => p.Distance)]);
 
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
@@ -106,14 +99,14 @@ internal static class IntersectionCompute {
                                         (Curve curveA, Curve curveB) => Math.Max(3, (int)Math.Ceiling(curveA.GetLength() / searchRadius)) is int samples
                                             ? Enumerable.Range(0, samples)
                                                 .Select(index => curveA.PointAt(curveA.Domain.ParameterAt(index / (double)(samples - 1))))
-                                                .Select(point => curveB.ClosestPoint(point, out double parameter)
-                                                    ? (PointA: point, PointB: curveB.PointAt(parameter), Distance: point.DistanceTo(curveB.PointAt(parameter)))
+                                                .Select(point => curveB.ClosestPoint(point, out double parameter) && curveB.PointAt(parameter) is Point3d closestB
+                                                    ? (PointA: point, PointB: closestB, Distance: point.DistanceTo(closestB))
                                                     : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
                                                 .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .Concat(Enumerable.Range(0, samples)
                                                     .Select(index => curveB.PointAt(curveB.Domain.ParameterAt(index / (double)(samples - 1))))
-                                                    .Select(point => curveA.ClosestPoint(point, out double parameter)
-                                                        ? (PointA: curveA.PointAt(parameter), PointB: point, Distance: curveA.PointAt(parameter).DistanceTo(point))
+                                                    .Select(point => curveA.ClosestPoint(point, out double parameter) && curveA.PointAt(parameter) is Point3d closestA
+                                                        ? (PointA: closestA, PointB: point, Distance: closestA.DistanceTo(point))
                                                         : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
                                                     .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance))
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
