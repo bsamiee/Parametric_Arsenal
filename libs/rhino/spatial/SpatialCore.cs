@@ -74,7 +74,7 @@ internal static class SpatialCore {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
         int count = 0;
         try {
-            void Collect(object? sender, RTreeEventArgs args) { if (count < buffer.Length) { buffer[count++] = args.Id; } }
+            void Collect(object? sender, RTreeEventArgs args) => count = count >= buffer.Length ? count : (buffer[count] = args.Id) is var _ ? count + 1 : count;
             _ = queryShape switch {
                 Sphere sphere => tree.Search(sphere, Collect),
                 BoundingBox box => tree.Search(box, Collect),
