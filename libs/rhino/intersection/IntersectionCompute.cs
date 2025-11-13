@@ -31,9 +31,9 @@ internal static class IntersectionCompute {
 
         static Result<(byte, double[], bool, double)> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersect.IntersectionOutput output, int count, double[] parameters) =>
             Enumerable.Range(0, count)
-                .Select(index => (curve.TangentAt(parameters[index]), output.Points[index]))
-                .Select(tuple => tuple.Item1.IsValid && surface.ClosestPoint(tuple.Item2, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
-                    ? Vector3d.VectorAngle(tuple.Item1, normal)
+                .Select(index => (Tangent: curve.TangentAt(parameters[index]), Point: output.Points[index]))
+                .Select(tuple => tuple.Tangent.IsValid && surface.ClosestPoint(tuple.Point, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
+                    ? Vector3d.VectorAngle(tuple.Tangent, normal)
                     : double.NaN)
                 .Where(angle => !double.IsNaN(angle))
                 .ToArray() is double[] angles && angles.Length > 0
@@ -199,8 +199,8 @@ internal static class IntersectionCompute {
                                                 Score: 1.0 / (1.0 + filtered.Average()),
                                                 Sensitivity: filtered.Max() / count,
                                                 UnstableFlags: [.. Enumerable.Range(0, count).Select(index => {
-                                                    int start = (int)Math.Round(index * filtered.Length / (double)count);
-                                                    int end = (int)Math.Round((index + 1) * filtered.Length / (double)count);
+                                                    int start = (int)Math.Round((double)index * filtered.Length / count);
+                                                    int end = (int)Math.Round((double)(index + 1) * filtered.Length / count);
                                                     return filtered.Skip(start).Take(end - start).Any(delta => delta > 1.0);
                                                 }),
                                                 ]))
