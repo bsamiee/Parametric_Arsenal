@@ -255,7 +255,7 @@ internal static class ExtractionCompute {
                 ? (true, ExtractionConfig.PrimitiveTypeCylinder, frame, [1.0 / meanMean, surface.GetBoundingBox(accurate: false).Diagonal.Length,])
                 : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
             (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
-                ? (true, ExtractionConfig.PrimitiveTypeSphere, frame, [1.0 / Math.Sqrt(Math.Abs(gaussianMean)),])
+                ? (true, ExtractionConfig.PrimitiveTypeSphere, frame, [1.0 / Math.Sqrt(gaussianMean),])
                 : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
             _ => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
         };
