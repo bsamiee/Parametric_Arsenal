@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -207,7 +208,7 @@ internal static class SpatialCompute {
                 (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: Math.Max(tolerance, context.AbsoluteTolerance), preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: Math.Max(tolerance, context.AbsoluteTolerance)) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<(Curve[], double[])>>)(() => {
                     double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
-                    int sampleCount = (int)Math.Max(SpatialConfig.MedialAxisMinSampleCount, Math.Min(SpatialConfig.MedialAxisMaxSampleCount, length / effectiveTolerance));
+                    int sampleCount = (int)RhinoMath.Clamp(length / effectiveTolerance, SpatialConfig.MedialAxisMinSampleCount, SpatialConfig.MedialAxisMaxSampleCount);
                     Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
                     Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
                     Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
