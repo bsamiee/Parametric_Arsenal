@@ -8,9 +8,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Topology diagnosis, healing, feature extraction algorithms.</summary>
+/// <summary>Topology diagnosis, progressive healing, and topological feature extraction.</summary>
+[Pure]
 internal static class TopologyCompute {
-    [Pure]
     internal static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> Diagnose(
         Brep brep,
         IGeometryContext context) =>
@@ -63,7 +63,6 @@ internal static class TopologyCompute {
                     return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
                 }))());
 
-    [Pure]
     internal static Result<(Brep Healed, byte Strategy, bool Success)> Heal(
         Brep brep,
         byte maxStrategy,
@@ -133,7 +132,6 @@ internal static class TopologyCompute {
                         : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed"));
                 }))());
 
-    [Pure]
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(
         Brep brep,
         IGeometryContext context) =>

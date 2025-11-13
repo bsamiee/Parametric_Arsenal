@@ -1,14 +1,13 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
 
-/// <summary>Operation types and validation dispatch for topology.</summary>
+/// <summary>Operation types, validation dispatch, and healing configuration for topology.</summary>
+[Pure]
 internal static class TopologyConfig {
-    /// <summary>Topology operation types for dispatch lookup.</summary>
-    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
-
     /// <summary>Operation metadata: (Type, OpType) to (ValidationMode, Name) mapping.</summary>
     internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), (V ValidationMode, string OpName)> OperationMeta =
         new Dictionary<(Type, OpType), (V, string)> {
@@ -29,39 +28,26 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>G2 curvature threshold ratio: 10% of angle tolerance.</summary>
-    internal const double CurvatureThresholdRatio = 0.1;
-
-    /// <summary>Near-miss proximity multiplier: 100× tolerance.</summary>
-    internal const double NearMissMultiplier = 100.0;
-
-    /// <summary>Maximum edge count for O(n²) near-miss detection. Above this, skip near-miss analysis for performance.</summary>
-    internal const int MaxEdgesForNearMissAnalysis = 100;
-
-    /// <summary>Minimum loop length for hole detection.</summary>
-    internal const double MinLoopLength = 1e-6;
-
-    /// <summary>Healing strategy: Conservative Repair with 0.1× tolerance.</summary>
-    internal const byte StrategyConservativeRepair = 0;
-
-    /// <summary>Healing strategy: Moderate JoinNakedEdges with 1.0× tolerance.</summary>
-    internal const byte StrategyModerateJoin = 1;
-
-    /// <summary>Healing strategy: Aggressive JoinNakedEdges with 10.0× tolerance.</summary>
-    internal const byte StrategyAggressiveJoin = 2;
-
-    /// <summary>Healing strategy: Combined Repair + JoinNakedEdges.</summary>
-    internal const byte StrategyCombined = 3;
-
-    /// <summary>Healing strategy: Targeted JoinEdges for near-miss edge pairs.</summary>
-    internal const byte StrategyTargetedJoin = 4;
-
-    /// <summary>Healing strategy: JoinBreps for disconnected components.</summary>
-    internal const byte StrategyComponentJoin = 5;
-
-    /// <summary>Maximum number of healing strategies (6 total: Conservative, Moderate, Aggressive, Combined, Targeted, Component).</summary>
-    internal const int MaxHealingStrategies = 6;
-
     /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
     internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];
+
+    /// <summary>Topology operation types for dispatch lookup.</summary>
+    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
+
+    /// <summary>Edge analysis thresholds for continuity classification.</summary>
+    internal const double CurvatureThresholdRatio = 0.1;
+    internal const double MinLoopLength = 1e-6;
+
+    /// <summary>Diagnostic thresholds for topology problem detection.</summary>
+    internal const double NearMissMultiplier = 100.0;
+    internal const int MaxEdgesForNearMissAnalysis = 100;
+
+    /// <summary>Healing strategy identifiers for progressive topology repair.</summary>
+    internal const byte StrategyConservativeRepair = 0;
+    internal const byte StrategyModerateJoin = 1;
+    internal const byte StrategyAggressiveJoin = 2;
+    internal const byte StrategyCombined = 3;
+    internal const byte StrategyTargetedJoin = 4;
+    internal const byte StrategyComponentJoin = 5;
+    internal const int MaxHealingStrategies = 6;
 }

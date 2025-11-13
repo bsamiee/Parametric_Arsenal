@@ -17,24 +17,24 @@ public static class Topology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface pattern for polymorphic result dispatch")]
     public interface IResult;
 
-    /// <summary>Edge continuity classification for geometric analysis.</summary>
+    /// <summary>Edge continuity classification: G0/G1/G2, interior, boundary, non-manifold.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct EdgeContinuityType(byte Value) {
-        /// <summary>G0 sharp edge below continuity threshold.</summary>
+        /// <summary>G0 sharp edge with discontinuous tangent.</summary>
         public static readonly EdgeContinuityType Sharp = new(0);
-        /// <summary>G1 smooth tangent continuity.</summary>
+        /// <summary>G1 smooth edge with continuous tangent.</summary>
         public static readonly EdgeContinuityType Smooth = new(1);
-        /// <summary>G2 curvature continuity.</summary>
+        /// <summary>G2 edge with continuous curvature.</summary>
         public static readonly EdgeContinuityType Curvature = new(2);
-        /// <summary>Interior manifold edge valence 2.</summary>
+        /// <summary>Interior manifold edge with valence 2.</summary>
         public static readonly EdgeContinuityType Interior = new(3);
-        /// <summary>Boundary naked edge valence 1.</summary>
+        /// <summary>Boundary naked edge with valence 1.</summary>
         public static readonly EdgeContinuityType Boundary = new(4);
-        /// <summary>Non-manifold edge valence &gt; 2.</summary>
+        /// <summary>Non-manifold edge with valence greater than 2.</summary>
         public static readonly EdgeContinuityType NonManifold = new(5);
     }
 
-    /// <summary>Naked edge data: curves, indices, valences.</summary>
+    /// <summary>Naked edge analysis: boundary curves, indices, valences, and metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NakedEdgeData(
         IReadOnlyList<Curve> EdgeCurves,
@@ -49,7 +49,7 @@ public static class Topology {
             $"NakedEdges: {this.EdgeCurves.Count}/{this.TotalEdgeCount} | L={this.TotalLength:F3} | Ordered={this.IsOrdered}");
     }
 
-    /// <summary>Boundary loops: joined edges, closure, diagnostics.</summary>
+    /// <summary>Boundary loops from joined naked edges with closure and join diagnostics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BoundaryLoopData(
         IReadOnlyList<Curve> Loops,
@@ -64,7 +64,7 @@ public static class Topology {
             $"BoundaryLoops: {this.Loops.Count} | FailedJoins={this.FailedJoins} | Tol={this.JoinTolerance:E2}");
     }
 
-    /// <summary>Non-manifold vertices/edges: valences, locations.</summary>
+    /// <summary>Non-manifold detection with edge/vertex indices, valences, and locations.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NonManifoldData(
         IReadOnlyList<int> EdgeIndices,
@@ -82,7 +82,7 @@ public static class Topology {
                 $"NonManifold: Edges={this.EdgeIndices.Count} | Verts={this.VertexIndices.Count} | MaxVal={this.MaxValence}");
     }
 
-    /// <summary>Connected components: adjacency graph, bounding boxes.</summary>
+    /// <summary>Connected components via BFS with adjacency graph and bounds.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ConnectivityData(
         IReadOnlyList<IReadOnlyList<int>> ComponentIndices,
@@ -99,7 +99,7 @@ public static class Topology {
                 $"Connectivity: {this.TotalComponents} components | Largest={this.ComponentSizes.Max()}");
     }
 
-    /// <summary>Edge classification: G0/G1/G2 types, geometric measures.</summary>
+    /// <summary>Edge continuity classification with measures grouped by type.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record EdgeClassificationData(
         IReadOnlyList<int> EdgeIndices,
@@ -113,7 +113,7 @@ public static class Topology {
             $"EdgeClassification: Total={this.EdgeIndices.Count} | Sharp={this.GroupedByType.GetValueOrDefault(EdgeContinuityType.Sharp, []).Count}");
     }
 
-    /// <summary>Edge adjacency: face normals, dihedral angles, manifold state.</summary>
+    /// <summary>Edge-face adjacency with normals, dihedral angle, and manifold status.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record AdjacencyData(
         int EdgeIndex,
@@ -132,7 +132,7 @@ public static class Topology {
                 : string.Create(CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: NonManifold (valence={this.AdjacentFaceIndices.Count})");
     }
 
-    /// <summary>Vertex data: connected edges/faces, valence, manifold status.</summary>
+    /// <summary>Vertex topology with connected edges/faces, valence, and manifold status.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record VertexData(
         int VertexIndex,
@@ -148,7 +148,7 @@ public static class Topology {
             $"Vertex[{this.VertexIndex}]: Valence={this.Valence} | {(this.IsBoundary ? "Boundary" : "Interior")} | {(this.IsManifold ? "Manifold" : "NonManifold")}");
     }
 
-    /// <summary>Ngon topology: membership, boundaries, centroids.</summary>
+    /// <summary>Ngon analysis: face membership, boundary edges, and centroids.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NgonTopologyData(
         IReadOnlyList<int> NgonIndices,
@@ -166,7 +166,7 @@ public static class Topology {
                 $"NgonTopology: {this.TotalNgons} ngons | {this.TotalFaces} faces | AvgValence={this.EdgeCountPerNgon.Average():F1}");
     }
 
-    /// <summary>Naked boundary edges via polymorphic dispatch.</summary>
+    /// <summary>Extract naked boundary edges with optional loop ordering.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NakedEdgeData> GetNakedEdges<T>(
         T geometry,
@@ -174,7 +174,7 @@ public static class Topology {
         bool orderLoops = false) where T : notnull =>
         TopologyCore.ExecuteNakedEdges(input: geometry, context: context, orderLoops: orderLoops);
 
-    /// <summary>Closed boundary loops from naked edges.</summary>
+    /// <summary>Join naked edges into closed boundary loops with tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<BoundaryLoopData> GetBoundaryLoops<T>(
         T geometry,
@@ -182,21 +182,21 @@ public static class Topology {
         double? tolerance = null) where T : notnull =>
         TopologyCore.ExecuteBoundaryLoops(input: geometry, context: context, tolerance: tolerance);
 
-    /// <summary>Non-manifold vertex and edge detection.</summary>
+    /// <summary>Detect non-manifold vertices and edges with valences.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NonManifoldData> GetNonManifoldData<T>(
         T geometry,
         IGeometryContext context) where T : notnull =>
         TopologyCore.ExecuteNonManifold(input: geometry, context: context);
 
-    /// <summary>Connected components and adjacency graph.</summary>
+    /// <summary>Compute connected components via BFS with adjacency graph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<ConnectivityData> GetConnectivity<T>(
         T geometry,
         IGeometryContext context) where T : notnull =>
         TopologyCore.ExecuteConnectivity(input: geometry, context: context);
 
-    /// <summary>Edge classification by continuity type.</summary>
+    /// <summary>Classify edges by G0/G1/G2 continuity with angle threshold.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<EdgeClassificationData> ClassifyEdges<T>(
         T geometry,
@@ -205,7 +205,7 @@ public static class Topology {
         double? angleThreshold = null) where T : notnull =>
         TopologyCore.ExecuteEdgeClassification(input: geometry, context: context, minimumContinuity: minimumContinuity, angleThreshold: angleThreshold);
 
-    /// <summary>Face adjacency for specific edge.</summary>
+    /// <summary>Get adjacent faces and dihedral angle for edge index.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<AdjacencyData> GetAdjacency<T>(
         T geometry,
@@ -213,7 +213,7 @@ public static class Topology {
         int edgeIndex) where T : notnull =>
         TopologyCore.ExecuteAdjacency(input: geometry, context: context, edgeIndex: edgeIndex);
 
-    /// <summary>Vertex topology: valence, manifold status.</summary>
+    /// <summary>Get vertex topology with connected edges, faces, and valence.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<VertexData> GetVertexData<T>(
         T geometry,
@@ -221,21 +221,21 @@ public static class Topology {
         int vertexIndex) where T : notnull =>
         TopologyCore.ExecuteVertexData(input: geometry, context: context, vertexIndex: vertexIndex);
 
-    /// <summary>Ngon topology analysis for quad-dominant meshes.</summary>
+    /// <summary>Extract ngon topology with face membership and boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NgonTopologyData> GetNgonTopology<T>(
         T geometry,
         IGeometryContext context) where T : notnull =>
         TopologyCore.ExecuteNgonTopology(input: geometry, context: context);
 
-    /// <summary>Diagnose topology problems with edge gaps, near-misses, repair suggestions.</summary>
+    /// <summary>Diagnose topology with edge gaps, near-misses, and repair strategy suggestions.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> DiagnoseTopology(
         Brep brep,
         IGeometryContext context) =>
         TopologyCompute.Diagnose(brep: brep, context: context);
 
-    /// <summary>Progressive topology healing and automatic rollback.</summary>
+    /// <summary>Progressive healing with automatic rollback and strategy selection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Brep Healed, byte Strategy, bool Success)> HealTopology(
         Brep brep,
@@ -243,7 +243,7 @@ public static class Topology {
         IGeometryContext context) =>
         TopologyCompute.Heal(brep: brep, maxStrategy: maxStrategy, context: context);
 
-    /// <summary>Extract topological features: genus, holes, handles, solid classification.</summary>
+    /// <summary>Extract genus, holes, handles, and solid classification via Euler.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractTopologicalFeatures(
         Brep brep,

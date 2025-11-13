@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
@@ -7,6 +8,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Plane/centroid extraction and transformation via mass properties.</summary>
+[Pure]
 internal static class OrientCore {
     internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
         new Dictionary<Type, Func<object, Result<Plane>>> {
@@ -38,7 +40,8 @@ internal static class OrientCore {
             },
         }.ToFrozenDictionary();
 
-    /// <summary>Centroid extraction via mass properties or bbox.</summary>
+    /// <summary>Centroid extraction via mass properties or bounding box.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
         (geometry, useMassProperties) switch {
             (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
@@ -63,14 +66,15 @@ internal static class OrientCore {
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
         };
 
-    /// <summary>Best-fit plane from point cloud or mesh via PCA.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Best-fit plane from point cloud or mesh via principal component analysis.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {
             PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
                 Point3d[] points = pc.GetPoints();
+                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
                 return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? Math.Sqrt(points.Sum(p => { double d = plane.DistanceTo(p); return d * d; }) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
+                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
                         ? ResultFactory.Create(value: plane)
                         : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
                     : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
@@ -78,8 +82,9 @@ internal static class OrientCore {
             PointCloud pc => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {pc.Count}")),
             Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
                 Point3d[] points = m.Vertices.ToPoint3dArray();
+                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
                 return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? Math.Sqrt(points.Sum(p => { double d = plane.DistanceTo(p); return d * d; }) / points.Length) is double rms && rms <= OrientConfig.BestFitResidualThreshold
+                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
                         ? ResultFactory.Create(value: plane)
                         : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
                     : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);

@@ -8,10 +8,10 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Optimization, relative orientation, pattern alignment algorithms.</summary>
+/// <summary>Optimization, relative orientation, and pattern alignment algorithms.</summary>
+[Pure]
 internal static class OrientCompute {
-    /// <summary>Optimizes orientation for canonical alignment and stability using specified criteria (1=compact packing, 2=centroid alignment, 3=flatness, 4=canonical position).</summary>
-    [Pure]
+    /// <summary>Optimize orientation via criteria: 1=compact, 2=centroid, 3=flatness, 4=canonical.</summary>
     internal static Result<(Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
@@ -63,8 +63,7 @@ internal static class OrientCompute {
                         }))()
                         : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));
 
-    /// <summary>Compute relative orientation between two geometries.</summary>
-    [Pure]
+    /// <summary>Compute relative orientation with symmetry and relationship classification.</summary>
     internal static Result<(Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelative(
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -141,8 +140,7 @@ internal static class OrientCompute {
                 };
     }
 
-    /// <summary>Detect patterns in geometry array and compute alignment.</summary>
-    [Pure]
+    /// <summary>Detect linear or radial patterns with anomaly identification.</summary>
     internal static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectPattern(
         GeometryBase[] geometries,
         IGeometryContext context) =>

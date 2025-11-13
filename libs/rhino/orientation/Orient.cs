@@ -11,49 +11,49 @@ namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Polymorphic geometry orientation and canonical alignment.</summary>
 public static class Orient {
-    /// <summary>Canonical orientation mode for world plane alignments.</summary>
+    /// <summary>Canonical orientation modes for world plane alignment operations.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct Canonical(byte mode) {
         internal readonly byte Mode = mode;
-        /// <summary>Align to world XY at bounding box center.</summary>
+        /// <summary>Align bounding box center to world XY plane.</summary>
         public static readonly Canonical WorldXY = new(1);
-        /// <summary>Align to world YZ at bounding box center.</summary>
+        /// <summary>Align bounding box center to world YZ plane.</summary>
         public static readonly Canonical WorldYZ = new(2);
-        /// <summary>Align to world XZ at bounding box center.</summary>
+        /// <summary>Align bounding box center to world XZ plane.</summary>
         public static readonly Canonical WorldXZ = new(3);
-        /// <summary>Translate area centroid to origin.</summary>
+        /// <summary>Translate area centroid to world origin.</summary>
         public static readonly Canonical AreaCentroid = new(4);
-        /// <summary>Translate volume centroid to origin.</summary>
+        /// <summary>Translate volume centroid to world origin.</summary>
         public static readonly Canonical VolumeCentroid = new(5);
     }
 
-    /// <summary>Orientation target: plane, point, vector, or geometry frame.</summary>
+    /// <summary>Orientation specification for plane, point, vector, or curve/surface frame targets.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct OrientSpec {
-        /// <summary>Target plane for plane-to-plane transformation.</summary>
+        /// <summary>Target plane for plane-to-plane alignment.</summary>
         public Plane? TargetPlane { get; init; }
-        /// <summary>Target point for translation.</summary>
+        /// <summary>Target point for translation operations.</summary>
         public Point3d? TargetPoint { get; init; }
-        /// <summary>Target vector for rotation.</summary>
+        /// <summary>Target vector for rotation alignment.</summary>
         public Vector3d? TargetVector { get; init; }
-        /// <summary>Target curve for frame-based transformation.</summary>
+        /// <summary>Target curve for frame-based orientation.</summary>
         public Curve? TargetCurve { get; init; }
-        /// <summary>Target surface for frame-based transformation.</summary>
+        /// <summary>Target surface for frame-based orientation.</summary>
         public Surface? TargetSurface { get; init; }
-        /// <summary>Curve parameter for frame evaluation.</summary>
+        /// <summary>Curve parameter for frame evaluation at specific location.</summary>
         public double CurveParameter { get; init; }
-        /// <summary>Surface UV for frame evaluation.</summary>
+        /// <summary>Surface UV coordinates for frame evaluation.</summary>
         public (double u, double v) SurfaceUV { get; init; }
 
-        /// <summary>Plane-to-plane orientation.</summary>
+        /// <summary>Create plane-to-plane orientation specification.</summary>
         public static OrientSpec Plane(Plane p) => new() { TargetPlane = p };
-        /// <summary>Point-to-point orientation.</summary>
+        /// <summary>Create point-to-point translation specification.</summary>
         public static OrientSpec Point(Point3d p) => new() { TargetPoint = p };
-        /// <summary>Vector-to-vector orientation.</summary>
+        /// <summary>Create vector-to-vector rotation specification.</summary>
         public static OrientSpec Vector(Vector3d v) => new() { TargetVector = v };
-        /// <summary>Curve frame orientation.</summary>
+        /// <summary>Create curve frame orientation at parameter t.</summary>
         public static OrientSpec Curve(Curve c, double t) => new() { TargetCurve = c, CurveParameter = t };
-        /// <summary>Surface frame orientation.</summary>
+        /// <summary>Create surface frame orientation at UV coordinates.</summary>
         public static OrientSpec Surface(Surface s, double u, double v) => new() { TargetSurface = s, SurfaceUV = (u, v) };
     }
 
