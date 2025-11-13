@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -135,7 +136,7 @@ internal static class SpatialCompute {
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
 
-        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
+        // SDK RTree.CreateFromPointArray for O(log n) neighbor queries (vs O(n) linear scan) when pts.Length > 100
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
         int[] GetNeighbors(int idx) {
@@ -314,9 +315,9 @@ internal static class SpatialCompute {
 
     private static (bool Success, (int, int, int)[] Faces) ComputeInitialTetrahedron((Point3d Point, int Index)[] points, IGeometryContext context) =>
         (a: 0, b: points.Skip(1).Select((p, idx) => (Dist: points[0].Point.DistanceTo(p.Point), Idx: idx + 1)).MaxBy(x => x.Dist).Idx) is (int a, int b) &&
-        points.Where((_, i) => i >= 2).Select((p, i) => (Area: Vector3d.CrossProduct(points[b].Point - points[a].Point, p.Point - points[a].Point).Length / SpatialConfig.TriangleAreaDivisor, Idx: i + 2))
+        points.Where((_, i) => i >= 2).Select((p, i) => (Area: Vector3d.CrossProduct(points[b].Point - points[a].Point, p.Point - points[a].Point).Length / 2.0, Idx: i + 2))
             .Where(x => x.Area > context.AbsoluteTolerance).OrderByDescending(x => x.Area).FirstOrDefault() is (double, int c) && c > 1 &&
-        points.Where((_, i) => i >= 3).Select((p, i) => (Vol: Vector3d.Multiply(Vector3d.CrossProduct(points[b].Point - points[a].Point, points[c].Point - points[a].Point), p.Point - points[a].Point) / SpatialConfig.TetrahedronVolumeDivisor, Idx: i + 3))
+        points.Where((_, i) => i >= 3).Select((p, i) => (Vol: Vector3d.Multiply(Vector3d.CrossProduct(points[b].Point - points[a].Point, points[c].Point - points[a].Point), p.Point - points[a].Point) / 6.0, Idx: i + 3))
             .Where(x => Math.Abs(x.Vol) > context.AbsoluteTolerance).OrderByDescending(x => Math.Abs(x.Vol)).FirstOrDefault() is (double v, int d) && d > 2
             ? (true, v > 0 ? [(a, b, c), (a, c, d), (a, d, b), (b, d, c),] : [(a, c, b), (a, d, c), (a, b, d), (b, c, d),])
             : (false, []);
@@ -408,7 +409,7 @@ internal static class SpatialCompute {
                 Point3d[] circumcenters = new Point3d[triangles.Length];
                 for (int ti = 0; ti < triangles.Length; ti++) {
                     (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
-                    double d = SpatialConfig.CircumcenterDeterminantFactor * ((a.X * (b.Y - c.Y)) + (b.X * (c.Y - a.Y)) + (c.X * (a.Y - b.Y)));
+                    double d = 2.0 * ((a.X * (b.Y - c.Y)) + (b.X * (c.Y - a.Y)) + (c.X * (a.Y - b.Y)));
                     double aSq = (a.X * a.X) + (a.Y * a.Y);
                     double bSq = (b.X * b.X) + (b.Y * b.Y);
                     double cSq = (c.X * c.X) + (c.Y * c.Y);

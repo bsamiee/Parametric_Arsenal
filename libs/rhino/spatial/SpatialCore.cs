@@ -10,7 +10,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>RTree construction and queries with pooled buffers.</summary>
+/// <summary>SDK RTree spatial indexing with ArrayPool buffers and proximity queries.</summary>
 internal static class SpatialCore {
     private static readonly Func<object, RTree> _pointArrayFactory = s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(Point3d[]))](s);
     private static readonly Func<object, RTree> _pointCloudFactory = s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(PointCloud))](s);
@@ -51,14 +51,21 @@ internal static class SpatialCore {
                 (Point3d[] needles, double distanceLimit) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distanceLimit, kNearest: nearest, distLimited: limited),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
             }
-            : (i, q, _, b) => ExecuteRangeSearch(tree: factory(i), queryShape: q, bufferSize: b);
+            : (i, q, _, b) => {
+                using RTree tree = factory(i);
+                return ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b);
+            };
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
         (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
-            ? ExecuteOverlapSearch(tree1: _meshFactory(m1), tree2: _meshFactory(m2), tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b)
+            ? ((Func<Result<IReadOnlyList<int>>>)(() => {
+                using RTree tree1 = _meshFactory(m1);
+                using RTree tree2 = _meshFactory(m2);
+                return ExecuteOverlapSearch(tree1: tree1, tree2: tree2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b);
+            }))()
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
-    /// <summary>Builds RTree from geometry array with bounding box insertion.</summary>
+    /// <summary>Builds RTree from geometry array using SDK GetBoundingBox for accurate spatial indexing.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
@@ -68,7 +75,7 @@ internal static class SpatialCore {
         return tree;
     }
 
-    /// <summary>Range search with sphere/box query using pooled buffers.</summary>
+    /// <summary>SDK RTree.Search with custom callback and ArrayPool buffers for zero-allocation queries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
@@ -86,7 +93,7 @@ internal static class SpatialCore {
         }
     }
 
-    /// <summary>K-nearest or distance-limited proximity search.</summary>
+    /// <summary>SDK RTree.Point3dKNeighbors / RTree.PointCloudKNeighbors for k-nearest or distance-limited searches.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
         limit switch {
@@ -101,7 +108,7 @@ internal static class SpatialCore {
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 
-    /// <summary>Mesh overlap detection with tolerance-aware dual-tree search.</summary>
+    /// <summary>SDK RTree.SearchOverlaps for efficient mesh face overlap detection with tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
         int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
