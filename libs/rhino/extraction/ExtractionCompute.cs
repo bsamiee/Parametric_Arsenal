@@ -210,8 +210,8 @@ internal static class ExtractionCompute {
         int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
         SurfaceCurvature[] curvatures = [.. from int i in Enumerable.Range(0, sampleCount)
             from int j in Enumerable.Range(0, sampleCount)
-            let u = uDomain.ParameterAt(i / (double)(sampleCount - 1))
-            let v = vDomain.ParameterAt(j / (double)(sampleCount - 1))
+            let u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5)
+            let v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5)
             let curv = surface.CurvatureAt(u: u, v: v)
             where curv is not null
             select curv,
