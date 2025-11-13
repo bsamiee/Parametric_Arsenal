@@ -201,8 +201,65 @@ internal static class ExtractionCompute {
                             : surface switch {
                                 Extrusion ext when ext.IsValid && ext.PathLineCurve() is LineCurve lc =>
                                     (true, ExtractionConfig.PrimitiveTypeExtrusion, new Plane(ext.PathStart, lc.Line.Direction), [lc.Line.Length,]),
-                                _ => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+                                _ => ClassifySurfaceByCurvature(surface: surface),
                             };
+
+    [Pure]
+    private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) {
+        (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
+        int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
+        SurfaceCurvature[] curvatures = [.. from int i in Enumerable.Range(0, sampleCount)
+            from int j in Enumerable.Range(0, sampleCount)
+            let u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5)
+            let v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5)
+            let curv = surface.CurvatureAt(u: u, v: v)
+            where curv is not null
+            select curv,
+        ];
+
+        return curvatures.Length < ExtractionConfig.MinCurvatureSamples
+            ? (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, [])
+            : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures);
+    }
+
+    [Pure]
+    private static (bool Success, byte Type, Plane Frame, double[] Params) TestPrincipalCurvatureConstancy(
+        Surface surface,
+        SurfaceCurvature[] curvatures) {
+        int n = curvatures.Length;
+        double gaussianSum = 0.0, gaussianSumSq = 0.0, meanSum = 0.0, meanSumSq = 0.0;
+        for (int i = 0; i < n; i++) {
+            double g = curvatures[i].Gaussian;
+            double m = curvatures[i].Mean;
+            gaussianSum += g;
+            gaussianSumSq += g * g;
+            meanSum += m;
+            meanSumSq += m * m;
+        }
+        double gaussianMean = gaussianSum / n;
+        double meanMean = meanSum / n;
+        double gaussianVar = (gaussianSumSq / n) - (gaussianMean * gaussianMean);
+        double meanVar = (meanSumSq / n) - (meanMean * meanMean);
+        bool gaussianConstant = Math.Abs(gaussianMean) > RhinoMath.ZeroTolerance
+            ? gaussianVar / (gaussianMean * gaussianMean) < ExtractionConfig.CurvatureVariationThreshold
+            : gaussianVar < RhinoMath.SqrtEpsilon;
+        bool meanConstant = Math.Abs(meanMean) > RhinoMath.ZeroTolerance
+            ? meanVar / (meanMean * meanMean) < ExtractionConfig.CurvatureVariationThreshold
+            : meanVar < RhinoMath.SqrtEpsilon;
+
+        return (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon) switch {
+            (true, _, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypePlane, frame, [frame.OriginX, frame.OriginY, frame.OriginZ,])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            (false, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypeCylinder, frame, [1.0 / meanMean, surface.GetBoundingBox(accurate: false).Diagonal.Length,])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                ? (true, ExtractionConfig.PrimitiveTypeSphere, frame, [1.0 / Math.Sqrt(gaussianMean),])
+                : (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+            _ => (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, []),
+        };
+    }
 
     [Pure]
     private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) =>
@@ -318,22 +375,19 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
-    private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) {
-        Vector3d v1 = (points[0] - centroid);
-        v1 = v1.Length > RhinoMath.ZeroTolerance ? v1 / v1.Length : Vector3d.XAxis;
-
-        for (int i = 1; i < points.Length; i++) {
-            Vector3d v2 = (points[i] - centroid);
-            v2 = v2.Length > RhinoMath.ZeroTolerance ? v2 / v2.Length : Vector3d.YAxis;
-            Vector3d normal = Vector3d.CrossProduct(v1, v2);
-
-            if (normal.Length > RhinoMath.ZeroTolerance) {
-                return normal / normal.Length;
-            }
-        }
-
-        return Vector3d.ZAxis;
-    }
+    private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) =>
+        Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
+            ? bestFit.Normal
+            : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
+                ? (v1 / v1.Length) is Vector3d v1n
+                    ? Enumerable.Range(1, points.Length - 1)
+                        .Select(i => (points[i] - centroid))
+                        .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
+                        .Select(v2 => Vector3d.CrossProduct(v1n, v2))
+                        .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d n && n.Length > RhinoMath.ZeroTolerance
+                            ? n / n.Length
+                            : Vector3d.ZAxis
+                    : Vector3d.ZAxis
 
     private static Result<(byte Type, Transform SymmetryTransform, double Confidence)> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
         (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)

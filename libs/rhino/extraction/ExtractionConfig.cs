@@ -57,10 +57,18 @@ internal static class ExtractionConfig {
     internal const double ScalingVarianceThreshold = 0.1;
     /// <summary>Feature edge angle threshold 30° in radians for sharp edge detection.</summary>
     internal static readonly double FeatureEdgeAngleThreshold = RhinoMath.ToRadians(30.0);
+    /// <summary>Principal curvature sample count 16 for surface classification.</summary>
+    internal const int CurvatureSampleCount = 16;
+    /// <summary>Minimum curvature samples 4 required for classification.</summary>
+    internal const int MinCurvatureSamples = 4;
+    /// <summary>Curvature variation threshold 0.05 for principal curvature constancy tests.</summary>
+    internal const double CurvatureVariationThreshold = 0.05;
     /// <summary>Minimum isocurve count 2 for valid extraction.</summary>
     internal const int MinIsocurveCount = 2;
     /// <summary>Maximum isocurve count 100 to prevent memory issues.</summary>
     internal const int MaxIsocurveCount = 100;
+    /// <summary>Default osculating frame count 10 for perpendicular frame extraction.</summary>
+    internal const int DefaultOsculatingFrameCount = 10;
     /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
@@ -79,6 +87,7 @@ internal static class ExtractionConfig {
             [(6, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(7, typeof(Brep))] = V.Standard | V.Topology,
             [(7, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(8, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(10, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(10, typeof(Surface))] = V.Standard,
             [(10, typeof(Brep))] = V.Standard | V.Topology,

@@ -273,6 +273,17 @@ internal static class ExtractionCore {
                 }))(),
                 ])
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve and continuity")),
+            [(8, typeof(Curve))] = static (geometry, request, _) => geometry is Curve curve
+                ? (request.Parameter switch {
+                    int count when count >= 2 => count,
+                    null => ExtractionConfig.DefaultOsculatingFrameCount,
+                    _ => 0,
+                }) is int frameCount && frameCount >= 2
+                    ? curve.GetPerpendicularFrames(parameters: [.. Enumerable.Range(0, frameCount).Select(i => curve.Domain.ParameterAt(i / (double)(frameCount - 1))),]) is Plane[] frames && frames.Length > 0
+                        ? ResultFactory.Create<Point3d[]>(value: [.. frames.Select(static frame => frame.Origin),])
+                        : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("GetPerpendicularFrames failed"))
+                    : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected frame count >= 2"))
+                : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve")),
         };
         FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
             .GroupBy(static entry => entry.Key.Kind)
