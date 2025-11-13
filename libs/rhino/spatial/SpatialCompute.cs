@@ -9,8 +9,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Clustering, medial axis, proximity, convex hull, Delaunay, and Voronoi algorithms.</summary>
-[Pure]
+/// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
     private static readonly IComparer<Type> _typeSpecificity = Comparer<Type>.Create(static (left, right) =>
         left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
@@ -195,23 +194,9 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
-        int[] assignments = [.. Enumerable.Range(0, pts.Length),];
-        for (int iteration = 0; iteration < pts.Length - k; iteration++) {
-            (int c1, int c2, double minDist) = (0, 1, double.MaxValue);
-            for (int i = 0; i < pts.Length; i++) {
-                for (int j = i + 1; j < pts.Length; j++) {
-                    double dist = assignments[i] != assignments[j] ? pts[i].DistanceTo(pts[j]) : double.MaxValue;
-                    (c1, c2, minDist) = dist < minDist ? (assignments[i], assignments[j], dist) : (c1, c2, minDist);
-                }
-            }
-            for (int i = 0; i < assignments.Length; i++) {
-                assignments[i] = assignments[i] == c2 ? c1 : assignments[i] > c2 ? assignments[i] - 1 : assignments[i];
-            }
-        }
-        return assignments;
-    }
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int[] HierarchicalAssign(Point3d[] pts, int k) =>
+        Enumerable.Range(0, pts.Length - k).Aggregate(Enumerable.Range(0, pts.Length).ToArray(), (a, _) => Enumerable.Range(0, pts.Length).SelectMany(i => Enumerable.Range(i + 1, pts.Length - i - 1).Where(j => a[i] != a[j]).Select(j => (Cluster1: a[i], Cluster2: a[j], Distance: pts[i].DistanceTo(pts[j])))).OrderBy(t => t.Distance).First() is (int c1, int c2, double) ? [.. Enumerable.Range(0, a.Length).Select(i => a[i] == c2 ? c1 : a[i] > c2 ? a[i] - 1 : a[i])] : a);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
@@ -290,8 +275,8 @@ internal static class SpatialCompute {
                         return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
                     }))();
 
-    /// <summary>Compute 2D convex hull via Andrew's monotone chain algorithm.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
             : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
@@ -319,8 +304,8 @@ internal static class SpatialCompute {
                 }))()
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
 
-    /// <summary>Compute 3D convex hull via incremental algorithm with mesh face indices.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
         points.Length < 4
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
@@ -374,8 +359,8 @@ internal static class SpatialCompute {
         return ResultFactory.Create<int[][]>(value: [.. faces.Select(f => new int[] { indexed[f.Item1].Index, indexed[f.Item2].Index, indexed[f.Item3].Index }),]);
     }
 
-    /// <summary>Compute 2D Delaunay triangulation via Bowyer-Watson algorithm.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"))
@@ -403,7 +388,7 @@ internal static class SpatialCompute {
                 return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
             }))();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
         double ax = a.X - p.X;
         double ay = a.Y - p.Y;
@@ -415,8 +400,8 @@ internal static class SpatialCompute {
         return det > context.AbsoluteTolerance;
     }
 
-    /// <summary>Compute 2D Voronoi diagram from Delaunay triangulation with cell vertices.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
