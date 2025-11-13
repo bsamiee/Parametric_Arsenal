@@ -457,7 +457,7 @@ internal static class SpatialCompute {
                         }))()
                         : [];
                 }
-                return ResultFactory.Create<Point3d[][]>(value: cells);
+                return ResultFactory.Create(value: cells);
             }))());
 
     private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
