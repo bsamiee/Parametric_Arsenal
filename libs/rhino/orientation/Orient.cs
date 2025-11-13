@@ -71,7 +71,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -83,7 +82,7 @@ public static class Orient {
                     (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
                     (1, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
                     (2, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), Plane.WorldZX)),
                     (4, BoundingBox box) => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center)),
                     (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)),
                     _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
@@ -91,7 +90,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -105,7 +103,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -134,7 +131,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -147,7 +143,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -161,7 +156,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -183,7 +177,6 @@ public static class Orient {
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -215,7 +208,6 @@ public static class Orient {
             config: new OperationConfig<Brep, (Transform, double, byte[])> {
                 Context = context,
                 ValidationMode = V.Standard | V.Topology,
-                EnableDiagnostics = false,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
