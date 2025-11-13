@@ -113,25 +113,22 @@ internal static class TopologyCore {
                     null or { Length: 0 } => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
                     Brep[] { Length: 1 } => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
                     Brep[] components => ((Func<Result<IReadOnlyList<Topology.ConnectivityData>>>)(() => {
-                        try {
-                            Dictionary<int, int> faceToComponent = [];
-                            int faceOffset = 0;
-                            for (int compIdx = 0; compIdx < components.Length; compIdx++) {
-                                for (int localFaceIdx = 0; localFaceIdx < components[compIdx].Faces.Count; localFaceIdx++) {
-                                    faceToComponent[faceOffset + localFaceIdx] = compIdx;
-                                }
-                                faceOffset += components[compIdx].Faces.Count;
-                            }
-                            IReadOnlyList<IReadOnlyList<int>> componentIndices = [.. Enumerable.Range(0, components.Length).Select(compIdx => (IReadOnlyList<int>)[.. faceToComponent.Where(kvp => kvp.Value == compIdx).Select(kvp => kvp.Key),]),];
-                            IReadOnlyList<int> componentSizes = [.. components.Select(c => c.Faces.Count),];
-                            IReadOnlyList<BoundingBox> componentBounds = [.. components.Select(c => c.GetBoundingBox(accurate: false)),];
-                            FrozenDictionary<int, IReadOnlyList<int>> adjacencyGraph = Enumerable.Range(0, brep.Faces.Count).ToFrozenDictionary(keySelector: fIdx => fIdx, elementSelector: fIdx => (IReadOnlyList<int>)[.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]);
-                            return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: componentIndices, ComponentSizes: componentSizes, ComponentBounds: componentBounds, TotalComponents: components.Length, IsFullyConnected: components.Length == 1, AdjacencyGraph: adjacencyGraph),]);
-                        } finally {
-                            foreach (Brep component in components) {
-                                component.Dispose();
-                            }
+                        foreach (Brep component in components) {
+                            using (component) { }
                         }
+                        Dictionary<int, int> faceToComponent = [];
+                        int faceOffset = 0;
+                        for (int compIdx = 0; compIdx < components.Length; compIdx++) {
+                            for (int localFaceIdx = 0; localFaceIdx < components[compIdx].Faces.Count; localFaceIdx++) {
+                                faceToComponent[faceOffset + localFaceIdx] = compIdx;
+                            }
+                            faceOffset += components[compIdx].Faces.Count;
+                        }
+                        IReadOnlyList<IReadOnlyList<int>> componentIndices = [.. Enumerable.Range(0, components.Length).Select(compIdx => (IReadOnlyList<int>)[.. faceToComponent.Where(kvp => kvp.Value == compIdx).Select(kvp => kvp.Key),]),];
+                        IReadOnlyList<int> componentSizes = [.. components.Select(c => c.Faces.Count),];
+                        IReadOnlyList<BoundingBox> componentBounds = [.. components.Select(c => c.GetBoundingBox(accurate: false)),];
+                        FrozenDictionary<int, IReadOnlyList<int>> adjacencyGraph = Enumerable.Range(0, brep.Faces.Count).ToFrozenDictionary(keySelector: fIdx => fIdx, elementSelector: fIdx => (IReadOnlyList<int>)[.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]);
+                        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: componentIndices, ComponentSizes: componentSizes, ComponentBounds: componentBounds, TotalComponents: components.Length, IsFullyConnected: components.Length == 1, AdjacencyGraph: adjacencyGraph),]);
                     }))(),
                 },
                 Mesh mesh => ComputeConnectivity(_: mesh, faceCount: mesh.Faces.Count, getAdjacent: fIdx => mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0), getBounds: fIdx => mesh.Faces[fIdx] switch { MeshFace face => face.IsQuad ? new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C], mesh.Vertices[face.D],]) : new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C],]) }, getAdjacentForGraph: fIdx => [.. mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),]),
