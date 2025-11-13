@@ -135,7 +135,7 @@ internal static class SpatialCompute {
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
 
-        // Use RTree for large point sets (O(log n) neighbor queries vs O(n) linear scan)
+        // SDK RTree.CreateFromPointArray for O(log n) neighbor queries (vs O(n) linear scan) when pts.Length > 100
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
         int[] GetNeighbors(int idx) {
