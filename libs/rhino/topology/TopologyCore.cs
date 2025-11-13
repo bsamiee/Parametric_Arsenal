@@ -114,7 +114,15 @@ internal static class TopologyCore {
                     Brep[] { Length: 1 } => ComputeConnectivity(_: brep, faceCount: brep.Faces.Count, getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()), getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false), getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
                     Brep[] components => ((Func<Result<IReadOnlyList<Topology.ConnectivityData>>>)(() => {
                         try {
-                            IReadOnlyList<IReadOnlyList<int>> componentIndices = [.. components.Select((_, i) => (IReadOnlyList<int>)[.. Enumerable.Range(i, 1),]),];
+                            Dictionary<int, int> faceToComponent = [];
+                            int faceOffset = 0;
+                            for (int compIdx = 0; compIdx < components.Length; compIdx++) {
+                                for (int localFaceIdx = 0; localFaceIdx < components[compIdx].Faces.Count; localFaceIdx++) {
+                                    faceToComponent[faceOffset + localFaceIdx] = compIdx;
+                                }
+                                faceOffset += components[compIdx].Faces.Count;
+                            }
+                            IReadOnlyList<IReadOnlyList<int>> componentIndices = [.. Enumerable.Range(0, components.Length).Select(compIdx => (IReadOnlyList<int>)[.. faceToComponent.Where(kvp => kvp.Value == compIdx).Select(kvp => kvp.Key),]),];
                             IReadOnlyList<int> componentSizes = [.. components.Select(c => c.Faces.Count),];
                             IReadOnlyList<BoundingBox> componentBounds = [.. components.Select(c => c.GetBoundingBox(accurate: false)),];
                             FrozenDictionary<int, IReadOnlyList<int>> adjacencyGraph = Enumerable.Range(0, brep.Faces.Count).ToFrozenDictionary(keySelector: fIdx => fIdx, elementSelector: fIdx => (IReadOnlyList<int>)[.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]);
