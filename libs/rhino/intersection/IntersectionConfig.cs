@@ -68,6 +68,12 @@ internal static class IntersectionConfig {
     /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
     internal const int MaxNearMissSamples = 1000;
 
+    /// <summary>Minimum sample count for curve near-miss detection.</summary>
+    internal const int MinCurveNearMissSamples = 3;
+
+    /// <summary>Minimum sample count for Brep near-miss detection.</summary>
+    internal const int MinBrepNearMissSamples = 8;
+
     /// <summary>Blend quality scores for intersection types.</summary>
     internal const double TangentBlendScore = 1.0;
     internal const double PerpendicularBlendScore = 0.5;
