@@ -18,13 +18,21 @@ internal static class AnalysisCompute {
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
                 int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
-                (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
-                    .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
-                ];
-                SurfaceCurvature[] curvatures = [.. uvGrid
-                    .Select(uv => validSurface.CurvatureAt(u: uv.u, v: uv.v))
-                    .Where(sc => RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)),
-                ];
+                (double u, double v)[] uvGrid = new (double, double)[gridSize * gridSize];
+                int uvIndex = 0;
+                for (int i = 0; i < gridSize; i++) {
+                    for (int j = 0; j < gridSize; j++) {
+                        uvGrid[uvIndex++] = (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0)));
+                    }
+                }
+                List<SurfaceCurvature> curvaturesList = [];
+                for (int i = 0; i < uvGrid.Length; i++) {
+                    SurfaceCurvature sc = validSurface.CurvatureAt(u: uvGrid[i].u, v: uvGrid[i].v);
+                    if (RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)) {
+                        curvaturesList.Add(sc);
+                    }
+                }
+                SurfaceCurvature[] curvatures = [.. curvaturesList,];
                 Interval uDomain = validSurface.Domain(0);
                 Interval vDomain = validSurface.Domain(1);
                 double uSpan = uDomain.Length;
@@ -58,11 +66,15 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.Degeneracy | V.SurfaceContinuity,])
             .Bind(validCurve => {
-                (double Parameter, Vector3d Curvature)[] samples = [.. Enumerable.Range(0, AnalysisConfig.CurveFairnessSampleCount)
-                    .Select(i => validCurve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0)))
-                    .Select(t => (Parameter: t, Curvature: validCurve.CurvatureAt(t)))
-                    .Where(pair => pair.Curvature.IsValid),
-                ];
+                List<(double Parameter, Vector3d Curvature)> samplesList = [];
+                for (int i = 0; i < AnalysisConfig.CurveFairnessSampleCount; i++) {
+                    double t = validCurve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0));
+                    Vector3d curvature = validCurve.CurvatureAt(t);
+                    if (curvature.IsValid) {
+                        samplesList.Add((t, curvature));
+                    }
+                }
+                (double Parameter, Vector3d Curvature)[] samples = [.. samplesList,];
                 double[] curvatures = [.. samples.Select(s => s.Curvature.Length)];
                 return samples.Length > 2
                     && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
