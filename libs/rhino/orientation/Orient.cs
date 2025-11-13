@@ -5,6 +5,7 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
@@ -111,7 +112,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > OrientConfig.MinVectorLength && t.Length > OrientConfig.MinVectorLength =>
+                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
                         ((Func<Result<Transform>>)(() => {
                             Vector3d su = new(s);
                             Vector3d tu = new(t);
@@ -120,8 +121,8 @@ public static class Orient {
                             _ = tu.Unitize();
                             Point3d pt = anchor ?? box.Center;
 
-                            return Vector3d.CrossProduct(su, tu).Length < OrientConfig.ParallelThreshold
-                                ? Math.Abs((su * tu) + 1.0) < OrientConfig.ParallelThreshold
+                            return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
+                                ? Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
                                     ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
                                     : ResultFactory.Create(value: Transform.Identity)
                                 : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
