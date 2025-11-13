@@ -132,23 +132,25 @@ internal static class IntersectionCompute {
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Brep brepA, Brep brepB) => Math.Max(8, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samples
-                                            ? Enumerable.Range(0, samples * samples)
-                                                .Select(index => {
-                                                    BoundingBox bbox = brepA.GetBoundingBox(accurate: false);
-                                                    int row = index / samples;
-                                                    int col = index % samples;
-                                                    return new Point3d(
-                                                        bbox.Min.X + ((bbox.Max.X - bbox.Min.X) * col / (samples - 1)),
-                                                        bbox.Min.Y + ((bbox.Max.Y - bbox.Min.Y) * row / (samples - 1)),
-                                                        (bbox.Min.Z + bbox.Max.Z) / 2.0);
-                                                })
-                                                .Select(point => brepA.ClosestPoint(point) is Point3d closestA && brepB.ClosestPoint(closestA) is Point3d closestB
-                                                    ? (PointA: closestA, PointB: closestB, Distance: closestA.DistanceTo(closestB))
-                                                    : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                                .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
-                                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
-                                                ? ResultFactory.Create(value: toArrays(brepPairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                                            ? (
+                                                BoundingBox bbox = brepA.GetBoundingBox(accurate: false);
+                                                Enumerable.Range(0, samples * samples)
+                                                    .Select(index => {
+                                                        int row = index / samples;
+                                                        int col = index % samples;
+                                                        return new Point3d(
+                                                            bbox.Min.X + ((bbox.Max.X - bbox.Min.X) * col / (samples - 1)),
+                                                            bbox.Min.Y + ((bbox.Max.Y - bbox.Min.Y) * row / (samples - 1)),
+                                                            (bbox.Min.Z + bbox.Max.Z) / 2.0);
+                                                    })
+                                                    .Select(point => brepA.ClosestPoint(point) is Point3d closestA && brepB.ClosestPoint(closestA) is Point3d closestB
+                                                        ? (PointA: closestA, PointB: closestB, Distance: closestA.DistanceTo(closestB))
+                                                        : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                                    .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
+                                                    .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
+                                                    ? ResultFactory.Create(value: toArrays(brepPairs))
+                                                    : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                                            )
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0) && (meshB.Vertices.Count > 0)
                                             ? Enumerable.Range(0, Math.Min(meshA.Vertices.Count, IntersectionConfig.MaxNearMissSamples))
