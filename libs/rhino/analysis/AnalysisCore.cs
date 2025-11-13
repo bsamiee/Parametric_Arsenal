@@ -7,6 +7,7 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -75,7 +76,7 @@ internal static class AnalysisCore {
                 [typeof(PlaneSurface)] = (Modes[typeof(PlaneSurface)], (g, ctx, _, uv, _, _, order) => SurfaceLogic((PlaneSurface)g, ctx, uv, order)),
                 [typeof(Brep)] = (Modes[typeof(Brep)], (g, ctx, _, uv, faceIdx, testPt, order) => {
                     Brep brep = (Brep)g;
-                    int fIdx = Math.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
+                    int fIdx = RhinoMath.Clamp(faceIdx ?? 0, 0, brep.Faces.Count - 1);
                     using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
                     (double u, double v) = uv ?? (sf.Domain(0).Mid, sf.Domain(1).Mid);
                     Point3d testPoint = testPt ?? brep.GetBoundingBox(accurate: false).Center;
@@ -100,7 +101,7 @@ internal static class AnalysisCore {
                 ),
                 [typeof(Mesh)] = (Modes[typeof(Mesh)], (g, _, _, _, vertIdx, _, _) => {
                     Mesh mesh = (Mesh)g;
-                    int vIdx = Math.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
+                    int vIdx = RhinoMath.Clamp(vertIdx ?? 0, 0, mesh.Vertices.Count - 1);
                     Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
                     return ((Func<Result<Analysis.IResult>>)(() => {
                         using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
