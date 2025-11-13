@@ -169,7 +169,7 @@ internal static class TopologyCore {
         Array.Fill(componentIds, -1);
         int componentCount = 0;
         for (int seed = 0; seed < faceCount; seed++) {
-            if (componentIds[seed] == -1) {
+            componentCount = componentIds[seed] != -1 ? componentCount : ((Func<int>)(() => {
                 Queue<int> queue = new([seed,]);
                 componentIds[seed] = componentCount;
                 while (queue.Count > 0) {
@@ -179,8 +179,8 @@ internal static class TopologyCore {
                         queue.Enqueue(adjFace);
                     }
                 }
-                componentCount++;
-            }
+                return componentCount;
+            }))() + 1;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
         IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => {

@@ -93,12 +93,11 @@ internal static class TopologyCompute {
                             : (false, int.MaxValue);
                         bool isImprovement = isValid && nakedEdges < originalNakedEdges && nakedEdges < bestNakedEdges;
 
-                        if (isImprovement) {
-                            bestHealed?.Dispose();
-                            (bestHealed, bestStrategy, bestNakedEdges) = (copy, currentStrategy, nakedEdges);
-                        } else {
-                            copy.Dispose();
-                        }
+                        Brep? toDispose = isImprovement ? bestHealed : copy;
+                        toDispose?.Dispose();
+                        (bestHealed, bestStrategy, bestNakedEdges) = isImprovement
+                            ? (copy, currentStrategy, nakedEdges)
+                            : (bestHealed, bestStrategy, bestNakedEdges);
                     }
 
                     return bestHealed is Brep healed
