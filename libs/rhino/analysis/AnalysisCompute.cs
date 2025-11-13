@@ -17,7 +17,7 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: surface)
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
-                int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
+                int gridSize = Math.Max(AnalysisConfig.MinimumGridSize, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
                 (double u, double v)[] uvGrid = [.. Enumerable.Range(0, gridSize)
                     .SelectMany(i => Enumerable.Range(0, gridSize).Select(j => (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0))))),
                 ];
@@ -27,14 +27,14 @@ internal static class AnalysisCompute {
                 ];
                 Interval uDomain = validSurface.Domain(0);
                 Interval vDomain = validSurface.Domain(1);
-                double uSpan = Math.Abs(uDomain.Length);
-                double vSpan = Math.Abs(vDomain.Length);
-                double singularityThresholdU = Math.Min(
-                    Math.Max(uSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
-                    uSpan * AnalysisConfig.SingularityBoundaryFraction);
-                double singularityThresholdV = Math.Min(
-                    Math.Max(vSpan * AnalysisConfig.SingularityProximityFactor, RhinoMath.SqrtEpsilon),
-                    vSpan * AnalysisConfig.SingularityBoundaryFraction);
+                double singularityThresholdU = RhinoMath.Clamp(
+                    uDomain.Length * AnalysisConfig.SingularityProximityFactor,
+                    RhinoMath.SqrtEpsilon,
+                    uDomain.Length * AnalysisConfig.SingularityBoundaryFraction);
+                double singularityThresholdV = RhinoMath.Clamp(
+                    vDomain.Length * AnalysisConfig.SingularityProximityFactor,
+                    RhinoMath.SqrtEpsilon,
+                    vDomain.Length * AnalysisConfig.SingularityBoundaryFraction);
                 return curvatures.Length > 0
                     && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
                     && (gaussianSorted.Length % 2 is 0 ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0 : gaussianSorted[gaussianSorted.Length / 2]) is double medianGaussian
@@ -45,8 +45,8 @@ internal static class AnalysisCompute {
                         MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
                         Singularities: uvGrid.Where(uv =>
                             validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
-                            || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
-                            || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV).ToArray(),
+                            || (uDomain.NormalizedParameterAt(uv.u) is double uNorm && (uNorm <= AnalysisConfig.SingularityBoundaryFraction || uNorm >= (1.0 - AnalysisConfig.SingularityBoundaryFraction)))
+                            || (vDomain.NormalizedParameterAt(uv.v) is double vNorm && (vNorm <= AnalysisConfig.SingularityBoundaryFraction || vNorm >= (1.0 - AnalysisConfig.SingularityBoundaryFraction)))).ToArray(),
                         UniformityScore: Math.Clamp(medianGaussian > context.AbsoluteTolerance ? Math.Max(0.0, 1.0 - (stdDevGaussian / (medianGaussian * AnalysisConfig.HighCurvatureMultiplier))) : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)))
                     : ResultFactory.Create<(double[], double[], (double, double)[], double)>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"));
             });
@@ -101,16 +101,12 @@ internal static class AnalysisCompute {
                         vertices[3] = validIndices && isQuad ? (Point3d)validMesh.Vertices[face.D] : vertices[0];
 
                         int vertCount = isQuad ? 4 : 3;
-
                         for (int j = 0; j < vertCount; j++) {
                             edgeLengths[j] = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
                         }
-                        double minEdge = double.MaxValue;
-                        double maxEdge = double.MinValue;
-                        for (int j = 0; j < vertCount; j++) {
-                            minEdge = Math.Min(minEdge, edgeLengths[j]);
-                            maxEdge = Math.Max(maxEdge, edgeLengths[j]);
-                        }
+                        (double minEdge, double maxEdge) = (
+                            Enumerable.Range(0, vertCount).Min(j => edgeLengths[j]),
+                            Enumerable.Range(0, vertCount).Max(j => edgeLengths[j]));
                         double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
 
                         double skewness = isQuad
@@ -121,13 +117,10 @@ internal static class AnalysisCompute {
                                 Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
                             ]).Max(angle => Math.Abs(RhinoMath.ToDegrees(angle) - AnalysisConfig.QuadIdealAngleDegrees)) / AnalysisConfig.QuadIdealAngleDegrees
                             : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
-                                ? (
-                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(ab, ac)),
-                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)),
-                                    RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc))
-                                ) is (double angleA, double angleB, double angleC)
-                                    ? Math.Max(Math.Abs(angleA - AnalysisConfig.TriangleIdealAngleDegrees), Math.Max(Math.Abs(angleB - AnalysisConfig.TriangleIdealAngleDegrees), Math.Abs(angleC - AnalysisConfig.TriangleIdealAngleDegrees))) / AnalysisConfig.TriangleIdealAngleDegrees
-                                    : 1.0
+                                && RhinoMath.ToDegrees(Vector3d.VectorAngle(ab, ac)) is double angleA
+                                && RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)) is double angleB
+                                && RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc)) is double angleC
+                                ? new double[] { Math.Abs(angleA - AnalysisConfig.TriangleIdealAngleDegrees), Math.Abs(angleB - AnalysisConfig.TriangleIdealAngleDegrees), Math.Abs(angleC - AnalysisConfig.TriangleIdealAngleDegrees) }.Max() / AnalysisConfig.TriangleIdealAngleDegrees
                                 : 1.0;
 
                         double jacobian = isQuad

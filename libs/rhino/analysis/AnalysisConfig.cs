@@ -79,4 +79,7 @@ internal static class AnalysisConfig {
 
     /// <summary>Ideal interior angle for square/rectangle in degrees.</summary>
     internal const double QuadIdealAngleDegrees = 90.0;
+
+    /// <summary>Minimum grid size for surface sampling: 2×2 grid minimum.</summary>
+    internal const int MinimumGridSize = 2;
 }
