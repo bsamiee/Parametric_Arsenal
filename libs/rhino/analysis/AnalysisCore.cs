@@ -26,7 +26,7 @@ internal static class AnalysisCore {
             double[] disc = [.. buffer[..discCount]];
             return cv.FrameAt(param, out Plane frame)
                 ? (cv.DerivativeAt(param, order),
-                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5)),]),
+                    cv.GetPerpendicularFrames([.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount).Select(i => cv.Domain.ParameterAt(i / (AnalysisConfig.CurveFrameSampleCount - 1.0))),]),
                     AreaMassProperties.Compute(cv)) is (Vector3d[] derivatives, Plane[] frames, AreaMassProperties amp)
                     ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
                         cv.PointAt(param), derivatives, cv.CurvatureAt(param).Length, frame, frames,

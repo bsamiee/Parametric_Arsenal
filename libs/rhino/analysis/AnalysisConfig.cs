@@ -82,4 +82,16 @@ internal static class AnalysisConfig {
 
     /// <summary>Minimum grid size for surface sampling: 2×2 grid minimum.</summary>
     internal const int MinimumGridSize = 2;
+
+    /// <summary>Score bounds: minimum score value.</summary>
+    internal const double ScoreMinimum = 0.0;
+
+    /// <summary>Score bounds: maximum score value.</summary>
+    internal const double ScoreMaximum = 1.0;
+
+    /// <summary>Median calculation: divisor for even-count averaging.</summary>
+    internal const double MedianAveragingDivisor = 2.0;
+
+    /// <summary>Triangle area calculation: multiplier for cross product formula.</summary>
+    internal const double TriangleAreaMultiplier = 2.0;
 }
