@@ -34,8 +34,8 @@ internal static class IntersectionCompute {
                 .Select(index => (Tangent: curve.TangentAt(parameters[index]), Point: output.Points[index]))
                 .Select(tuple => tuple.Tangent.IsValid && surface.ClosestPoint(tuple.Point, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
                     ? Vector3d.VectorAngle(tuple.Tangent, normal)
-                    : double.NaN)
-                .Where(angle => !double.IsNaN(angle))
+                    : RhinoMath.UnsetValue)
+                .Where(angle => RhinoMath.IsValidDouble(angle))
                 .ToArray() is double[] angles && angles.Length > 0
                     ? curveSurfaceClassifier(angles)
                     : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed);
@@ -54,9 +54,9 @@ internal static class IntersectionCompute {
                                     (Curve curveA, Curve curveB) when parametersA >= count && parametersB >= count => Enumerable.Range(0, count)
                                         .Select(index => (curveA.TangentAt(output.ParametersA[index]), curveB.TangentAt(output.ParametersB[index])) is (Vector3d tangentA, Vector3d tangentB) && tangentA.IsValid && tangentB.IsValid
                                             ? Vector3d.VectorAngle(tangentA, tangentB)
-                                            : double.NaN)
-                                        .Where(angle => !double.IsNaN(angle))
-                                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && (circularMean < 0.0 ? circularMean + RhinoMath.TwoPI : circularMean) is double averageAngle
+                                            : RhinoMath.UnsetValue)
+                                        .Where(angle => RhinoMath.IsValidDouble(angle))
+                                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                                             : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
                                     (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA]),
@@ -96,7 +96,7 @@ internal static class IntersectionCompute {
                                     };
 
                                     return (primary, secondary) switch {
-                                        (Curve curveA, Curve curveB) => Math.Max(3, (int)Math.Ceiling(curveA.GetLength() / searchRadius)) is int samples
+                                        (Curve curveA, Curve curveB) => Math.Max(IntersectionConfig.MinCurveNearMissSamples, (int)Math.Ceiling(curveA.GetLength() / searchRadius)) is int samples
                                             ? Enumerable.Range(0, samples)
                                                 .Select(index => curveA.PointAt(curveA.Domain.ParameterAt(index / (double)(samples - 1))))
                                                 .Select(point => curveB.ClosestPoint(point, out double parameter) && curveB.PointAt(parameter) is Point3d closestB
@@ -113,7 +113,7 @@ internal static class IntersectionCompute {
                                                 ? ResultFactory.Create(value: toArrays(curvePairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                        (Curve curve, Surface surface) => Math.Max(3, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
+                                        (Curve curve, Surface surface) => Math.Max(IntersectionConfig.MinCurveNearMissSamples, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
                                             ? Enumerable.Range(0, samples)
                                                 .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(samples - 1))))
                                                 .Select(point => surface.ClosestPoint(point, out double u, out double v)
@@ -124,7 +124,7 @@ internal static class IntersectionCompute {
                                                 ? ResultFactory.Create(value: toArrays(pairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                        (Brep brepA, Brep brepB) => Math.Max(8, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samples && brepA.GetBoundingBox(accurate: false) is BoundingBox bbox
+                                        (Brep brepA, Brep brepB) => Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samples && brepA.GetBoundingBox(accurate: false) is BoundingBox bbox
                                             ? Enumerable.Range(0, samples * samples)
                                                 .Select(index => new Point3d(
                                                     bbox.Min.X + ((bbox.Max.X - bbox.Min.X) * (index % samples) / (samples - 1)),
@@ -196,7 +196,7 @@ internal static class IntersectionCompute {
                                                         }
                                                         return ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy);
                                                     })
-                                                    .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); }),
+                                                    .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (RhinoMath.UnsetValue, null); }),
                                             Surface surface when surface.Duplicate() is Surface copy && copy.Translate(direction * perturbationDistance) =>
                                                 IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
                                                     .Map(result => {
@@ -205,13 +205,13 @@ internal static class IntersectionCompute {
                                                         }
                                                         return ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy);
                                                     })
-                                                    .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (double.NaN, null); }),
-                                            _ => (double.NaN, null),
+                                                    .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (RhinoMath.UnsetValue, null); }),
+                                            _ => (RhinoMath.UnsetValue, null),
                                         };
 
                                     (double Delta, IDisposable? Resource)[] perturbations = [.. directions.Select(dir => perturbAndIntersect(dir, validA))];
                                     try {
-                                        double[] filtered = [.. perturbations.Select(entry => entry.Delta).Where(delta => !double.IsNaN(delta))];
+                                        double[] filtered = [.. perturbations.Select(entry => entry.Delta).Where(delta => RhinoMath.IsValidDouble(delta))];
                                         return filtered.Length > 0
                                             ? ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (
                                                 Score: 1.0 / (1.0 + filtered.Average()),
