@@ -18,21 +18,25 @@ internal static class AnalysisCompute {
             .Validate(args: [context, V.Standard | V.BoundingBox | V.UVDomain,])
             .Bind(validSurface => {
                 int gridSize = Math.Max(2, (int)Math.Sqrt(AnalysisConfig.SurfaceQualitySampleCount));
-                (double u, double v)[] uvGrid = new (double, double)[gridSize * gridSize];
+                int totalSamples = gridSize * gridSize;
+                (double u, double v)[] uvGrid = new (double, double)[totalSamples];
+                SurfaceCurvature[] curvatures = new SurfaceCurvature[totalSamples];
+                int validCount = 0;
                 int uvIndex = 0;
+                double gridDivisor = gridSize - 1.0;
+
                 for (int i = 0; i < gridSize; i++) {
+                    double u = validSurface.Domain(0).ParameterAt(i / gridDivisor);
                     for (int j = 0; j < gridSize; j++) {
-                        uvGrid[uvIndex++] = (u: validSurface.Domain(0).ParameterAt(i / (gridSize - 1.0)), v: validSurface.Domain(1).ParameterAt(j / (gridSize - 1.0)));
+                        double v = validSurface.Domain(1).ParameterAt(j / gridDivisor);
+                        uvGrid[uvIndex++] = (u, v);
+                        SurfaceCurvature sc = validSurface.CurvatureAt(u: u, v: v);
+                        if (RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)) {
+                            curvatures[validCount++] = sc;
+                        }
                     }
                 }
-                List<SurfaceCurvature> curvaturesList = [];
-                for (int i = 0; i < uvGrid.Length; i++) {
-                    SurfaceCurvature sc = validSurface.CurvatureAt(u: uvGrid[i].u, v: uvGrid[i].v);
-                    if (RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean)) {
-                        curvaturesList.Add(sc);
-                    }
-                }
-                SurfaceCurvature[] curvatures = [.. curvaturesList,];
+                SurfaceCurvature[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
                 Interval uDomain = validSurface.Domain(0);
                 Interval vDomain = validSurface.Domain(1);
                 double uSpan = uDomain.Length;
@@ -45,14 +49,14 @@ internal static class AnalysisCompute {
                     vSpan * AnalysisConfig.SingularityProximityFactor,
                     RhinoMath.SqrtEpsilon,
                     vSpan * AnalysisConfig.SingularityBoundaryFraction);
-                return curvatures.Length > 0
-                    && curvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
+                return validCurvatures.Length > 0
+                    && validCurvatures.Select(sc => Math.Abs(sc.Gaussian)).Order().ToArray() is double[] gaussianSorted
                     && (gaussianSorted.Length % 2 is 0 ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0 : gaussianSorted[gaussianSorted.Length / 2]) is double medianGaussian
-                    && curvatures.Average(sc => Math.Abs(sc.Gaussian)) is double avgGaussian
-                    && Math.Sqrt(curvatures.Sum(sc => Math.Pow(Math.Abs(sc.Gaussian) - avgGaussian, 2)) / curvatures.Length) is double stdDevGaussian
+                    && validCurvatures.Average(sc => Math.Abs(sc.Gaussian)) is double avgGaussian
+                    && Math.Sqrt(validCurvatures.Sum(sc => Math.Pow(Math.Abs(sc.Gaussian) - avgGaussian, 2)) / validCurvatures.Length) is double stdDevGaussian
                     ? ResultFactory.Create(value: (
-                        GaussianSamples: curvatures.Select(sc => sc.Gaussian).ToArray(),
-                        MeanSamples: curvatures.Select(sc => sc.Mean).ToArray(),
+                        GaussianSamples: validCurvatures.Select(sc => sc.Gaussian).ToArray(),
+                        MeanSamples: validCurvatures.Select(sc => sc.Mean).ToArray(),
                         Singularities: uvGrid.Where(uv =>
                             validSurface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
                             || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
@@ -66,25 +70,32 @@ internal static class AnalysisCompute {
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.Degeneracy | V.SurfaceContinuity,])
             .Bind(validCurve => {
-                List<(double Parameter, Vector3d Curvature)> samplesList = [];
-                for (int i = 0; i < AnalysisConfig.CurveFairnessSampleCount; i++) {
-                    double t = validCurve.Domain.ParameterAt(i / (AnalysisConfig.CurveFairnessSampleCount - 1.0));
+                const int maxSamples = AnalysisConfig.CurveFairnessSampleCount;
+                (double Parameter, Vector3d Curvature)[] samples = new (double, Vector3d)[maxSamples];
+                double[] curvatures = new double[maxSamples];
+                int validCount = 0;
+                const double sampleDivisor = maxSamples - 1.0;
+
+                for (int i = 0; i < maxSamples; i++) {
+                    double t = validCurve.Domain.ParameterAt(i / sampleDivisor);
                     Vector3d curvature = validCurve.CurvatureAt(t);
                     if (curvature.IsValid) {
-                        samplesList.Add((t, curvature));
+                        samples[validCount] = (t, curvature);
+                        curvatures[validCount] = curvature.Length;
+                        validCount++;
                     }
                 }
-                (double Parameter, Vector3d Curvature)[] samples = [.. samplesList,];
-                double[] curvatures = [.. samples.Select(s => s.Curvature.Length)];
-                return samples.Length > 2
-                    && Enumerable.Range(1, curvatures.Length - 1).Sum(i => Math.Abs(curvatures[i] - curvatures[i - 1])) / (curvatures.Length - 1) is double avgDiff
+                (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
+                double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
+                return validSamples.Length > 2
+                    && Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1) is double avgDiff
                     && validCurve.GetLength() is double curveLength
                     ? ResultFactory.Create(value: (
                         SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * AnalysisConfig.SmoothnessSensitivity)), 0.0, 1.0),
-                        CurvatureSamples: curvatures,
-                        InflectionPoints: Enumerable.Range(1, curvatures.Length - 2)
-                            .Where(i => Math.Abs((curvatures[i] - curvatures[i - 1]) - (curvatures[i + 1] - curvatures[i])) > AnalysisConfig.InflectionSharpnessThreshold || ((curvatures[i] - curvatures[i - 1]) * (curvatures[i + 1] - curvatures[i])) < 0)
-                            .Select(i => (samples[i].Parameter, Math.Abs(curvatures[i] - curvatures[i - 1]) > AnalysisConfig.InflectionSharpnessThreshold))
+                        CurvatureSamples: validCurvatures,
+                        InflectionPoints: Enumerable.Range(1, validCurvatures.Length - 2)
+                            .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > AnalysisConfig.InflectionSharpnessThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
+                            .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > AnalysisConfig.InflectionSharpnessThreshold))
                             .ToArray(),
                         EnergyMetric: curvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
                             ? (curvatures.Sum(k => k * k) * (curveLength / (AnalysisConfig.CurveFairnessSampleCount - 1))) / (maxCurv * curveLength)
