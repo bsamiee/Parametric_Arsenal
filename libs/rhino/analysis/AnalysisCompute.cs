@@ -97,8 +97,8 @@ internal static class AnalysisCompute {
                             .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > AnalysisConfig.InflectionSharpnessThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
                             .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > AnalysisConfig.InflectionSharpnessThreshold))
                             .ToArray(),
-                        EnergyMetric: curvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
-                            ? (curvatures.Sum(k => k * k) * (curveLength / (AnalysisConfig.CurveFairnessSampleCount - 1))) / (maxCurv * curveLength)
+                        EnergyMetric: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
+                            ? (validCurvatures.Sum(k => k * k) * (curveLength / (AnalysisConfig.CurveFairnessSampleCount - 1))) / (maxCurv * curveLength)
                             : 0.0))
                     : ResultFactory.Create<(double, double[], (double, bool)[], double)>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
             });
