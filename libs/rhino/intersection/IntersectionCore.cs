@@ -132,16 +132,7 @@ internal static class IntersectionCore {
             ((typeof(Brep), typeof(Plane)), (first, second, tolerance, _, _) => ArrayResultBuilder((RhinoIntersect.BrepPlane((Brep)first, (Plane)second, tolerance, out Curve[] curves, out Point3d[] points), curves, points))),
             ((typeof(Brep), typeof(Surface)), (first, second, tolerance, _, _) => ArrayResultBuilder((RhinoIntersect.BrepSurface((Brep)first, (Surface)second, tolerance, out Curve[] curves, out Point3d[] points), curves, points))),
             ((typeof(Surface), typeof(Surface)), (first, second, tolerance, _, _) => ArrayResultBuilder((RhinoIntersect.SurfaceSurface((Surface)first, (Surface)second, tolerance, out Curve[] curves, out Point3d[] points), curves, points))),
-            ((typeof(Mesh), typeof(Mesh)), (first, second, tolerance, options, _) => options.Sorted switch {
-                true => PolylineProcessor(RhinoIntersect.MeshMeshAccurate((Mesh)first, (Mesh)second, tolerance)),
-                false => RhinoIntersect.MeshMeshFast((Mesh)first, (Mesh)second) switch {
-                    Line[] { Length: > 0 } segments => ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                        [.. segments.SelectMany(line => (Point3d[])[line.From, line.To])],
-                        [], [], [], [], [])),
-                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
-                },
-            }),
+            ((typeof(Mesh), typeof(Mesh)), (first, second, tolerance, _, _) => PolylineProcessor(RhinoIntersect.MeshMeshAccurate((Mesh)first, (Mesh)second, tolerance))),
             ((typeof(Mesh), typeof(Ray3d)), (first, second, _, _, _) => RhinoIntersect.MeshRay((Mesh)first, (Ray3d)second) switch {
                 double distance when distance >= 0d => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Ray3d)second).PointAt(distance)], [], [distance], [], [], [])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
