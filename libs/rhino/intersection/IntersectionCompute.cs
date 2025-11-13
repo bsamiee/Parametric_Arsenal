@@ -62,7 +62,7 @@ internal static class IntersectionCompute {
                                     (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA]),
                                     (Surface surface, Curve curve) when parametersB >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersB]),
                                     _ when parametersA < count || parametersB < count => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-                                    _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
+                                    _ => ResultFactory.Create(value: ((byte)2, (double[])[], false, 0.0)),
                                 },
                             }));
                 });
