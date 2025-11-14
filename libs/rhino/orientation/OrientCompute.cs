@@ -85,7 +85,7 @@ internal static class OrientCompute {
                             ? Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                                 ? ((geometryA, geometryB) switch {
                                     (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
-                                        ? new Plane(pa.Origin, pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
+                                        ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
                                             && ba.Vertices.Select(va => {
                                                 Point3d reflected = va.Location;
                                                 reflected.Transform(Transform.Mirror(mirrorPlane: mirror));
