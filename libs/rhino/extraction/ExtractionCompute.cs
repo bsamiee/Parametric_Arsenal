@@ -90,12 +90,14 @@ internal static class ExtractionCompute {
         bool isSmooth = dihedralAngle > ExtractionConfig.SmoothEdgeAngleThreshold;
         bool isSharp = dihedralAngle < ExtractionConfig.SharpEdgeAngleThreshold;
         bool isChamfer = !isSmooth && !isSharp;
+        double length = edge.EdgeCurve.GetLength();
 
-        return isChamfer
-            ? (Type: ExtractionConfig.FeatureTypeChamfer, Param: dihedralAngle)
-            : mean > RhinoMath.ZeroTolerance
-                ? (Type: ExtractionConfig.FeatureTypeVariableRadiusFillet, Param: 1.0 / mean)
-                : (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: edge.EdgeCurve.GetLength());
+        return (isChamfer, isSmooth, isSharp, mean > RhinoMath.ZeroTolerance) switch {
+            (true, _, _, _) => (Type: ExtractionConfig.FeatureTypeChamfer, Param: dihedralAngle),
+            (_, true, _, true) => (Type: ExtractionConfig.FeatureTypeVariableRadiusFillet, Param: 1.0 / mean),
+            (_, _, true, _) => (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: length),
+            _ => (Type: ExtractionConfig.FeatureTypeGenericEdge, Param: length),
+        };
     }
 
     [Pure]
