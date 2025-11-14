@@ -20,42 +20,47 @@ internal static class FieldsCompute {
     internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
         double[] distances,
         Point3d[] grid,
-        int resolution) {
+        int resolution,
+        Vector3d gridDelta) {
         int totalSamples = distances.Length;
         Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
 
         try {
-            double h = FieldsConfig.GradientFiniteDifferenceStep;
-            double twoH = 2.0 * h;
+            double dx = gridDelta.X;
+            double dy = gridDelta.Y;
+            double dz = gridDelta.Z;
+            double twoDx = 2.0 * dx;
+            double twoDy = 2.0 * dy;
+            double twoDz = 2.0 * dz;
 
-            // Central difference: ∇f = [(f(x+h) - f(x-h))/(2h), (f(y+h) - f(y-h))/(2h), (f(z+h) - f(z-h))/(2h)]
+            // Central difference: ∇f = [(f(x+dx) - f(x-dx))/(2dx), (f(y+dy) - f(y-dy))/(2dy), (f(z+dz) - f(z-dz))/(2dz)]
             for (int i = 0; i < resolution; i++) {
                 for (int j = 0; j < resolution; j++) {
                     for (int k = 0; k < resolution; k++) {
                         int idx = (i * resolution * resolution) + (j * resolution) + k;
 
                         double dfdx = (i < resolution - 1 && i > 0)
-                            ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoH
+                            ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoDx
                             : (i == 0 && resolution > 1)
-                                ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / h
+                                ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / dx
                                 : (i == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / h
+                                    ? (distances[idx] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx
                                     : 0.0;
 
                         double dfdy = (j < resolution - 1 && j > 0)
-                            ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoH
+                            ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoDy
                             : (j == 0 && resolution > 1)
-                                ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / h
+                                ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / dy
                                 : (j == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / h
+                                    ? (distances[idx] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy
                                     : 0.0;
 
                         double dfdz = (k < resolution - 1 && k > 0)
-                            ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoH
+                            ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoDz
                             : (k == 0 && resolution > 1)
-                                ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / h
+                                ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / dz
                                 : (k == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / h
+                                    ? (distances[idx] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz
                                     : 0.0;
 
                         gradients[idx] = new Vector3d(dfdx, dfdy, dfdz);
@@ -235,20 +240,12 @@ internal static class FieldsCompute {
                 }
             }
 
-            // Validate: if no triangles/vertices, return error for this isovalue
-            return (vertices.Count == 0 || faces.Count == 0)
-                ? ResultFactory.Create<Mesh[]>(
-                    error: E.Geometry.InvalidIsovalue.WithContext($"No isosurface found for isovalue {isovalue}"),
-                )
-                : (() => {
-                    Mesh mesh = new();
-                    mesh.Vertices.AddVertices(vertices);
-                    _ = mesh.Faces.AddFaces(faces);
-                    _ = mesh.Normals.ComputeNormals();
-                    _ = mesh.Compact();
-                    meshes[isoIdx] = mesh;
-                    return (Result<Mesh[]>)null;
-                })();
+            Mesh mesh = new();
+            mesh.Vertices.AddVertices(vertices);
+            _ = mesh.Faces.AddFaces(faces);
+            _ = mesh.Normals.ComputeNormals();
+            _ = mesh.Compact();
+            meshes[isoIdx] = mesh;
         }
 
         return ResultFactory.Create(value: meshes);

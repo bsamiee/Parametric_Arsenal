@@ -10,49 +10,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Fields dispatch registry and spatial acceleration.</summary>
+/// <summary>Fields dispatch registry.</summary>
 [Pure]
 internal static class FieldsCore {
-    /// <summary>3D grid sampling configuration (reserved for future grid-based optimizations).</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    internal readonly record struct SampleGrid(
-        Point3d Origin,
-        Vector3d Delta,
-        int Resolution,
-        int TotalSamples);
-
-    // ============================================================================
-    // RTREE FACTORY FUNCTIONS (inline RTree construction - NO helper methods)
-    // ============================================================================
-
-    private static readonly Func<object, RTree> _meshRTreeFactory = geometry => {
-        RTree tree = new();
-        Mesh mesh = (Mesh)geometry;
-        _ = tree.Insert(mesh.GetBoundingBox(accurate: true), 0);
-        return tree;
-    };
-
-    private static readonly Func<object, RTree> _brepRTreeFactory = geometry => {
-        RTree tree = new();
-        Brep brep = (Brep)geometry;
-        _ = tree.Insert(brep.GetBoundingBox(accurate: true), 0);
-        return tree;
-    };
-
-    private static readonly Func<object, RTree> _curveRTreeFactory = geometry => {
-        RTree tree = new();
-        Curve curve = (Curve)geometry;
-        _ = tree.Insert(curve.GetBoundingBox(accurate: true), 0);
-        return tree;
-    };
-
-    private static readonly Func<object, RTree> _surfaceRTreeFactory = geometry => {
-        RTree tree = new();
-        Surface surface = (Surface)geometry;
-        _ = tree.Insert(surface.GetBoundingBox(accurate: true), 0);
-        return tree;
-    };
-
     // ============================================================================
     // OPERATION REGISTRY (byte + Type → execute function + integration method)
     // ============================================================================
@@ -103,16 +63,6 @@ internal static class FieldsCore {
                     }
 
                     // Inline distance computation (NO helper method)
-                    RTree? tree = totalSamples > FieldsConfig.DistanceFieldRTreeThreshold
-                        ? (typed switch {
-                            Mesh => _meshRTreeFactory(typed),
-                            Brep => _brepRTreeFactory(typed),
-                            Curve => _curveRTreeFactory(typed),
-                            Surface => _surfaceRTreeFactory(typed),
-                            _ => null,
-                        })
-                        : null;
-
                     for (int i = 0; i < totalSamples; i++) {
                         Point3d closest = typed switch {
                             Mesh m => m.ClosestPoint(grid[i]),
@@ -131,8 +81,6 @@ internal static class FieldsCore {
 
                         distances[i] = inside ? -unsignedDist : unsignedDist;
                     }
-
-                    tree?.Dispose();
 
                     Point3d[] finalGrid = [.. grid[..totalSamples]];
                     double[] finalDistances = [.. distances[..totalSamples]];

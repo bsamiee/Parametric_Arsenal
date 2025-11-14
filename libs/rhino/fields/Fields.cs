@@ -30,6 +30,7 @@ public static class Fields {
             stepSize.HasValue && stepSize.Value >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
                 ? stepSize.Value
                 : FieldsConfig.DefaultStepSize;
+    }
 
     /// <summary>Compute signed distance field: geometry → (grid points[], distances[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -58,11 +59,15 @@ public static class Fields {
         T geometry,
         FieldSpec spec,
         IGeometryContext context) where T : GeometryBase =>
-        DistanceField(geometry: geometry, spec: spec, context: context).Bind(distanceField =>
-            FieldsCompute.ComputeGradient(
+        DistanceField(geometry: geometry, spec: spec, context: context).Bind(distanceField => {
+            BoundingBox bounds = spec.Bounds ?? geometry.GetBoundingBox(accurate: true);
+            Vector3d gridDelta = (bounds.Max - bounds.Min) / (spec.Resolution - 1);
+            return FieldsCompute.ComputeGradient(
                 distances: distanceField.Distances,
                 grid: distanceField.Grid,
-                resolution: spec.Resolution));
+                resolution: spec.Resolution,
+                gridDelta: gridDelta);
+        });
 
     /// <summary>Trace streamlines along vector field: (field, seeds) → curves[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
