@@ -37,7 +37,7 @@ public static class Fields {
         T geometry,
         FieldSpec spec,
         IGeometryContext context) where T : GeometryBase =>
-        FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Arsenal.Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
+        FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
             true => UnifiedOperation.Apply(
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<(Point3d[], double[])>>>)(item =>
