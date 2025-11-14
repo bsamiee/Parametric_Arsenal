@@ -59,11 +59,11 @@ internal static class MorphologyCompute {
                     int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
                     int valence = neighbors.Length;
                     double beta = valence is 3
-                        ? 0.1875
+                        ? MorphologyConfig.LoopBetaValence3
                         : valence is 6
-                            ? 0.0625
+                            ? MorphologyConfig.LoopBetaValence6
                             : valence > 2
-                                ? (((1.0 / valence) * (0.625 - Math.Pow((0.375 + ((0.25 * Math.Cos(RhinoMath.TwoPI / valence)))), 2.0))))
+                                ? (((1.0 / valence) * (MorphologyConfig.LoopCenterWeight - Math.Pow((MorphologyConfig.LoopNeighborBase + ((MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence)))), 2.0))))
                                 : 0.0;
 
                     Point3d sum = Point3d.Origin;
@@ -98,7 +98,7 @@ internal static class MorphologyCompute {
                             Vector3d va = originalVerts[a] - Point3d.Origin;
                             Vector3d vb = originalVerts[b] - Point3d.Origin;
                             Vector3d vc = originalVerts[c] - Point3d.Origin;
-                            Point3d mid = Point3d.Origin + (0.375 * (v1 + v2)) + (0.125 * (va + vb + vc - v1 - v2));
+                            Point3d mid = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (va + vb + vc - v1 - v2));
                             midIdx = subdivided.Vertices.Add(mid);
                             edgeMidpoints[edges[e]] = midIdx;
                         }
@@ -145,7 +145,7 @@ internal static class MorphologyCompute {
                         if (!edgeMidpoints.TryGetValue(edges[e], out int midIdx)) {
                             int v1 = edges[e].Item1;
                             int v2 = edges[e].Item2;
-                            Point3d mid = 0.5 * (originalVerts[v1] + originalVerts[v2]);
+                            Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
 
                             int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
                             int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
@@ -172,17 +172,17 @@ internal static class MorphologyCompute {
                                     Vector3d vmid = mid - Point3d.Origin;
                                     Vector3d vopp1 = originalVerts[opposite1] - Point3d.Origin;
                                     Vector3d vopp2 = originalVerts[opposite2] - Point3d.Origin;
-                                    Point3d adjusted = Point3d.Origin + vmid + (0.125 * (vopp1 + vopp2));
+                                    Point3d adjusted = Point3d.Origin + vmid + (MorphologyConfig.ButterflyOppositeWeight * (vopp1 + vopp2));
                                     int[] wing1 = [.. v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2),];
                                     int[] wing2 = [.. v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2),];
                                     Vector3d vadjusted = adjusted - Point3d.Origin;
                                     for (int w = 0; w < wing1.Length && w < 2; w++) {
                                         int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing1[w])[0];
-                                        vadjusted -= 0.0625 * (originalVerts[meshVertIdx] - Point3d.Origin);
+                                        vadjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[meshVertIdx] - Point3d.Origin);
                                     }
                                     for (int w = 0; w < wing2.Length && w < 2; w++) {
                                         int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing2[w])[0];
-                                        vadjusted -= 0.0625 * (originalVerts[meshVertIdx] - Point3d.Origin);
+                                        vadjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[meshVertIdx] - Point3d.Origin);
                                     }
                                     return Point3d.Origin + vadjusted;
                                 }))()

@@ -36,6 +36,39 @@ internal static class MorphologyConfig {
     /// <summary>Mean curvature flow timestep safety factor relative to minimum edge length.</summary>
     internal const double CurvatureFlowTimestepFactor = 0.01;
 
+    /// <summary>Loop subdivision β-weight for 3-valence vertices (3/16).</summary>
+    internal const double LoopBetaValence3 = 0.1875;
+
+    /// <summary>Loop subdivision β-weight for 6-valence vertices (1/16) - regular case.</summary>
+    internal const double LoopBetaValence6 = 0.0625;
+
+    /// <summary>Loop subdivision centering weight coefficient (5/8).</summary>
+    internal const double LoopCenterWeight = 0.625;
+
+    /// <summary>Loop subdivision neighbor contribution base (3/8).</summary>
+    internal const double LoopNeighborBase = 0.375;
+
+    /// <summary>Loop subdivision cosine multiplier for irregular valence (1/4).</summary>
+    internal const double LoopCosineMultiplier = 0.25;
+
+    /// <summary>Loop edge midpoint weight for endpoints (3/8 each).</summary>
+    internal const double LoopEdgeMidpointWeight = 0.375;
+
+    /// <summary>Loop edge midpoint weight for opposite vertices (1/8 each).</summary>
+    internal const double LoopEdgeOppositeWeight = 0.125;
+
+    /// <summary>Butterfly subdivision simple midpoint weight (1/2).</summary>
+    internal const double ButterflyMidpointWeight = 0.5;
+
+    /// <summary>Butterfly subdivision opposite vertex positive weight (1/8 each).</summary>
+    internal const double ButterflyOppositeWeight = 0.125;
+
+    /// <summary>Butterfly subdivision wing vertex negative weight (-1/16 each).</summary>
+    internal const double ButterflyWingWeight = 0.0625;
+
+    /// <summary>Uniform Laplacian weight (simple average of neighbors).</summary>
+    internal const double UniformLaplacianWeight = 1.0;
+
     /// <summary>Validation mode dispatch: maps (operation ID, input type) to validation flags.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {

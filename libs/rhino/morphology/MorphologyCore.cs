@@ -207,8 +207,8 @@ internal static class MorphologyCore {
                 int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
                 Point3d neighborPos = positions[meshVertIdx];
                 double weight = useCotangent
-                    ? 1.0 / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                    : 1.0;
+                    ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                    : MorphologyConfig.UniformLaplacianWeight;
                 sum += (weight * neighborPos);
                 weightSum += weight;
             }
