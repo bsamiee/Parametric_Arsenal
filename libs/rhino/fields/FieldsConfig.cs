@@ -391,8 +391,6 @@ internal static class FieldsConfig {
     // DISTANCE FIELD PARAMETERS (using RhinoMath for tolerance-based computations)
     // ============================================================================
 
-    /// <summary>RTree threshold for switching from linear to spatial search (based on SpatialConfig pattern).</summary>
-    internal const int DistanceFieldRTreeThreshold = 100;
     /// <summary>Inside/outside ray casting tolerance multiplier (context.AbsoluteTolerance × this value).</summary>
     internal const double InsideOutsideToleranceMultiplier = 10.0;
 }

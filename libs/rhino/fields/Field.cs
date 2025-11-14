@@ -43,7 +43,7 @@ public static class Field {
                     EnableDiagnostics = false,
                 }).Map(results => results[0]),
             false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {typeof(T).Name}")),
+                error: E.Geometry.UnsupportedFieldOperation.WithContext($"Distance field not supported for {typeof(T).Name}")),
         };
 
     /// <summary>Compute gradient field: geometry → (grid points[], gradient vectors[]).</summary>
