@@ -50,9 +50,9 @@ Scalar and vector field operations for computational morphology: signed distance
 
 **Mesh.ClosestMeshPoint(Point3d)**: Returns MeshPoint with face index, parameters, and distance. Essential for signed distance computation with inside/outside determination.
 
-**Curve.ClosestPoint(Point3d)**: Returns parameter t. Use Curve.PointAt(t), Curve.TangentAt(t), Curve.CurvatureAt(t) for gradient field construction.
+**Curve.ClosestPoint(Point3d, out double t)**: Returns boolean success, outputs parameter t. Use Curve.PointAt(t), Curve.TangentAt(t), Curve.CurvatureAt(t) for gradient field construction.
 
-**Surface.ClosestPoint(Point3d)**: Returns UV parameters. Use Surface.PointAt(u,v), Surface.NormalAt(u,v) for distance fields and gradient computation.
+**Surface.ClosestPoint(Point3d, out double u, out double v)**: Returns boolean success, outputs UV parameters. Use Surface.PointAt(u,v), Surface.NormalAt(u,v) for distance fields and gradient computation.
 
 **Brep.ClosestPoint(Point3d)**: Returns ComponentIndex, Point3d, UV parameters. Critical for complex geometry distance queries.
 
@@ -75,10 +75,11 @@ Scalar and vector field operations for computational morphology: signed distance
 - Inside/outside determination via Brep.IsPointInside or ray casting winding number
 - Negate distance for interior points
 
-**Gradient Computation**: Finite difference approximation:
-- Sample field at x, x+δx, x+δy, x+δz (δ = context.AbsoluteTolerance)
-- Gradient = [(f(x+δx)-f(x))/δx, (f(x+δy)-f(x))/δy, (f(x+δz)-f(x))/δz]
-- Use RhinoMath for robust zero checks
+**Gradient Computation**: Central difference approximation (O(h²) accuracy):
+- Sample field at x±δx, y±δy, z±δz where δ = RhinoMath.SqrtEpsilon (≈1.5e-8)
+- Gradient = [(f(x+h)-f(x-h))/(2h), (f(y+h)-f(y-h))/(2h), (f(z+h)-f(z-h))/(2h)]
+- Forward/backward difference at grid boundaries (O(h) accuracy)
+- Use RhinoMath.SqrtEpsilon for optimal numerical stability vs. accuracy tradeoff
 
 **Streamline Integration**: Runge-Kutta 4th order (RK4):
 - k1 = f(p)
@@ -90,10 +91,11 @@ Scalar and vector field operations for computational morphology: signed distance
 
 **Isosurface Extraction**: Marching Cubes algorithm:
 - Sample field on 3D grid (resolution from user spec)
-- For each cube: evaluate field at 8 corners
-- Lookup table (256 cases) determines triangle configuration
-- Linear interpolation for edge intersections
-- Output: triangle mesh via Mesh.CreateFromTriangles
+- For each cube: evaluate field at 8 corners to determine configuration (0-255)
+- Lookup table (256 cases) determines triangle edge indices
+- Linear interpolation: t = (isovalue - f1) / (f2 - f1) for edge vertex position
+- Output: Mesh constructed via Mesh.Vertices.AddVertices() and Mesh.Faces.AddFaces()
+- Mesh.Normals.ComputeNormals() for proper shading, Mesh.Compact() to optimize
 
 **Performance Critical**: 
 - Use ArrayPool<T>.Shared for temporary buffers

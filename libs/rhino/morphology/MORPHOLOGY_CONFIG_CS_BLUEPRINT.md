@@ -133,6 +133,8 @@ internal static class MorphologyConfig {
     /// Each entry corresponds to one of 256 possible cube configurations (8 corners × 2 states).
     /// Values are edge indices (0-11) where triangles intersect cube edges.
     /// Empty array means no triangles (all corners same state).
+    /// IMPORTANT: Full 256-case table required in actual implementation. This shows pattern only.
+    /// Reference: Paul Bourke's marching cubes lookup table or equivalent validated source.
     /// </remarks>
     internal static readonly int[][] MarchingCubesTable = [
         [],  // Case 0: all outside
@@ -151,8 +153,8 @@ internal static class MorphologyConfig {
         [0, 10, 1, 0, 8, 10, 8, 11, 10,],  // Case 13: corners 0,2,3 inside
         [3, 9, 0, 3, 11, 9, 11, 10, 9,],  // Case 14: corners 1,2,3 inside
         [9, 8, 10, 10, 8, 11,],  // Case 15: corners 0,1,2,3 inside
-        // Cases 16-255: (remaining 240 configurations follow same pattern)
-        // Full table omitted for brevity - actual implementation includes all 256 cases
+        // Cases 16-255: (remaining 240 configurations - MUST be included in actual implementation)
+        // Pattern repeats with symmetry transformations of base 16 cases
     ];
 
     /// <summary>Marching cubes edge vertex pairs: edge index → (vertex1, vertex2).</summary>

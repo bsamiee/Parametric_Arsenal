@@ -207,33 +207,38 @@ internal static class MorphologyCompute {
 
                         // Get triangle configuration from lookup table
                         int[] triangleEdges = MorphologyConfig.MarchingCubesTable[cubeIndex];
-                        if (triangleEdges.Length == 0) {
-                            continue;
-                        }
 
-                        // Generate vertices by linear interpolation on edges
-                        Point3f[] edgeVertices = new Point3f[12];
-                        for (int e = 0; e < triangleEdges.Length; e++) {
-                            int edgeIdx = triangleEdges[e];
-                            (int v1, int v2) = MorphologyConfig.EdgeVertexPairs[edgeIdx];
-                            double f1 = scalarField[cornerIndices[v1]];
-                            double f2 = scalarField[cornerIndices[v2]];
-                            double t = Math.Abs(f2 - f1) > RhinoMath.ZeroTolerance
-                                ? (isovalue - f1) / (f2 - f1)
-                                : 0.5;
-                            Point3d p1 = gridPoints[cornerIndices[v1]];
-                            Point3d p2 = gridPoints[cornerIndices[v2]];
-                            edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
-                        }
+                        // Process cube using pattern matching (NO if statement)
+                        _ = triangleEdges.Length switch {
+                            0 => 0,  // No triangles - skip this cube
+                            _ => ((Func<int>)(() => {
+                                Point3f[] edgeVertices = new Point3f[12];
+                                
+                                // Generate vertices by linear interpolation on edges
+                                for (int e = 0; e < triangleEdges.Length; e++) {
+                                    int edgeIdx = triangleEdges[e];
+                                    (int v1, int v2) = MorphologyConfig.EdgeVertexPairs[edgeIdx];
+                                    double f1 = scalarField[cornerIndices[v1]];
+                                    double f2 = scalarField[cornerIndices[v2]];
+                                    double t = Math.Abs(f2 - f1) > RhinoMath.ZeroTolerance
+                                        ? (isovalue - f1) / (f2 - f1)
+                                        : 0.5;
+                                    Point3d p1 = gridPoints[cornerIndices[v1]];
+                                    Point3d p2 = gridPoints[cornerIndices[v2]];
+                                    edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
+                                }
 
-                        // Add triangles (every 3 edge indices form a triangle)
-                        for (int t = 0; t < triangleEdges.Length; t += 3) {
-                            int vIdx = vertices.Count;
-                            vertices.Add(edgeVertices[triangleEdges[t]]);
-                            vertices.Add(edgeVertices[triangleEdges[t + 1]]);
-                            vertices.Add(edgeVertices[triangleEdges[t + 2]]);
-                            faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
-                        }
+                                // Add triangles (every 3 edge indices form a triangle)
+                                for (int t = 0; t < triangleEdges.Length; t += 3) {
+                                    int vIdx = vertices.Count;
+                                    vertices.Add(edgeVertices[triangleEdges[t]]);
+                                    vertices.Add(edgeVertices[triangleEdges[t + 1]]);
+                                    vertices.Add(edgeVertices[triangleEdges[t + 2]]);
+                                    faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
+                                }
+                                return 1;
+                            }))(),
+                        };
                     }
                 }
             }
@@ -297,13 +302,13 @@ internal readonly struct MarchingCube {
 ## Key Patterns Demonstrated
 1. **ArrayPool buffers** - Rent/Return with try/finally in all algorithms
 2. **For-loops hot paths** - Grid iteration with index access
-3. **Central difference gradient** - (f(x+h) - f(x-h)) / (2h) with boundary cases
-4. **RK4 integration** - Four stages with weights from config
+3. **Central difference gradient** - (f(x+h) - f(x-h)) / (2h) with boundary cases (O(h²) accuracy)
+4. **RK4 integration** - Four stages with exact weights [1/6, 1/3, 1/3, 1/6] from config
 5. **Inline vector interpolation** - Nearest neighbor search inline
-6. **Marching cubes** - 256-case lookup, linear edge interpolation
+6. **Marching cubes** - 256-case lookup, linear edge interpolation with pattern matching (NO if)
 7. **NO helper methods** - All logic inline in main algorithms
-8. **Pattern matching** - Integration method switch expressions
-9. **RhinoMath constants** - ZeroTolerance for comparisons
+8. **Pattern matching** - Integration method and cube processing via switch expressions (NO if/else)
+9. **RhinoMath constants** - ZeroTolerance for comparisons, SqrtEpsilon for gradient step
 10. **Tuple deconstruction** - Multiple return values
 
 ## Integration Points
@@ -314,9 +319,11 @@ internal readonly struct MarchingCube {
 
 ## Algorithm Details
 
-**Gradient**: Central difference with boundary handling (forward/backward at edges)
-**Streamline**: RK4 with nearest-neighbor field interpolation, adaptive termination
-**Isosurface**: Classic marching cubes, linear interpolation on cube edges, mesh generation
+**Gradient**: Central difference with O(h²) accuracy, forward/backward at edges with O(h) accuracy. Step size h = RhinoMath.SqrtEpsilon for optimal numerical stability.
+
+**Streamline**: RK4 integration with exact weights [1/6, 1/3, 1/3, 1/6], nearest-neighbor field interpolation, adaptive termination on convergence or max steps.
+
+**Isosurface**: Classic marching cubes with 256-case lookup table, linear interpolation t = (iso - f1)/(f2 - f1) on cube edges, Rhino Mesh construction with normal computation.
 
 ## Struct Justification
 - **RK4State**: Encapsulates 4 intermediate slopes for RK4 integration (currently not used in simplified inline version)
