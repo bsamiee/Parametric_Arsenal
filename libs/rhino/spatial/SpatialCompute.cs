@@ -438,6 +438,7 @@ internal static class SpatialCompute {
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+        // Check for degenerate triangle: if orientation is near zero, the points are collinear and the incircle predicate is not meaningful.
         if (Math.Abs(orientation) <= orientationTolerance) {
             return false;
         }
