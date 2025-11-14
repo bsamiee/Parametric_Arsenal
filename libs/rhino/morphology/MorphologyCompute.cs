@@ -355,6 +355,138 @@ internal static class MorphologyCompute {
             }))();
 
     [Pure]
+    internal static Result<Mesh> OffsetMesh(
+        Mesh mesh,
+        double distance,
+        bool _,
+        IGeometryContext __) =>
+        !RhinoMath.IsValidDouble(distance) || Math.Abs(distance) < MorphologyConfig.MinOffsetDistance
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}")))
+            : Math.Abs(distance) > MorphologyConfig.MaxOffsetDistance
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}")))
+                : ((Func<Result<Mesh>>)(() => {
+                    Mesh? offset = mesh.Offset(distance);
+                    return offset?.IsValid is true
+                        ? ResultFactory.Create(value: offset)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
+                }))();
+
+    [Pure]
+    internal static Result<Mesh> ReduceMesh(
+        Mesh mesh,
+        int targetFaceCount,
+        bool _,
+        double accuracy,
+        IGeometryContext __) =>
+        targetFaceCount < MorphologyConfig.MinReductionFaceCount
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}")))
+            : targetFaceCount >= mesh.Faces.Count
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount} >= Current: {mesh.Faces.Count}")))
+                : !RhinoMath.IsValidDouble(accuracy) || accuracy < MorphologyConfig.MinReductionAccuracy || accuracy > MorphologyConfig.MaxReductionAccuracy
+                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Accuracy: {accuracy:F3}")))
+                    : ((Func<Result<Mesh>>)(() => {
+                        Mesh reduced = mesh.DuplicateMesh();
+                        bool success = reduced.Reduce(
+                            desiredPolygonCount: targetFaceCount,
+                            allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
+                            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * 10),
+                            normalizeSize: false,
+                            cancelToken: System.Threading.CancellationToken.None,
+                            progress: null,
+                            problemDescription: out string _,
+                            threaded: false);
+                        return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * 1.1
+                            ? ResultFactory.Create(value: reduced)
+                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
+                    }))();
+
+    [Pure]
+    internal static Result<Mesh> RemeshIsotropic(
+        Mesh mesh,
+        double targetEdgeLength,
+        int maxIterations,
+        bool _,
+        IGeometryContext context) {
+        BoundingBox bounds = mesh.GetBoundingBox(accurate: false);
+        double diagLength = bounds.Diagonal.Length;
+        double minEdge = context.AbsoluteTolerance * MorphologyConfig.RemeshMinEdgeLengthFactor;
+        double maxEdge = diagLength * MorphologyConfig.RemeshMaxEdgeLengthFactor;
+
+        return !RhinoMath.IsValidDouble(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")))
+            : maxIterations is <= 0 or > 100
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}")))
+                : ((Func<Result<Mesh>>)(() => {
+                    Mesh remeshed = mesh.DuplicateMesh();
+                    double splitThreshold = targetEdgeLength * MorphologyConfig.RemeshSplitThresholdFactor;
+
+                    for (int iter = 0; iter < maxIterations; iter++) {
+                        bool changed = false;
+
+                        for (int i = remeshed.TopologyEdges.Count - 1; i >= 0; i--) {
+                            Line edge = remeshed.TopologyEdges.EdgeLine(i);
+                            changed = edge.Length > splitThreshold
+                                ? ((Func<bool>)(() => {
+                                    Point3d mid = edge.PointAt(0.5);
+                                    int midIdx = remeshed.Vertices.Add(mid);
+                                    return midIdx >= 0;
+                                }))() || changed
+                                : changed;
+                        }
+
+                        changed = false;
+
+                        Point3d[] positions = [.. Enumerable.Range(0, remeshed.Vertices.Count).Select(i => (Point3d)remeshed.Vertices[i]),];
+                        Point3d[] smoothed = LaplacianUpdate(remeshed, positions, useCotangent: false);
+                        for (int i = 0; i < smoothed.Length; i++) {
+                            _ = remeshed.Vertices.SetVertex(i, smoothed[i]);
+                        }
+
+                        _ = remeshed.Normals.ComputeNormals();
+                        _ = remeshed.Compact();
+
+                        double[] edgeLengths = [.. Enumerable.Range(0, remeshed.TopologyEdges.Count)
+                            .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length),
+                        ];
+                        double meanEdge = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
+                        bool converged = Math.Abs(meanEdge - targetEdgeLength) < (targetEdgeLength * 0.1);
+                        changed = !converged && changed;
+                    }
+
+                    return remeshed.IsValid
+                        ? ResultFactory.Create(value: remeshed)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshingFailed);
+                }))();
+    }
+
+    [Pure]
+    private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
+        Point3d[] updated = new Point3d[positions.Length];
+
+        for (int i = 0; i < positions.Length; i++) {
+            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            updated[i] = neighbors.Length is 0
+                ? positions[i]
+                : ((Func<Point3d>)(() => {
+                    Point3d sum = Point3d.Origin;
+                    double weightSum = 0.0;
+                    for (int j = 0; j < neighbors.Length; j++) {
+                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                        Point3d neighborPos = positions[meshVertIdx];
+                        double weight = useCotangent
+                            ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                            : MorphologyConfig.UniformLaplacianWeight;
+                        sum += (weight * neighborPos);
+                        weightSum += weight;
+                    }
+                    return weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
+                }))();
+        }
+
+        return updated;
+    }
+
+    [Pure]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         double[] aspectRatios = new double[mesh.Faces.Count];
         double[] minAngles = new double[mesh.Faces.Count];

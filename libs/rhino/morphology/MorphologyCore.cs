@@ -21,6 +21,9 @@ internal static class MorphologyCore {
             [(MorphologyConfig.OpSmoothLaplacian, typeof(Mesh))] = ExecuteSmoothLaplacian,
             [(MorphologyConfig.OpSmoothTaubin, typeof(Mesh))] = ExecuteSmoothTaubin,
             [(MorphologyConfig.OpEvolveMeanCurvature, typeof(Mesh))] = ExecuteEvolveMeanCurvature,
+            [(MorphologyConfig.OpOffset, typeof(Mesh))] = ExecuteOffset,
+            [(MorphologyConfig.OpReduce, typeof(Mesh))] = ExecuteReduce,
+            [(MorphologyConfig.OpRemesh, typeof(Mesh))] = ExecuteRemesh,
         }.ToFrozenDictionary();
 
     [Pure]
@@ -174,6 +177,59 @@ internal static class MorphologyCore {
                 }))();
 
     [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteOffset(
+        object input,
+        object parameters,
+        IGeometryContext context) =>
+        input is not Mesh mesh
+            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
+            : parameters is not ValueTuple<double, bool>
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: (double distance, bool bothSides)"))
+                : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                    ValueTuple<double, bool> tuple = (ValueTuple<double, bool>)parameters;
+                    double distance = tuple.Item1;
+                    bool bothSides = tuple.Item2;
+                    return MorphologyCompute.OffsetMesh(mesh, distance, bothSides, context)
+                        .Bind(offset => ComputeOffsetMetrics(mesh, offset, distance, context));
+                }))();
+
+    [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteReduce(
+        object input,
+        object parameters,
+        IGeometryContext context) =>
+        input is not Mesh mesh
+            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
+            : parameters is not ValueTuple<int, bool, double>
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: (int targetFaceCount, bool preserveBoundary, double accuracy)"))
+                : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                    ValueTuple<int, bool, double> tuple = (ValueTuple<int, bool, double>)parameters;
+                    int targetFaces = tuple.Item1;
+                    bool preserveBoundary = tuple.Item2;
+                    double accuracy = tuple.Item3;
+                    return MorphologyCompute.ReduceMesh(mesh, targetFaces, preserveBoundary, accuracy, context)
+                        .Bind(reduced => ComputeReductionMetrics(mesh, reduced, context));
+                }))();
+
+    [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh(
+        object input,
+        object parameters,
+        IGeometryContext context) =>
+        input is not Mesh mesh
+            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
+            : parameters is not ValueTuple<double, int, bool>
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: (double targetEdgeLength, int maxIterations, bool preserveFeatures)"))
+                : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                    ValueTuple<double, int, bool> tuple = (ValueTuple<double, int, bool>)parameters;
+                    double targetEdge = tuple.Item1;
+                    int maxIters = tuple.Item2;
+                    bool preserveFeats = tuple.Item3;
+                    return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, context)
+                        .Bind(remeshed => ComputeRemeshMetrics(remeshed, targetEdge, maxIters, context));
+                }))();
+
+    [Pure]
     private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
 
@@ -295,6 +351,114 @@ internal static class MorphologyCore {
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [
                 new Morphology.SmoothingResult(smoothed, iterations, rms, maxDisp, quality, converged),
+            ]);
+    }
+
+    [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeOffsetMetrics(
+        Mesh original,
+        Mesh offset,
+        double _,
+        IGeometryContext context) {
+        Point3d[] originalVerts = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, offset.Vertices.Count))
+            .Select(i => (Point3d)original.Vertices[i]),
+        ];
+        Point3d[] offsetVerts = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, offset.Vertices.Count))
+            .Select(i => (Point3d)offset.Vertices[i]),
+        ];
+        double[] displacements = [.. originalVerts.Zip(offsetVerts, (o, off) => o.DistanceTo(off)),];
+        double actualDist = displacements.Length > 0 ? displacements.Average() : 0.0;
+        bool hasDegen = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
+
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+            value: [new Morphology.OffsetResult(
+                offset,
+                actualDist,
+                hasDegen,
+                original.Vertices.Count,
+                offset.Vertices.Count,
+                original.Faces.Count,
+                offset.Faces.Count),
+            ]);
+    }
+
+    [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeReductionMetrics(
+        Mesh original,
+        Mesh reduced,
+        IGeometryContext context) {
+        double reductionRatio = original.Faces.Count > 0
+            ? (double)reduced.Faces.Count / original.Faces.Count
+            : 1.0;
+
+        double[] aspectRatios = [.. Enumerable.Range(0, reduced.Faces.Count)
+            .Select(i => {
+                Point3d a = reduced.Vertices[reduced.Faces[i].A];
+                Point3d b = reduced.Vertices[reduced.Faces[i].B];
+                Point3d c = reduced.Vertices[reduced.Faces[i].C];
+                double ab = a.DistanceTo(b);
+                double bc = b.DistanceTo(c);
+                double ca = c.DistanceTo(a);
+                double maxEdge = Math.Max(Math.Max(ab, bc), ca);
+                double minEdge = Math.Min(Math.Min(ab, bc), ca);
+                return minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
+            }),
+        ];
+
+        double[] edgeLengths = [.. Enumerable.Range(0, reduced.TopologyEdges.Count)
+            .Select(i => reduced.TopologyEdges.EdgeLine(i).Length),
+        ];
+
+        double quality = MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0;
+        double meanAspect = aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0;
+        double minEdge = edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0;
+        double maxEdge = edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0;
+
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+            value: [new Morphology.ReductionResult(
+                reduced,
+                original.Faces.Count,
+                reduced.Faces.Count,
+                reductionRatio,
+                quality,
+                meanAspect,
+                minEdge,
+                maxEdge),
+            ]);
+    }
+
+    [Pure]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRemeshMetrics(
+        Mesh remeshed,
+        double targetEdge,
+        int maxIters,
+        IGeometryContext context) {
+        double[] edgeLengths = [.. Enumerable.Range(0, remeshed.TopologyEdges.Count)
+            .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length),
+        ];
+
+        double mean = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
+        double[] squares = [.. edgeLengths.Select(e => Math.Pow(e - mean, 2.0)),];
+        double variance = edgeLengths.Length > 0
+            ? squares.Average()
+            : 0.0;
+        double stdDev = Math.Sqrt(variance);
+        double uniformity = mean > context.AbsoluteTolerance
+            ? Math.Exp(-stdDev / mean)
+            : 0.0;
+        bool converged = Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * 0.1);
+
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+            value: [new Morphology.RemeshResult(
+                remeshed,
+                targetEdge,
+                mean,
+                stdDev,
+                uniformity,
+                maxIters,
+                converged,
+                0,
+                remeshed.Faces.Count),
             ]);
     }
 }
