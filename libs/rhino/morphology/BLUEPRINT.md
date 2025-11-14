@@ -1,7 +1,7 @@
 # Morphology Library Blueprint
 
 ## Overview
-Scalar and vector field operations for computational morphology: signed distance fields, gradient fields, streamline tracing, and isosurface extraction. Enables distance-based shape analysis, flow visualization, and implicit surface modeling.
+Scalar and vector field operations for computational morphology: signed distance fields (SDF), gradient fields, streamline tracing via RK4 integration, and isosurface extraction via marching cubes. Enables distance-based shape analysis, flow field visualization, and implicit surface modeling for generative design and computational analysis.
 
 ## Existing libs/ Infrastructure Analysis
 
@@ -24,10 +24,11 @@ Scalar and vector field operations for computational morphology: signed distance
 ### Similar libs/rhino/ Implementations
 
 **`libs/rhino/spatial/`**: 
-- RTree spatial indexing with ArrayPool buffers - REUSE for closest point queries
+- RTree spatial indexing with ArrayPool buffers - REUSE for closest point queries in distance field computation
 - FrozenDictionary dispatch pattern (type pairs → operations) - REPLICATE for field operations
-- ConditionalWeakTable caching - APPLY for expensive field evaluations
-- BufferSize configuration constants - ADOPT similar patterns
+- ConditionalWeakTable caching - NOT NEEDED (fields are stateless computations, no geometry-keyed caching)
+- BufferSize configuration constants - ADOPT similar patterns for grid sampling buffers
+- **ProximityField already exists** - DO NOT duplicate this functionality
 
 **`libs/rhino/extraction/`**: 
 - Polymorphic spec pattern (int/double/Vector3d/Semantic) - ADAPT for field parameters
@@ -104,6 +105,32 @@ Scalar and vector field operations for computational morphology: signed distance
 - Minimum: RhinoCommon 8.0
 - Tested: RhinoCommon 8.24+
 
+## CRITICAL: NO ENUMS - Byte-Based Dispatch Pattern
+
+**ABSOLUTE REQUIREMENT**: This library **MUST NOT** use enum types. Following established patterns in extraction/, spatial/, and orientation/ folders:
+
+1. **Operation Classification**: Use byte constants (NOT enums)
+   - `const byte OperationDistance = 0;`
+   - `const byte OperationGradient = 1;`
+   - `const byte OperationStreamline = 2;`
+   - `const byte OperationIsosurface = 3;`
+
+2. **Integration Methods**: Use byte constants (NOT enums)
+   - `const byte IntegrationEuler = 0;`
+   - `const byte IntegrationRK2 = 1;`
+   - `const byte IntegrationRK4 = 2;`
+   - `const byte IntegrationAdaptiveRK4 = 3;`
+
+3. **Dispatch via FrozenDictionary**: All operation-type mappings use `FrozenDictionary<(byte, Type), T>`
+
+4. **Why NO ENUMS**: 
+   - Enums are strongly typed, preventing flexible polymorphic dispatch
+   - Byte constants enable O(1) FrozenDictionary lookup
+   - Matches project architectural standards across ALL libs/rhino/ folders
+   - Enables runtime operation composition without boxing/unboxing overhead
+
+**This is non-negotiable** - any use of enums violates core architectural principles.
+
 ## File Organization
 
 ### Pattern C (4 files - Maximum Complexity Domain)
@@ -111,11 +138,11 @@ Scalar and vector field operations for computational morphology: signed distance
 Justification: Four distinct operation categories (distance, gradient, streamline, isosurface) with complex algorithms requiring separation for readability while maintaining density.
 
 ### File 1: `Morphology.cs`
-**Purpose**: Public API surface with polymorphic dispatch
+**Purpose**: Public API surface with UnifiedOperation dispatch (NO ENUMS - byte-based classification only)
 
 **Types** (2 total):
-- `Morphology` (static class): Primary API entry point with four operation categories
-- `FieldSpec` (readonly struct): Polymorphic field specification (resolution, bounds, tolerance)
+- `Morphology` (static class): Primary API entry point dispatching to MorphologyCore via byte operation codes
+- `FieldSpec` (readonly struct): Field specification with resolution, bounds, step size (NO MODE ENUMS)
 
 **Key Members**:
 - `DistanceField<T>(T geometry, FieldSpec spec, IGeometryContext)`: Signed distance field → (Point3d[] grid, double[] distances)
@@ -229,70 +256,116 @@ internal static Result<double[]> ComputeSignedDistance(
 **LOC Estimate**: 250-300
 
 ### File 4: `MorphologyConfig.cs`
-**Purpose**: Configuration types, constants, and lookup tables
+**Purpose**: Configuration constants, byte-based operation IDs, and FrozenDictionary dispatch tables
 
-**Types** (2 total):
-- `MorphologyConfig` (internal static class): Constants and marching cubes lookup table
-- `FieldSpec` (public readonly struct): Field specification with validation (MOVED from File 1 after consideration)
+**Types** (1 total):
+- `MorphologyConfig` (internal static class): Constants, byte operation codes, marching cubes lookup, buffer size dispatch
 
 **Key Members**:
-- `DefaultResolution` (const int): 32 - default grid resolution
-- `DefaultStepSize` (const double): 0.01 - default integration step
-- `MaxStreamlineSteps` (const int): 10000 - prevent infinite loops
-- `MarchingCubesTable` (static readonly int[][]): 256-case triangle configuration lookup
-- `ValidateFieldSpec(FieldSpec, IGeometryContext)`: Specification validation logic
+- **Operation Type Identifiers** (byte constants): Distance=0, Gradient=1, Streamline=2, Isosurface=3
+- **Integration Method Identifiers** (byte constants): Euler=0, RK2=1, RK4=2, AdaptiveRK4=3
+- **Grid Resolution Constants**: DefaultResolution=32, MinResolution=8, MaxResolution=256
+- **Integration Constants**: DefaultStepSize=0.01, MaxStreamlineSteps=10000, AdaptiveStepTolerance=1e-6
+- **Buffer Size Dispatch** (FrozenDictionary<(byte, Type), int>): Operation-type pairs to buffer sizes
+- **Validation Mode Dispatch** (FrozenDictionary<(byte, Type), V>): Operation-type pairs to validation modes
+- **Marching Cubes Lookup** (static readonly int[][]): 256-case edge-to-triangle configuration table
+- **RK4 Coefficients** (static readonly double[]): [1/6, 1/3, 1/3, 1/6] weights for RK4 integration
 
 **Code Style Example**:
 ```csharp
 internal static class MorphologyConfig {
-    internal const int DefaultResolution = 32;
-    internal const double DefaultStepSize = 0.01;
-    internal const int MaxStreamlineSteps = 10000;
-    internal const int MarchingCubesBufferSize = 4096;
+    // Operation type identifiers (NO ENUMS - use byte constants)
+    internal const byte OperationDistance = 0;
+    internal const byte OperationGradient = 1;
+    internal const byte OperationStreamline = 2;
+    internal const byte OperationIsosurface = 3;
 
-    internal static readonly FrozenDictionary<(int Resolution, Type Geometry), int> BufferSizes =
-        new Dictionary<(int, Type), int> {
-            [(32, typeof(Mesh))] = 1024,
-            [(64, typeof(Mesh))] = 4096,
-            [(32, typeof(Brep))] = 2048,
-            [(64, typeof(Brep))] = 8192,
+    // Integration method identifiers (NO ENUMS - use byte constants)
+    internal const byte IntegrationEuler = 0;
+    internal const byte IntegrationRK2 = 1;
+    internal const byte IntegrationRK4 = 2;
+    internal const byte IntegrationAdaptiveRK4 = 3;
+
+    // Grid resolution bounds (use RhinoMath.Clamp for validation)
+    internal const int DefaultResolution = 32;
+    internal const int MinResolution = 8;
+    internal const int MaxResolution = 256;
+
+    // Integration step parameters (computed from context.AbsoluteTolerance where possible)
+    internal const double DefaultStepSize = 0.01;
+    internal const double MinStepSize = 1e-8;
+    internal const double MaxStepSize = 1.0;
+    internal const int MaxStreamlineSteps = 10000;
+    internal static readonly double AdaptiveStepTolerance = RhinoMath.SqrtEpsilon;
+    internal static readonly double GradientFiniteDifferenceStep = RhinoMath.SqrtEpsilon;
+
+    // RK4 integration weights (exact fractions for numerical accuracy)
+    internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
+    internal static readonly double[] RK4HalfStep = [0.5, 0.5, 1.0,];
+
+    // Buffer size dispatch: (operation, geometry type) → buffer size
+    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), int> BufferSizes =
+        new Dictionary<(byte, Type), int> {
+            [(OperationDistance, typeof(Mesh))] = 2048,
+            [(OperationDistance, typeof(Brep))] = 4096,
+            [(OperationDistance, typeof(Curve))] = 1024,
+            [(OperationDistance, typeof(Surface))] = 2048,
+            [(OperationGradient, typeof(Mesh))] = 4096,
+            [(OperationGradient, typeof(Brep))] = 8192,
+            [(OperationStreamline, typeof(void))] = 2048,
+            [(OperationIsosurface, typeof(void))] = 8192,
         }.ToFrozenDictionary();
 
-    internal static readonly int[][] MarchingCubesTable = [
-        // 256 cases: each row is triangle vertex indices for cube configuration
-        [],  // Case 0: no intersections
-        [0, 8, 3,],  // Case 1: vertex 0 inside
-        // ... 254 more cases (compressed in actual implementation)
-    ];
-}
+    // Validation mode dispatch: (operation, geometry type) → validation flags
+    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), V> ValidationModes =
+        new Dictionary<(byte, Type), V> {
+            [(OperationDistance, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(OperationDistance, typeof(Brep))] = V.Standard | V.Topology,
+            [(OperationDistance, typeof(Curve))] = V.Standard | V.Degeneracy,
+            [(OperationDistance, typeof(Surface))] = V.Standard | V.BoundingBox,
+            [(OperationGradient, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(OperationGradient, typeof(Brep))] = V.Standard | V.Topology,
+            [(OperationGradient, typeof(Curve))] = V.Standard | V.Degeneracy,
+            [(OperationGradient, typeof(Surface))] = V.Standard | V.BoundingBox,
+        }.ToFrozenDictionary();
 
-public readonly struct FieldSpec(int resolution, BoundingBox? bounds, double? stepSize) {
-    public readonly int Resolution = resolution > 0 
-        ? resolution 
-        : MorphologyConfig.DefaultResolution;
-    public readonly BoundingBox? Bounds = bounds;
-    public readonly double StepSize = stepSize ?? MorphologyConfig.DefaultStepSize;
+    // Marching cubes edge-to-triangle lookup (256 cases, compressed representation)
+    // Each entry: cube corner configuration (8 bits) → triangle vertex indices on edges
+    internal static readonly int[][] MarchingCubesTable = [
+        [],  // Case 0: all corners outside
+        [0, 8, 3,],  // Case 1: corner 0 inside
+        [0, 1, 9,],  // Case 2: corner 1 inside
+        [1, 8, 3, 9, 8, 1,],  // Case 3: corners 0,1 inside
+        // ... 252 more cases (actual table in implementation)
+    ];
+
+    // Marching cubes edge intersection lookup: edge index → (vertex1, vertex2) pair
+    internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
+        (0, 1), (1, 2), (2, 3), (3, 0),  // Bottom face edges
+        (4, 5), (5, 6), (6, 7), (7, 4),  // Top face edges
+        (0, 4), (1, 5), (2, 6), (3, 7),  // Vertical edges
+    ];
 }
 ```
 
-**LOC Estimate**: 150-180 (including marching cubes table)
+**LOC Estimate**: 180-220 (including 256-case marching cubes table compressed with pattern repetition)
 
 ## Adherence to Limits
 
 - **Files**: 4 files (✓ at maximum, justified by distinct algorithm categories)
-- **Types**: 10 types total (✓ at maximum: 2+3+3+2)
-- **Estimated Total LOC**: 750-930 (well within reasonable range for complex computational geometry)
+- **Types**: 9 types total (✓ within limit: 2+3+3+1 - removed FieldSpec validation helper)
+- **Estimated Total LOC**: 700-880 (well within reasonable range for complex computational geometry)
 
 **Justification for 4 files**: Distance fields, gradient fields, streamline integration, and isosurface extraction are algorithmically distinct operations that benefit from separation. Each algorithm requires 150-300 LOC of dense computational code. Consolidation into 3 files would create members exceeding 300 LOC limit.
 
-**Justification for 10 types**: Minimal type count given complexity:
-- 1 public API class
-- 1 public spec struct  
+**Justification for 9 types**: Minimal type count given complexity:
+- 1 public API class (Morphology)
+- 1 public spec struct (FieldSpec)
 - 3 core algorithm structs (SampleGrid, RK4State, MarchingCube)
 - 3 internal implementation classes (Core, Compute, Config)
-- 2 internal helper structs (DistanceQuery, FieldSpec validation)
+- **NO internal helper types** - validation inline with switch expressions
 
-All types justified and necessary.
+All types justified and necessary. **NO ENUMS** - all classification via byte constants.
 
 ## Algorithmic Density Strategy
 
@@ -314,10 +387,27 @@ All types justified and necessary.
 
 ## Dispatch Architecture
 
-### Type-Based Operation Dispatch
+### CRITICAL: NO ENUMS - Byte-Based Classification Only
+
+**Following extraction/, spatial/, orientation/ patterns:**
+- Operation types: byte constants (0=Distance, 1=Gradient, 2=Streamline, 3=Isosurface)
+- Integration methods: byte constants (0=Euler, 1=RK2, 2=RK4, 3=AdaptiveRK4)
+- All dispatch via FrozenDictionary<(byte, Type), T> lookups
+- **NEVER use enum types** - violates project architectural standards
+
+### Type-Operation Pair Dispatch
 
 ```csharp
-FrozenDictionary<Type, (V ValidationMode, Func<object, FieldSpec, IGeometryContext, Result<T>> Execute)>
+// MorphologyCore.cs dispatch registry
+internal static readonly FrozenDictionary<(byte Operation, Type Geometry), (V Mode, Func<object, FieldSpec, IGeometryContext, Result<T>> Execute)> OperationRegistry =
+    new Dictionary<(byte, Type), (V, Func<object, FieldSpec, IGeometryContext, Result<T>>)> {
+        [(MorphologyConfig.OperationDistance, typeof(Mesh))] = (V.Standard | V.MeshSpecific, ExecuteDistanceField<Mesh>),
+        [(MorphologyConfig.OperationDistance, typeof(Brep))] = (V.Standard | V.Topology, ExecuteDistanceField<Brep>),
+        [(MorphologyConfig.OperationDistance, typeof(Curve))] = (V.Standard | V.Degeneracy, ExecuteDistanceField<Curve>),
+        [(MorphologyConfig.OperationDistance, typeof(Surface))] = (V.Standard | V.BoundingBox, ExecuteDistanceField<Surface>),
+        [(MorphologyConfig.OperationGradient, typeof(Mesh))] = (V.Standard | V.MeshSpecific, ExecuteGradientField<Mesh>),
+        // ... additional operation-type pairs
+    }.ToFrozenDictionary();
 ```
 
 **Mesh**: V.MeshSpecific → Mesh.ClosestMeshPoint for O(n) queries, RTree for acceleration
@@ -325,16 +415,15 @@ FrozenDictionary<Type, (V ValidationMode, Func<object, FieldSpec, IGeometryConte
 **Curve**: V.Degeneracy → Curve.ClosestPoint + tangent/curvature for gradient
 **Surface**: V.BoundingBox → Surface.ClosestPoint + normal for distance field
 
-### Field Operation Pattern Matching
+### Byte-Based Operation Switch (NOT string/enum)
 
 ```csharp
-operation switch {
-    "distance" => ComputeSignedDistance(geometry, grid, context),
-    "gradient" => ComputeGradient(distanceField, grid, context),
-    "streamline" => IntegrateStreamline(vectorField, seeds, spec, context),
-    "isosurface" => ExtractIsosurface(scalarField, spec, isovalue, context),
-    _ => ResultFactory.Create(error: E.Geometry.UnsupportedAnalysis),
-}
+// Public API dispatches to Core via byte operation codes
+byte operationType = MorphologyConfig.OperationDistance;  // NOT enum, NOT string
+MorphologyCore.OperationRegistry.TryGetValue((operationType, typeof(T)), out (V mode, Func<...> execute) config) switch {
+    true => UnifiedOperation.Apply(...),
+    false => ResultFactory.Create(error: E.Geometry.UnsupportedAnalysis),
+};
 ```
 
 ## Public API Surface
@@ -389,6 +478,7 @@ public readonly struct FieldSpec {
 
 ## Code Style Adherence Verification
 
+- [x] **NO ENUMS** - All classification uses byte constants with FrozenDictionary dispatch
 - [x] All examples use pattern matching (no if/else statements)
 - [x] All examples use explicit types (no var)
 - [x] All examples use named parameters where non-obvious
@@ -399,6 +489,8 @@ public readonly struct FieldSpec {
 - [x] One type per file organization planned
 - [x] All member estimates under 300 LOC
 - [x] All patterns match existing libs/ exemplars
+- [x] Byte-based dispatch matches extraction/, spatial/, orientation/ patterns
+- [x] FrozenDictionary for all type-operation mappings
 
 ## Error Allocation Strategy
 
@@ -478,19 +570,25 @@ public static readonly SystemError InvalidScalarField = Get(2743);
 
 ## Implementation Sequence
 
-1. Read this blueprint thoroughly
-2. **Create error codes**: Add morphology errors to E.cs (2700-2749 range)
-3. **Create MorphologyConfig.cs**: Constants, FieldSpec struct, marching cubes table
-4. **Create MorphologyCore.cs**: FrozenDictionary dispatch, RTree factories, grid sampling
-5. **Implement distance field**: ComputeSignedDistance in MorphologyCompute.cs
-6. **Implement gradient field**: ComputeGradient using finite differences
-7. **Implement streamline tracing**: IntegrateStreamline using RK4
-8. **Implement isosurface extraction**: ExtractIsosurface using marching cubes
-9. **Create Morphology.cs**: Public API with UnifiedOperation integration
-10. **Verify patterns**: Check all code matches exemplars (no var, no if/else, K&R, etc.)
-11. **Verify LOC limits**: Ensure all members ≤300 LOC
-12. **Verify file/type limits**: Confirm 4 files, 10 types maximum
-13. **Build and test**: Validate compilation and basic functionality
+1. Read this blueprint thoroughly - **pay special attention to NO ENUMS requirement**
+2. **Study byte-based patterns**: Read extraction/ExtractionConfig.cs, spatial/SpatialConfig.cs thoroughly
+3. **Create MorphologyConfig.cs FIRST**: Byte operation codes, FrozenDictionary dispatch, marching cubes table
+4. **Add error codes**: Add morphology errors to E.cs (2700-2749 range)
+5. **Create MorphologyCore.cs**: Byte-based FrozenDictionary dispatch registry, RTree factories
+6. **Create MorphologyCompute.cs**: Core algorithms with ArrayPool buffers
+7. **Implement distance field**: ComputeSignedDistance with RTree acceleration
+8. **Implement gradient field**: ComputeGradient using central difference with RhinoMath.SqrtEpsilon step
+9. **Implement streamline tracing**: IntegrateStreamline using RK4 with weights from config
+10. **Implement isosurface extraction**: ExtractIsosurface using marching cubes 256-case lookup
+11. **Create Morphology.cs**: Public API dispatching via byte operation codes
+12. **VERIFY NO ENUMS**: `grep -r "enum " morphology/ --include="*.cs"` must return zero results
+13. **Verify byte dispatch**: All FrozenDictionary keys use (byte, Type) tuples
+14. **Verify RhinoMath usage**: All constants from RhinoMath (ZeroTolerance, SqrtEpsilon, IsValidDouble)
+15. **Verify ArrayPool**: All temporary buffers use ArrayPool<T>.Shared
+16. **Verify patterns**: Check all code matches exemplars (no var, no if/else, K&R, pattern matching)
+17. **Verify LOC limits**: Ensure all members ≤300 LOC
+18. **Verify file/type limits**: Confirm 4 files, 9 types (NOT 10 - removed extra helper type)
+19. **Build and validate**: Ensure compilation succeeds
 
 ## Advanced Features (Future Considerations)
 
