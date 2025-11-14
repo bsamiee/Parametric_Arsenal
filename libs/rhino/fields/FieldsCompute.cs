@@ -9,7 +9,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Dense field algorithms: gradient, curl, divergence, laplacian, vector potential, interpolation, streamline, isosurface.</summary>
+/// <summary>Dense field algorithms: gradient, curl, divergence, laplacian, hessian, vector potential, interpolation, streamline, isosurface, critical points, statistics.</summary>
 [Pure]
 internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -419,6 +419,7 @@ internal static class FieldsCompute {
 
                 for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
                     Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, tree: tree, resolution: resolution, bounds: bounds);
+                    double k1Magnitude = k1.Length;
 
                     Vector3d k2 = integrationMethod switch {
                         0 => k1,
@@ -445,11 +446,16 @@ internal static class FieldsCompute {
                         _ => Vector3d.Zero,
                     };
 
-                    bool shouldContinue = delta.Length > context.AbsoluteTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
+                    Point3d nextPoint = current + delta;
+                    bool inBounds = bounds.Contains(nextPoint);
+                    bool fieldTooWeak = k1Magnitude < FieldsConfig.MinFieldMagnitude;
+                    bool stepTooSmall = delta.Length < RhinoMath.ZeroTolerance;
+                    bool shouldContinue = inBounds && !fieldTooWeak && !stepTooSmall && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
+
                     _ = shouldContinue switch {
                         false => 0,
                         true => ((Func<int>)(() => {
-                            current += delta;
+                            current = nextPoint;
                             pathBuffer[stepCount] = current;
                             stepCount++;
                             return 1;
@@ -549,5 +555,363 @@ internal static class FieldsCompute {
         }
 
         return ResultFactory.Create(value: meshes);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
+    internal static Result<(Point3d[] Grid, double[,][] Hessian)> ComputeHessian(
+        double[] scalarField,
+        Point3d[] grid,
+        int resolution,
+        Vector3d gridDelta) {
+        return (scalarField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], double[,][])>(error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points")),
+            (_, false) => ResultFactory.Create<(Point3d[], double[,][])>(error: E.Geometry.InvalidHessianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (true, true) => ((Func<Result<(Point3d[], double[,][])>>)(() => {
+                int totalSamples = scalarField.Length;
+                double[,][] hessian = new double[3, 3][];
+                for (int row = 0; row < 3; row++) {
+                    for (int col = 0; col < 3; col++) {
+                        hessian[row, col] = ArrayPool<double>.Shared.Rent(totalSamples);
+                    }
+                }
+
+                try {
+                    double dx2 = gridDelta.X * gridDelta.X;
+                    double dy2 = gridDelta.Y * gridDelta.Y;
+                    double dz2 = gridDelta.Z * gridDelta.Z;
+                    double dxdy = gridDelta.X * gridDelta.Y;
+                    double dxdz = gridDelta.X * gridDelta.Z;
+                    double dydz = gridDelta.Y * gridDelta.Z;
+                    int resSquared = resolution * resolution;
+
+                    for (int i = 0; i < resolution; i++) {
+                        for (int j = 0; j < resolution; j++) {
+                            for (int k = 0; k < resolution; k++) {
+                                int idx = (i * resSquared) + (j * resolution) + k;
+                                double center = scalarField[idx];
+
+                                double d2f_dx2 = (i > 0 && i < resolution - 1)
+                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + k] - (2.0 * center) + scalarField[((i - 1) * resSquared) + (j * resolution) + k]) / dx2
+                                    : 0.0;
+
+                                double d2f_dy2 = (j > 0 && j < resolution - 1)
+                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + k] - (2.0 * center) + scalarField[(i * resSquared) + ((j - 1) * resolution) + k]) / dy2
+                                    : 0.0;
+
+                                double d2f_dz2 = (k > 0 && k < resolution - 1)
+                                    ? (scalarField[(i * resSquared) + (j * resolution) + (k + 1)] - (2.0 * center) + scalarField[(i * resSquared) + (j * resolution) + (k - 1)]) / dz2
+                                    : 0.0;
+
+                                double d2f_dxdy = (i > 0 && i < resolution - 1 && j > 0 && j < resolution - 1)
+                                    ? (scalarField[((i + 1) * resSquared) + ((j + 1) * resolution) + k] - scalarField[((i + 1) * resSquared) + ((j - 1) * resolution) + k] - scalarField[((i - 1) * resSquared) + ((j + 1) * resolution) + k] + scalarField[((i - 1) * resSquared) + ((j - 1) * resolution) + k]) / (4.0 * dxdy)
+                                    : 0.0;
+
+                                double d2f_dxdz = (i > 0 && i < resolution - 1 && k > 0 && k < resolution - 1)
+                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + (k + 1)] - scalarField[((i + 1) * resSquared) + (j * resolution) + (k - 1)] - scalarField[((i - 1) * resSquared) + (j * resolution) + (k + 1)] + scalarField[((i - 1) * resSquared) + (j * resolution) + (k - 1)]) / (4.0 * dxdz)
+                                    : 0.0;
+
+                                double d2f_dydz = (j > 0 && j < resolution - 1 && k > 0 && k < resolution - 1)
+                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + (k + 1)] - scalarField[(i * resSquared) + ((j + 1) * resolution) + (k - 1)] - scalarField[(i * resSquared) + ((j - 1) * resolution) + (k + 1)] + scalarField[(i * resSquared) + ((j - 1) * resolution) + (k - 1)]) / (4.0 * dydz)
+                                    : 0.0;
+
+                                hessian[0, 0][idx] = d2f_dx2;
+                                hessian[1, 1][idx] = d2f_dy2;
+                                hessian[2, 2][idx] = d2f_dz2;
+                                hessian[0, 1][idx] = d2f_dxdy;
+                                hessian[1, 0][idx] = d2f_dxdy;
+                                hessian[0, 2][idx] = d2f_dxdz;
+                                hessian[2, 0][idx] = d2f_dxdz;
+                                hessian[1, 2][idx] = d2f_dydz;
+                                hessian[2, 1][idx] = d2f_dydz;
+                            }
+                        }
+                    }
+
+                    double[,][] finalHessian = new double[3, 3][];
+                    for (int row = 0; row < 3; row++) {
+                        for (int col = 0; col < 3; col++) {
+                            finalHessian[row, col] = [.. hessian[row, col][..totalSamples]];
+                        }
+                    }
+                    return ResultFactory.Create(value: (Grid: grid, Hessian: finalHessian));
+                } finally {
+                    for (int row = 0; row < 3; row++) {
+                        for (int col = 0; col < 3; col++) {
+                            ArrayPool<double>.Shared.Return(hessian[row, col], clearArray: true);
+                        }
+                    }
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> ComputeDirectionalDerivative(
+        Vector3d[] gradientField,
+        Point3d[] grid,
+        Vector3d direction) {
+        return (gradientField.Length == grid.Length, direction.IsValid && direction.Length > RhinoMath.ZeroTolerance) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points")),
+            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
+            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
+                int totalSamples = gradientField.Length;
+                double[] directionalDerivatives = ArrayPool<double>.Shared.Rent(totalSamples);
+                Vector3d unitDirection = direction / direction.Length;
+
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        directionalDerivatives[i] = Vector3d.Multiply(gradientField[i], unitDirection);
+                    }
+
+                    double[] finalDerivatives = [.. directionalDerivatives[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, DirectionalDerivatives: finalDerivatives));
+                } finally {
+                    ArrayPool<double>.Shared.Return(directionalDerivatives, clearArray: true);
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] Magnitudes)> ComputeFieldMagnitude(
+        Vector3d[] vectorField,
+        Point3d[] grid) {
+        return (vectorField.Length == grid.Length) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points")),
+            true => ((Func<Result<(Point3d[], double[])>>)(() => {
+                int totalSamples = vectorField.Length;
+                double[] magnitudes = ArrayPool<double>.Shared.Rent(totalSamples);
+
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        magnitudes[i] = vectorField[i].Length;
+                    }
+
+                    double[] finalMagnitudes = [.. magnitudes[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Magnitudes: finalMagnitudes));
+                } finally {
+                    ArrayPool<double>.Shared.Return(magnitudes, clearArray: true);
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeVectorField(
+        Vector3d[] vectorField,
+        Point3d[] grid) {
+        return (vectorField.Length == grid.Length) switch {
+            false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points")),
+            true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                int totalSamples = vectorField.Length;
+                Vector3d[] normalized = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
+
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        double magnitude = vectorField[i].Length;
+                        normalized[i] = magnitude > FieldsConfig.MinFieldMagnitude
+                            ? vectorField[i] / magnitude
+                            : Vector3d.Zero;
+                    }
+
+                    Vector3d[] finalNormalized = [.. normalized[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Normalized: finalNormalized));
+                } finally {
+                    ArrayPool<Vector3d>.Shared.Return(normalized, clearArray: true);
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
+        double[] scalarField,
+        Vector3d[] vectorField,
+        Point3d[] grid,
+        int component) {
+        return (scalarField.Length == grid.Length, vectorField.Length == grid.Length, component is >= 0 and <= 2) switch {
+            (false, _, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points")),
+            (_, false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
+            (_, _, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Component must be 0 (X), 1 (Y), or 2 (Z)")),
+            (true, true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
+                int totalSamples = scalarField.Length;
+                double[] product = ArrayPool<double>.Shared.Rent(totalSamples);
+
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        product[i] = component switch {
+                            0 => scalarField[i] * vectorField[i].X,
+                            1 => scalarField[i] * vectorField[i].Y,
+                            2 => scalarField[i] * vectorField[i].Z,
+                            _ => 0.0,
+                        };
+                    }
+
+                    double[] finalProduct = [.. product[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Product: finalProduct));
+                } finally {
+                    ArrayPool<double>.Shared.Return(product, clearArray: true);
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
+        Vector3d[] vectorField1,
+        Vector3d[] vectorField2,
+        Point3d[] grid) {
+        return (vectorField1.Length == grid.Length, vectorField2.Length == grid.Length) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points")),
+            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points")),
+            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
+                int totalSamples = vectorField1.Length;
+                double[] dotProduct = ArrayPool<double>.Shared.Rent(totalSamples);
+
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        dotProduct[i] = Vector3d.Multiply(vectorField1[i], vectorField2[i]);
+                    }
+
+                    double[] finalDotProduct = [.. dotProduct[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, DotProduct: finalDotProduct));
+                } finally {
+                    ArrayPool<double>.Shared.Return(dotProduct, clearArray: true);
+                }
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
+    internal static Result<Fields.CriticalPoint[]> DetectCriticalPoints(
+        double[] scalarField,
+        Vector3d[] gradientField,
+        double[,][] hessian,
+        Point3d[] grid,
+        int resolution) {
+        return (scalarField.Length == grid.Length, gradientField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
+            (false, _, _) => ResultFactory.Create<Fields.CriticalPoint[]>(error: E.Geometry.InvalidCriticalPointDetection.WithContext("Scalar field length must match grid points")),
+            (_, false, _) => ResultFactory.Create<Fields.CriticalPoint[]>(error: E.Geometry.InvalidCriticalPointDetection.WithContext("Gradient field length must match grid points")),
+            (_, _, false) => ResultFactory.Create<Fields.CriticalPoint[]>(error: E.Geometry.InvalidCriticalPointDetection.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (true, true, true) => ((Func<Result<Fields.CriticalPoint[]>>)(() => {
+                List<Fields.CriticalPoint> criticalPoints = [];
+
+                for (int i = 1; i < resolution - 1; i++) {
+                    for (int j = 1; j < resolution - 1; j++) {
+                        for (int k = 1; k < resolution - 1; k++) {
+                            int idx = (i * resolution * resolution) + (j * resolution) + k;
+                            Vector3d gradient = gradientField[idx];
+
+                            bool isCritical = gradient.Length < FieldsConfig.MinFieldMagnitude;
+                            _ = isCritical switch {
+                                false => 0,
+                                true => ((Func<int>)(() => {
+                                    double[,] localHessian = new double[3, 3];
+                                    for (int row = 0; row < 3; row++) {
+                                        for (int col = 0; col < 3; col++) {
+                                            localHessian[row, col] = hessian[row, col][idx];
+                                        }
+                                    }
+
+                                    (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
+                                    byte criticalType = ClassifyCriticalPoint(eigenvalues);
+
+                                    criticalPoints.Add(new Fields.CriticalPoint(
+                                        Location: grid[idx],
+                                        Type: criticalType,
+                                        Value: scalarField[idx],
+                                        Eigenvectors: eigenvectors,
+                                        Eigenvalues: eigenvalues));
+                                    return 1;
+                                }))(),
+                            };
+                        }
+                    }
+                }
+
+                Fields.CriticalPoint[] result = [.. criticalPoints];
+                return ResultFactory.Create(value: result);
+            }))(),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte ClassifyCriticalPoint(double[] eigenvalues) {
+        int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
+        int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
+
+        return (positiveCount, negativeCount) switch {
+            (3, 0) => FieldsConfig.CriticalPointMinimum,
+            (0, 3) => FieldsConfig.CriticalPointMaximum,
+            _ => FieldsConfig.CriticalPointSaddle,
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate for eigendecomposition")]
+    private static (double[] Eigenvalues, Vector3d[] Eigenvectors) ComputeEigendecomposition3x3(double[,] matrix) {
+        double a = matrix[0, 0];
+        double b = matrix[0, 1];
+        double c = matrix[0, 2];
+        double d = matrix[1, 1];
+        double e = matrix[1, 2];
+        double f = matrix[2, 2];
+
+        double p1 = (b * b) + (c * c) + (e * e);
+        bool isDiagonal = p1 < RhinoMath.SqrtEpsilon;
+
+        return isDiagonal switch {
+            true => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
+            false => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fields.FieldStatistics> ComputeFieldStatistics(
+        double[] scalarField,
+        Point3d[] grid) {
+        return (scalarField.Length == grid.Length, scalarField.Length > 0) switch {
+            (false, _) => ResultFactory.Create<Fields.FieldStatistics>(error: E.Geometry.InvalidFieldStatistics.WithContext("Scalar field length must match grid points")),
+            (_, false) => ResultFactory.Create<Fields.FieldStatistics>(error: E.Geometry.InvalidFieldStatistics.WithContext("Scalar field must not be empty")),
+            (true, true) => ((Func<Result<Fields.FieldStatistics>>)(() => {
+                double min = double.MaxValue;
+                double max = double.MinValue;
+                double sum = 0.0;
+                int minIdx = 0;
+                int maxIdx = 0;
+
+                for (int i = 0; i < scalarField.Length; i++) {
+                    double value = scalarField[i];
+                    bool validValue = RhinoMath.IsValidDouble(value);
+                    _ = validValue switch {
+                        false => 0,
+                        true => ((Func<int>)(() => {
+                            sum += value;
+                            (min, minIdx) = value < min ? (value, i) : (min, minIdx);
+                            (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
+                            return 1;
+                        }))(),
+                    };
+                }
+
+                double mean = sum / scalarField.Length;
+                double sumSquaredDiff = 0.0;
+                for (int i = 0; i < scalarField.Length; i++) {
+                    double diff = scalarField[i] - mean;
+                    sumSquaredDiff += diff * diff;
+                }
+                double stdDev = System.Math.Sqrt(sumSquaredDiff / scalarField.Length);
+
+                return ResultFactory.Create(value: new Fields.FieldStatistics(
+                    Min: min,
+                    Max: max,
+                    Mean: mean,
+                    StdDev: stdDev,
+                    MinLocation: grid[minIdx],
+                    MaxLocation: grid[maxIdx]));
+            }))(),
+        };
     }
 }

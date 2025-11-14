@@ -7,7 +7,20 @@ namespace Arsenal.Rhino.Fields;
 [Pure]
 internal static class FieldsConfig {
     internal const byte OperationDistance = 0;
+    internal const byte OperationGradient = 1;
+    internal const byte OperationCurl = 2;
+    internal const byte OperationDivergence = 3;
+    internal const byte OperationLaplacian = 4;
+    internal const byte OperationVectorPotential = 5;
+    internal const byte OperationHessian = 6;
+    internal const byte OperationDirectionalDerivative = 7;
+    internal const byte OperationMagnitude = 8;
+    internal const byte OperationNormalize = 9;
+    internal const byte OperationCriticalPoints = 10;
+    internal const byte OperationStatistics = 11;
 
+    internal const byte IntegrationEuler = 0;
+    internal const byte IntegrationRK2 = 1;
     internal const byte IntegrationRK4 = 2;
 
     internal const byte InterpolationNearest = 0;
@@ -22,12 +35,18 @@ internal static class FieldsConfig {
     internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
     internal const double MaxStepSize = 1.0;
     internal const int MaxStreamlineSteps = 10000;
+    internal const double MinFieldMagnitude = 1e-10;
 
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
+    internal static readonly double[] RK2HalfSteps = [0.5,];
 
     internal const int StreamlineRTreeThreshold = 1000;
     internal const int FieldRTreeThreshold = 100;
+
+    internal const byte CriticalPointMinimum = 0;
+    internal const byte CriticalPointMaximum = 1;
+    internal const byte CriticalPointSaddle = 2;
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
@@ -166,4 +185,8 @@ internal static class FieldsConfig {
     }
 
     internal const double InsideOutsideToleranceMultiplier = 10.0;
+
+    /// <summary>Critical point detection: eigenvalue threshold for classification.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 }

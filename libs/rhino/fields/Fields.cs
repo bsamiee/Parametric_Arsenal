@@ -30,6 +30,14 @@ public static class Fields {
             : FieldsConfig.DefaultStepSize;
     }
 
+    /// <summary>Critical point classification result with location, type (minimum/maximum/saddle), value, and eigendecomposition.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct CriticalPoint(Point3d Location, byte Type, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
+
+    /// <summary>Field statistics including min, max, mean, standard deviation, and extreme value locations.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct FieldStatistics(double Min, double Max, double Mean, double StdDev, Point3d MinLocation, Point3d MaxLocation);
+
     /// <summary>Compute signed distance field: geometry → (grid points[], distances[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Distances)> DistanceField<T>(
@@ -235,5 +243,135 @@ public static class Fields {
                 gridPoints: gridPoints,
                 resolution: spec.Resolution,
                 isovalues: isovalues),
+        };
+
+    /// <summary>Compute Hessian field (second derivative matrix): scalar field → (grid points[], hessian matrices[3,3][]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
+    public static Result<(Point3d[] Grid, double[,][] Hessian)> HessianField(
+        double[] scalarField,
+        Point3d[] gridPoints,
+        FieldSpec spec,
+        BoundingBox bounds) =>
+        (scalarField.Length == gridPoints.Length) switch {
+            false => ResultFactory.Create<(Point3d[], double[,][])>(
+                error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points")),
+            true => FieldsCompute.ComputeHessian(
+                scalarField: scalarField,
+                grid: gridPoints,
+                resolution: spec.Resolution,
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
+        };
+
+    /// <summary>Compute directional derivative field: (gradient field, direction) → (grid points[], directional derivatives[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> DirectionalDerivativeField(
+        Vector3d[] gradientField,
+        Point3d[] gridPoints,
+        Vector3d direction) =>
+        (gradientField.Length == gridPoints.Length) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points")),
+            true => FieldsCompute.ComputeDirectionalDerivative(
+                gradientField: gradientField,
+                grid: gridPoints,
+                direction: direction),
+        };
+
+    /// <summary>Compute vector field magnitude: vector field → (grid points[], magnitudes[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] Grid, double[] Magnitudes)> FieldMagnitude(
+        Vector3d[] vectorField,
+        Point3d[] gridPoints) =>
+        (vectorField.Length == gridPoints.Length) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points")),
+            true => FieldsCompute.ComputeFieldMagnitude(
+                vectorField: vectorField,
+                grid: gridPoints),
+        };
+
+    /// <summary>Normalize vector field: vector field → (grid points[], normalized vectors[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeField(
+        Vector3d[] vectorField,
+        Point3d[] gridPoints) =>
+        (vectorField.Length == gridPoints.Length) switch {
+            false => ResultFactory.Create<(Point3d[], Vector3d[])>(
+                error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points")),
+            true => FieldsCompute.NormalizeVectorField(
+                vectorField: vectorField,
+                grid: gridPoints),
+        };
+
+    /// <summary>Scalar-vector field product: (scalar field, vector field, component) → (grid points[], product[]) where component 0=X, 1=Y, 2=Z.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
+        double[] scalarField,
+        Vector3d[] vectorField,
+        Point3d[] gridPoints,
+        int component) =>
+        (scalarField.Length == gridPoints.Length, vectorField.Length == gridPoints.Length) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points")),
+            (_, false) => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
+            (true, true) => FieldsCompute.ScalarVectorProduct(
+                scalarField: scalarField,
+                vectorField: vectorField,
+                grid: gridPoints,
+                component: component),
+        };
+
+    /// <summary>Vector-vector dot product field: (vector field 1, vector field 2) → (grid points[], dot products[]).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
+        Vector3d[] vectorField1,
+        Vector3d[] vectorField2,
+        Point3d[] gridPoints) =>
+        (vectorField1.Length == gridPoints.Length, vectorField2.Length == gridPoints.Length) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points")),
+            (_, false) => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points")),
+            (true, true) => FieldsCompute.VectorDotProduct(
+                vectorField1: vectorField1,
+                vectorField2: vectorField2,
+                grid: gridPoints),
+        };
+
+    /// <summary>Detect and classify critical points in scalar field: (field, gradient, hessian) → critical points[] with type classification (minimum, maximum, saddle).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
+    public static Result<CriticalPoint[]> CriticalPoints(
+        double[] scalarField,
+        Vector3d[] gradientField,
+        double[,][] hessian,
+        Point3d[] gridPoints,
+        FieldSpec spec) =>
+        (scalarField.Length == gridPoints.Length, gradientField.Length == gridPoints.Length) switch {
+            (false, _) => ResultFactory.Create<CriticalPoint[]>(
+                error: E.Geometry.InvalidCriticalPointDetection.WithContext("Scalar field length must match grid points")),
+            (_, false) => ResultFactory.Create<CriticalPoint[]>(
+                error: E.Geometry.InvalidCriticalPointDetection.WithContext("Gradient field length must match grid points")),
+            (true, true) => FieldsCompute.DetectCriticalPoints(
+                scalarField: scalarField,
+                gradientField: gradientField,
+                hessian: hessian,
+                grid: gridPoints,
+                resolution: spec.Resolution),
+        };
+
+    /// <summary>Compute field statistics: scalar field → (min, max, mean, std dev, min location, max location).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<FieldStatistics> ComputeStatistics(
+        double[] scalarField,
+        Point3d[] gridPoints) =>
+        (scalarField.Length == gridPoints.Length) switch {
+            false => ResultFactory.Create<FieldStatistics>(
+                error: E.Geometry.InvalidFieldStatistics.WithContext("Scalar field length must match grid points")),
+            true => FieldsCompute.ComputeFieldStatistics(
+                scalarField: scalarField,
+                grid: gridPoints),
         };
 }
