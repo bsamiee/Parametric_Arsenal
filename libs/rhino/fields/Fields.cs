@@ -25,8 +25,8 @@ public static class Fields {
         /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
         public readonly BoundingBox? Bounds = bounds;
         /// <summary>Integration/sampling step size.</summary>
-        public readonly double StepSize = stepSize >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
-            ? stepSize.Value
+        public readonly double StepSize = stepSize is { } value && value >= FieldsConfig.MinStepSize && value <= FieldsConfig.MaxStepSize
+            ? value
             : FieldsConfig.DefaultStepSize;
     }
 
@@ -118,7 +118,7 @@ public static class Fields {
                 gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
         };
 
-    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A, Coulomb gauge approximation via x-axis line integral (limited to simple fields).</summary>
+    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A. Uses Coulomb gauge approximation via x-axis line integral (accurate only for fields with simple structure aligned with x-axis; general 3D magnetic fields require full volume integral).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Potential)> VectorPotentialField(
         Vector3d[] magneticField,
