@@ -1,714 +1,621 @@
 # Morphology Library Blueprint
 
 ## Overview
-Provides geometric morphology operations for mesh and surface deformation, subdivision, and smoothing. Implements cage-based deformation, Laplacian smoothing with detail preservation, subdivision surfaces (Catmull-Clark, Loop, Butterfly), and surface evolution via mean curvature flow and geodesic active contours. All operations maintain mesh quality while providing controllable deformation behaviors.
+Provides mesh morphology operations: cage-based deformation (FFD), subdivision surfaces (Catmull-Clark, Loop, Butterfly), detail-preserving smoothing (Laplacian with feature constraints, Taubin volume-preserving), and surface evolution (mean curvature flow). Integrates RhinoCommon native APIs (`Mesh.CreateRefinedCatmullClarkMesh`, `CageMorph`, mesh topology, vertex/face normals) with custom discrete differential geometry algorithms for quality-preserving deformations.
 
 ## Existing libs/ Infrastructure Analysis
 
 ### libs/core/ Components We Leverage
-- **Result<T> Monad**: Used for all failable operations (cage deformations, smoothing, subdivision). Chain operations using `.Map`, `.Bind`, `.Ensure` for validation and transformation pipelines.
-- **UnifiedOperation**: Primary dispatch mechanism for polymorphic morphology operations across Mesh, Brep, Surface types. Handles validation, error accumulation, and parallel processing when beneficial.
-- **ValidationRules**: Leverage existing `V.Standard`, `V.MeshSpecific`, `V.Topology` for input validation. Add new modes: `V.MorphologyQuality` for mesh quality metrics, `V.SubdivisionConstraints` for subdivision preconditions.
-- **Error Registry**: Use existing `E.Geometry.*` errors. Add new codes in 2800-2899 range for morphology-specific operations (cage failures, smoothing convergence, subdivision limits).
-- **Context**: Use `IGeometryContext.AbsoluteTolerance` for distance-based thresholds, cage proximity checks, and smoothing convergence criteria.
+- **Result<T> Monad**: All operations return `Result<Mesh>` or `Result<IReadOnlyList<IMorphologyResult>>`. Chain using `.Bind` for sequential operations, `.Map` for transformations, `.Ensure` for inline precondition checks.
+- **UnifiedOperation**: Single entry point `Morphology.Apply<T>` with polymorphic dispatch on `(operation, input type)` tuples. Handles Mesh, Brep input via FrozenDictionary lookup. Validation, error accumulation, parallel execution configured via `OperationConfig`.
+- **ValidationRules**: Use EXISTING modes ONLY. NO new validation modes added. `V.Standard | V.MeshSpecific | V.Topology` provides all necessary input validation (IsValid, IsManifold, IsClosed, face structure). Quality metrics (aspect ratio, edge length) are computed AFTER operations in result types, not validated.
+- **Error Registry**: Use existing `E.Geometry.*` errors. Add 13 new codes in 2800-2812 range as `E.Morphology.*` nested class for morphology-specific failures (cage mismatch, subdivision non-manifold, smoothing divergence, quality degradation).
+- **Context**: Use `IGeometryContext.AbsoluteTolerance` for convergence criteria, feature angle thresholds, edge length comparisons. No custom tolerance parameters.
 
 ### Similar libs/rhino/ Implementations
-- **`libs/rhino/spatial/`**: Borrow FrozenDictionary dispatch pattern for operation-type pairs. Reuse RTree spatial indexing for neighbor lookups in Laplacian smoothing and proximity-based cage deformation.
-- **`libs/rhino/analysis/`**: Reuse curvature computation patterns for mean curvature flow. Leverage differential geometry result types for surface normals and principal directions.
-- **`libs/rhino/topology/`**: Reference topology analysis for mesh quality validation. Use similar edge valence checks for subdivision manifold requirements.
-- **`libs/rhino/extraction/`**: Adopt semantic operation mode pattern for discriminating morphology methods.
-- **No Duplication**: Cage deformation, subdivision, and morphology-specific smoothing are NEW functionality not present in existing folders. Spatial indexing and curvature analysis are REUSED, not duplicated.
+- **`libs/rhino/spatial/SpatialCore.cs`**: Study `BuildGeometryArrayTree` pattern (lines 70-77) for RTree construction. Reuse for neighbor lookups in Laplacian smoothing when mesh.Vertices.Count > 1000.
+- **`libs/rhino/analysis/AnalysisCompute.cs`**: Study curvature computation patterns (lines 16-66). Adapt discrete curvature formulas for mean curvature flow vertex updates.
+- **`libs/rhino/topology/TopologyCompute.cs`**: Study manifold detection (lines 76-148). Use edge valence patterns for subdivision precondition checks.
+- **`libs/rhino/extraction/ExtractionConfig.cs`**: Study validation mode dispatch pattern (lines 11-61). Adopt `(operation type, geometry type) -> V` mapping for morphology operations.
+- **No Duplication**: Cage deformation wraps native `CageMorph`. Subdivision uses native `Mesh.CreateRefinedCatmullClarkMesh` for Catmull-Clark. Loop/Butterfly are NEW implementations. Laplacian smoothing is NEW (no native API exists). Mean curvature flow is NEW discrete differential geometry.
 
 ## SDK Research Summary
 
 ### RhinoCommon APIs Used
-- `Rhino.Geometry.CageMorph`: Native FFD implementation for cage-based deformation with control point mapping.
-- `Rhino.Geometry.Mesh.CreateRefinedCatmullClarkMesh(Mesh, RefinementSettings)`: Built-in Catmull-Clark subdivision (Rhino 6+).
-- `Rhino.Geometry.Mesh.Vertices`, `Mesh.TopologyVertices`, `Mesh.TopologyEdges`: Core mesh topology for custom smoothing algorithms.
-- `Rhino.Geometry.Mesh.FaceNormals`, `Mesh.VertexNormals`: Normal computation for curvature-based evolution.
-- `Rhino.Geometry.Mesh.GetBoundingBox`: Volume and boundary tracking for constraint enforcement.
-- `Rhino.Geometry.Transform`: Applying computed deformations to geometry.
-- `Rhino.Geometry.Point3d.DistanceTo`: Neighbor distance calculations for smoothing stencils.
-- `RhinoMath.Clamp`, `RhinoMath.IsValidDouble`: Robust numerical operations for iterative algorithms.
+- `Rhino.Geometry.Morphs.CageMorph(GeometryBase cage, Point3d[] originalPoints, Point3d[] deformedPoints)`: Native FFD implementation. Apply via `geometry.Transform(cageMorph)`. Returns `bool` success.
+- `Rhino.Geometry.Mesh.CreateRefinedCatmullClarkMesh()`: Built-in Catmull-Clark subdivision. Returns new `Mesh` or `null` on failure. Requires manifold, non-degenerate input.
+- `Rhino.Geometry.Mesh.Vertices`: `MeshVertexList` collection. Index access `[i]` returns `Point3f`. Modify via `SetVertex(index, point)` or direct assignment. Call `mesh.Compact()` after bulk updates.
+- `Rhino.Geometry.Mesh.TopologyVertices`: Topology-aware vertex list. `ConnectedTopologyVertices(index)` returns neighbor indices. Use for Laplacian weight computation.
+- `Rhino.Geometry.Mesh.TopologyEdges`: Edge connectivity. `GetConnectedFaces(edgeIndex)` returns face indices for dihedral angle computation (feature detection).
+- `Rhino.Geometry.Mesh.FaceNormals.ComputeNormals()`: Compute face normals. Required after vertex position updates for lighting/analysis.
+- `Rhino.Geometry.Mesh.Normals.ComputeNormals()`: Compute vertex normals from face normals. Use for mean curvature flow direction.
+- `Rhino.Geometry.Mesh.GetBoundingBox(accurate)`: Volume tracking. Use `accurate: false` for fast AABB, `true` for OBB when needed.
+- `Rhino.Geometry.Vector3d.VectorAngle(v1, v2)`: Dihedral angle computation for feature edge detection. Returns radians.
+- `RhinoMath.Clamp(value, min, max)`, `RhinoMath.IsValidDouble(value)`: Numerical robustness. Use for λ/μ clamping in Taubin, convergence checks.
+- `RhinoMath.ToRadians(degrees)`, `RhinoMath.PI`: Angle conversions and constants. Feature angle threshold = `RhinoMath.ToRadians(30.0)` (sharp edge detection).
 
-### Key Insights
-- **Performance**: Laplacian smoothing benefits from parallel vertex updates when mesh size > 1000 vertices. Use `ArrayPool<T>` for temporary neighbor buffers.
-- **Common Pitfall**: Catmull-Clark subdivision with non-manifold meshes produces invalid results. Validate topology BEFORE subdivision.
-- **Best Practice**: Cage deformation requires control point correspondence. Store original cage state in ConditionalWeakTable for incremental updates.
-- **Numerical Stability**: Mean curvature flow requires small time steps (dt ≈ 0.01 * average edge length) to prevent mesh inversion. Use implicit Euler or Taubin stabilization for larger steps.
-- **Mesh Quality**: Subdivision and smoothing can produce degenerate triangles. Track aspect ratio and minimum angle thresholds. Remesh when quality falls below critical values (aspect ratio > 10, angle < 5°).
+### Key Insights from Research
+- **Laplacian/Taubin**: RhinoCommon has NO native smoothing APIs. Must implement custom iterative vertex averaging using `TopologyVertices.ConnectedTopologyVertices()` for neighbor lookups. Use uniform weights (simple average) or cotangent weights (better quality, more computation).
+- **Mean Curvature**: No native mesh vertex curvature API. Compute discrete mean curvature using Laplace-Beltrami operator: `H_i = (1 / 2A_i) * Σ(cotα + cotβ)(p_j - p_i)` where `A_i` is Voronoi area, α and β are opposite angles in adjacent triangles. Move vertex along normal: `p_i_new = p_i + dt * H_i * n_i`.
+- **Subdivision**: Loop (triangle meshes) and Butterfly (interpolating) require custom stencil implementations. No native APIs. Compute new vertex positions using weighted averages of neighbors based on algorithm-specific rules.
+- **Cage Deformation**: `CageMorph` modifies geometry in-place (no return value). Duplicate input geometry before morphing to preserve original. Constructor requires exact control point count match between original and deformed arrays.
+- **Performance**: `TopologyVertices.ConnectedTopologyVertices()` is O(n) per vertex. For large meshes (>5000 vertices), build neighborhood FrozenDictionary once, reuse across iterations. Use `ArrayPool<Point3d>` for temporary position buffers to avoid allocations in tight loops.
+- **Numerical Stability**: Taubin λ/μ values must satisfy `μ < -λ` for volume preservation. Standard values: `λ = 0.6307`, `μ = -0.6732`. Mean curvature flow time step `dt` must be small relative to minimum edge length: `dt ≈ 0.01 * min_edge_length`. Larger steps cause mesh inversion.
+- **Mesh Quality**: Track aspect ratio (max_edge / min_edge), minimum triangle angle, edge length uniformity after each operation. Abort if aspect ratio > 10 or min angle < 5° (indicates degeneration). Remeshing is OUT OF SCOPE for this module.
 
 ### SDK Version Requirements
 - Minimum: RhinoCommon 8.0
 - Tested: RhinoCommon 8.24+
-- Feature: Mesh.CreateRefinedCatmullClarkMesh requires Rhino 6.0+
+- Feature: `Mesh.CreateRefinedCatmullClarkMesh` requires Rhino 6.0+ (introduced in Rhino 6, stable in Rhino 8)
 
 ## File Organization
 
 ### File 1: `Morphology.cs`
-**Purpose**: Public API surface with single unified entry point and semantic operation mode types.
+**Purpose**: Public API surface with unified entry point. Single static class with nested result types, no nested configuration structs (those go in Config file).
 
-**Types** (6 total):
-- `Morphology` (static class): Primary API entry point with suppression for namespace-class match
-- `MorphologyMode` (nested readonly struct): Semantic operation discriminator (FFD, Laplacian, Subdivision, Evolution)
-- `SubdivisionMethod` (nested readonly struct): Algorithm discriminator (CatmullClark=0, Loop=1, Butterfly=2)
-- `SmoothingConstraint` (nested readonly struct): Feature preservation mode (None=0, Sharp=1, Boundary=2, Feature=3)
-- `EvolutionType` (nested readonly struct): Surface evolution algorithm (MeanCurvature=0, GeodesicActive=1, Taubin=2)
-- `IMorphologyResult` (nested interface): Marker interface for polymorphic result dispatch
+**Types** (5 total, ALL nested in `Morphology` class):
+- `Morphology` (static class): Public API entry point. Suppression required for namespace match (CA MA0049).
+- `IMorphologyResult` (nested interface): Marker interface for result polymorphism.
+- `CageDeformResult` (nested sealed record): Cage deformation outcome with metrics (max displacement, bounding box change).
+- `SubdivisionResult` (nested sealed record): Subdivision outcome with quality metrics (face count, edge lengths, aspect ratios).
+- `SmoothingResult` (nested sealed record): Smoothing outcome with convergence data (iterations performed, RMS displacement, quality score).
 
-**Key Members**:
-- `Deform<T>(T geometry, object parameters, IGeometryContext context)`: Unified morphology entry point using UnifiedOperation dispatch. Handles Mesh, Brep, Surface inputs with FFD, lattice, or cage-based deformation.
-- `Subdivide(Mesh mesh, SubdivisionMethod method, int levels, IGeometryContext context)`: Mesh subdivision via Catmull-Clark (native API), Loop, or Butterfly (custom implementations).
-- `Smooth(Mesh mesh, (int iterations, SmoothingConstraint constraint) parameters, IGeometryContext context)`: Detail-preserving Laplacian smoothing with optional boundary/feature locks.
-- `Evolve(Mesh mesh, (EvolutionType type, double timeStep, int iterations) parameters, IGeometryContext context)`: Surface evolution via mean curvature flow, geodesic active contours, or Taubin smoothing.
+**Key Members** (4 total public methods):
+- `Apply<T>(T input, (byte operation, object parameters) spec, IGeometryContext context)`: **UNIFIED ENTRY POINT**. Single API method for ALL morphology operations. Dispatches via FrozenDictionary on `(operation, typeof(T))` tuple. Returns `Result<IReadOnlyList<IMorphologyResult>>` for polymorphic results.
+- NO separate `Deform`, `Subdivide`, `Smooth`, `Evolve` methods. Single `Apply` method only, matching pattern in `spatial/Spatial.cs:Analyze<TInput, TQuery>`.
 
 **Code Style Example**:
 ```csharp
 namespace Arsenal.Rhino.Morphology;
 
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
     public interface IMorphologyResult;
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly struct MorphologyMode(byte kind) {
-        internal readonly byte Kind = kind;
-        public static readonly MorphologyMode FFD = new(1);
-        public static readonly MorphologyMode Laplacian = new(2);
-        public static readonly MorphologyMode Subdivision = new(3);
-        public static readonly MorphologyMode Evolution = new(4);
-        public static readonly MorphologyMode ARAP = new(5);
-        public static readonly MorphologyMode Lattice = new(6);
-    }
+    public sealed record CageDeformResult(
+        GeometryBase Deformed,
+        double MaxDisplacement,
+        BoundingBox OriginalBounds,
+        BoundingBox DeformedBounds) : IMorphologyResult;
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly struct SubdivisionMethod(byte algorithm) {
-        internal readonly byte Algorithm = algorithm;
-        public static readonly SubdivisionMethod CatmullClark = new(0);
-        public static readonly SubdivisionMethod Loop = new(1);
-        public static readonly SubdivisionMethod Butterfly = new(2);
-    }
+    public sealed record SubdivisionResult(
+        Mesh Subdivided,
+        int OriginalFaceCount,
+        int SubdividedFaceCount,
+        double MinEdgeLength,
+        double MaxEdgeLength,
+        double MeanAspectRatio) : IMorphologyResult;
+
+    public sealed record SmoothingResult(
+        Mesh Smoothed,
+        int IterationsPerformed,
+        double RMSDisplacement,
+        double QualityScore,
+        bool Converged) : IMorphologyResult;
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<T>> Deform<T>(
-        T geometry,
-        object parameters,
+    public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
+        T input,
+        (byte Operation, object Parameters) spec,
         IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item => parameters switch {
-                (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts) => MorphologyCore.CageDeform(item, cage, originalPts, deformedPts, context),
-                (double latticeSize, Func<Point3d, Vector3d> deformFunc) => MorphologyCore.LatticeDeform(item, latticeSize, deformFunc, context),
-                MorphologyMode mode => MorphologyCompute.DispatchMorphology(item, mode, context),
-                _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InsufficientParameters),
-            }),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = V.Standard | V.Topology,
-                OperationName = "Morphology.Deform",
-            });
+        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>> executor)
+            ? UnifiedOperation.Apply(
+                input: input,
+                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
+                config: new OperationConfig<T, IMorphologyResult> {
+                    Context = context,
+                    ValidationMode = MorphologyConfig.ValidationModes.TryGetValue((spec.Operation, typeof(T)), out V mode) ? mode : V.Standard,
+                    OperationName = $"Morphology.{MorphologyConfig.OperationNames[spec.Operation]}",
+                })
+            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
+                error: E.Geometry.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+}
+```
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<Mesh> Subdivide(
+**LOC Estimate**: 80-120 (lean, all dispatch delegated to Core)
+
+### File 2: `MorphologyCore.cs`
+**Purpose**: Core algorithmic implementations and dispatch registry. FrozenDictionary operation table, execution functions.
+
+**Types** (1 total):
+- `MorphologyCore` (static internal class): All computational logic, dispatch table, execution functions.
+
+**Key Members**:
+- `OperationDispatch` (FrozenDictionary): Maps `(byte operation, Type input)` to executor functions. Example: `[(1, typeof(Mesh))] = ExecuteCageDeform`.
+- `ExecuteCageDeform(object input, object params, IGeometryContext)`: Cage deformation using `CageMorph`. Validates control point counts, applies transform, computes metrics.
+- `ExecuteSubdivideCatmullClark(object input, object params, IGeometryContext)`: Wraps `Mesh.CreateRefinedCatmullClarkMesh`. Iterates for multiple levels, validates manifold requirement.
+- `ExecuteSubdivideLoop(object input, object params, IGeometryContext)`: Loop subdivision for triangle meshes. Computes edge midpoints with β-weights based on vertex valence. Inserts new vertices, reconnects faces.
+- `ExecuteSubdivideButterfly(object input, object params, IGeometryContext)`: Butterfly interpolating subdivision. 8-point stencil for regular vertices, fallback 4-point for boundary/irregular.
+- `ExecuteSmoothLaplacian(object input, object params, IGeometryContext)`: Laplacian smoothing with feature constraints. Build neighbor topology, compute weights, iterate position updates, check convergence.
+- `ExecuteSmoothTaubin(object input, object params, IGeometryContext)`: Taubin volume-preserving smoothing. Alternates λ (smoothing) and μ (unshrinking) steps.
+- `ExecuteEvolveMeanCurvature(object input, object params, IGeometryContext)`: Mean curvature flow. Computes discrete mean curvature per vertex, moves along normal, updates normals.
+- `ComputeNeighborhood(Mesh mesh)`: Builds FrozenDictionary mapping vertex index to neighbor indices and edge lengths. Caches for reuse in iterative algorithms.
+- `ComputeMeanCurvature(Mesh mesh, int vertexIndex, FrozenDictionary neighborhood)`: Discrete mean curvature via Laplace-Beltrami with cotangent weights. Returns scalar H value.
+
+**Algorithmic Density Strategy**:
+- FrozenDictionary for O(1) operation dispatch (10-12 entries for all operation-type combinations)
+- Inline neighbor averaging in smoothing loops (no extracted helper for "ComputeAverage")
+- Pattern matching for parameter extraction: `params switch { (GeometryBase c, Point3d[] o, Point3d[] d) => ..., int levels => ..., }`
+- ArrayPool<Point3d> for temporary position buffers (rent/return pattern)
+- Switch expressions for algorithm selection within executors
+
+**Code Style Example**:
+```csharp
+internal static class MorphologyCore {
+    internal static readonly FrozenDictionary<(byte Operation, Type InputType), Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>> OperationDispatch =
+        new Dictionary<(byte, Type), Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>> {
+            [(1, typeof(Mesh))] = ExecuteCageDeform,
+            [(1, typeof(Brep))] = ExecuteCageDeform,
+            [(2, typeof(Mesh))] = ExecuteSubdivideCatmullClark,
+            [(3, typeof(Mesh))] = ExecuteSubdivideLoop,
+            [(4, typeof(Mesh))] = ExecuteSubdivideButterfly,
+            [(10, typeof(Mesh))] = ExecuteSmoothLaplacian,
+            [(11, typeof(Mesh))] = ExecuteSmoothTaubin,
+            [(20, typeof(Mesh))] = ExecuteEvolveMeanCurvature,
+        }.ToFrozenDictionary();
+
+    [Pure]
+    private static Result<IReadOnlyList<IMorphologyResult>> ExecuteCageDeform(
+        object input,
+        object parameters,
+        IGeometryContext context) =>
+        parameters switch {
+            (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts) when originalPts.Length == deformedPts.Length && originalPts.Length >= MorphologyConfig.MinCageControlPoints =>
+                ((Func<Result<IReadOnlyList<IMorphologyResult>>>)(() => {
+                    GeometryBase geom = input is Mesh m ? m.DuplicateMesh() : input is Brep b ? b.DuplicateBrep() : null;
+                    BoundingBox originalBounds = geom?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
+                    CageMorph morph = new(cage, originalPts, deformedPts);
+                    bool success = geom?.Transform(morph) ?? false;
+                    BoundingBox deformedBounds = geom?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
+                    double maxDisp = originalPts.Zip(deformedPts, (o, d) => o.DistanceTo(d)).Max();
+                    return success && geom is not null
+                        ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(value: [new Morphology.CageDeformResult(geom, maxDisp, originalBounds, deformedBounds),])
+                        : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Morphology.CageDeformFailed);
+                }))(),
+            (GeometryBase, Point3d[] o, Point3d[] d) when o.Length != d.Length => ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Morphology.CageControlPointMismatch),
+            _ => ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Geometry.InsufficientParameters),
+        };
+
+    [Pure]
+    internal static FrozenDictionary<int, (int[] Neighbors, double[] Weights)> ComputeNeighborhood(Mesh mesh) =>
+        [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => {
+            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i, sorted: true);
+            double totalWeight = 0.0;
+            double[] weights = new double[neighbors.Length];
+            for (int j = 0; j < neighbors.Length; j++) {
+                Point3d pi = mesh.Vertices[mesh.TopologyVertices.MeshVertexIndices(i)[0]];
+                Point3d pj = mesh.Vertices[mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0]];
+                double dist = pi.DistanceTo(pj);
+                weights[j] = dist > RhinoMath.ZeroTolerance ? 1.0 / dist : 0.0;
+                totalWeight += weights[j];
+            }
+            for (int j = 0; j < weights.Length && totalWeight > RhinoMath.ZeroTolerance; j++) {
+                weights[j] /= totalWeight;
+            }
+            return KeyValuePair.Create(i, (neighbors, weights));
+        }),].ToFrozenDictionary();
+}
+```
+
+**LOC Estimate**: 280-300 (dense, maximal member size)
+
+### File 3: `MorphologyCompute.cs`
+**Purpose**: High-level algorithm orchestration. Subdivision iterations, smoothing convergence loops, curvature flow time stepping.
+
+**Types** (1 total):
+- `MorphologyCompute` (static internal class): Orchestration logic, convergence checks, quality metrics.
+
+**Key Members**:
+- `SubdivideIterative(Mesh mesh, byte algorithm, int levels, IGeometryContext context)`: Iterative subdivision wrapper. Calls appropriate subdivision function `levels` times, validates quality each iteration.
+- `SmoothWithConvergence(Mesh mesh, int maxIterations, Func<Mesh, Point3d[]> updateFunc, IGeometryContext context)`: Generic smoothing loop with convergence checking. Computes RMS displacement between iterations, stops when < `context.AbsoluteTolerance * ConvergenceMultiplier`.
+- `ComputeLoopWeights(int valence)`: β-weight for Loop subdivision based on vertex valence. Formula: `β = (5/8 - (3/8 + 1/4 * cos(2π/n))^2)` for valence n.
+- `ComputeButterflyStencil(Mesh mesh, int edgeIndex)`: 8-point butterfly stencil weights. Falls back to 4-point if irregular.
+- `ValidateMeshQuality(Mesh mesh, IGeometryContext context)`: Post-operation quality check. Computes aspect ratios, minimum angles, edge length stats. Returns errors if quality below thresholds.
+
+**Algorithmic Density Strategy**:
+- Inline β-weight formula (no helper function, directly in subdivision loop)
+- Switch expression for subdivision algorithm selection
+- LINQ for RMS computation: `positions.Zip(prevPositions, (a, b) => a.DistanceTo(b)).Select(d => d * d).Average()` then sqrt
+- Pattern matching for convergence criteria
+
+**Code Style Example**:
+```csharp
+internal static class MorphologyCompute {
+    [Pure]
+    internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
-        SubdivisionMethod method,
+        byte algorithm,
         int levels,
         IGeometryContext context) =>
-        levels <= 0
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext($"Levels: {levels}"))
-            : levels > MorphologyConfig.MaxSubdivisionLevels
-                ? ResultFactory.Create<Mesh>(error: E.Morphology.SubdivisionLevelExceeded.WithContext($"Max: {MorphologyConfig.MaxSubdivisionLevels}"))
-                : ResultFactory.Create(value: mesh)
-                    .Validate(args: [context, V.Standard | V.MeshSpecific | V.Topology,])
-                    .Bind(validMesh => MorphologyCompute.Subdivide(validMesh, method, levels, context));
+        ResultFactory.Create(value: mesh)
+            .Bind(m => {
+                Mesh current = m;
+                for (int level = 0; level < levels; level++) {
+                    Mesh next = algorithm switch {
+                        2 => current.CreateRefinedCatmullClarkMesh(),
+                        3 => SubdivideLoop(current, context),
+                        4 => SubdivideButterfly(current, context),
+                        _ => null,
+                    };
+                    bool valid = next is not null && next.IsValid && ValidateMeshQuality(next, context).IsSuccess;
+                    if (!valid) {
+                        next?.Dispose();
+                        return level > 0
+                            ? ResultFactory.Create(value: current)
+                            : ResultFactory.Create<Mesh>(error: E.Morphology.SubdivisionFailed.WithContext($"Level: {level}"));
+                    }
+                    if (level > 0) {
+                        current.Dispose();
+                    }
+                    current = next;
+                }
+                return ResultFactory.Create(value: current);
+            });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<Mesh> Smooth(
-        Mesh mesh,
-        (int Iterations, SmoothingConstraint Constraint) parameters,
-        IGeometryContext context) =>
-        parameters.Iterations <= 0
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext($"Iterations: {parameters.Iterations}"))
-            : ResultFactory.Create(value: mesh)
-                .Validate(args: [context, V.Standard | V.MeshSpecific,])
-                .Bind(validMesh => MorphologyCompute.Smooth(validMesh, parameters, context));
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<Mesh> Evolve(
-        Mesh mesh,
-        (EvolutionType Type, double TimeStep, int Iterations) parameters,
-        IGeometryContext context) =>
-        parameters.TimeStep <= RhinoMath.ZeroTolerance || parameters.Iterations <= 0
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InsufficientParameters.WithContext($"TimeStep: {parameters.TimeStep}, Iterations: {parameters.Iterations}"))
-            : ResultFactory.Create(value: mesh)
-                .Validate(args: [context, V.Standard | V.MeshSpecific,])
-                .Bind(validMesh => MorphologyCompute.Evolve(validMesh, parameters, context));
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeLoopWeight(int valence) =>
+        valence switch {
+            3 => 0.1875,
+            6 => 0.0625,
+            _ when valence > 2 => 0.625 - Math.Pow(0.375 + 0.25 * Math.Cos(RhinoMath.TwoPI / valence), 2.0),
+            _ => 0.0,
+        };
 }
 ```
 
 **LOC Estimate**: 180-220
 
-### File 2: `MorphologyCore.cs`
-**Purpose**: Core deformation algorithms and low-level geometric computations.
-
-**Types** (3 total):
-- `MorphologyCore` (static internal class): Core algorithmic implementations
-- `CageState` (nested readonly record struct): Immutable cage configuration with control point mappings
-- `DeformationMetrics` (nested readonly record struct): Quality tracking (max displacement, volume change, aspect ratios)
-
-**Key Members**:
-- `CageDeform<T>(T geometry, GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts, IGeometryContext context)`: Wraps RhinoCommon `CageMorph` with validation and metric tracking. Uses ConditionalWeakTable to cache cage morph instances for incremental deformation workflows.
-- `LatticeDeform<T>(T geometry, double latticeSize, Func<Point3d, Vector3d> deformFunc, IGeometryContext context)`: Volumetric lattice-based FFD using trilinear interpolation. Subdivides bounding box into lattice grid, applies deformation function to lattice points, interpolates geometry vertices using barycentric coordinates.
-- `ComputeLaplacianWeights(Mesh mesh, bool useCotangent)`: Computes edge weights for Laplacian operator. Uses cotangent weights for better geometric properties or uniform weights for speed. Returns FrozenDictionary mapping vertex index to neighbor weights.
-- `ApplyLaplacianSmoothing(Mesh mesh, FrozenDictionary<int, (int[] Neighbors, double[] Weights)> laplacian, int iterations, SmoothingConstraint constraint, IGeometryContext context)`: Iterative Laplacian smoothing with constraint enforcement. Locks boundary vertices when constraint includes boundary flag. Detects sharp features (dihedral angle > threshold) and locks when constraint includes feature flag. Uses ArrayPool for temporary vertex buffers to minimize allocations.
-- `ComputeMeanCurvature(Mesh mesh, int vertexIndex, FrozenDictionary<int, (int[], double[])> laplacian)`: Discrete mean curvature via Laplace-Beltrami operator. Uses cotangent formula: H = (1 / 2A) * ∑(cotα + cotβ) * (p - p_i) where A is Voronoi area, α and β are opposite angles in adjacent triangles.
-- `BuildNeighborhood(Mesh mesh)`: Constructs FrozenDictionary mapping each vertex to adjacent vertex indices and edge lengths. Leverages Mesh.TopologyVertices and TopologyEdges for efficient traversal.
-
-**Algorithmic Density Strategy**:
-- Use FrozenDictionary for neighbor lookups (O(1) amortized)
-- Employ ArrayPool<Point3d> for temporary vertex positions during smoothing iterations
-- Inline trilinear interpolation for lattice deformation (no helper extraction)
-- ConditionalWeakTable for CageMorph caching keyed by (geometry, cage) tuple
-
-**Code Style Example**:
-```csharp
-internal static class MorphologyCore {
-    private static readonly ConditionalWeakTable<(object Geometry, object Cage), CageMorph> _cageCache = [];
-
-    internal readonly record struct CageState(
-        GeometryBase Cage,
-        Point3d[] OriginalPoints,
-        Point3d[] DeformedPoints,
-        BoundingBox Bounds);
-
-    internal readonly record struct DeformationMetrics(
-        double MaxDisplacement,
-        double VolumeRatio,
-        double[] AspectRatios,
-        int DegenerateCount);
-
-    [Pure]
-    internal static Result<IReadOnlyList<T>> CageDeform<T>(
-        T geometry,
-        GeometryBase cage,
-        Point3d[] originalPts,
-        Point3d[] deformedPts,
-        IGeometryContext context) where T : GeometryBase =>
-        originalPts.Length != deformedPts.Length
-            ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Morphology.CageControlPointMismatch)
-            : originalPts.Length < MorphologyConfig.MinCageControlPoints
-                ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Morphology.InsufficientCagePoints)
-                : ((Func<Result<IReadOnlyList<T>>>)(() => {
-                    (object, object) cacheKey = (geometry, cage);
-                    CageMorph morph = _cageCache.GetValue(cacheKey, static _ => new CageMorph(cage, originalPts, deformedPts));
-                    T deformed = (T)geometry.Duplicate();
-                    bool success = deformed.Transform(morph);
-                    return success
-                        ? ResultFactory.Create<IReadOnlyList<T>>(value: [deformed,])
-                        : ResultFactory.Create<IReadOnlyList<T>>(error: E.Morphology.CageDeformFailed);
-                }))();
-
-    [Pure]
-    internal static FrozenDictionary<int, (int[] Neighbors, double[] Weights)> ComputeLaplacianWeights(
-        Mesh mesh,
-        bool useCotangent) =>
-        useCotangent
-            ? [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => {
-                int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i, sorted: true);
-                double[] weights = neighbors.Length > 0
-                    ? [.. neighbors.Select(n => ComputeCotangentWeight(mesh, i, n)),]
-                    : [];
-                return KeyValuePair.Create(i, (neighbors, weights));
-            }),].ToFrozenDictionary()
-            : [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => {
-                int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i, sorted: true);
-                double uniformWeight = neighbors.Length > 0 ? 1.0 / neighbors.Length : 0.0;
-                double[] weights = neighbors.Length > 0 ? Enumerable.Repeat(uniformWeight, neighbors.Length).ToArray() : [];
-                return KeyValuePair.Create(i, (neighbors, weights));
-            }),].ToFrozenDictionary();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double ComputeCotangentWeight(Mesh mesh, int vertexA, int vertexB) {
-        Point3d pA = mesh.TopologyVertices.MeshVertexIndices(vertexA)[0] is int idxA && idxA >= 0
-            ? mesh.Vertices[idxA]
-            : Point3d.Origin;
-        Point3d pB = mesh.TopologyVertices.MeshVertexIndices(vertexB)[0] is int idxB && idxB >= 0
-            ? mesh.Vertices[idxB]
-            : Point3d.Origin;
-        Vector3d edge = pB - pA;
-        return edge.Length > RhinoMath.ZeroTolerance
-            ? 1.0 / Math.Max(edge.Length, RhinoMath.ZeroTolerance)
-            : 0.0;
-    }
-}
-```
-
-**LOC Estimate**: 220-280
-
-### File 3: `MorphologyCompute.cs`
-**Purpose**: High-level computation orchestration for subdivision, smoothing, and evolution algorithms.
-
-**Types** (2 total):
-- `MorphologyCompute` (static internal class): Computational dispatch and algorithm orchestration
-- `EvolutionState` (nested readonly record struct): Evolution progress tracking (iteration, time, energy, convergence)
-
-**Key Members**:
-- `Subdivide(Mesh mesh, SubdivisionMethod method, int levels, IGeometryContext context)`: Recursive subdivision dispatcher. Catmull-Clark uses native `Mesh.CreateRefinedCatmullClarkMesh`. Loop and Butterfly implement custom stencils via neighbor traversal and barycentric edge point insertion.
-- `Smooth(Mesh mesh, (int Iterations, SmoothingConstraint Constraint) parameters, IGeometryContext context)`: Orchestrates Laplacian smoothing. Computes weights via `MorphologyCore.ComputeLaplacianWeights`, applies iterations with constraint enforcement. Tracks quality metrics (aspect ratio, minimum angle) and aborts if mesh degenerates.
-- `Evolve(Mesh mesh, (EvolutionType Type, double TimeStep, int Iterations) parameters, IGeometryContext context)`: Surface evolution dispatcher. Mean curvature flow computes per-vertex curvature and moves along normal. Geodesic active contours add edge-attraction term. Taubin smoothing alternates positive and negative Laplacian for volume preservation.
-- `DispatchMorphology<T>(T geometry, MorphologyMode mode, IGeometryContext context)`: FrozenDictionary-based operation dispatch for semantic morphology modes.
-- `SubdivideLoop(Mesh mesh, int levels)`: Loop subdivision implementation for triangle meshes. Splits each triangle into 4, computes edge midpoints using Loop stencil (weighted by valence), relaxes vertex positions using β weights.
-- `SubdivideButterfly(Mesh mesh, int levels)`: Butterfly interpolating subdivision. Computes edge midpoints using 8-point butterfly stencil (requires regular valence-6 vertices for optimal results). Falls back to 4-point stencil for boundary edges.
-- `ComputeConvergence(Mesh current, Mesh previous, IGeometryContext context)`: Convergence test for iterative algorithms. Computes RMS vertex displacement between iterations. Returns true when displacement < convergence threshold (context.AbsoluteTolerance * ConvergenceMultiplier).
-
-**Algorithmic Density Strategy**:
-- FrozenDictionary dispatch for subdivision method selection
-- Parallel vertex updates in smoothing/evolution when mesh.Vertices.Count > 1000
-- Expression tree compilation for Loop subdivision stencil (β = valence-dependent weight)
-- Inline convergence computation using LINQ aggregate
-
-**Code Style Example**:
-```csharp
-internal static class MorphologyCompute {
-    internal readonly record struct EvolutionState(
-        int Iteration,
-        double Time,
-        double Energy,
-        bool Converged);
-
-    [Pure]
-    internal static Result<Mesh> Subdivide(
-        Mesh mesh,
-        SubdivisionMethod method,
-        int levels,
-        IGeometryContext context) =>
-        method.Algorithm switch {
-            0 => SubdivideCatmullClark(mesh, levels, context),
-            1 => SubdivideLoop(mesh, levels, context),
-            2 => SubdivideButterfly(mesh, levels, context),
-            _ => ResultFactory.Create<Mesh>(error: E.Morphology.UnsupportedSubdivision),
-        };
-
-    [Pure]
-    private static Result<Mesh> SubdivideCatmullClark(
-        Mesh mesh,
-        int levels,
-        IGeometryContext context) =>
-        ((Func<Result<Mesh>>)(() => {
-            Mesh current = mesh;
-            for (int level = 0; level < levels; level++) {
-                Mesh refined = current.CreateRefinedCatmullClarkMesh();
-                bool isValid = refined is not null && refined.IsValid;
-                if (!isValid) {
-                    refined?.Dispose();
-                    return level > 0
-                        ? ResultFactory.Create(value: current)
-                        : ResultFactory.Create<Mesh>(error: E.Morphology.SubdivisionFailed.WithContext($"Level: {level}"));
-                }
-                if (level > 0) {
-                    current.Dispose();
-                }
-                current = refined;
-            }
-            return ResultFactory.Create(value: current);
-        }))();
-
-    [Pure]
-    internal static Result<Mesh> Smooth(
-        Mesh mesh,
-        (int Iterations, SmoothingConstraint Constraint) parameters,
-        IGeometryContext context) {
-        FrozenDictionary<int, (int[] Neighbors, double[] Weights)> laplacian = MorphologyCore.ComputeLaplacianWeights(mesh, useCotangent: true);
-        Mesh smoothed = mesh.DuplicateMesh();
-        Point3d[] positions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
-        try {
-            for (int iter = 0; iter < parameters.Iterations; iter++) {
-                for (int i = 0; i < smoothed.Vertices.Count; i++) {
-                    bool isLocked = parameters.Constraint switch {
-                        { Kind: 2 } when smoothed.TopologyVertices.ConnectedFaces(i).Length < 2 => true,
-                        { Kind: 3 } when IsFeatureVertex(smoothed, i, MorphologyConfig.FeatureAngleThreshold) => true,
-                        _ => false,
-                    };
-                    positions[i] = isLocked
-                        ? smoothed.Vertices[i]
-                        : laplacian.TryGetValue(i, out (int[] neighbors, double[] weights) entry) && entry.neighbors.Length > 0
-                            ? entry.neighbors.Zip(entry.weights, (n, w) => (smoothed.Vertices[n], w))
-                                .Aggregate(Point3d.Origin, (acc, tuple) => acc + tuple.Item1 * tuple.Item2)
-                            : smoothed.Vertices[i];
-                }
-                for (int i = 0; i < smoothed.Vertices.Count; i++) {
-                    smoothed.Vertices[i] = positions[i];
-                }
-                smoothed.Normals.ComputeNormals();
-                smoothed.Compact();
-            }
-            return ResultFactory.Create(value: smoothed);
-        } finally {
-            ArrayPool<Point3d>.Shared.Return(positions, clearArray: true);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsFeatureVertex(Mesh mesh, int vertexIndex, double angleThreshold) {
-        int[] connectedFaces = mesh.TopologyVertices.ConnectedFaces(vertexIndex);
-        return connectedFaces.Length >= 2 && connectedFaces
-            .Take(connectedFaces.Length - 1)
-            .Zip(connectedFaces.Skip(1), (f1, f2) => {
-                Vector3d n1 = mesh.FaceNormals[f1];
-                Vector3d n2 = mesh.FaceNormals[f2];
-                double angle = Vector3d.VectorAngle(n1, n2);
-                return angle > angleThreshold;
-            })
-            .Any(isSharp => isSharp);
-    }
-}
-```
-
-**LOC Estimate**: 250-300
-
 ### File 4: `MorphologyConfig.cs`
-**Purpose**: Configuration constants, validation modes, and FrozenDictionary dispatch tables.
+**Purpose**: Configuration constants, operation IDs, validation mappings. NO nested structs (those are in main API file).
 
 **Types** (1 total):
-- `MorphologyConfig` (static internal class): Configuration and constants
+- `MorphologyConfig` (static internal class): Constants and lookup tables ONLY.
 
 **Key Members**:
-- `ValidationModes` (FrozenDictionary): Maps operation type to appropriate V.* flags
-- `SubdivisionLimits` (FrozenDictionary): Maps subdivision method to (MinValence, MaxValence, MaxLevels) constraints
-- `SmoothingDefaults` (FrozenDictionary): Maps constraint type to default parameters (iterations, feature angle, convergence threshold)
-- Constants: `MaxSubdivisionLevels`, `MinCageControlPoints`, `FeatureAngleThreshold`, `ConvergenceMultiplier`, `MaxLaplacianIterations`
+- `ValidationModes` (FrozenDictionary<(byte, Type), V>): Maps operation-type pairs to validation modes.
+- `OperationNames` (FrozenDictionary<byte, string>): Operation ID to name for diagnostics.
+- Constants: `MinCageControlPoints`, `MaxSubdivisionLevels`, `FeatureAngleRadians`, `TaubinLambda`, `TaubinMu`, `ConvergenceMultiplier`, `AspectRatioThreshold`, `MinAngleRadiansThreshold`.
+
+**Operation IDs** (NO byte-based mode structs, just constants):
+- `1` = CageDeform (FFD)
+- `2` = SubdivideCatmullClark
+- `3` = SubdivideLoop
+- `4` = SubdivideButterfly
+- `10` = SmoothLaplacian
+- `11` = SmoothTaubin
+- `20` = EvolveMeanCurvature
 
 **Code Style Example**:
 ```csharp
 internal static class MorphologyConfig {
-    internal const int MaxSubdivisionLevels = 5;
     internal const int MinCageControlPoints = 8;
-    internal const int MaxLaplacianIterations = 1000;
-    internal const double FeatureAngleThreshold = 0.523598776;
-    internal const double ConvergenceMultiplier = 100.0;
+    internal const int MaxSubdivisionLevels = 5;
+    internal const double FeatureAngleRadians = 0.5235987756;
     internal const double TaubinLambda = 0.6307;
     internal const double TaubinMu = -0.6732;
+    internal const double ConvergenceMultiplier = 100.0;
+    internal const double AspectRatioThreshold = 10.0;
+    internal const double MinAngleRadiansThreshold = 0.0872664626;
 
-    internal static readonly FrozenDictionary<byte, V> ValidationModes =
-        new Dictionary<byte, V> {
-            [1] = V.Standard | V.Topology,
-            [2] = V.Standard | V.MeshSpecific,
-            [3] = V.Standard | V.MeshSpecific | V.Topology,
-            [4] = V.Standard | V.MeshSpecific,
-            [5] = V.Standard | V.Topology,
-            [6] = V.Standard | V.BoundingBox,
+    internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
+        new Dictionary<(byte, Type), V> {
+            [(1, typeof(Mesh))] = V.Standard | V.Topology,
+            [(1, typeof(Brep))] = V.Standard | V.Topology,
+            [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(3, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(4, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(10, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(11, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(20, typeof(Mesh))] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
-    internal static readonly FrozenDictionary<byte, (int MinValence, int MaxValence, int MaxLevels)> SubdivisionLimits =
-        new Dictionary<byte, (int, int, int)> {
-            [0] = (MinValence: 3, MaxValence: 8, MaxLevels: 5),
-            [1] = (MinValence: 6, MaxValence: 6, MaxLevels: 4),
-            [2] = (MinValence: 6, MaxValence: 6, MaxLevels: 4),
-        }.ToFrozenDictionary();
-
-    internal static readonly FrozenDictionary<byte, (int Iterations, double Angle, double Convergence)> SmoothingDefaults =
-        new Dictionary<byte, (int, double, double)> {
-            [0] = (Iterations: 10, Angle: RhinoMath.PI, Convergence: 0.001),
-            [1] = (Iterations: 10, Angle: FeatureAngleThreshold, Convergence: 0.001),
-            [2] = (Iterations: 10, Angle: RhinoMath.PI, Convergence: 0.001),
-            [3] = (Iterations: 10, Angle: FeatureAngleThreshold, Convergence: 0.001),
+    internal static readonly FrozenDictionary<byte, string> OperationNames =
+        new Dictionary<byte, string> {
+            [1] = "CageDeform",
+            [2] = "SubdivideCatmullClark",
+            [3] = "SubdivideLoop",
+            [4] = "SubdivideButterfly",
+            [10] = "SmoothLaplacian",
+            [11] = "SmoothTaubin",
+            [20] = "EvolveMeanCurvature",
         }.ToFrozenDictionary();
 }
 ```
 
-**LOC Estimate**: 80-120
+**LOC Estimate**: 60-80
 
 ## Adherence to Limits
 
-- **Files**: 4 files (✓ PERFECT - exactly at 4-file maximum, exceeds 2-3 ideal but justified by domain complexity)
-- **Types**: 10 types total (✓ PERFECT - exactly at 10-type maximum, within 6-8 ideal range per file)
-  - File 1: 6 types (Morphology, MorphologyMode, SubdivisionMethod, SmoothingConstraint, EvolutionType, IMorphologyResult)
-  - File 2: 3 types (MorphologyCore, CageState, DeformationMetrics)
-  - File 3: 2 types (MorphologyCompute, EvolutionState)
-  - File 4: 1 type (MorphologyConfig)
-- **Estimated Total LOC**: 730-920 (well within acceptable range for 4-file folder)
-- **Individual Member LOC**: All estimated members < 300 LOC (largest is Smooth at ~250 LOC with inline convergence logic)
+- **Files**: 4 files (✓ EXACT at maximum, justified by complexity)
+- **Types**: 5 types total (✓ OPTIMAL, well below 10 maximum)
+  - File 1 (Morphology.cs): 5 types (Morphology class + 4 nested result types + 1 interface)
+  - File 2 (MorphologyCore.cs): 1 type (MorphologyCore class)
+  - File 3 (MorphologyCompute.cs): 1 type (MorphologyCompute class)
+  - File 4 (MorphologyConfig.cs): 1 type (MorphologyConfig class)
+- **Estimated Total LOC**: 600-720 (lean, eliminated unnecessary abstractions)
+- **Individual Member LOC**: Largest executor function ~280 LOC (CageDeform + all subdivision variants in MorphologyCore), within 300 LOC hard limit
 
 ## Algorithmic Density Strategy
 
 **How we achieve dense code without helpers**:
-1. **Expression tree compilation**: Loop subdivision β-weight computation compiles valence-dependent expression trees at runtime
-2. **FrozenDictionary dispatch**: Operation selection, validation mode lookup, subdivision limits - all O(1) lookups
-3. **Inline trilinear interpolation**: Lattice deformation computes barycentric coordinates inline using pattern matching on lattice cell position
-4. **Leverage ConditionalWeakTable**: CageMorph caching for incremental deformation workflows
-5. **Compose existing Result<T> operations**: Chain `.Bind`, `.Map`, `.Ensure` for validation and transformation pipelines instead of explicit conditionals
-6. **ArrayPool buffering**: Zero-allocation temporary vertex storage for iterative smoothing
-7. **Parallel.ForEach**: Parallel vertex updates when mesh size > 1000 vertices, configured via OperationConfig
-8. **Switch expression dispatch**: All algorithm selection via pattern matching, no if/else branches
-9. **LINQ aggregate**: Inline convergence RMS computation, weighted neighbor averaging, cotangent weight sums
-10. **Inline RhinoMath**: Use `RhinoMath.Clamp`, `RhinoMath.IsValidDouble`, `RhinoMath.PI` for numerical robustness without magic numbers
+1. **FrozenDictionary O(1) dispatch**: Single operation dispatch table in MorphologyCore maps `(operation byte, input Type)` to executor functions. No switch statements in API layer.
+2. **Inline formulas**: Loop β-weight formula inlined in subdivision loop. Cotangent weight computation inlined in neighborhood builder. No "CalculateWeight" helper extraction.
+3. **Pattern matching parameter extraction**: `params switch { (GeometryBase c, Point3d[] o, Point3d[] d) => ..., int levels => ..., }` directly in executor functions.
+4. **LINQ aggregate for convergence**: `positions.Zip(prevPositions, (a, b) => a.DistanceTo(b)).Select(d => d * d).Average()` for RMS displacement.
+5. **ArrayPool zero-allocation**: Rent/return pattern for temporary position buffers in smoothing iterations.
+6. **Switch expressions for algorithm selection**: `algorithm switch { 2 => CatmullClark(), 3 => Loop(), 4 => Butterfly() }`.
+7. **Unified Result composition**: Chain `.Bind` for sequential validation, `.Map` for metric computation, `.Ensure` for quality checks.
+8. **RhinoCommon constants**: Use `RhinoMath.ToRadians(30.0)` for feature angle, `RhinoMath.TwoPI` for Loop formula, `RhinoMath.ZeroTolerance` for numerical checks.
 
 ## Dispatch Architecture
 
-**Primary Dispatch: UnifiedOperation with Polymorphic Parameters**
-```csharp
-public static Result<IReadOnlyList<T>> Deform<T>(T geometry, object parameters, IGeometryContext context)
-    where T : GeometryBase =>
-    UnifiedOperation.Apply(
-        input: geometry,
-        operation: (Func<T, Result<IReadOnlyList<T>>>)(item => parameters switch {
-            (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts) => 
-                MorphologyCore.CageDeform(item, cage, originalPts, deformedPts, context),
-            (double latticeSize, Func<Point3d, Vector3d> deformFunc) => 
-                MorphologyCore.LatticeDeform(item, latticeSize, deformFunc, context),
-            MorphologyMode mode => 
-                MorphologyCompute.DispatchMorphology(item, mode, context),
-            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InsufficientParameters),
-        }),
-        config: new OperationConfig<T, T> {
-            Context = context,
-            ValidationMode = V.Standard | V.Topology,
-            OperationName = "Morphology.Deform",
-        });
-```
+**Single Unified Entry Point**: `Morphology.Apply<T>(input, (operation, params), context)`
 
-**Secondary Dispatch: FrozenDictionary for Subdivision Method**
+**Primary Dispatch**: FrozenDictionary in MorphologyCore
 ```csharp
-private static readonly FrozenDictionary<byte, Func<Mesh, int, IGeometryContext, Result<Mesh>>> _subdivisionDispatch =
-    new Dictionary<byte, Func<Mesh, int, IGeometryContext, Result<Mesh>>> {
-        [0] = SubdivideCatmullClark,
-        [1] = SubdivideLoop,
-        [2] = SubdivideButterfly,
+internal static readonly FrozenDictionary<(byte Operation, Type InputType), Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>> OperationDispatch =
+    new Dictionary<(byte, Type), Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>> {
+        [(1, typeof(Mesh))] = ExecuteCageDeform,
+        [(1, typeof(Brep))] = ExecuteCageDeform,
+        [(2, typeof(Mesh))] = ExecuteSubdivideCatmullClark,
+        [(3, typeof(Mesh))] = ExecuteSubdivideLoop,
+        [(4, typeof(Mesh))] = ExecuteSubdivideButterfly,
+        [(10, typeof(Mesh))] = ExecuteSmoothLaplacian,
+        [(11, typeof(Mesh))] = ExecuteSmoothTaubin,
+        [(20, typeof(Mesh))] = ExecuteEvolveMeanCurvature,
     }.ToFrozenDictionary();
 ```
 
-**Validation Mode Dispatch: FrozenDictionary for Operation Type**
+**Secondary Dispatch**: Validation mode lookup in MorphologyConfig
 ```csharp
-internal static readonly FrozenDictionary<byte, V> ValidationModes =
-    new Dictionary<byte, V> {
-        [1] = V.Standard | V.Topology,              // FFD
-        [2] = V.Standard | V.MeshSpecific,          // Laplacian
-        [3] = V.Standard | V.MeshSpecific | V.Topology, // Subdivision
-        [4] = V.Standard | V.MeshSpecific,          // Evolution
-        [5] = V.Standard | V.Topology,              // ARAP
-        [6] = V.Standard | V.BoundingBox,           // Lattice
+internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
+    new Dictionary<(byte, Type), V> {
+        [(1, typeof(Mesh))] = V.Standard | V.Topology,
+        [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+        [(10, typeof(Mesh))] = V.Standard | V.MeshSpecific,
     }.ToFrozenDictionary();
+```
+
+**Usage Pattern**:
+```csharp
+// Cage deformation (operation 1)
+Result<IReadOnlyList<IMorphologyResult>> result = Morphology.Apply(
+    mesh,
+    (Operation: 1, Parameters: (cage, originalPoints, deformedPoints)),
+    context);
+
+// Catmull-Clark subdivision (operation 2)
+Result<IReadOnlyList<IMorphologyResult>> result = Morphology.Apply(
+    mesh,
+    (Operation: 2, Parameters: 3), // 3 levels
+    context);
+
+// Laplacian smoothing (operation 10)
+Result<IReadOnlyList<IMorphologyResult>> result = Morphology.Apply(
+    mesh,
+    (Operation: 10, Parameters: (50, true)), // (iterations, lockBoundary)
+    context);
 ```
 
 ## Public API Surface
 
-### Primary Operations
+### Single Unified Entry Point
 ```csharp
-// Unified morphology entry point with polymorphic parameter dispatch
-public static Result<IReadOnlyList<T>> Deform<T>(
-    T geometry,
-    object parameters,
+public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
+    T input,
+    (byte Operation, object Parameters) spec,
     IGeometryContext context) where T : GeometryBase;
-
-// Mesh subdivision with algorithm selection
-public static Result<Mesh> Subdivide(
-    Mesh mesh,
-    SubdivisionMethod method,
-    int levels,
-    IGeometryContext context);
-
-// Detail-preserving smoothing with constraint enforcement
-public static Result<Mesh> Smooth(
-    Mesh mesh,
-    (int Iterations, SmoothingConstraint Constraint) parameters,
-    IGeometryContext context);
-
-// Surface evolution via curvature flow
-public static Result<Mesh> Evolve(
-    Mesh mesh,
-    (EvolutionType Type, double TimeStep, int Iterations) parameters,
-    IGeometryContext context);
 ```
 
-### Configuration Types
+### Operation IDs (constants, not byte structs)
+- `1` = Cage Deform (FFD): `Parameters: (GeometryBase cage, Point3d[] original, Point3d[] deformed)`
+- `2` = Subdivide Catmull-Clark: `Parameters: int levels`
+- `3` = Subdivide Loop: `Parameters: int levels`
+- `4` = Subdivide Butterfly: `Parameters: int levels`
+- `10` = Smooth Laplacian: `Parameters: (int iterations, bool lockBoundary)`
+- `11` = Smooth Taubin: `Parameters: (int iterations, double lambda, double mu)`
+- `20` = Evolve Mean Curvature: `Parameters: (double timeStep, int iterations)`
+
+### Result Types (nested in Morphology class)
 ```csharp
-// Operation semantic discriminator
-public readonly struct MorphologyMode(byte kind) {
-    public static readonly MorphologyMode FFD = new(1);
-    public static readonly MorphologyMode Laplacian = new(2);
-    public static readonly MorphologyMode Subdivision = new(3);
-    public static readonly MorphologyMode Evolution = new(4);
-    public static readonly MorphologyMode ARAP = new(5);
-    public static readonly MorphologyMode Lattice = new(6);
-}
+public interface IMorphologyResult;
 
-// Subdivision algorithm selector
-public readonly struct SubdivisionMethod(byte algorithm) {
-    public static readonly SubdivisionMethod CatmullClark = new(0);
-    public static readonly SubdivisionMethod Loop = new(1);
-    public static readonly SubdivisionMethod Butterfly = new(2);
-}
+public sealed record CageDeformResult(
+    GeometryBase Deformed,
+    double MaxDisplacement,
+    BoundingBox OriginalBounds,
+    BoundingBox DeformedBounds) : IMorphologyResult;
 
-// Smoothing constraint enforcement
-public readonly struct SmoothingConstraint(byte kind) {
-    public static readonly SmoothingConstraint None = new(0);
-    public static readonly SmoothingConstraint Sharp = new(1);
-    public static readonly SmoothingConstraint Boundary = new(2);
-    public static readonly SmoothingConstraint Feature = new(3);
-}
+public sealed record SubdivisionResult(
+    Mesh Subdivided,
+    int OriginalFaceCount,
+    int SubdividedFaceCount,
+    double MinEdgeLength,
+    double MaxEdgeLength,
+    double MeanAspectRatio) : IMorphologyResult;
 
-// Evolution algorithm type
-public readonly struct EvolutionType(byte algorithm) {
-    public static readonly EvolutionType MeanCurvature = new(0);
-    public static readonly EvolutionType GeodesicActive = new(1);
-    public static readonly EvolutionType Taubin = new(2);
-}
+public sealed record SmoothingResult(
+    Mesh Smoothed,
+    int IterationsPerformed,
+    double RMSDisplacement,
+    double QualityScore,
+    bool Converged) : IMorphologyResult;
 ```
 
 ## Error Code Allocation (E.cs Registry)
 
-**New Codes in 2800-2899 Range (Morphology Operations)**:
+**New Codes in 2800-2812 Range**:
 ```csharp
-// In libs/core/errors/E.cs dictionary:
+// In libs/core/errors/E.cs dictionary (add to existing 2000-2999 range):
 [2800] = "Cage-based deformation failed",
-[2801] = "Cage control point count mismatch",
+[2801] = "Cage control point count mismatch between original and deformed arrays",
 [2802] = "Insufficient cage control points (minimum 8 required)",
 [2803] = "Subdivision level exceeded maximum (5 levels)",
-[2804] = "Subdivision failed at specified level",
-[2805] = "Unsupported subdivision method for mesh type",
-[2806] = "Laplacian smoothing convergence failure",
-[2807] = "Mesh quality degraded below acceptable threshold",
-[2808] = "Surface evolution timestep too large for stability",
-[2809] = "Mean curvature computation failed",
-[2810] = "Lattice deformation grid creation failed",
-[2811] = "ARAP deformation energy minimization failed",
-[2812] = "Feature detection failed for constraint enforcement",
+[2804] = "Subdivision failed: non-manifold mesh or degenerate faces",
+[2805] = "Laplacian smoothing convergence failure after maximum iterations",
+[2806] = "Mesh quality degraded below acceptable threshold (aspect ratio or min angle)",
+[2807] = "Mean curvature flow timestep too large for stability",
+[2808] = "Mean curvature computation failed: degenerate vertex neighborhood",
+[2809] = "Taubin smoothing parameters invalid (μ must be < -λ)",
+[2810] = "Loop subdivision failed: requires triangle mesh",
+[2811] = "Butterfly subdivision failed: irregular vertex valence",
+[2812] = "Unsupported morphology configuration for geometry type",
 
-// In E.Geometry nested class:
-public static readonly SystemError CageDeformFailed = Get(2800);
-public static readonly SystemError CageControlPointMismatch = Get(2801);
-public static readonly SystemError InsufficientCagePoints = Get(2802);
-public static readonly SystemError SubdivisionLevelExceeded = Get(2803);
-public static readonly SystemError SubdivisionFailed = Get(2804);
-public static readonly SystemError UnsupportedSubdivision = Get(2805);
-public static readonly SystemError SmoothingConvergenceFailed = Get(2806);
-public static readonly SystemError MeshQualityDegraded = Get(2807);
-public static readonly SystemError EvolutionTimestepTooLarge = Get(2808);
-public static readonly SystemError CurvatureComputationFailed = Get(2809);
-public static readonly SystemError LatticeCreationFailed = Get(2810);
-public static readonly SystemError ARAPMinimizationFailed = Get(2811);
-public static readonly SystemError FeatureDetectionFailed = Get(2812);
+// In E.Geometry nested class (add as E.Morphology for clarity):
+public static class Morphology {
+    public static readonly SystemError CageDeformFailed = Get(2800);
+    public static readonly SystemError CageControlPointMismatch = Get(2801);
+    public static readonly SystemError InsufficientCagePoints = Get(2802);
+    public static readonly SystemError SubdivisionLevelExceeded = Get(2803);
+    public static readonly SystemError SubdivisionFailed = Get(2804);
+    public static readonly SystemError SmoothingConvergenceFailed = Get(2805);
+    public static readonly SystemError MeshQualityDegraded = Get(2806);
+    public static readonly SystemError EvolutionTimestepTooLarge = Get(2807);
+    public static readonly SystemError CurvatureComputationFailed = Get(2808);
+    public static readonly SystemError TaubinParametersInvalid = Get(2809);
+    public static readonly SystemError LoopRequiresTriangles = Get(2810);
+    public static readonly SystemError ButterflyIrregularValence = Get(2811);
+    public static readonly SystemError UnsupportedConfiguration = Get(2812);
+}
 ```
 
-## Validation Mode Integration (V.cs)
+## Validation Mode Integration (Surgical Refactoring)
 
-**New Validation Modes to Add**:
+### CRITICAL: NO Extension Methods, Proper Core Integration
+
+**Validation Philosophy**: MorphologyQuality validation is NOT a separate concern. It validates mesh structural integrity (manifold, closed) which ALREADY EXISTS in `V.Topology` and `V.MeshSpecific`. We do NOT need a new validation mode. Morphology operations should use EXISTING validation modes.
+
+**Correct Integration Strategy**:
+
+1. **DO NOT create `V.MorphologyQuality`** - This would duplicate existing validation logic.
+2. **Use existing modes**: 
+   - `V.Standard | V.MeshSpecific | V.Topology` for subdivision (manifold + closed checks)
+   - `V.Standard | V.MeshSpecific` for smoothing (valid mesh checks)
+   - `V.Standard | V.Topology` for cage deformation (topology preservation)
+
+3. **Quality metrics are NOT validation** - Aspect ratio, edge length distribution are RESULT METRICS, not validation failures. Compute in result types, don't fail validation.
+
+**Changes to libs/core/validation/**:
+
+### V.cs - NO CHANGES NEEDED
+Existing validation modes are sufficient:
+- `V.Standard` - IsValid check
+- `V.MeshSpecific` - Manifold, closed, face count checks (lines 50 in ValidationRules.cs)
+- `V.Topology` - Manifold, closed, solid checks (lines 47 in ValidationRules.cs)
+
+### ValidationRules.cs - NO CHANGES NEEDED
+Existing `_validationRules` FrozenDictionary entries already cover morphology requirements:
 ```csharp
-// In V.cs constants (next available flags):
-public static readonly V MorphologyQuality = new(32768);      // 2^15
-public static readonly V SubdivisionConstraints = new(65536); // 2^16
+// Line 47: V.Topology already validates manifold/closed/solid
+[V.Topology] = (
+    [(Member: "IsManifold", Error: E.Validation.InvalidTopology), 
+     (Member: "IsClosed", Error: E.Validation.InvalidTopology), 
+     (Member: "IsSolid", Error: E.Validation.InvalidTopology), ...],
+    [...]),
 
-// Update V.All to include new modes:
-public static readonly V All = new((ushort)(
-    Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
-    Topology._flags | Degeneracy._flags | Tolerance._flags | MeshSpecific._flags | 
-    SurfaceContinuity._flags | PolycurveStructure._flags | NurbsGeometry._flags | 
-    ExtrusionGeometry._flags | UVDomain._flags | SelfIntersection._flags | 
-    BrepGranular._flags | MorphologyQuality._flags | SubdivisionConstraints._flags
-));
-
-// Update AllFlags array:
-internal static readonly V[] AllFlags = [
-    Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, 
-    Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, 
-    ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular, 
-    MorphologyQuality, SubdivisionConstraints,
-];
+// Line 50: V.MeshSpecific already validates mesh structure
+[V.MeshSpecific] = (
+    [(Member: "IsManifold", Error: E.Validation.MeshInvalid), 
+     (Member: "IsClosed", Error: E.Validation.MeshInvalid), 
+     (Member: "IsTriangleMesh", Error: E.Validation.MeshInvalid), 
+     (Member: "IsQuadMesh", Error: E.Validation.MeshInvalid), ...],
+    []),
 ```
 
-**ValidationRules Integration** (in `ValidationRules.cs`):
+**Usage in MorphologyConfig.cs**:
 ```csharp
-// Add to _validationRules FrozenDictionary:
-[V.MorphologyQuality] = (
-    [
-        (Member: "IsValid", Error: E.Validation.GeometryInvalid),
-        (Member: "IsManifold", Error: E.Validation.NonManifoldEdges),
-        (Member: "IsClosed", Error: E.Validation.InvalidTopology),
-    ], 
-    [
-        (Member: "GetMinFaceArea", Error: E.Morphology.MeshQualityDegraded),
-        (Member: "GetMaxEdgeLength", Error: E.Morphology.MeshQualityDegraded),
-    ]
-),
-[V.SubdivisionConstraints] = (
-    [
-        (Member: "IsManifold", Error: E.Morphology.UnsupportedSubdivision),
-        (Member: "IsClosed", Error: E.Morphology.UnsupportedSubdivision),
-    ], 
-    []
-),
+internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
+    new Dictionary<(byte, Type), V> {
+        [(1, typeof(Mesh))] = V.Standard | V.Topology,              // Cage: topology preservation
+        [(1, typeof(Brep))] = V.Standard | V.Topology,              // Cage: topology preservation
+        [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,  // Catmull-Clark: requires manifold closed
+        [(3, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,  // Loop: requires manifold triangle mesh
+        [(4, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,  // Butterfly: requires manifold triangle mesh
+        [(10, typeof(Mesh))] = V.Standard | V.MeshSpecific,         // Laplacian: valid manifold mesh
+        [(11, typeof(Mesh))] = V.Standard | V.MeshSpecific,         // Taubin: valid manifold mesh
+        [(20, typeof(Mesh))] = V.Standard | V.MeshSpecific,         // Mean curvature: valid manifold mesh
+    }.ToFrozenDictionary();
 ```
 
-## Additional Operations Identified (Beyond Specification)
+**Quality Metrics in Results** (NOT Validation):
+```csharp
+// In Morphology.cs result types - quality is REPORTED, not VALIDATED
+public sealed record SubdivisionResult(
+    Mesh Subdivided,
+    int OriginalFaceCount,
+    int SubdividedFaceCount,
+    double MinEdgeLength,      // Metric, not validation
+    double MaxEdgeLength,      // Metric, not validation
+    double MeanAspectRatio)    // Metric, not validation
+    : IMorphologyResult;
 
-1. **Taubin Smoothing** (INCLUDED in EvolutionType):
-   - **Justification**: Volume-preserving variant of Laplacian smoothing. Alternates positive (λ) and negative (μ) smoothing steps to prevent mesh shrinkage while maintaining smoothness. Critical for CAD applications where volume preservation is required.
-   - **Integration**: Added as `EvolutionType.Taubin` with constants `TaubinLambda = 0.6307` and `TaubinMu = -0.6732` (empirically optimal values).
+// Quality check in MorphologyCompute.cs - FAILS operation if quality too poor
+internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
+    mesh.Faces.Select(ComputeFaceAspectRatio).Max() is double maxAspect && maxAspect > MorphologyConfig.AspectRatioThreshold
+        ? ResultFactory.Create<Mesh>(error: E.Morphology.MeshQualityDegraded.WithContext($"MaxAspect: {maxAspect:F2}"))
+        : ResultFactory.Create(value: mesh);
+```
 
-2. **ARAP Deformation** (As-Rigid-As-Possible, INCLUDED in MorphologyMode):
-   - **Justification**: Constraint-based deformation that preserves local rigidity while allowing global shape changes. Superior to FFD for organic deformations where local detail must be preserved. Used in character rigging, handle-based modeling.
-   - **Integration**: Added as `MorphologyMode.ARAP` with error minimization via sparse matrix solver. Iterates between local rotation estimation and global position optimization.
+**Summary**: 
+- **NO new validation modes** - Use existing `V.Topology` and `V.MeshSpecific`
+- **NO extension methods** - Quality checks are internal functions in MorphologyCompute.cs
+- **NO helper methods** - Aspect ratio computation inlined in quality validator
+- **Surgical integration** - Reuse existing validation infrastructure, add zero new validation code to libs/core/
 
-3. **Volumetric Lattice Deformation** (INCLUDED in MorphologyMode and Deform parameters):
-   - **Justification**: Alternative to cage-based FFD using regular 3D grid. Provides uniform control over enclosed volume with simpler setup (no cage modeling required). Trilinear interpolation ensures C0 continuity across lattice cells.
-   - **Integration**: Added as `MorphologyMode.Lattice` and tuple parameter `(double latticeSize, Func<Point3d, Vector3d> deformFunc)` in Deform API. Lattice size controls grid resolution (smaller = finer control, more computation).
+## Implementation Sequence
+
+1. **Add error codes to E.cs** - Codes 2800-2812 in dictionary, `E.Morphology` nested class
+2. **NO changes to V.cs** - Use existing validation modes (V.Standard, V.MeshSpecific, V.Topology)
+3. **NO changes to ValidationRules.cs** - Existing validation rules are sufficient
+4. **Create MorphologyConfig.cs** - Constants, FrozenDictionary dispatch tables, operation IDs, validation mode mappings using EXISTING V.* flags
+5. **Create MorphologyCompute.cs** - Subdivision iterations, smoothing convergence, INLINE quality checks (no helper methods)
+6. **Create MorphologyCore.cs** - Operation dispatch table, executor functions, neighborhood builder
+7. **Create Morphology.cs** - Public API with nested result types, single `Apply` entry point
+8. **Verify NO extension methods** - All functionality in static internal classes
+9. **Verify NO helper methods** - All logic inlined or in dense primary methods
+10. **Verify patterns** - Compare against spatial/Spatial.cs, analysis/Analysis.cs structure
+11. **Check LOC limits** - Ensure largest member ≤ 300 LOC
+12. **Verify type nesting** - All types properly nested, no free-floating structs/records
+13. **Verify code style** - No var, no if/else, named params, trailing commas, K&R braces
+
+## References
+
+### SDK Documentation
+- [RhinoCommon Mesh Class](https://developer.rhino3d.com/api/rhinocommon/rhino.geometry.mesh)
+- [RhinoCommon CageMorph Class](https://developer.rhino3d.com/api/RhinoCommon/html/T_Rhino_Geometry_Morphs_CageMorph.htm)
+- [RhinoCommon Mesh.CreateRefinedCatmullClarkMesh](https://developer.rhino3d.com/api/RhinoCommon/html/M_Rhino_Geometry_Mesh_CreateRefinedCatmullClarkMesh.htm)
+- [RhinoCommon MeshVertexNormalList.ComputeNormals](https://developer.rhino3d.com/api/RhinoCommon/html/M_Rhino_Geometry_Collections_MeshVertexNormalList_ComputeNormals.htm)
+- [RhinoMath Class](https://developer.rhino3d.com/api/RhinoCommon/html/T_Rhino_RhinoMath.htm)
+
+### Algorithmic References
+- Loop Subdivision: "Smooth Subdivision Surfaces Based on Triangles" (Charles Loop, 1987)
+- Butterfly Subdivision: "Interpolating Subdivision for Meshes with Arbitrary Topology" (Zorin et al., 1996)
+- Taubin Smoothing: "A Signal Processing Approach to Fair Surface Design" (Taubin, 1995)
+- Mean Curvature Flow: "Discrete Differential-Geometry Operators for Triangulated 2-Manifolds" (Meyer et al., 2003)
+- Laplacian Smoothing: "Curvature of Triangle Meshes" (Vaillant, 2013) - https://rodolphe-vaillant.fr/entry/33/
+
+### Related libs/ Code (MUST READ BEFORE IMPLEMENTING)
+- `libs/core/results/` - Result monad patterns (Map, Bind, Ensure chaining)
+- `libs/core/operations/` - UnifiedOperation configuration (OperationConfig properties)
+- `libs/core/validation/` - ValidationRules expression trees, V.* flag composition
+- `libs/core/errors/` - Error code allocation patterns, E.* nested class structure
+- `libs/rhino/spatial/SpatialCore.cs` - FrozenDictionary dispatch pattern (lines 23-43), RTree usage
+- `libs/rhino/analysis/AnalysisCompute.cs` - Curvature computation (lines 16-66), ArrayPool pattern
+- `libs/rhino/topology/TopologyCompute.cs` - Manifold validation (lines 76-148), edge valence checks
+- `libs/rhino/extraction/ExtractionConfig.cs` - Validation mode dispatch (lines 11-61), `(kind, type) -> V` pattern
 
 ## Code Style Adherence Verification
 
 - [x] All examples use pattern matching (no if/else statements)
 - [x] All examples use explicit types (no var usage)
-- [x] All examples use named parameters where ambiguous
+- [x] All examples use named parameters where appropriate
 - [x] All examples use trailing commas in collections
-- [x] All examples use K&R brace style (`method() {` not `method()\n{`)
-- [x] All examples use target-typed new() where type is known
+- [x] All examples use K&R brace style (opening brace on same line)
+- [x] All examples use target-typed new() where applicable
 - [x] All examples use collection expressions [] where applicable
-- [x] One type per file organization (struct types nested in primary class)
-- [x] All member estimates under 300 LOC (largest: Smooth at ~250 LOC)
-- [x] All patterns match existing libs/ exemplars (spatial/, analysis/, topology/)
-- [x] File-scoped namespaces with K&R brace continuation
-- [x] Proper suppression usage (only Morphology.cs for namespace match)
-
-## Implementation Sequence
-
-1. **Read this blueprint thoroughly** - Understand all file dependencies and integration points
-2. **Double-check SDK usage patterns** - Verify CageMorph, CreateRefinedCatmullClarkMesh APIs
-3. **Verify libs/ integration strategy** - Confirm Result, UnifiedOperation, V.*, E.* patterns
-4. **Add error codes to E.cs** - Codes 2800-2812 in dictionary and E.Geometry static class
-5. **Add validation modes to V.cs** - MorphologyQuality, SubdivisionConstraints flags
-6. **Update ValidationRules.cs** - Add FrozenDictionary entries for new V.* modes
-7. **Create MorphologyConfig.cs** - Constants, FrozenDictionary dispatch tables
-8. **Create MorphologyCore.cs** - CageDeform, LatticeDeform, LaplacianWeights, neighborhood building
-9. **Create MorphologyCompute.cs** - Subdivide, Smooth, Evolve orchestration
-10. **Create Morphology.cs** - Public API with nested types, UnifiedOperation integration
-11. **Verify patterns match exemplars** - Compare against spatial/, analysis/, topology/ structure
-12. **Check LOC limits (≤300)** - Ensure no member exceeds hard limit
-13. **Verify file/type limits (≤4 files, ≤10 types)** - Count types across all files
-14. **Verify code style compliance** - No var, no if/else, named params, trailing commas
-15. **Integration test** - Verify Result chaining, UnifiedOperation dispatch, validation integration
-
-## References
-
-### SDK Documentation
-- [RhinoCommon API - CageMorph](https://developer.rhino3d.com/api/RhinoCommon/html/T_Rhino_Geometry_Morphs_CageMorph.htm)
-- [RhinoCommon API - Mesh.CreateRefinedCatmullClarkMesh](https://developer.rhino3d.com/api/RhinoCommon/html/M_Rhino_Geometry_Mesh_CreateRefinedCatmullClarkMesh.htm)
-- [RhinoCommon Guides - Geometry](https://developer.rhino3d.com/guides/rhinocommon/)
-- [McNeel Forum - Mesh Deformation Discussion](https://discourse.mcneel.com/t/mesh-deformation/133424)
-
-### Algorithmic References
-- Mean Curvature Flow: Lectures by Haslhofer et al. (2024)
-- Laplacian Smoothing: Mesh Smoothing Revisited (Vollmer et al., 1999)
-- Subdivision Surfaces: CGAL 6.1 User Manual
-- Loop Subdivision: Triangle Mesh Subdivision (Charles Loop, 1987)
-- Butterfly Subdivision: Interpolating Subdivision for Meshes (Zorin et al., 1996)
-- Taubin Smoothing: Curve and Surface Smoothing (Taubin, 1995)
-- ARAP Deformation: As-Rigid-As-Possible Surface Modeling (Sorkine & Alexa, 2007)
-
-### Related libs/ Code (MUST READ BEFORE IMPLEMENTING)
-- `libs/core/results/` - Result monad patterns, chaining, error handling
-- `libs/core/operations/` - UnifiedOperation configuration and usage patterns
-- `libs/core/validation/` - ValidationRules expression trees, V.* mode composition
-- `libs/core/errors/` - Error code allocation patterns, E.* registry usage
-- `libs/rhino/spatial/` - FrozenDictionary dispatch, ArrayPool usage, RTree neighbor lookups
-- `libs/rhino/analysis/` - Differential geometry computation, curvature analysis patterns
-- `libs/rhino/topology/` - Edge valence analysis, manifold detection, quality metrics
-- `libs/rhino/extraction/` - Semantic operation mode pattern, polymorphic parameter dispatch
+- [x] Types properly nested (result types nested in Morphology class)
+- [x] All member estimates under 300 LOC
+- [x] All patterns match existing libs/ exemplars
+- [x] Single unified API entry point (Apply method only)
+- [x] FrozenDictionary dispatch (not nested byte structs)
+- [x] Proper RhinoCommon constant usage (RhinoMath.ToRadians, RhinoMath.PI, etc.)
