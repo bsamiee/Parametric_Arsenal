@@ -183,15 +183,21 @@ internal static class IntersectionCompute {
                         .Bind(validA => validate(geomB, context, modeB)
                             .Bind(validB => IntersectionCore.NormalizeOptions(new Intersect.IntersectionOptions(), context)
                                 .Bind(normalized => {
-                                    double goldenRatio = (1.0 + Math.Sqrt(5.0)) / 2.0;
-                                    Vector3d[] directions = [.. Enumerable.Range(0, IntersectionConfig.StabilitySampleCount)
-                                        .Select(index => {
-                                            double y = 1.0 - ((2.0 * index) / (IntersectionConfig.StabilitySampleCount - 1.0));
-                                            double radius = Math.Sqrt(1.0 - (y * y));
-                                            double theta = RhinoMath.TwoPI * index / goldenRatio;
-                                            return new Vector3d(Math.Cos(theta) * radius, y, Math.Sin(theta) * radius);
-                                        }),
-                                    ];
+                                    const int sampleCount = IntersectionConfig.StabilitySampleCount;
+                                    return sampleCount < 2
+                                        ? ResultFactory.Create<(double Score, double Sensitivity)>(
+                                            error: E.Geometry.InvalidCount.WithContext(context: "StabilitySampleCount must be >= 2"))
+                                        : ResultFactory.Create(value: sampleCount).Bind(samples => {
+                                            // Fibonacci sphere: uniform distribution via golden ratio spiral (eliminates polar clustering bias)
+                                            double goldenRatio = (1.0 + Math.Sqrt(5.0)) / 2.0;
+                                            Vector3d[] directions = [.. Enumerable.Range(0, samples)
+                                                .Select(index => {
+                                                    double y = 1.0 - ((2.0 * index) / (samples - 1.0));
+                                                    double radius = Math.Sqrt(1.0 - (y * y));
+                                                    double theta = RhinoMath.TwoPI * index / goldenRatio;
+                                                    return new Vector3d(Math.Cos(theta) * radius, y, Math.Sin(theta) * radius);
+                                                }),
+                                            ];
                                     double perturbationDistance = validA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor;
                                     Result<(double Score, double Sensitivity)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity)>(value: (1.0, 0.0));
 
@@ -231,6 +237,7 @@ internal static class IntersectionCompute {
                                             Resource?.Dispose();
                                         }
                                     }
+                                        });
                                 })));
                 }),
         };
