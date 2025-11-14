@@ -8,8 +8,6 @@ namespace Arsenal.Rhino.Fields;
 internal static class FieldsConfig {
     internal const byte OperationDistance = 0;
 
-    internal const byte IntegrationEuler = 0;
-    internal const byte IntegrationRK2 = 1;
     internal const byte IntegrationRK4 = 2;
 
     internal const byte InterpolationNearest = 0;

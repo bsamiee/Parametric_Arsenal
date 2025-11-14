@@ -303,12 +303,7 @@ internal static class FieldsCompute {
         double dz = bounds.Max.Z - bounds.Min.Z;
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => InterpolateTrilinearScalarInternal(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateTrilinearScalarInternal(Point3d query, double[] scalarField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
+            false => ((Func<Result<double>>)(() => {
         int resSquared = resolution * resolution;
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
@@ -346,6 +341,8 @@ internal static class FieldsCompute {
         double c1 = c01 + (ty * (c11 - c01));
 
         return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+            }))(),
+        };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -355,12 +352,7 @@ internal static class FieldsCompute {
         double dz = bounds.Max.Z - bounds.Min.Z;
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => InterpolateTrilinearVectorInternal(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateTrilinearVectorInternal(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
+            false => ((Func<Result<Vector3d>>)(() => {
         int resSquared = resolution * resolution;
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
@@ -398,6 +390,8 @@ internal static class FieldsCompute {
         Vector3d c1 = c01 + (ty * (c11 - c01));
 
         return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+            }))(),
+        };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
