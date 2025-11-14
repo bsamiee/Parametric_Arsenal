@@ -45,9 +45,7 @@ internal static class MorphologyCompute {
                                 ? ResultFactory.Create(value: current)
                                 : ResultFactory.Create<Mesh>(error: E.Morphology.SubdivisionFailed.WithContext($"Level: {level}, Algorithm: {algorithm}"));
                         }
-                        if (level > 0 && level < levels - 1) {
-                            current.Dispose();
-                        }
+                        _ = level > 0 && level < levels - 1 ? current.Dispose() : (object?)null;
                         current = next;
                     }
                     return ResultFactory.Create(value: current);
@@ -155,39 +153,38 @@ internal static class MorphologyCompute {
                             int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
                             bool hasRegularStencil = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4;
                             
-                            if (hasRegularStencil) {
-                                int opposite1 = -1;
-                                int opposite2 = -1;
-                                for (int fi = 0; fi < mesh.Faces.Count; fi++) {
-                                    int[] faceVerts = [mesh.Faces[fi].A, mesh.Faces[fi].B, mesh.Faces[fi].C,];
-                                    bool hasV1 = Array.IndexOf(faceVerts, v1) >= 0;
-                                    bool hasV2 = Array.IndexOf(faceVerts, v2) >= 0;
-                                    if (hasV1 && hasV2) {
-                                        int opp = faceVerts.First(v => v != v1 && v != v2);
-                                        if (opposite1 < 0) {
-                                            opposite1 = opp;
-                                        } else {
-                                            opposite2 = opp;
-                                        }
+                            (int opposite1, int opposite2) = hasRegularStencil
+                                ? ((Func<(int, int)>)(() => {
+                                    int opp1 = -1;
+                                    int opp2 = -1;
+                                    for (int fi = 0; fi < mesh.Faces.Count; fi++) {
+                                        int[] faceVerts = [mesh.Faces[fi].A, mesh.Faces[fi].B, mesh.Faces[fi].C,];
+                                        bool hasV1 = Array.IndexOf(faceVerts, v1) >= 0;
+                                        bool hasV2 = Array.IndexOf(faceVerts, v2) >= 0;
+                                        int opp = hasV1 && hasV2 ? faceVerts.First(v => v != v1 && v != v2) : -1;
+                                        opp1 = opp >= 0 && opp1 < 0 ? opp : opp1;
+                                        opp2 = opp >= 0 && opp1 >= 0 && opp != opp1 ? opp : opp2;
                                     }
-                                }
-                                
-                                if (opposite1 >= 0 && opposite2 >= 0) {
-                                    mid += 0.125 * (originalVerts[opposite1] + originalVerts[opposite2]);
-                                    
+                                    return (opp1, opp2);
+                                }))()
+                                : (-1, -1);
+                            
+                            mid = opposite1 >= 0 && opposite2 >= 0
+                                ? ((Func<Point3d>)(() => {
+                                    Point3d adjusted = mid + 0.125 * (originalVerts[opposite1] + originalVerts[opposite2]);
                                     int[] wing1 = v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2).ToArray();
                                     int[] wing2 = v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2).ToArray();
-                                    
                                     for (int w = 0; w < wing1.Length && w < 2; w++) {
                                         int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing1[w])[0];
-                                        mid -= 0.0625 * originalVerts[meshVertIdx];
+                                        adjusted -= 0.0625 * originalVerts[meshVertIdx];
                                     }
                                     for (int w = 0; w < wing2.Length && w < 2; w++) {
                                         int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing2[w])[0];
-                                        mid -= 0.0625 * originalVerts[meshVertIdx];
+                                        adjusted -= 0.0625 * originalVerts[meshVertIdx];
                                     }
-                                }
-                            }
+                                    return adjusted;
+                                }))()
+                                : mid;
                             
                             midIdx = subdivided.Vertices.Add(mid);
                             edgeMidpoints[edges[e]] = midIdx;
@@ -230,7 +227,7 @@ internal static class MorphologyCompute {
                     bool converged = false;
                     double threshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
                     
-                    for (int iter = 0; iter < maxIterations; iter++) {
+                    for (int iter = 0; iter < maxIterations && !converged; iter++) {
                         Point3d[] updated = updateFunc(smoothed, positions, context);
                         
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
@@ -249,10 +246,7 @@ internal static class MorphologyCompute {
                                 .Average())
                             : double.MaxValue;
                         
-                        if (rmsDisp < threshold) {
-                            converged = true;
-                            break;
-                        }
+                        converged = rmsDisp < threshold;
                         
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
                             prevPositions[i] = positions[i];

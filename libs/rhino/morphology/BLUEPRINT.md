@@ -290,12 +290,12 @@ internal static class MorphologyCompute {
 internal static class MorphologyConfig {
     internal const int MinCageControlPoints = 8;
     internal const int MaxSubdivisionLevels = 5;
-    internal const double FeatureAngleRadians = 0.5235987756;
+    internal static readonly double FeatureAngleRadians = RhinoMath.ToRadians(30.0);
     internal const double TaubinLambda = 0.6307;
     internal const double TaubinMu = -0.6732;
     internal const double ConvergenceMultiplier = 100.0;
     internal const double AspectRatioThreshold = 10.0;
-    internal const double MinAngleRadiansThreshold = 0.0872664626;
+    internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
 
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
