@@ -19,7 +19,7 @@ public static class Morphology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for polymorphic result dispatch")]
     public interface IMorphologyResult;
 
-    /// <summary>Cage deformation result with displacement metrics and boundary tracking.</summary>
+    /// <summary>Cage deformation result with displacement and volume tracking.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
         GeometryBase Deformed,
@@ -34,7 +34,7 @@ public static class Morphology {
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
 
-    /// <summary>Subdivision result with quality metrics and face count changes.</summary>
+    /// <summary>Subdivision result with quality metrics and face counts.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SubdivisionResult(
         Mesh Subdivided,
@@ -51,7 +51,7 @@ public static class Morphology {
             $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
 
-    /// <summary>Smoothing result with convergence data and quality score.</summary>
+    /// <summary>Smoothing result with convergence tracking and quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SmoothingResult(
         Mesh Smoothed,
@@ -66,22 +66,8 @@ public static class Morphology {
             $"Smoothing | Iterations={this.IterationsPerformed} | RMS={this.RMSDisplacement:E2} | Quality={this.QualityScore:F3} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Unified morphology operation entry point with polymorphic parameter dispatch.</summary>
-    /// <typeparam name="T">Geometry type (Mesh, Brep)</typeparam>
-    /// <param name="input">Input geometry to morph</param>
-    /// <param name="spec">Operation specification: (operation byte, parameters object)</param>
-    /// <param name="context">Geometry context for tolerance and validation</param>
-    /// <returns>Result containing list of morphology results</returns>
-    /// <remarks>
-    /// Operation IDs:
-    /// 1 = CageDeform: params = (GeometryBase cage, Point3d[] original, Point3d[] deformed)
-    /// 2 = SubdivideCatmullClark: params = int levels
-    /// 3 = SubdivideLoop: params = int levels
-    /// 4 = SubdivideButterfly: params = int levels
-    /// 10 = SmoothLaplacian: params = (int iterations, bool lockBoundary)
-    /// 11 = SmoothTaubin: params = (int iterations, double lambda, double mu)
-    /// 20 = EvolveMeanCurvature: params = (double timeStep, int iterations)
-    /// </remarks>
+    /// <summary>Unified morphology operation entry with polymorphic dispatch via (operation ID, parameters tuple).</summary>
+    /// <remarks>Operation IDs: 1=CageDeform (cage,original[],deformed[]), 2=CatmullClark (levels), 3=Loop (levels), 4=Butterfly (levels), 10=Laplacian (iters,lockBoundary), 11=Taubin (iters,λ,μ), 20=MeanCurvature (timeStep,iters).</remarks>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,
