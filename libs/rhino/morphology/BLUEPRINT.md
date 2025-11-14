@@ -7,37 +7,41 @@ Implements advanced mesh and surface deformation operations via free-form deform
 
 ### libs/core/ Components We Leverage
 - **Result<T> Monad**: All operations return `Result<IReadOnlyList<T>>` for error handling. Use `Map`, `Bind`, `Ensure` for operation chains. Lazy evaluation via `deferred` parameter for expensive computations.
-- **UnifiedOperation**: Primary dispatch engine for polymorphic input handling (Mesh, Brep, Surface). Configuration via `OperationConfig<TIn, TOut>` provides validation, parallelism, caching, diagnostics.
-- **ValidationRules**: Leverage existing `V.Standard`, `V.Topology`, `V.MeshSpecific`, `V.Degeneracy` modes. Add new `V.MorphologyConstraints` flag for deformation-specific validation (control cage validity, handle constraints, topology preservation).
-- **Error Registry**: Use existing `E.Geometry.*` errors (2600-2699 range allocated for morphology). New codes: 2600-2604 (FFD), 2605-2609 (Laplacian), 2610-2614 (Subdivision), 2615-2619 (Evolution).
+- **UnifiedOperation**: Primary dispatch engine for polymorphic input handling (Mesh, Brep, Surface). Configuration via `OperationConfig<TIn, TOut>` provides validation, parallelism, caching, diagnostics. Always use named parameters in config initialization.
+- **ValidationRules**: Leverage existing `V.Standard`, `V.Topology`, `V.MeshSpecific`, `V.Degeneracy` modes. No new validation flags needed - combinations of existing flags suffice.
+- **Error Registry**: Allocate codes 2600-2619 in `E.Geometry.*` domain for morphology-specific errors.
 - **Context**: Use `IGeometryContext.AbsoluteTolerance`, `RelativeTolerance` for convergence criteria, threshold comparisons, and numerical stability checks.
 
 ### Similar libs/rhino/ Implementations
-- **`libs/rhino/spatial/`**: FrozenDictionary dispatch pattern for type-based polymorphism. Reuse spatial indexing patterns for neighbor searches in Laplacian operators.
-- **`libs/rhino/analysis/`**: Result record types with debugging displays. Adopt similar diagnostic output for deformation quality metrics.
-- **`libs/rhino/extraction/`**: Pattern matching on geometry types. Similar approach for morphology operation dispatch.
+- **`libs/rhino/extraction/`**: **CRITICAL PATTERN** - Uses readonly struct `Semantic(byte kind)` with static readonly instances instead of enums. Byte-based FrozenDictionary dispatch via `(byte Kind, Type GeometryType)` keys. This is the definitive pattern to follow.
+- **`libs/rhino/spatial/`**: FrozenDictionary with `(Type Input, Type Query)` tuples for polymorphic dispatch. Uses Func factories for RTree construction. ArrayPool<T>.Shared for zero-allocation buffers.
+- **`libs/rhino/analysis/`**: Type-based FrozenDictionary validation modes. Result record types with DebuggerDisplay. ArrayPool for temporary arrays. Uses `using` statements for mass properties disposal.
 - **No Duplication**: Morphology operations are distinct from existing spatial (indexing), analysis (differential geometry), or topology (connectivity) - no overlap exists.
 
 ## SDK Research Summary
 
 ### RhinoCommon APIs Used
-- **`Rhino.Geometry.Mesh`**: `Vertices`, `TopologyVertices`, `TopologyEdges`, `Faces` for mesh structure. `Normals`, `VertexNormals` for smoothing. `GetBoundingBox` for cage initialization.
-- **`Rhino.Geometry.Mesh.Vertices`**: `SetVertex`, `Add`, array indexer for vertex manipulation. `Count` for iteration bounds.
-- **`Rhino.Geometry.Point3d`**: Arithmetic operators `+`, `-`, `*` for displacement calculations. `DistanceTo` for constraint satisfaction.
-- **`Rhino.Geometry.Vector3d`**: `Unitize` for normal computation. `CrossProduct`, `DotProduct` for geometric calculations. `Length` for magnitude checks.
-- **`Rhino.Geometry.SubD`**: `CreateFromMesh` for quad mesh input. `Subdivide` for Catmull-Clark refinement. `ToBrep` for NURBS conversion.
-- **`Rhino.Geometry.Surface`**: `Evaluate`, `PointAt`, `NormalAt` for cage surface evaluation. `ClosestPoint` for projection operations.
-- **`Rhino.Geometry.Curve`**: `CurvatureAt`, `TangentAt`, `FrameAt` for curvature-driven evolution.
-- **`Rhino.Geometry.Brep`**: `Faces`, `Edges`, `Vertices` for topology traversal. `ClosestPoint` for surface evolution constraints.
-- **`RhinoMath`**: `ZeroTolerance` for numerical comparisons. `PI`, `Epsilon` for angle/convergence thresholds. `Clamp` for parameter bounds. `EpsilonEquals` for float comparisons.
-- **`System.Math`**: `Sqrt`, `Pow`, `Abs`, `Max`, `Min` for numerical operations. Never use magic constants - reference formula context.
+- **`Rhino.Geometry.Mesh`**: `Vertices` (count, SetVertex, array indexer), `TopologyVertices` (ConnectedEdges, count), `TopologyEdges` (GetEdgeLength, GetConnectedFaces, GetTopologyVertices, count), `Faces` (array indexer, count), `Normals` (ComputeNormals, array indexer), `GetBoundingBox`, `DuplicateMesh`.
+- **`Rhino.Geometry.Collections.MeshTopologyVertexList`**: `ConnectedEdges(int vertexIndex)` returns int[] of edge indices. `SortVertices()` orders edges radially. Access via `mesh.TopologyVertices`.
+- **`Rhino.Geometry.Collections.MeshTopologyEdgeList`**: `GetEdgeLength(int edgeIndex)` returns double length. `GetConnectedFaces(int edgeIndex)` returns int[] face indices. `GetTopologyVertices(int edgeIndex)` returns (int, int) vertex pair. `EdgeLine(int edgeIndex)` returns Line geometry.
+- **`Rhino.Geometry.Point3d`**: Arithmetic operators `+`, `-`, `*`, `/` for vector displacement. `DistanceTo(Point3d)` for constraint satisfaction. `Transform(Transform)` for cage transformations. `IsValid` property check.
+- **`Rhino.Geometry.Vector3d`**: `Unitize()` modifies to unit length. `Length` property. `CrossProduct(Vector3d, Vector3d)` static method. `DotProduct(Vector3d, Vector3d)` static method for angle computation.
+- **`Rhino.Geometry.SubD`**: `CreateFromMesh(Mesh)` for quad mesh input. `Subdivide(int)` for Catmull-Clark iterations. `ToBrep()` for NURBS conversion. **Always** `Duplicate()` before calling `Subdivide` as it modifies internal state.
+- **`Rhino.Geometry.Surface`**: `Evaluate(double u, double v, int order, out Point3d point, out Vector3d[] derivatives)` for cage evaluation. `PointAt(double u, double v)`, `NormalAt(double u, double v)`, `FrameAt(double u, double v, out Plane)`, `Domain(int direction)` for UV bounds. `CurvatureAt(double u, double v)` returns SurfaceCurvature with `Kappa(int)`, `Gaussian`, `Mean` properties.
+- **`Rhino.Geometry.Transform`**: `TryGetInverse(out Transform)` for coordinate space conversion. `Multiply` or `*` operator for composition. Never use matrix elements directly - use SDK methods.
+- **`Rhino.Geometry.NurbsSurface`**: `Points` property (NurbsSurfacePointList) for control point access. `KnotsU`, `KnotsV` properties (NurbsSurfaceKnotList). `DegreeU`, `DegreeV`, `OrderU`, `OrderV` properties. `Create(int uDegree, int vDegree, int uCount, int vCount)` static method for construction.
+- **`RhinoMath`**: `ZeroTolerance` (2.32e-10) for numerical zero checks. `Epsilon` (DBL_EPSILON) for machine precision. `PI`, `HalfPI`, `TwoPI` for angles. `Clamp(double val, double min, double max)` for parameter bounds. `EpsilonEquals(double a, double b, double epsilon)` for tolerance comparisons. `IsValidDouble(double)` for NaN/Infinity checks. `ToRadians`, `ToDegrees` for angle conversion.
+- **`System.Math`**: `Sqrt`, `Pow`, `Abs`, `Max`, `Min`, `Sin`, `Cos`, `Tan`, `Atan2` for numerical operations. **Never use magic constants** - derive from RhinoMath or formula variables.
+- **`System.Buffers.ArrayPool<T>`**: `ArrayPool<double>.Shared.Rent(int minimumLength)` for temporary buffers. **Always** `Return(array, clearArray: true)` in `finally` blocks. Critical for hot path allocation elimination.
 
 ### Key Insights
-- **Performance**: Laplacian matrix construction via sparse adjacency is O(n) where n = vertex count. Iterative solving is O(k*n) where k = iterations. Use `ArrayPool<double>.Shared` for temporary buffers.
-- **Common Pitfall**: SubD operations modify internal state - always `Duplicate()` before subdivision. FFD requires cage control points as anchor handles - validate constraint count ≥ 3.
-- **Best Practice**: Mean curvature flow timestep must be ≤ h²/4 where h = minimum edge length (CFL condition). Use `Mesh.GetEdgeLengths()` to compute bounds.
-- **Topology Preservation**: Laplacian smoothing iterations must not flip face normals. Check via `Vector3d.DotProduct(oldNormal, newNormal) > 0` after each step.
-- **Numerical Stability**: Cotangent weights in Laplacian can be negative/infinite for degenerate triangles. Clamp to `[RhinoMath.ZeroTolerance, 1e6]` range.
+- **Performance**: Laplacian matrix construction via sparse adjacency is O(n) where n = vertex count. Iterative solving is O(k*n) where k = iterations. **Always** use `ArrayPool<double>.Shared` for temporary buffers (edge lengths, weights, accumulated positions).
+- **Common Pitfall**: `SubD.Subdivide()` **modifies internal state** - always call `subd.Duplicate()` before subdivision. FFD cage must have ≥8 control points (2×2×2 minimum lattice). Constraint indices must be within mesh vertex bounds.
+- **Best Practice**: Mean curvature flow timestep must satisfy CFL condition: `stepSize ≤ (minEdgeLength)² / 4`. Compute via `minLength = Enumerable.Range(0, mesh.TopologyEdges.Count).Min(i => mesh.TopologyEdges.GetEdgeLength(i))`. Never hardcode timesteps.
+- **Topology Preservation**: Laplacian smoothing must not flip face normals. Validate via `Vector3d.DotProduct(oldNormal, newNormal) > 0` after update. If flipped, clamp displacement to `0.5 * edgeLength` maximum.
+- **Numerical Stability**: Cotangent weights can be negative/infinite for degenerate triangles (angle → 0 or π). **Always** clamp weights to `[RhinoMath.ZeroTolerance, 1e6]`. For angles, check `Math.Abs(Math.Sin(angle)) > RhinoMath.ZeroTolerance` before division.
+- **Mesh Topology**: `TopologyVertices` vs `Vertices` differ in unwelded meshes. Topology represents welded structure. Use `mesh.TopologyVertices.ConnectedEdges(i)` for neighbor discovery, not vertex array iteration.
+- **Disposal**: Mass properties (`VolumeMassProperties`, `AreaMassProperties`) implement `IDisposable`. **Always** use `using` statements or explicit `Dispose()` in `finally` blocks (see AnalysisCore.cs pattern).
 
 ### SDK Version Requirements
 - Minimum: RhinoCommon 8.0 (SubD API)
@@ -46,149 +50,254 @@ Implements advanced mesh and surface deformation operations via free-form deform
 ## File Organization
 
 ### File 1: `Morph.cs`
-**Purpose**: Public API surface with polymorphic entry points
+**Purpose**: Public API surface with polymorphic entry points and semantic type definitions
 
-**Types** (6 total):
+**Types** (5 total):
 - `Morph`: Static class with public operation methods
-- `FFDCage`: Record struct `(Point3d[] ControlPoints, int[] Dimensions, Transform LocalToWorld)` for cage specification
-- `LaplacianMode`: Enum `{ Uniform, Cotangent, MeanValue }` for weight schemes
-- `SubdivisionScheme`: Enum `{ CatmullClark, Loop, Butterfly }` for refinement methods
-- `EvolutionDriver`: Enum `{ MeanCurvature, GeodesicActive, WillmoreFlow }` for surface evolution types
-- `MorphConstraint`: Record struct `(int[] FixedIndices, Point3d[] TargetPositions, double[] Weights)` for handle constraints
+- `DeformationMode`: Readonly struct with byte discriminator for FFD/smoothing/subdivision operations (pattern from Extract.Semantic)
+- `SmoothingWeight`: Readonly struct with byte discriminator for Laplacian weight schemes
+- `EvolutionFlow`: Readonly struct with byte discriminator for surface evolution PDEs
+- `MorphRequest`: Internal readonly struct consolidating operation kind, parameters, and validation mode
 
 **Key Members**:
-- `FFD<T>(T geometry, FFDCage cage, MorphConstraint constraints, IGeometryContext context)`: Free-form deformation via trivariate Bernstein polynomials. Compute local (u,v,w) coordinates via barycentric interpolation, evaluate B-spline basis at control points, apply displacement field.
-- `Smooth<T>(T geometry, LaplacianMode mode, int iterations, double lambda, IGeometryContext context)`: Laplacian smoothing. Build sparse adjacency matrix, compute weights (uniform=1/degree, cotangent=cot(α)+cot(β), mean-value=tan(α/2)+tan(β/2)), solve linear system `L*x = b` where L is Laplacian operator.
-- `Subdivide(Mesh mesh, SubdivisionScheme scheme, int levels, IGeometryContext context)`: Subdivision surface refinement. Catmull-Clark: edge points = (v1+v2+f1+f2)/4, face points = avg(vertices), update vertex = (Q+2R+(n-3)S)/n. Loop/Butterfly: split edges recursively, reposition via masks.
-- `Evolve(Surface surface, EvolutionDriver driver, double stepSize, int maxSteps, IGeometryContext context)`: Surface evolution via PDE integration. Mean curvature: ∂x/∂t = H*n where H = (κ1+κ2)/2. Geodesic: minimize ∫g(|∇I|)*ds with level set representation. Explicit Euler timestep.
+- `Deform<T>(T geometry, DeformationMode mode, object specification, IGeometryContext context)`: Unified deformation entry point. Dispatches to FFD/smoothing/subdivision based on `mode.Kind` byte. Pattern matches specification to extract cage/constraint/iteration parameters. Returns `Result<IReadOnlyList<Mesh>>`.
+- `Evolve(Surface surface, EvolutionFlow flow, (double StepSize, int MaxSteps) parameters, IGeometryContext context)`: Surface evolution via PDE integration. Pattern matches `flow.Kind` to select mean curvature/geodesic active contour/Willmore energy. Returns `Result<IReadOnlyList<Surface>>`.
 
-**Code Style Example**:
+**DeformationMode semantic types** (byte-based, not enum):
+- `DeformationMode.FFD = new(1)`: Free-form deformation via trivariate Bernstein basis
+- `DeformationMode.Smooth = new(2)`: Laplacian smoothing with weight scheme parameter
+- `DeformationMode.Subdivide = new(3)`: Recursive mesh refinement (Catmull-Clark primary, Loop/Butterfly via parameter)
+
+**SmoothingWeight semantic types**:
+- `SmoothingWeight.Uniform = new(0)`: Weight = 1/degree for each neighbor
+- `SmoothingWeight.Cotangent = new(1)`: Weight = (cot(α) + cot(β))/2 for angle-based
+- `SmoothingWeight.MeanValue = new(2)`: Weight = tan(α/2) + tan(β/2) for harmonic
+
+**EvolutionFlow semantic types**:
+- `EvolutionFlow.MeanCurvature = new(0)`: ∂x/∂t = H*n where H = (κ1+κ2)/2
+- `EvolutionFlow.GeodesicActive = new(1)`: Edge-driven contour evolution with stopping term
+- `EvolutionFlow.Willmore = new(2)`: ∂x/∂t = -ΔH*n - 2H(H²-K)*n for bending energy minimization
+
+**Code Style Example** (follows Extract.cs pattern exactly):
 ```csharp
-public static Result<IReadOnlyList<Mesh>> FFD<T>(
+/// <summary>Deformation operation discriminator.</summary>
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+public readonly struct DeformationMode(byte kind) {
+    internal readonly byte Kind = kind;
+    
+    /// <summary>Free-form deformation via control cage lattice.</summary>
+    public static readonly DeformationMode FFD = new(1);
+    /// <summary>Laplacian mesh smoothing with weight schemes.</summary>
+    public static readonly DeformationMode Smooth = new(2);
+    /// <summary>Recursive subdivision surface refinement.</summary>
+    public static readonly DeformationMode Subdivide = new(3);
+}
+
+[Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static Result<IReadOnlyList<Mesh>> Deform<T>(
     T geometry,
-    FFDCage cage,
-    MorphConstraint constraints,
-    IGeometryContext context) where T : GeometryBase =>
-    UnifiedOperation.Apply(
-        input: geometry,
-        operation: (Func<T, Result<IReadOnlyList<Mesh>>>)(item => item switch {
-            Mesh m => MorphCore.ApplyFFD(m, cage, constraints, context),
-            Brep b => b.Faces.SelectMany(static f => f.ToBrep().ToMesh(density: 0)).ToArray() is Mesh[] meshes
-                ? MorphCore.ApplyFFD(meshes[0], cage, constraints, context)
-                : ResultFactory.Create<IReadOnlyList<Mesh>>(error: E.Geometry.MorphMeshConversionFailed),
-            _ => ResultFactory.Create<IReadOnlyList<Mesh>>(
-                error: E.Geometry.MorphUnsupportedType.WithContext($"Type: {item.GetType().Name}")),
-        }),
-        config: new OperationConfig<T, Mesh> {
-            Context = context,
-            ValidationMode = V.Standard | V.Topology | V.MeshSpecific,
-            OperationName = "Morph.FFD",
-            EnableDiagnostics = false,
-        });
-```
-
-**LOC Estimate**: 180-220 (6 types × 25-35 LOC, dense API surface)
-
-### File 2: `MorphCore.cs`
-**Purpose**: Core implementation logic with algorithmic kernels
-
-**Types** (3 total):
-- `MorphCore`: Static class with internal implementation methods
-- `LaplacianMatrix`: Readonly struct `(double[] Values, int[] RowIndices, int[] ColPointers)` for CSR sparse storage
-- `SubdivisionTopology`: Readonly struct `(int[][] FaceVertices, int[][] EdgeVertices, Dictionary<(int,int), int> EdgeMap)` for connectivity caching
-
-**Key Members**:
-- `ApplyFFD(Mesh mesh, FFDCage cage, MorphConstraint constraints, IGeometryContext context)`: FFD core algorithm. Transform mesh to cage local space via `cage.LocalToWorld.TryGetInverse()`. For each vertex, compute (u,v,w) in [0,1]³ via trilinear interpolation. Evaluate displacement: `d = Σ B_i(u)*B_j(v)*B_k(w)*(P_ijk - P_ijk_original)` where B are Bernstein bases. Apply constraint projection via least squares: minimize `||x - x₀||² + Σ wᵢ||xᵢ - tᵢ||²`.
-- `BuildLaplacianMatrix(Mesh mesh, LaplacianMode mode, IGeometryContext context)`: Construct sparse Laplacian. For uniform: `L[i,j] = -1/degree(i)` for neighbors j, `L[i,i] = 1`. For cotangent: compute angles α,β opposite to edge ij, weight = `(cot(α) + cot(β))/2`, clamp to `[RhinoMath.ZeroTolerance, 1e6]`. Return CSR format for efficient matrix-vector product.
-- `SolveLinearSystem(LaplacianMatrix L, Point3d[] b, MorphConstraint constraints, IGeometryContext context)`: Iterative solver for `Lx = b` with constraints. Use Gauss-Seidel: `x[i]^(k+1) = (b[i] - Σ(j≠i) L[i,j]*x[j]^k) / L[i,i]`. For constrained indices, fix `x[i] = target[i]` each iteration. Converge when `||x^(k+1) - x^k||/||x^k|| < context.RelativeTolerance`.
-- `CatmullClarkStep(Mesh mesh, SubdivisionTopology topology, IGeometryContext context)`: Single subdivision iteration. Compute face points: `F = Σ vertices / count`. Edge points: `E = (v1 + v2 + f1 + f2) / 4`. Update vertices: `V' = (Q + 2R + (n-3)V) / n` where Q = avg face points, R = avg edge midpoints, n = valence. Build new mesh with quad faces.
-- `MeanCurvatureStep(Surface surface, double stepSize, IGeometryContext context)`: Single evolution timestep. Sample surface at (u,v) grid. Compute curvature: `H = (surface.CurvatureAt(u,v).Kappa(0) + surface.CurvatureAt(u,v).Kappa(1))/2`. Compute normal: `n = surface.NormalAt(u,v)`. Displace: `x' = x + stepSize * H * n`. Check CFL: `stepSize ≤ minEdgeLength² / 4`. Rebuild surface via interpolation.
-
-**Code Style Example**:
-```csharp
-internal static Result<IReadOnlyList<Mesh>> ApplyFFD(
-    Mesh mesh,
-    FFDCage cage,
-    MorphConstraint constraints,
-    IGeometryContext context) {
-    return cage.LocalToWorld.TryGetInverse(out Transform worldToLocal) switch {
-        false => ResultFactory.Create<IReadOnlyList<Mesh>>(
-            error: E.Geometry.FFDCageTransformInvalid),
-        true => mesh.Vertices.Count >= 3 switch {
-            false => ResultFactory.Create<IReadOnlyList<Mesh>>(
-                error: E.Geometry.FFDInsufficientVertices.WithContext($"Count: {mesh.Vertices.Count}")),
-            true => ((Point3d[] uvw, Point3d[] displaced) = (
-                [.. mesh.Vertices.Select(static v => new Point3d(v))
-                    .Select(p => worldToLocal * p)
-                    .Select(p => new Point3d(
-                        RhinoMath.Clamp(p.X, min: 0.0, max: 1.0),
-                        RhinoMath.Clamp(p.Y, min: 0.0, max: 1.0),
-                        RhinoMath.Clamp(p.Z, min: 0.0, max: 1.0)))],
-                new Point3d[mesh.Vertices.Count])) switch {
-                (Point3d[] coords, Point3d[] result) => ComputeFFDDisplacement(
-                    coords, result, cage, mesh.Vertices.ToPoint3dArray(), context)
-                    .Bind(positions => ApplyConstraints(positions, constraints, context))
-                    .Map(finalPos => {
-                        Mesh deformed = mesh.DuplicateMesh();
-                        for (int i = 0; i < finalPos.Length; i++) {
-                            deformed.Vertices.SetVertex(index: i, vertex: finalPos[i]);
-                        }
-                        return (IReadOnlyList<Mesh>)[deformed];
-                    }),
-            },
-        },
+    DeformationMode mode,
+    object specification,
+    IGeometryContext context) where T : GeometryBase {
+    Type geometryType = geometry.GetType();
+    
+    Result<MorphRequest> requestResult = (mode.Kind, specification) switch {
+        (1, (Point3d[] controlPoints, int[] dimensions, Transform transform, int[] fixedIndices, Point3d[] targets)) =>
+            controlPoints.Length >= MorphConfig.FFDMinControlPoints
+                ? ResultFactory.Create(value: new MorphRequest(
+                    kind: 1,
+                    parameter: (controlPoints, dimensions, transform, fixedIndices, targets),
+                    validationMode: MorphConfig.GetValidationMode(1, geometryType)))
+                : ResultFactory.Create<MorphRequest>(error: E.Geometry.FFDInsufficientControlPoints),
+        (2, (byte weightKind, int iterations, double lambda)) =>
+            iterations > 0 && lambda > 0.0 && lambda < 1.0
+                ? ResultFactory.Create(value: new MorphRequest(
+                    kind: 2,
+                    parameter: (weightKind, iterations, lambda),
+                    validationMode: MorphConfig.GetValidationMode(2, geometryType)))
+                : ResultFactory.Create<MorphRequest>(error: E.Geometry.LaplacianInvalidParameters),
+        (3, (byte schemeKind, int levels)) =>
+            levels > 0 && levels <= MorphConfig.MaxSubdivisionLevels
+                ? ResultFactory.Create(value: new MorphRequest(
+                    kind: 3,
+                    parameter: (schemeKind, levels),
+                    validationMode: MorphConfig.GetValidationMode(3, geometryType)))
+                : ResultFactory.Create<MorphRequest>(error: E.Geometry.SubdivisionInvalidLevels),
+        _ => ResultFactory.Create<MorphRequest>(error: E.Geometry.MorphInvalidSpecification),
     };
+    
+    return requestResult.Bind(request =>
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<Mesh>>>)(item =>
+                MorphCore.Execute(item, request, context)),
+            config: new OperationConfig<T, Mesh> {
+                Context = context,
+                ValidationMode = request.ValidationMode,
+                OperationName = $"Morph.{mode.Kind}",
+                EnableDiagnostics = false,
+            }));
 }
 ```
 
-**LOC Estimate**: 220-270 (3 types, dense algorithmic implementations)
+**LOC Estimate**: 160-200 (5 types, dense API with byte dispatch pattern)
 
-### File 3: `MorphConfig.cs`
-**Purpose**: Configuration types, constants, and dispatch tables
+### File 2: `MorphCore.cs`
+**Purpose**: Core implementation logic with byte-based dispatch and algorithmic kernels
 
 **Types** (2 total):
-- `MorphConfig`: Static class with internal configuration
-- `MorphMetrics`: Readonly record struct `(double MinEdgeLength, double MaxEdgeLength, double AvgCurvature, int DegenerateCount)` for quality diagnostics
+- `MorphCore`: Static class with internal implementation methods and FrozenDictionary dispatch tables
+- `LaplacianMatrix`: Readonly struct for CSR (Compressed Sparse Row) format storage - `(double[] Values, int[] RowIndices, int[] ColPointers, int VertexCount)`
 
 **Key Members**:
-- `TypeDispatch`: FrozenDictionary mapping (operation type, geometry type) → validation mode. Key = `(string Operation, Type GeometryType)`, Value = `V mode`. Operations: "FFD", "Smooth", "Subdivide", "Evolve". Geometry: Mesh, Brep, Surface, SubD.
-- `ValidationConfig`: FrozenDictionary for operation-specific validation requirements. Map operation → `(V RequiredModes, V OptionalModes, double[] ToleranceMultipliers)`.
-- `ConvergenceThresholds`: Constants for iterative solvers. `LaplacianMaxIterations = 1000`, `LaplacianRelativeTolerance = 1e-6`, `EvolutionMaxSteps = 500`, `EvolutionCFLFactor = 0.25` (safety factor for CFL condition).
-- `SubdivisionLimits`: Mesh refinement bounds. `MaxSubdivisionLevels = 5`, `MaxVertexCount = 1_000_000`, `MinEdgeLength = RhinoMath.ZeroTolerance * 10`, `MaxAspectRatio = 100.0`.
-- `FFDParameters`: Cage construction defaults. `DefaultCageDivisions = new int[] { 3, 3, 3 }`, `MinControlPoints = 8` (2×2×2 minimum), `BernsteinDegree = 3` (cubic basis).
-- `ComputeMetrics(Mesh mesh, IGeometryContext context)`: Quality assessment. Compute edge length statistics via `mesh.TopologyEdges`, curvature via `mesh.Vertices` normal deviation, degeneracy via aspect ratio checks. Return diagnostic record.
+- **`Execute(GeometryBase geometry, MorphRequest request, IGeometryContext context)`**: Primary dispatch via `_operationHandlers` FrozenDictionary lookup on `(request.Kind, geometry.GetType())`. Pattern: `_operationHandlers.TryGetValue((kind, type), out handler) ? handler(geometry, request, context) : fallback`. Similar to ExtractionCore dispatch pattern.
+- **`_operationHandlers`**: FrozenDictionary with key `(byte Kind, Type GeometryType)` → value `Func<GeometryBase, MorphRequest, IGeometryContext, Result<IReadOnlyList<Mesh>>>`. Initialized via BuildHandlerRegistry() pattern. Contains entries for (1, typeof(Mesh)), (2, typeof(Mesh)), (3, typeof(Mesh)), with normalization handlers for Brep→Mesh conversion.
+- **`_weightComputers`**: FrozenDictionary with key `byte WeightKind` → value `Func<Mesh, int, int, IGeometryContext, double>`. Kind 0=uniform (returns `1.0/degree`), Kind 1=cotangent (computes opposite angles via `TopologyEdges`, returns clamped `(cot(α)+cot(β))/2`), Kind 2=mean-value (returns `tan(α/2)+tan(β/2)`).
+- **`_subdivisionMasks`**: FrozenDictionary with key `byte SchemeKind` → value `Func<Mesh, IGeometryContext, Result<Mesh>>`. Kind 0=Catmull-Clark (quad-based), Kind 1=Loop (triangle-based approximating), Kind 2=Butterfly (triangle-based interpolating).
+- **`BuildLaplacianMatrix(Mesh mesh, byte weightKind, IGeometryContext context)`**: Constructs sparse CSR matrix. Uses `_weightComputers[weightKind]` to compute edge weights. Iterates `mesh.TopologyVertices` via `ConnectedEdges()`, accumulates weights in `ArrayPool<double>.Shared` buffer, converts to CSR. For uniform: diagonal = 1, off-diagonal = -1/degree. For cotangent: extracts triangle angles via `TopologyEdges.GetConnectedFaces()`, computes angles from edge vectors, clamps weights.
+- **`SolveSmoothing(LaplacianMatrix L, Point3d[] positions, int[] fixedIndices, int iterations, double lambda, IGeometryContext context)`**: Iterative Gauss-Seidel solver with damping. Rents buffer from `ArrayPool<double>.Shared` for new positions. Each iteration: `x_new[i] = (1-lambda)*x_old[i] + lambda * Σ(w_ij * x_old[j])`. Constrained vertices unchanged. Converges when `maxDisplacement < context.AbsoluteTolerance * MorphConfig.ConvergenceRelativeThreshold` or iterations exhausted.
+- **`ApplyCatmullClark(Mesh mesh, int levels, IGeometryContext context)`**: Subdivision via SubD API. Converts to `SubD.CreateFromMesh(mesh)`, calls `subd.Subdivide(levels)` (after `Duplicate()`), returns `subd.ToBrep().Faces[0].ToBrep().GetMesh()`. Validates quad topology, checks vertex count explosion (reject if `count > MorphConfig.MaxVertexCount`).
+- **`EvolveStep(Surface surface, byte flowKind, double stepSize, IGeometryContext context)`**: Single PDE timestep via `_evolutionFlows[flowKind]` dispatcher. Kind 0: mean curvature flow `∂x/∂t = H*n`. Kind 1: geodesic active contour (requires edge map parameter). Kind 2: Willmore flow `∂x/∂t = -ΔH*n`. Samples surface UV grid, computes curvature, displaces control points, rebuilds via `NurbsSurface.Create()`.
 
-**Code Style Example**:
+**Code Style Example** (FrozenDictionary dispatch pattern from SpatialCore.cs):
 ```csharp
-internal static readonly FrozenDictionary<(string Operation, Type GeometryType), V> TypeDispatch =
-    new Dictionary<(string, Type), V> {
-        [("FFD", typeof(Mesh))] = V.Standard | V.Topology | V.MeshSpecific,
-        [("FFD", typeof(Brep))] = V.Standard | V.Topology | V.BrepGranular,
-        [("Smooth", typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Degeneracy,
-        [("Smooth", typeof(SubD))] = V.Standard,
-        [("Subdivide", typeof(Mesh))] = V.Standard | V.Topology | V.MeshSpecific,
-        [("Evolve", typeof(Surface))] = V.Standard | V.SurfaceContinuity | V.UVDomain,
-        [("Evolve", typeof(Brep))] = V.Standard | V.Topology | V.BrepGranular,
+// Primary dispatcher - follows SpatialCore.OperationRegistry pattern
+private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, MorphRequest, IGeometryContext, Result<IReadOnlyList<Mesh>>>> _operationHandlers =
+    BuildHandlerRegistry();
+
+private static FrozenDictionary<(byte, Type), Func<GeometryBase, MorphRequest, IGeometryContext, Result<IReadOnlyList<Mesh>>>> BuildHandlerRegistry() =>
+    new Dictionary<(byte, Type), Func<GeometryBase, MorphRequest, IGeometryContext, Result<IReadOnlyList<Mesh>>>> {
+        [(1, typeof(Mesh))] = static (g, r, c) => g is Mesh m && r.Parameter is (Point3d[] cp, int[] dim, Transform t, int[] fixed, Point3d[] targets)
+            ? ApplyFFD(m, cp, dim, t, fixed, targets, c)
+            : ResultFactory.Create<IReadOnlyList<Mesh>>(error: E.Geometry.FFDInvalidParameters),
+        [(2, typeof(Mesh))] = static (g, r, c) => g is Mesh m && r.Parameter is (byte wk, int iter, double lambda)
+            ? ApplySmoothing(m, wk, iter, lambda, c)
+            : ResultFactory.Create<IReadOnlyList<Mesh>>(error: E.Geometry.LaplacianInvalidParameters),
+        [(3, typeof(Mesh))] = static (g, r, c) => g is Mesh m && r.Parameter is (byte sk, int levels)
+            ? ApplySubdivision(m, sk, levels, c)
+            : ResultFactory.Create<IReadOnlyList<Mesh>>(error: E.Geometry.SubdivisionInvalidLevels),
     }.ToFrozenDictionary();
 
-internal static readonly FrozenDictionary<string, (V Required, V Optional, double[] ToleranceMult)> ValidationConfig =
-    new Dictionary<string, (V, V, double[])> {
-        ["FFD"] = (V.Standard | V.Topology, V.MeshSpecific, [1.0, 10.0, 100.0]),
-        ["Smooth"] = (V.Standard, V.Degeneracy, [0.1, 1.0, 10.0]),
-        ["Subdivide"] = (V.Standard | V.Topology, V.None, [1.0, 1.0, 1.0]),
-        ["Evolve"] = (V.Standard | V.SurfaceContinuity, V.UVDomain, [0.01, 0.1, 1.0]),
+// Weight computer dispatch - byte-based, no enums
+private static readonly FrozenDictionary<byte, Func<Mesh, int, int, IGeometryContext, double>> _weightComputers =
+    new Dictionary<byte, Func<Mesh, int, int, IGeometryContext, double>> {
+        [0] = static (m, vi, _, _) => 1.0 / m.TopologyVertices.ConnectedEdges(vi).Length,
+        [1] = static (m, vi, ni, c) => ComputeCotangentWeight(m, vi, ni, c),
+        [2] = static (m, vi, ni, c) => ComputeMeanValueWeight(m, vi, ni, c),
     }.ToFrozenDictionary();
+
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+internal static Result<IReadOnlyList<Mesh>> Execute(
+    GeometryBase geometry,
+    MorphRequest request,
+    IGeometryContext context) =>
+    _operationHandlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, MorphRequest, IGeometryContext, Result<IReadOnlyList<Mesh>>>? handler)
+        ? handler(geometry, request, context)
+        : ResultFactory.Create<IReadOnlyList<Mesh>>(
+            error: E.Geometry.MorphUnsupportedType.WithContext($"Kind: {request.Kind}, Type: {geometry.GetType().Name}"));
 ```
 
-**LOC Estimate**: 140-180 (2 types, primarily data structures and constants)
+**LOC Estimate**: 200-250 (2 types, FrozenDictionary dispatch with inline lambdas)
+
+### File 3: `MorphConfig.cs`
+**Purpose**: Configuration constants and byte-based validation mode dispatch
+
+**Types** (1 total):
+- `MorphConfig`: Static class with internal configuration (follows ExtractionConfig.cs pattern exactly)
+
+**Key Members**:
+- **`ValidationModes`**: FrozenDictionary with key `(byte Kind, Type GeometryType)` → value `V`. Entries: `[(1, typeof(Mesh))] = V.Standard | V.Topology`, `[(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Degeneracy`, `[(3, typeof(Mesh))] = V.Standard | V.Topology | V.MeshSpecific`. Pattern from ExtractionConfig line-by-line.
+- **`GetValidationMode(byte kind, Type geometryType)`**: Lookup with fallback logic. Exact match on `(kind, type)`, else `IsAssignableFrom` search with type specificity ordering. Returns `V.Standard` default. Identical to ExtractionConfig.GetValidationMode implementation.
+
+**Constants** (organized by operation, following AnalysisConfig pattern):
+- **FFD Parameters**: `FFDMinControlPoints = 8` (2×2×2 lattice minimum), `FFDBernsteinDegree = 3` (cubic basis), `FFDDefaultDivisions = 3` (per axis).
+- **Laplacian Smoothing**: `LaplacianMaxIterations = 1000`, `LaplacianDefaultIterations = 10`, `LaplacianDefaultLambda = 0.5` (damping factor), `LaplacianConvergenceThreshold = 1e-6` (relative change), `CotangentWeightMin = RhinoMath.ZeroTolerance`, `CotangentWeightMax = 1e6`.
+- **Subdivision**: `MaxSubdivisionLevels = 5`, `MaxVertexCount = 1_000_000`, `MinEdgeLengthFactor = 10.0` (multiplier of `RhinoMath.ZeroTolerance`), `MaxAspectRatio = 100.0`.
+- **Surface Evolution**: `EvolutionMaxSteps = 500`, `EvolutionCFLFactor = 0.25` (safety factor: actual stepSize = factor * h²/4), `EvolutionDefaultStepSize = 0.01`, `EvolutionMinStepSize = RhinoMath.ZeroTolerance * 100`.
+- **Topology Checks**: `NormalFlipAngleThreshold = RhinoMath.ToRadians(90.0)`, `MaxDisplacementRatio = 0.5` (relative to edge length).
+- **Angle Computation**: `DegenerateAngleMin = RhinoMath.ToRadians(1.0)`, `DegenerateAngleMax = RhinoMath.ToRadians(179.0)` (for cotangent stability).
+
+**Code Style Example** (follows ExtractionConfig.cs exactly):
+```csharp
+using System.Collections.Frozen;
+using Arsenal.Core.Validation;
+using Rhino;
+using Rhino.Geometry;
+
+namespace Arsenal.Rhino.Morphology;
+
+/// <summary>Configuration for morphology operations: validation modes and algorithmic constants.</summary>
+[Pure]
+internal static class MorphConfig {
+    /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
+    internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
+        new Dictionary<(byte, Type), V> {
+            [(1, typeof(Mesh))] = V.Standard | V.Topology,
+            [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Degeneracy,
+            [(3, typeof(Mesh))] = V.Standard | V.Topology | V.MeshSpecific,
+        }.ToFrozenDictionary();
+    
+    /// <summary>Gets validation mode with fallback for (kind, type) pair.</summary>
+    internal static V GetValidationMode(byte kind, Type geometryType) =>
+        ValidationModes.TryGetValue((kind, geometryType), out V exact)
+            ? exact
+            : ValidationModes
+                .Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
+                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) =>
+                    a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(V.Standard)
+                .First();
+    
+    /// <summary>FFD control cage parameters.</summary>
+    internal const int FFDMinControlPoints = 8;
+    internal const int FFDBernsteinDegree = 3;
+    internal const int FFDDefaultDivisions = 3;
+    
+    /// <summary>Laplacian smoothing parameters.</summary>
+    internal const int LaplacianMaxIterations = 1000;
+    internal const int LaplacianDefaultIterations = 10;
+    internal const double LaplacianDefaultLambda = 0.5;
+    internal const double LaplacianConvergenceThreshold = 1e-6;
+    internal static readonly double CotangentWeightMin = RhinoMath.ZeroTolerance;
+    internal const double CotangentWeightMax = 1e6;
+    
+    /// <summary>Subdivision surface limits.</summary>
+    internal const int MaxSubdivisionLevels = 5;
+    internal const int MaxVertexCount = 1_000_000;
+    internal static readonly double MinEdgeLength = RhinoMath.ZeroTolerance * 10.0;
+    internal const double MaxAspectRatio = 100.0;
+    
+    /// <summary>Surface evolution PDE integration.</summary>
+    internal const int EvolutionMaxSteps = 500;
+    internal const double EvolutionCFLFactor = 0.25;
+    internal const double EvolutionDefaultStepSize = 0.01;
+    internal static readonly double EvolutionMinStepSize = RhinoMath.ZeroTolerance * 100.0;
+    
+    /// <summary>Topology preservation thresholds.</summary>
+    internal static readonly double NormalFlipAngleThreshold = RhinoMath.ToRadians(90.0);
+    internal const double MaxDisplacementRatio = 0.5;
+    
+    /// <summary>Degenerate angle bounds for cotangent stability.</summary>
+    internal static readonly double DegenerateAngleMin = RhinoMath.ToRadians(1.0);
+    internal static readonly double DegenerateAngleMax = RhinoMath.ToRadians(179.0);
+}
+```
+
+**LOC Estimate**: 70-90 (1 type, pure configuration following exact ExtractionConfig pattern)
 
 ## Adherence to Limits
 
 - **Files**: 3 files ✓ (ideal 2-3 range, below 4-file maximum)
-- **Types**: 11 types total ✓ (slightly above 10-type maximum due to configuration/diagnostic records, but 6 core operational types are within ideal 6-8 range)
-- **Estimated Total LOC**: 540-670 (180+220+270+140 average = 540 LOC, well below limits)
+- **Types**: 8 types total ✓ (within ideal 6-8 range, below 10-type maximum)
+- **Estimated Total LOC**: 430-540 (160+200+70 average = 430 LOC)
 
-**Justification for 11 types**: Core operational types (6): Morph class + 5 configuration types. Support types (5): 2 sparse matrix structures + 3 diagnostic records. Each type serves distinct algorithmic purpose - no helper sprawl. Alternative would require nested types or multiple responsibilities, violating single-purpose principle.
+**Type Breakdown**:
+- **Morph.cs** (5 types): Morph static class, DeformationMode struct, SmoothingWeight struct, EvolutionFlow struct, MorphRequest struct
+- **MorphCore.cs** (2 types): MorphCore static class, LaplacianMatrix struct
+- **MorphConfig.cs** (1 type): MorphConfig static class
+
+All types serve distinct purposes with no helper sprawl. Pattern precisely follows extraction/ and spatial/ exemplars.
 
 ## Algorithmic Density Strategy
 
@@ -291,82 +400,131 @@ Secondary dispatch for internal operations via FrozenDictionary:
 - Subdivision masks: `SubdivisionScheme → Func<Topology, Point3d[]>`
 - Evolution drivers: `EvolutionDriver → Func<Surface, double, Point3d[]>`
 
+## Error Code Allocation
+
+Add to `libs/core/errors/E.cs` in `E.Geometry` class (range 2600-2619):
+
+```csharp
+// Morphology Operations (2600-2619)
+public static readonly SystemError FFDInsufficientControlPoints = Get(2600);
+public static readonly SystemError FFDInvalidParameters = Get(2601);
+public static readonly SystemError FFDCageTransformInvalid = Get(2602);
+public static readonly SystemError FFDConstraintIndexOutOfRange = Get(2603);
+public static readonly SystemError LaplacianInvalidParameters = Get(2605);
+public static readonly SystemError LaplacianConvergenceFailed = Get(2606);
+public static readonly SystemError LaplacianTopologyChanged = Get(2607);
+public static readonly SystemError SubdivisionInvalidLevels = Get(2610);
+public static readonly SystemError SubdivisionVertexOverflow = Get(2611);
+public static readonly SystemError SubdivisionTopologyInvalid = Get(2612);
+public static readonly SystemError EvolutionInvalidStepSize = Get(2615);
+public static readonly SystemError EvolutionCFLViolation = Get(2616);
+public static readonly SystemError EvolutionConvergenceFailed = Get(2617);
+public static readonly SystemError MorphInvalidSpecification = Get(2618);
+public static readonly SystemError MorphUnsupportedType = Get(2619);
+```
+
+Add to error message dictionary in `E.cs` (line ~133):
+
+```csharp
+// Morphology Operations (2600-2619)
+[2600] = "FFD requires minimum 8 control points (2×2×2 lattice)",
+[2601] = "FFD parameters invalid (controlPoints, dimensions, transform, constraints)",
+[2602] = "FFD cage transform cannot be inverted",
+[2603] = "Constraint index exceeds mesh vertex count",
+[2605] = "Laplacian parameters invalid (weightKind, iterations, lambda)",
+[2606] = "Laplacian solver failed to converge within iteration limit",
+[2607] = "Smoothing operation altered mesh topology (normal flip detected)",
+[2610] = "Subdivision level count invalid (must be 1-5)",
+[2611] = "Subdivision would exceed maximum vertex count (1M)",
+[2612] = "Mesh topology invalid for subdivision (non-manifold or open)",
+[2615] = "Evolution step size invalid or violates stability bounds",
+[2616] = "CFL condition violated (stepSize > minEdgeLength²/4)",
+[2617] = "Surface evolution failed to converge",
+[2618] = "Morphology operation specification does not match expected pattern",
+[2619] = "Geometry type not supported for morphology operation",
+```
+
 ## Public API Surface
 
 ### Primary Operations
 ```csharp
-// Free-Form Deformation: Cage-based spatial warping
-public static Result<IReadOnlyList<Mesh>> FFD<T>(
+// Unified deformation entry point with byte-based mode dispatch
+public static Result<IReadOnlyList<Mesh>> Deform<T>(
     T geometry,
-    FFDCage cage,
-    MorphConstraint constraints,
+    DeformationMode mode,
+    object specification,
     IGeometryContext context) where T : GeometryBase;
 
-// Laplacian Smoothing: Detail-preserving mesh fairing
-public static Result<IReadOnlyList<Mesh>> Smooth<T>(
-    T geometry,
-    LaplacianMode mode,
-    int iterations,
-    double lambda,
-    IGeometryContext context) where T : GeometryBase;
-
-// Subdivision Surface: Recursive mesh refinement
-public static Result<IReadOnlyList<Mesh>> Subdivide(
-    Mesh mesh,
-    SubdivisionScheme scheme,
-    int levels,
-    IGeometryContext context);
-
-// Surface Evolution: PDE-based shape optimization
+// Surface evolution via PDE integration  
 public static Result<IReadOnlyList<Surface>> Evolve(
     Surface surface,
-    EvolutionDriver driver,
-    double stepSize,
-    int maxSteps,
+    EvolutionFlow flow,
+    (double StepSize, int MaxSteps) parameters,
     IGeometryContext context);
 ```
 
-### Configuration Types
+### Semantic Type Definitions (byte-based, following Extract.Semantic pattern)
 ```csharp
-// FFD control cage specification
-public readonly record struct FFDCage(
-    Point3d[] ControlPoints,
-    int[] Dimensions,
-    Transform LocalToWorld);
-
-// Deformation constraint specification
-public readonly record struct MorphConstraint(
-    int[] FixedIndices,
-    Point3d[] TargetPositions,
-    double[] Weights);
-
-// Laplacian weight schemes
-public enum LaplacianMode : byte {
-    Uniform = 0,      // Uniform weights: 1/degree
-    Cotangent = 1,    // Cotangent weights: (cot α + cot β)/2
-    MeanValue = 2,    // Mean-value weights: (tan α/2 + tan β/2)
+/// <summary>Deformation operation discriminator.</summary>
+[StructLayout(LayoutKind.Auto)]
+public readonly struct DeformationMode(byte kind) {
+    internal readonly byte Kind = kind;
+    
+    public static readonly DeformationMode FFD = new(1);
+    public static readonly DeformationMode Smooth = new(2);
+    public static readonly DeformationMode Subdivide = new(3);
 }
 
-// Subdivision schemes
-public enum SubdivisionScheme : byte {
-    CatmullClark = 0, // Quad-based, C² limit surface
-    Loop = 1,         // Triangle-based, approximating
-    Butterfly = 2,    // Triangle-based, interpolating
+/// <summary>Laplacian weight scheme discriminator.</summary>
+[StructLayout(LayoutKind.Auto)]
+public readonly struct SmoothingWeight(byte kind) {
+    internal readonly byte Kind = kind;
+    
+    public static readonly SmoothingWeight Uniform = new(0);
+    public static readonly SmoothingWeight Cotangent = new(1);
+    public static readonly SmoothingWeight MeanValue = new(2);
 }
 
-// Surface evolution drivers
-public enum EvolutionDriver : byte {
-    MeanCurvature = 0,   // Minimize surface area
-    GeodesicActive = 1,  // Edge-driven contour evolution
-    WillmoreFlow = 2,    // Minimize bending energy
+/// <summary>Surface evolution PDE discriminator.</summary>
+[StructLayout(LayoutKind.Auto)]
+public readonly struct EvolutionFlow(byte kind) {
+    internal readonly byte Kind = kind;
+    
+    public static readonly EvolutionFlow MeanCurvature = new(0);
+    public static readonly EvolutionFlow GeodesicActive = new(1);
+    public static readonly EvolutionFlow Willmore = new(2);
 }
+```
 
-// Quality diagnostics
-public readonly record struct MorphMetrics(
-    double MinEdgeLength,
-    double MaxEdgeLength,
-    double AvgCurvature,
-    int DegenerateCount);
+### Usage Examples
+```csharp
+// FFD with control cage
+Result<IReadOnlyList<Mesh>> ffd = Morph.Deform(
+    geometry: mesh,
+    mode: DeformationMode.FFD,
+    specification: (controlPoints, dimensions, transform, fixedIndices, targetPositions),
+    context: context);
+
+// Laplacian smoothing with cotangent weights
+Result<IReadOnlyList<Mesh>> smooth = Morph.Deform(
+    geometry: mesh,
+    mode: DeformationMode.Smooth,
+    specification: (SmoothingWeight.Cotangent.Kind, iterations: 50, lambda: 0.5),
+    context: context);
+
+// Catmull-Clark subdivision (byte 0)
+Result<IReadOnlyList<Mesh>> subdivide = Morph.Deform(
+    geometry: mesh,
+    mode: DeformationMode.Subdivide,
+    specification: (schemeKind: (byte)0, levels: 2),
+    context: context);
+
+// Mean curvature flow
+Result<IReadOnlyList<Surface>> evolve = Morph.Evolve(
+    surface: surface,
+    flow: EvolutionFlow.MeanCurvature,
+    parameters: (stepSize: 0.01, maxSteps: 100),
+    context: context);
 ```
 
 ## Code Style Adherence Verification
