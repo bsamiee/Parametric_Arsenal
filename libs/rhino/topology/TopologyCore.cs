@@ -286,7 +286,7 @@ internal static class TopologyCore {
                     for (int index = 0; index < mesh.Ngons.Count; index++) {
                         MeshNgon ngon = mesh.Ngons.GetNgon(index);
                         uint[]? faceList = ngon.FaceIndexList();
-                        uint[]? boundaryEdges = ngon.BoundaryVertexIndexList();
+                        uint[]? boundaryEdges = ngon.BoundaryEdgeIndexList();
                         Point3d center = mesh.Ngons.GetNgonCenter(index);
                         IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
                         IReadOnlyList<int> boundaries = [.. (boundaryEdges is uint[] be ? be : []).Select(edge => unchecked((int)edge)),];
