@@ -129,7 +129,7 @@ public static class Orient {
                                             Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(su, Vector3d.XAxis) : Vector3d.CrossProduct(su, Vector3d.YAxis);
                                             bool normalized = axisCandidate.Unitize();
                                             return normalized
-                                                ? ResultFactory.Create(value: Transform.Rotation(RhinoMath.PI, axisCandidate, pt))
+                                                ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axisCandidate, pt))
                                                 : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
                                         }))()
                                         : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)

@@ -75,7 +75,7 @@ internal static class OrientCompute {
                                     return results.MaxBy(r => r.Item2) is (Transform best, double bestScore, byte[] met) && bestScore > 0
                                         ? ResultFactory.Create(value: (best, bestScore, met))
                                         : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
-                                }))();
+                                }))(),
                             };
                         }))()
                         : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));

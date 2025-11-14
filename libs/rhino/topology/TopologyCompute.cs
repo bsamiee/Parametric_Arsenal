@@ -90,8 +90,7 @@ internal static class TopologyCompute {
                             4 => ((Func<bool>)(() => {
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;
-                                int iteration = 0;
-                                while (iteration < TopologyConfig.MaxEdgesForNearMissAnalysis) {
+                                for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
                                     int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
                                     if (nakedEdgeIndices.Length == 0) {
                                         break;
@@ -120,19 +119,16 @@ internal static class TopologyCompute {
                                             double distES = edgeA.PointAtEnd.DistanceTo(edgeB.PointAtStart);
                                             double distEE = edgeA.PointAtEnd.DistanceTo(edgeB.PointAtEnd);
                                             double minDist = Math.Min(Math.Min(distSS, distSE), Math.Min(distES, distEE));
-                                            if (minDist < threshold) {
-                                                if (copy.JoinEdges(edgeIndex0: edgeIndexA, edgeIndex1: edgeIndexB, joinTolerance: threshold, compact: false)) {
-                                                    joinedAny = true;
-                                                    joinedThisPass = true;
-                                                    break;
-                                                }
+                                            if (minDist < threshold && copy.JoinEdges(edgeIndex0: edgeIndexA, edgeIndex1: edgeIndexB, joinTolerance: threshold, compact: false)) {
+                                                joinedAny = true;
+                                                joinedThisPass = true;
+                                                break;
                                             }
                                         }
                                     }
                                     if (!joinedThisPass) {
                                         break;
                                     }
-                                    iteration++;
                                 }
                                 copy.Compact();
                                 return joinedAny;
