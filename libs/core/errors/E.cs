@@ -84,6 +84,25 @@ public static class E {
             [2707] = "Vector potential field computation failed or invalid",
             [2708] = "Field interpolation failed or invalid query point",
 
+            // Morphology Operations (2800-2812)
+            [2800] = "Cage-based deformation failed",
+            [2801] = "Cage control point count mismatch between original and deformed arrays",
+            [2802] = "Insufficient cage control points (minimum 8 required)",
+            [2803] = "Subdivision level exceeded maximum (5 levels)",
+            [2804] = "Subdivision failed: non-manifold mesh or degenerate faces",
+            [2805] = "Laplacian smoothing convergence failure after maximum iterations",
+            [2806] = "Mesh quality degraded below acceptable threshold (aspect ratio or min angle)",
+            [2807] = "Mean curvature flow timestep too large for stability",
+            [2808] = "Mean curvature computation failed: degenerate vertex neighborhood",
+            [2809] = "Taubin smoothing parameters invalid (μ must be < -λ)",
+            [2810] = "Loop subdivision failed: requires triangle mesh",
+            [2811] = "Butterfly subdivision failed: irregular vertex valence",
+            [2812] = "Unsupported morphology configuration for geometry type",
+
+            // General Geometry Type Errors (2007-2008)
+            [2007] = "Invalid or unsupported geometry type",
+            [2008] = "Unsupported configuration for operation and geometry type combination",
+
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
             [3000] = "Geometry must be valid",
@@ -230,6 +249,27 @@ public static class E {
         public static readonly SystemError InvalidLaplacianComputation = Get(2706);
         public static readonly SystemError InvalidVectorPotentialComputation = Get(2707);
         public static readonly SystemError InvalidFieldInterpolation = Get(2708);
+
+        // General Geometry Type Errors (2007-2008)
+        public static readonly SystemError InvalidGeometryType = Get(2007);
+        public static readonly SystemError UnsupportedConfiguration = Get(2008);
+
+        /// <summary>Morphology operation errors (2800-2812).</summary>
+        public static class Morphology {
+            public static readonly SystemError CageDeformFailed = Get(2800);
+            public static readonly SystemError CageControlPointMismatch = Get(2801);
+            public static readonly SystemError InsufficientCagePoints = Get(2802);
+            public static readonly SystemError SubdivisionLevelExceeded = Get(2803);
+            public static readonly SystemError SubdivisionFailed = Get(2804);
+            public static readonly SystemError SmoothingConvergenceFailed = Get(2805);
+            public static readonly SystemError MeshQualityDegraded = Get(2806);
+            public static readonly SystemError EvolutionTimestepTooLarge = Get(2807);
+            public static readonly SystemError CurvatureComputationFailed = Get(2808);
+            public static readonly SystemError TaubinParametersInvalid = Get(2809);
+            public static readonly SystemError LoopRequiresTriangles = Get(2810);
+            public static readonly SystemError ButterflyIrregularValence = Get(2811);
+            public static readonly SystemError UnsupportedConfiguration = Get(2812);
+        }
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
