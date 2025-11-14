@@ -84,7 +84,11 @@ public static class E {
             [2707] = "Vector potential field computation failed or invalid",
             [2708] = "Field interpolation failed or invalid query point",
 
-            // Morphology Operations (2800-2812)
+            // General Geometry Type Errors (2007-2008)
+            [2007] = "Invalid or unsupported geometry type",
+            [2008] = "Unsupported configuration for operation and geometry type combination",
+
+            // Morphology Operations (2800-2810)
             [2800] = "Cage-based deformation failed",
             [2801] = "Cage control point count mismatch between original and deformed arrays",
             [2802] = "Insufficient cage control points (minimum 8 required)",
@@ -94,12 +98,8 @@ public static class E {
             [2806] = "Mesh quality degraded below acceptable threshold (aspect ratio or min angle)",
             [2807] = "Taubin smoothing parameters invalid (μ must be < -λ)",
             [2808] = "Loop subdivision failed: requires triangle mesh",
-            [2809] = "Butterfly subdivision failed: irregular vertex valence",
+            [2809] = "Butterfly subdivision failed: requires triangle mesh",
             [2810] = "Unsupported morphology configuration for geometry type",
-
-            // General Geometry Type Errors (2007-2008)
-            [2007] = "Invalid or unsupported geometry type",
-            [2008] = "Unsupported configuration for operation and geometry type combination",
 
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
@@ -263,7 +263,7 @@ public static class E {
             public static readonly SystemError MeshQualityDegraded = Get(2806);
             public static readonly SystemError TaubinParametersInvalid = Get(2807);
             public static readonly SystemError LoopRequiresTriangles = Get(2808);
-            public static readonly SystemError ButterflyIrregularValence = Get(2809);
+            public static readonly SystemError ButterflyRequiresTriangles = Get(2809);
             public static readonly SystemError UnsupportedConfiguration = Get(2810);
         }
     }

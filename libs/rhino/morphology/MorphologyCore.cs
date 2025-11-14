@@ -95,7 +95,7 @@ internal static class MorphologyCore {
             : parameters is not int levels
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: int levels"))
                 : !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
-                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.ButterflyIrregularValence.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
+                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
                     : MorphologyCompute.SubdivideIterative(mesh, MorphologyConfig.OpSubdivideButterfly, levels, context)
                         .Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, context));
 
@@ -180,26 +180,22 @@ internal static class MorphologyCore {
 
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-
-            if (neighbors.Length is 0) {
-                updated[i] = positions[i];
-                continue;
-            }
-
-            Point3d sum = Point3d.Origin;
-            double weightSum = 0.0;
-
-            for (int j = 0; j < neighbors.Length; j++) {
-                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
-                Point3d neighborPos = positions[meshVertIdx];
-                double weight = useCotangent
-                    ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                    : MorphologyConfig.UniformLaplacianWeight;
-                sum += (weight * neighborPos);
-                weightSum += weight;
-            }
-
-            updated[i] = weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
+            updated[i] = neighbors.Length is 0
+                ? positions[i]
+                : ((Func<Point3d>)(() => {
+                    Point3d sum = Point3d.Origin;
+                    double weightSum = 0.0;
+                    for (int j = 0; j < neighbors.Length; j++) {
+                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                        Point3d neighborPos = positions[meshVertIdx];
+                        double weight = useCotangent
+                            ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                            : MorphologyConfig.UniformLaplacianWeight;
+                        sum += (weight * neighborPos);
+                        weightSum += weight;
+                    }
+                    return weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
+                }))();
         }
 
         return updated;
@@ -211,24 +207,21 @@ internal static class MorphologyCore {
 
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-
-            if (neighbors.Length is 0) {
-                updated[i] = positions[i];
-                continue;
-            }
-
-            Point3d laplacian = Point3d.Origin;
+            updated[i] = neighbors.Length is 0
+                ? positions[i]
+                : ((Func<Point3d>)(() => {
+                    Point3d laplacian = Point3d.Origin;
             for (int j = 0; j < neighbors.Length; j++) {
                 int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
                 laplacian += positions[meshVertIdx] - positions[i];
             }
             laplacian /= neighbors.Length;
 
-            Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
-            Vector3d laplacianVec = laplacian - Point3d.Origin;
-            double curvature = normal * laplacianVec;
-
-            updated[i] = positions[i] + ((timeStep * curvature) * normal);
+                    Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
+                    Vector3d laplacianVec = laplacian - Point3d.Origin;
+                    double curvature = normal * laplacianVec;
+                    return positions[i] + ((timeStep * curvature) * normal);
+                }))();
         }
 
         return updated;
