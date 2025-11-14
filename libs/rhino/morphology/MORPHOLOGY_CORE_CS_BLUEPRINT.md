@@ -4,10 +4,9 @@
 Byte-based FrozenDictionary dispatch registry, RTree spatial acceleration factories, and grid sampling infrastructure. NO helper methods - inline algorithm logic.
 
 ## Type Count
-**3 types**: 
+**2 types**: 
 1. `MorphologyCore` (internal static class - dispatch registry)
-2. `SampleGrid` (internal readonly struct - 3D grid configuration)
-3. `DistanceQuery` (internal readonly struct - cached closest point result)
+2. `SampleGrid` (internal readonly struct - 3D grid configuration for passing to compute methods)
 
 ## Critical Patterns
 - Byte-based FrozenDictionary dispatch (NO enums)
@@ -130,8 +129,8 @@ internal static class MorphologyCore {
                         Point3d closest = typed switch {
                             Mesh m => m.ClosestPoint(grid[i]),
                             Brep b => b.ClosestPoint(grid[i]),
-                            Curve c => c.PointAt(c.ClosestPoint(grid[i])),
-                            Surface s => s.PointAt(s.ClosestPoint(grid[i]).Item1, s.ClosestPoint(grid[i]).Item2),
+                            Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
+                            Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
                             _ => grid[i],
                         };
 
@@ -182,29 +181,9 @@ internal readonly struct SampleGrid {
             this.Origin.Y + (j * this.Delta.Y),
             this.Origin.Z + (k * this.Delta.Z));
 }
-
-/// <summary>Cached distance query result for O(1) field evaluation.</summary>
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-internal readonly struct DistanceQuery {
-    internal readonly Point3d SamplePoint;
-    internal readonly Point3d ClosestPoint;
-    internal readonly double Distance;
-    internal readonly bool IsInside;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal DistanceQuery(Point3d samplePoint, Point3d closestPoint, double distance, bool isInside) {
-        this.SamplePoint = samplePoint;
-        this.ClosestPoint = closestPoint;
-        this.Distance = distance;
-        this.IsInside = isInside;
-    }
-
-    [Pure]
-    internal double SignedDistance => this.IsInside ? -this.Distance : this.Distance;
-}
 ```
 
-## LOC: 178
+## LOC: 158 (reduced from 178 - removed unused DistanceQuery struct)
 
 ## Key Patterns Demonstrated
 1. **Byte-based dispatch** - FrozenDictionary with (byte, Type) keys
@@ -226,8 +205,7 @@ internal readonly struct DistanceQuery {
 - **RTree**: Spatial acceleration for large point clouds
 
 ## Struct Justification
-- **SampleGrid**: Encapsulates grid parameters for passing to compute methods
-- **DistanceQuery**: Caches query results to avoid recomputation (not used in this file but available for MorphologyCompute)
+- **SampleGrid**: Encapsulates grid parameters for passing to compute methods. Provides cleaner parameter passing than multiple loose values.
 
 ## No Helper Methods
-Grid sampling and distance computation inline in ExecuteDistanceField. RTree factories are lambdas in readonly fields.
+Grid sampling and distance computation inline in ExecuteDistanceField. RTree factories are lambdas in readonly fields. Removed unused DistanceQuery struct to minimize type count.

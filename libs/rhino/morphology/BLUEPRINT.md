@@ -238,8 +238,8 @@ internal static Result<double[]> ComputeSignedDistance(
             Point3d closest = geometry switch {
                 Mesh m => m.ClosestPoint(grid[i]),
                 Brep b => b.ClosestPoint(grid[i]),
-                Curve c => c.PointAt(c.ClosestPoint(grid[i])),
-                Surface s => s.PointAt(s.ClosestPoint(grid[i]).Item1, s.ClosestPoint(grid[i]).Item2),
+                Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
+                Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
                 _ => grid[i],
             };
             double unsignedDist = grid[i].DistanceTo(closest);

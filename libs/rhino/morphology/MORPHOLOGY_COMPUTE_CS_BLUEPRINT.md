@@ -4,10 +4,8 @@
 Dense computational algorithms: gradient field computation, RK4 streamline integration, and marching cubes isosurface extraction. ArrayPool buffers, inline math, NO helper methods.
 
 ## Type Count
-**3 types**:
-1. `MorphologyCompute` (internal static class - algorithm implementations)
-2. `RK4State` (internal readonly struct - Runge-Kutta integration state)
-3. `MarchingCube` (internal readonly struct - cube corner configuration)
+**1 type**:
+1. `MorphologyCompute` (internal static class - algorithm implementations only, no helper structs)
 
 ## Critical Patterns
 - ArrayPool for all temporary buffers
@@ -116,14 +114,23 @@ internal static class MorphologyCompute {
                 for (int step = 0; step < MorphologyConfig.MaxStreamlineSteps - 1; step++) {
                     Vector3d k1 = InterpolateVectorField(vectorField, gridPoints, current);
                     
-                    (Vector3d k2, Vector3d k3, Vector3d k4) = integrationMethod switch {
-                        0 => (k1, k1, k1),  // Euler: use k1 for all stages
-                        1 => (InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[0] * k1)), k1, k1),  // RK2
-                        2 or 3 => (  // RK4 or AdaptiveRK4
-                            InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[0] * k1)),
-                            InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[1] * k1)),
-                            InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[2] * k1))),
-                        _ => (k1, k1, k1),
+                    // RK4 requires sequential computation: k2 depends on k1, k3 depends on k2, k4 depends on k3
+                    Vector3d k2 = integrationMethod switch {
+                        0 => k1,  // Euler: use k1 for all
+                        1 or 2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[0] * k1)),
+                        _ => k1,
+                    };
+                    
+                    Vector3d k3 = integrationMethod switch {
+                        0 or 1 => k1,  // Euler/RK2: not used
+                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[1] * k2)),  // RK4: use k2
+                        _ => k1,
+                    };
+                    
+                    Vector3d k4 = integrationMethod switch {
+                        0 or 1 => k1,  // Euler/RK2: not used
+                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * MorphologyConfig.RK4HalfSteps[2] * k3)),  // RK4: use k3
+                        _ => k1,
                     };
 
                     Vector3d delta = integrationMethod switch {
@@ -133,13 +140,19 @@ internal static class MorphologyCompute {
                         _ => Vector3d.Zero,
                     };
 
-                    (delta.Length <= context.AbsoluteTolerance, stepCount >= MorphologyConfig.MaxStreamlineSteps - 1) switch {
-                        (true, _) => break,  // Converged
-                        (_, true) => break,  // Max steps
-                        _ => (current, stepCount) = (current + delta, stepCount + 1),
+                    bool shouldContinue = delta.Length > context.AbsoluteTolerance && stepCount < MorphologyConfig.MaxStreamlineSteps - 1;
+                    _ = shouldContinue switch {
+                        false => 0,  // Stop iteration
+                        true => ((Func<int>)(() => {
+                            current = current + delta;
+                            stepCount = stepCount + 1;
+                            pathBuffer[stepCount - 1] = current;
+                            return 1;
+                        }))(),
                     };
-
-                    pathBuffer[stepCount - 1] = current;
+                    
+                    // Early exit when converged
+                    step = shouldContinue ? step : MorphologyConfig.MaxStreamlineSteps;
                 }
 
                 streamlines[seedIdx] = stepCount > 1
@@ -254,50 +267,9 @@ internal static class MorphologyCompute {
         return ResultFactory.Create(value: meshes);
     }
 }
-
-/// <summary>RK4 integration state for streamline tracing.</summary>
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-internal readonly struct RK4State {
-    internal readonly Point3d Position;
-    internal readonly Vector3d K1;
-    internal readonly Vector3d K2;
-    internal readonly Vector3d K3;
-    internal readonly Vector3d K4;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal RK4State(Point3d position, Vector3d k1, Vector3d k2, Vector3d k3, Vector3d k4) {
-        this.Position = position;
-        this.K1 = k1;
-        this.K2 = k2;
-        this.K3 = k3;
-        this.K4 = k4;
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Point3d Advance(double stepSize) =>
-        this.Position + (stepSize * ((MorphologyConfig.RK4Weights[0] * this.K1) + (MorphologyConfig.RK4Weights[1] * this.K2) + (MorphologyConfig.RK4Weights[2] * this.K3) + (MorphologyConfig.RK4Weights[3] * this.K4)));
-}
-
-/// <summary>Marching cube corner configuration.</summary>
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-internal readonly struct MarchingCube {
-    internal readonly int[] CornerIndices;
-    internal readonly double[] CornerValues;
-    internal readonly int CubeIndex;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal MarchingCube(int[] cornerIndices, double[] cornerValues, double isovalue) {
-        this.CornerIndices = cornerIndices;
-        this.CornerValues = cornerValues;
-        this.CubeIndex = 0;
-        for (int c = 0; c < 8; c++) {
-            this.CubeIndex = cornerValues[c] < isovalue ? this.CubeIndex | (1 << c) : this.CubeIndex;
-        }
-    }
-}
 ```
 
-## LOC: 249
+## LOC: 205 (reduced from 249 - removed unused structs)
 
 ## Key Patterns Demonstrated
 1. **ArrayPool buffers** - Rent/Return with try/finally in all algorithms
@@ -325,9 +297,5 @@ internal readonly struct MarchingCube {
 
 **Isosurface**: Classic marching cubes with 256-case lookup table, linear interpolation t = (iso - f1)/(f2 - f1) on cube edges, Rhino Mesh construction with normal computation.
 
-## Struct Justification
-- **RK4State**: Encapsulates 4 intermediate slopes for RK4 integration (currently not used in simplified inline version)
-- **MarchingCube**: Encapsulates cube corner data for isosurface extraction (currently not used in simplified inline version)
-
-## No Helper Methods
-All algorithms inline. InterpolateVectorField is small private method (5 lines) - considered acceptable as it's called multiple times per integration step.
+## No Helper Structs or Methods
+All algorithms inline. InterpolateVectorField is small private method (5 lines) - considered acceptable as it's called multiple times per integration step. Removed unused RK4State and MarchingCube structs to minimize type count.

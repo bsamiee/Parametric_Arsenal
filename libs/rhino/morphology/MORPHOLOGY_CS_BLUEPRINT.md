@@ -41,7 +41,7 @@ public static class Morphology {
         public readonly double StepSize;
 
         public FieldSpec(int resolution = MorphologyConfig.DefaultResolution, BoundingBox? bounds = null, double? stepSize = null) {
-            this.Resolution = resolution > MorphologyConfig.MinResolution
+            this.Resolution = resolution >= MorphologyConfig.MinResolution
                 ? resolution
                 : MorphologyConfig.DefaultResolution;
             this.Bounds = bounds;
