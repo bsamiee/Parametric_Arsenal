@@ -25,10 +25,9 @@ public static class Fields {
         /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
         public readonly BoundingBox? Bounds = bounds;
         /// <summary>Integration/sampling step size.</summary>
-        public readonly double StepSize =
-            stepSize >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
-                ? stepSize.Value
-                : FieldsConfig.DefaultStepSize;
+        public readonly double StepSize = stepSize.HasValue && stepSize.Value >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
+            ? stepSize.Value
+            : FieldsConfig.DefaultStepSize;
     }
 
     /// <summary>Compute signed distance field: geometry → (grid points[], distances[]).</summary>

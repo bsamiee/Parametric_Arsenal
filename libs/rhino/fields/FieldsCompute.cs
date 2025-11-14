@@ -337,6 +337,7 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<double> InterpolateTrilinearScalarInternal(Point3d query, double[] scalarField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
+        int resSquared = resolution * resolution;
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
         double normZ = (query.Z - bounds.Min.Z) / dz;
@@ -355,14 +356,14 @@ internal static class FieldsCompute {
         double ty = fj - j0;
         double tz = fk - k0;
 
-        double c000 = scalarField[(i0 * resolution * resolution) + (j0 * resolution) + k0];
-        double c001 = scalarField[(i0 * resolution * resolution) + (j0 * resolution) + k1];
-        double c010 = scalarField[(i0 * resolution * resolution) + (j1 * resolution) + k0];
-        double c011 = scalarField[(i0 * resolution * resolution) + (j1 * resolution) + k1];
-        double c100 = scalarField[(i1 * resolution * resolution) + (j0 * resolution) + k0];
-        double c101 = scalarField[(i1 * resolution * resolution) + (j0 * resolution) + k1];
-        double c110 = scalarField[(i1 * resolution * resolution) + (j1 * resolution) + k0];
-        double c111 = scalarField[(i1 * resolution * resolution) + (j1 * resolution) + k1];
+        double c000 = scalarField[(i0 * resSquared) + (j0 * resolution) + k0];
+        double c001 = scalarField[(i0 * resSquared) + (j0 * resolution) + k1];
+        double c010 = scalarField[(i0 * resSquared) + (j1 * resolution) + k0];
+        double c011 = scalarField[(i0 * resSquared) + (j1 * resolution) + k1];
+        double c100 = scalarField[(i1 * resSquared) + (j0 * resolution) + k0];
+        double c101 = scalarField[(i1 * resSquared) + (j0 * resolution) + k1];
+        double c110 = scalarField[(i1 * resSquared) + (j1 * resolution) + k0];
+        double c111 = scalarField[(i1 * resSquared) + (j1 * resolution) + k1];
 
         double c00 = c000 + (tx * (c100 - c000));
         double c01 = c001 + (tx * (c101 - c001));
@@ -388,6 +389,7 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Vector3d> InterpolateTrilinearVectorInternal(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
+        int resSquared = resolution * resolution;
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
         double normZ = (query.Z - bounds.Min.Z) / dz;
@@ -406,14 +408,14 @@ internal static class FieldsCompute {
         double ty = fj - j0;
         double tz = fk - k0;
 
-        Vector3d c000 = vectorField[(i0 * resolution * resolution) + (j0 * resolution) + k0];
-        Vector3d c001 = vectorField[(i0 * resolution * resolution) + (j0 * resolution) + k1];
-        Vector3d c010 = vectorField[(i0 * resolution * resolution) + (j1 * resolution) + k0];
-        Vector3d c011 = vectorField[(i0 * resolution * resolution) + (j1 * resolution) + k1];
-        Vector3d c100 = vectorField[(i1 * resolution * resolution) + (j0 * resolution) + k0];
-        Vector3d c101 = vectorField[(i1 * resolution * resolution) + (j0 * resolution) + k1];
-        Vector3d c110 = vectorField[(i1 * resolution * resolution) + (j1 * resolution) + k0];
-        Vector3d c111 = vectorField[(i1 * resolution * resolution) + (j1 * resolution) + k1];
+        Vector3d c000 = vectorField[(i0 * resSquared) + (j0 * resolution) + k0];
+        Vector3d c001 = vectorField[(i0 * resSquared) + (j0 * resolution) + k1];
+        Vector3d c010 = vectorField[(i0 * resSquared) + (j1 * resolution) + k0];
+        Vector3d c011 = vectorField[(i0 * resSquared) + (j1 * resolution) + k1];
+        Vector3d c100 = vectorField[(i1 * resSquared) + (j0 * resolution) + k0];
+        Vector3d c101 = vectorField[(i1 * resSquared) + (j0 * resolution) + k1];
+        Vector3d c110 = vectorField[(i1 * resSquared) + (j1 * resolution) + k0];
+        Vector3d c111 = vectorField[(i1 * resSquared) + (j1 * resolution) + k1];
 
         Vector3d c00 = c000 + (tx * (c100 - c000));
         Vector3d c01 = c001 + (tx * (c101 - c001));
