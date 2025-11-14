@@ -304,43 +304,43 @@ internal static class FieldsCompute {
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
             false => ((Func<Result<double>>)(() => {
-        int resSquared = resolution * resolution;
-        double normX = (query.X - bounds.Min.X) / dx;
-        double normY = (query.Y - bounds.Min.Y) / dy;
-        double normZ = (query.Z - bounds.Min.Z) / dz;
-        double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-        double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-        double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
+                int resSquared = resolution * resolution;
+                double normX = (query.X - bounds.Min.X) / dx;
+                double normY = (query.Y - bounds.Min.Y) / dy;
+                double normZ = (query.Z - bounds.Min.Z) / dz;
+                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
+                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
+                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
 
-        int i0 = (int)fi;
-        int j0 = (int)fj;
-        int k0 = (int)fk;
-        int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-        int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-        int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
+                int i0 = (int)fi;
+                int j0 = (int)fj;
+                int k0 = (int)fk;
+                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
+                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
+                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
 
-        double tx = fi - i0;
-        double ty = fj - j0;
-        double tz = fk - k0;
+                double tx = fi - i0;
+                double ty = fj - j0;
+                double tz = fk - k0;
 
-        double c000 = scalarField[(i0 * resSquared) + (j0 * resolution) + k0];
-        double c001 = scalarField[(i0 * resSquared) + (j0 * resolution) + k1];
-        double c010 = scalarField[(i0 * resSquared) + (j1 * resolution) + k0];
-        double c011 = scalarField[(i0 * resSquared) + (j1 * resolution) + k1];
-        double c100 = scalarField[(i1 * resSquared) + (j0 * resolution) + k0];
-        double c101 = scalarField[(i1 * resSquared) + (j0 * resolution) + k1];
-        double c110 = scalarField[(i1 * resSquared) + (j1 * resolution) + k0];
-        double c111 = scalarField[(i1 * resSquared) + (j1 * resolution) + k1];
+                double c000 = scalarField[(i0 * resSquared) + (j0 * resolution) + k0];
+                double c001 = scalarField[(i0 * resSquared) + (j0 * resolution) + k1];
+                double c010 = scalarField[(i0 * resSquared) + (j1 * resolution) + k0];
+                double c011 = scalarField[(i0 * resSquared) + (j1 * resolution) + k1];
+                double c100 = scalarField[(i1 * resSquared) + (j0 * resolution) + k0];
+                double c101 = scalarField[(i1 * resSquared) + (j0 * resolution) + k1];
+                double c110 = scalarField[(i1 * resSquared) + (j1 * resolution) + k0];
+                double c111 = scalarField[(i1 * resSquared) + (j1 * resolution) + k1];
 
-        double c00 = c000 + (tx * (c100 - c000));
-        double c01 = c001 + (tx * (c101 - c001));
-        double c10 = c010 + (tx * (c110 - c010));
-        double c11 = c011 + (tx * (c111 - c011));
+                double c00 = c000 + (tx * (c100 - c000));
+                double c01 = c001 + (tx * (c101 - c001));
+                double c10 = c010 + (tx * (c110 - c010));
+                double c11 = c011 + (tx * (c111 - c011));
 
-        double c0 = c00 + (ty * (c10 - c00));
-        double c1 = c01 + (ty * (c11 - c01));
+                double c0 = c00 + (ty * (c10 - c00));
+                double c1 = c01 + (ty * (c11 - c01));
 
-        return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
             }))(),
         };
     }
@@ -353,43 +353,43 @@ internal static class FieldsCompute {
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
             false => ((Func<Result<Vector3d>>)(() => {
-        int resSquared = resolution * resolution;
-        double normX = (query.X - bounds.Min.X) / dx;
-        double normY = (query.Y - bounds.Min.Y) / dy;
-        double normZ = (query.Z - bounds.Min.Z) / dz;
-        double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-        double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-        double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
+                int resSquared = resolution * resolution;
+                double normX = (query.X - bounds.Min.X) / dx;
+                double normY = (query.Y - bounds.Min.Y) / dy;
+                double normZ = (query.Z - bounds.Min.Z) / dz;
+                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
+                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
+                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
 
-        int i0 = (int)fi;
-        int j0 = (int)fj;
-        int k0 = (int)fk;
-        int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-        int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-        int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
+                int i0 = (int)fi;
+                int j0 = (int)fj;
+                int k0 = (int)fk;
+                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
+                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
+                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
 
-        double tx = fi - i0;
-        double ty = fj - j0;
-        double tz = fk - k0;
+                double tx = fi - i0;
+                double ty = fj - j0;
+                double tz = fk - k0;
 
-        Vector3d c000 = vectorField[(i0 * resSquared) + (j0 * resolution) + k0];
-        Vector3d c001 = vectorField[(i0 * resSquared) + (j0 * resolution) + k1];
-        Vector3d c010 = vectorField[(i0 * resSquared) + (j1 * resolution) + k0];
-        Vector3d c011 = vectorField[(i0 * resSquared) + (j1 * resolution) + k1];
-        Vector3d c100 = vectorField[(i1 * resSquared) + (j0 * resolution) + k0];
-        Vector3d c101 = vectorField[(i1 * resSquared) + (j0 * resolution) + k1];
-        Vector3d c110 = vectorField[(i1 * resSquared) + (j1 * resolution) + k0];
-        Vector3d c111 = vectorField[(i1 * resSquared) + (j1 * resolution) + k1];
+                Vector3d c000 = vectorField[(i0 * resSquared) + (j0 * resolution) + k0];
+                Vector3d c001 = vectorField[(i0 * resSquared) + (j0 * resolution) + k1];
+                Vector3d c010 = vectorField[(i0 * resSquared) + (j1 * resolution) + k0];
+                Vector3d c011 = vectorField[(i0 * resSquared) + (j1 * resolution) + k1];
+                Vector3d c100 = vectorField[(i1 * resSquared) + (j0 * resolution) + k0];
+                Vector3d c101 = vectorField[(i1 * resSquared) + (j0 * resolution) + k1];
+                Vector3d c110 = vectorField[(i1 * resSquared) + (j1 * resolution) + k0];
+                Vector3d c111 = vectorField[(i1 * resSquared) + (j1 * resolution) + k1];
 
-        Vector3d c00 = c000 + (tx * (c100 - c000));
-        Vector3d c01 = c001 + (tx * (c101 - c001));
-        Vector3d c10 = c010 + (tx * (c110 - c010));
-        Vector3d c11 = c011 + (tx * (c111 - c011));
+                Vector3d c00 = c000 + (tx * (c100 - c000));
+                Vector3d c01 = c001 + (tx * (c101 - c001));
+                Vector3d c10 = c010 + (tx * (c110 - c010));
+                Vector3d c11 = c011 + (tx * (c111 - c011));
 
-        Vector3d c0 = c00 + (ty * (c10 - c00));
-        Vector3d c1 = c01 + (ty * (c11 - c01));
+                Vector3d c0 = c00 + (ty * (c10 - c00));
+                Vector3d c1 = c01 + (ty * (c11 - c01));
 
-        return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
             }))(),
         };
     }
