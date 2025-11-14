@@ -208,22 +208,25 @@ internal static class ExtractionCompute {
     private static (bool Success, byte Type, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) {
         (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
         int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
-        List<SurfaceCurvature> curvaturesList = [];
+        int maxSamples = sampleCount * sampleCount;
+        SurfaceCurvature[] curvatures = new SurfaceCurvature[maxSamples];
+        int validCount = 0;
+        double sampleDivisor = sampleCount > 1 ? sampleCount - 1.0 : 1.0;
+
         for (int i = 0; i < sampleCount; i++) {
+            double u = uDomain.ParameterAt(sampleCount > 1 ? i / sampleDivisor : 0.5);
             for (int j = 0; j < sampleCount; j++) {
-                double u = uDomain.ParameterAt(sampleCount > 1 ? i / (double)(sampleCount - 1) : 0.5);
-                double v = vDomain.ParameterAt(sampleCount > 1 ? j / (double)(sampleCount - 1) : 0.5);
+                double v = vDomain.ParameterAt(sampleCount > 1 ? j / sampleDivisor : 0.5);
                 SurfaceCurvature? curv = surface.CurvatureAt(u: u, v: v);
                 if (curv is not null) {
-                    curvaturesList.Add(curv);
+                    curvatures[validCount++] = curv;
                 }
             }
         }
-        SurfaceCurvature[] curvatures = [.. curvaturesList,];
 
-        return curvatures.Length < ExtractionConfig.MinCurvatureSamples
+        return validCount < ExtractionConfig.MinCurvatureSamples
             ? (false, ExtractionConfig.PrimitiveTypeUnknown, Plane.WorldXY, [])
-            : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures);
+            : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures.AsSpan(0, validCount).ToArray());
     }
 
     [Pure]
@@ -269,21 +272,33 @@ internal static class ExtractionCompute {
     }
 
     [Pure]
-    private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) =>
-        (surface.Domain(0), surface.Domain(1), (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount))) is (Interval u, Interval v, int samplesPerDir)
-            ? Math.Sqrt(Enumerable.Range(0, samplesPerDir).SelectMany(i => Enumerable.Range(0, samplesPerDir).Select(j =>
-                surface.PointAt(u: u.ParameterAt(i / (double)(samplesPerDir - 1)), v: v.ParameterAt(j / (double)(samplesPerDir - 1))) is Point3d sp
-                    ? sp.DistanceToSquared(type switch {
-                        ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(sp),
-                        ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: sp, cylinderPlane: frame, radius: pars[0]),
-                        ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: sp, center: frame.Origin, radius: pars[0]),
-                        ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: sp, conePlane: frame, baseRadius: pars[0], height: pars[1]),
-                        ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: sp, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
-                        ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(sp),
-                        _ => sp,
-                    })
-                    : 0.0)).Sum() / (samplesPerDir * samplesPerDir))
-            : 0.0;
+    private static double ComputeSurfaceResidual(Surface surface, byte type, Plane frame, double[] pars) {
+        (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
+        int samplesPerDir = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount));
+        int totalSamples = samplesPerDir * samplesPerDir;
+        double sumSquaredDistances = 0.0;
+        double sampleDivisor = samplesPerDir > 1 ? samplesPerDir - 1.0 : 1.0;
+
+        for (int i = 0; i < samplesPerDir; i++) {
+            double u = uDomain.ParameterAt(i / sampleDivisor);
+            for (int j = 0; j < samplesPerDir; j++) {
+                double v = vDomain.ParameterAt(j / sampleDivisor);
+                Point3d surfacePoint = surface.PointAt(u: u, v: v);
+                Point3d primitivePoint = type switch {
+                    ExtractionConfig.PrimitiveTypePlane when pars.Length >= 3 => frame.ClosestPoint(surfacePoint),
+                    ExtractionConfig.PrimitiveTypeCylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
+                    ExtractionConfig.PrimitiveTypeSphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
+                    ExtractionConfig.PrimitiveTypeCone when pars.Length >= 3 => ProjectPointToCone(point: surfacePoint, conePlane: frame, baseRadius: pars[0], height: pars[1]),
+                    ExtractionConfig.PrimitiveTypeTorus when pars.Length >= 2 => ProjectPointToTorus(point: surfacePoint, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
+                    ExtractionConfig.PrimitiveTypeExtrusion when pars.Length >= 1 => frame.ClosestPoint(surfacePoint),
+                    _ => surfacePoint,
+                };
+                sumSquaredDistances += surfacePoint.DistanceToSquared(primitivePoint);
+            }
+        }
+
+        return Math.Sqrt(sumSquaredDistances / totalSamples);
+    }
 
     [Pure]
     private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) {
@@ -402,18 +417,32 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) {
-        Vector3d[] orderedCandidates = [.. candidates.OrderBy(c => c.SquareLength),];
-        Vector3d u = orderedCandidates[0];
-        Vector3d uDir = u / u.Length;
-        Vector3d vCandidate = orderedCandidates.Skip(1).FirstOrDefault(c =>
-            c.Length > context.AbsoluteTolerance
-            && Math.Abs(Vector3d.Multiply(uDir, c / c.Length)) < ExtractionConfig.GridOrthogonalityThreshold);
+        Vector3d u = candidates.Length > 0 ? candidates[0] : Vector3d.Zero;
+        double minLengthSq = u.SquareLength;
+        for (int i = 1; i < candidates.Length; i++) {
+            double lengthSq = candidates[i].SquareLength;
+            if (lengthSq < minLengthSq) {
+                u = candidates[i];
+                minLengthSq = lengthSq;
+            }
+        }
 
-        return vCandidate.Length > context.AbsoluteTolerance
-            ? (U: u, V: vCandidate, Success: true)
-            : (U: Vector3d.Zero, V: Vector3d.Zero, Success: false);
+        double uLen = u.Length;
+        if (uLen <= context.AbsoluteTolerance) {
+            return (Vector3d.Zero, Vector3d.Zero, false);
+        }
+
+        Vector3d uDir = u / uLen;
+        for (int i = 0; i < candidates.Length; i++) {
+            Vector3d candidate = candidates[i];
+            double candidateLen = candidate.Length;
+            if (candidateLen > context.AbsoluteTolerance
+                && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
+                return (u, candidate, true);
+            }
+        }
+        return (Vector3d.Zero, Vector3d.Zero, false);
     }
-
     private static bool IsGridPoint(Vector3d vector, Vector3d u, Vector3d v, IGeometryContext context) {
         double uLen = u.Length;
         double vLen = v.Length;

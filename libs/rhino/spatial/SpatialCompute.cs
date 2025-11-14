@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -61,74 +62,82 @@ internal static class SpatialCompute {
         int[] assignments = new int[pts.Length];
         Point3d[] centroids = new Point3d[k];
         Random rng = new(SpatialConfig.KMeansSeed);
+        double[] distSq = ArrayPool<double>.Shared.Rent(pts.Length);
 
-        // K-means++ initialization with squared distances
-        centroids[0] = pts[rng.Next(pts.Length)];
-        for (int i = 1; i < k; i++) {
-            double[] distSq = new double[pts.Length];
+        Point3d SelectWeighted(double sumWeights) {
+            double target = rng.NextDouble() * sumWeights;
+            double cumulative = 0.0;
             for (int j = 0; j < pts.Length; j++) {
-                double minDist = pts[j].DistanceTo(centroids[0]);
-                for (int c = 1; c < i; c++) {
-                    double dist = pts[j].DistanceTo(centroids[c]);
-                    minDist = dist < minDist ? dist : minDist;
+                cumulative += distSq[j];
+                if (cumulative >= target) {
+                    return pts[j];
                 }
-                distSq[j] = minDist * minDist;
             }
+            return pts[^1];
+        }
 
-            double sum = 0.0;
-            for (int j = 0; j < distSq.Length; j++) {
-                sum += distSq[j];
-            }
-
-            if (sum <= tol || sum <= 0.0) {
-                centroids[i] = pts[rng.Next(pts.Length)];
-            } else {
-                double target = rng.NextDouble() * sum;
-                double cumulative = 0.0;
-                int selectedIdx = pts.Length - 1;
-                for (int j = 0; j < distSq.Length; j++) {
-                    cumulative += distSq[j];
-                    if (cumulative >= target) {
-                        selectedIdx = j;
-                        break;
+        try {
+            // K-means++ initialization with squared distances
+            centroids[0] = pts[rng.Next(pts.Length)];
+            for (int i = 1; i < k; i++) {
+                for (int j = 0; j < pts.Length; j++) {
+                    double minDist = pts[j].DistanceTo(centroids[0]);
+                    for (int c = 1; c < i; c++) {
+                        double dist = pts[j].DistanceTo(centroids[c]);
+                        minDist = dist < minDist ? dist : minDist;
                     }
+                    distSq[j] = minDist * minDist;
                 }
-                centroids[i] = pts[selectedIdx];
-            }
-        }
 
-        // Lloyd's algorithm with hot-path optimization
-        for (int iter = 0; iter < maxIter; iter++) {
-            // Assign to nearest centroid (hot path - use for loops)
-            for (int i = 0; i < pts.Length; i++) {
-                int nearest = 0;
-                double minDist = pts[i].DistanceTo(centroids[0]);
-                for (int j = 1; j < k; j++) {
-                    double dist = pts[i].DistanceTo(centroids[j]);
-                    (nearest, minDist) = dist < minDist ? (j, dist) : (nearest, minDist);
+                double sum = 0.0;
+                for (int j = 0; j < pts.Length; j++) {
+                    sum += distSq[j];
                 }
-                assignments[i] = nearest;
+
+                centroids[i] = sum <= tol || sum <= 0.0
+                    ? pts[rng.Next(pts.Length)]
+                    : SelectWeighted(sum);
             }
 
-            // Recompute centroids and check convergence
-            (Point3d Sum, int Count)[] clusters = [.. Enumerable.Range(0, k).Select(static _ => (Point3d.Origin, 0)),];
-            for (int i = 0; i < pts.Length; i++) {
-                clusters[assignments[i]] = (clusters[assignments[i]].Sum + pts[i], clusters[assignments[i]].Count + 1);
+            // Lloyd's algorithm with hot-path optimization
+            (Point3d Sum, int Count)[] clusters = new (Point3d, int)[k];
+            for (int iter = 0; iter < maxIter; iter++) {
+                // Assign to nearest centroid (hot path - use for loops)
+                for (int i = 0; i < pts.Length; i++) {
+                    int nearest = 0;
+                    double minDist = pts[i].DistanceTo(centroids[0]);
+                    for (int j = 1; j < k; j++) {
+                        double dist = pts[i].DistanceTo(centroids[j]);
+                        (nearest, minDist) = dist < minDist ? (j, dist) : (nearest, minDist);
+                    }
+                    assignments[i] = nearest;
+                }
+
+                // Recompute centroids and check convergence
+                for (int i = 0; i < k; i++) {
+                    clusters[i] = (Point3d.Origin, 0);
+                }
+                for (int i = 0; i < pts.Length; i++) {
+                    int cluster = assignments[i];
+                    clusters[cluster] = (clusters[cluster].Sum + pts[i], clusters[cluster].Count + 1);
+                }
+
+                double maxShift = 0.0;
+                for (int i = 0; i < k; i++) {
+                    Point3d newCentroid = clusters[i].Count > 0 ? clusters[i].Sum / clusters[i].Count : centroids[i];
+                    maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
+                    centroids[i] = newCentroid;
+                }
+
+                if (maxShift <= tol) {
+                    break;
+                }
             }
 
-            double maxShift = 0.0;
-            for (int i = 0; i < k; i++) {
-                Point3d newCentroid = clusters[i].Count > 0 ? clusters[i].Sum / clusters[i].Count : centroids[i];
-                maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
-                centroids[i] = newCentroid;
-            }
-
-            if (maxShift <= tol) {
-                break;
-            }
+            return assignments;
+        } finally {
+            ArrayPool<double>.Shared.Return(distSq, clearArray: false);
         }
-
-        return assignments;
     }
 
     internal static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) {

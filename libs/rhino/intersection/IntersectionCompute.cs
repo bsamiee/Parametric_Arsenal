@@ -74,8 +74,18 @@ internal static class IntersectionCompute {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        static (Point3d[], Point3d[], double[]) toArrays((Point3d PointA, Point3d PointB, double Distance)[] pairs) =>
-            ([.. pairs.Select(p => p.PointA)], [.. pairs.Select(p => p.PointB)], [.. pairs.Select(p => p.Distance)]);
+        static (Point3d[], Point3d[], double[]) toArrays((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
+            int count = pairs.Length;
+            Point3d[] pointsA = new Point3d[count];
+            Point3d[] pointsB = new Point3d[count];
+            double[] distances = new double[count];
+            for (int i = 0; i < count; i++) {
+                pointsA[i] = pairs[i].PointA;
+                pointsB[i] = pairs[i].PointB;
+                distances[i] = pairs[i].Distance;
+            }
+            return (pointsA, pointsB, distances);
+        }
 
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
