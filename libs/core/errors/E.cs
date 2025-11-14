@@ -73,6 +73,30 @@ public static class E {
             [2602] = "No primitives detected in geometry",
             [2603] = "No pattern detected in geometry collection",
 
+            // Field Operations (2700-2749)
+            // Distance Field (2700-2709)
+            [2700] = "Field resolution must be positive integer",
+            [2701] = "Field bounds invalid or degenerate",
+            [2702] = "Distance field computation failed",
+            [2703] = "Inside/outside determination failed for signed distance",
+
+            // Gradient Field (2720-2729)
+            [2720] = "Gradient computation failed",
+            [2721] = "Invalid gradient field sampling parameters",
+            [2722] = "Zero gradient magnitude in critical region",
+
+            // Streamline Operations (2730-2739)
+            [2730] = "Streamline integration failed to converge",
+            [2731] = "Invalid seed points for streamline tracing",
+            [2732] = "Streamline divergence detected - unstable flow",
+            [2733] = "Maximum integration steps exceeded",
+
+            // Isosurface Operations (2740-2749)
+            [2740] = "Isosurface extraction failed",
+            [2741] = "Isovalue outside scalar field range",
+            [2742] = "Marching cubes algorithm failure",
+            [2743] = "Scalar field data invalid or insufficient",
+
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
             [3000] = "Geometry must be valid",
@@ -208,6 +232,30 @@ public static class E {
         public static readonly SystemError DecompositionFailed = Get(2601);
         public static readonly SystemError NoPrimitivesDetected = Get(2602);
         public static readonly SystemError NoPatternDetected = Get(2603);
+
+        // Field Operations (2700-2749)
+        // Distance Field (2700-2709)
+        public static readonly SystemError InvalidFieldResolution = Get(2700);
+        public static readonly SystemError InvalidFieldBounds = Get(2701);
+        public static readonly SystemError DistanceFieldComputationFailed = Get(2702);
+        public static readonly SystemError InsideOutsideTestFailed = Get(2703);
+
+        // Gradient Field (2720-2729)
+        public static readonly SystemError GradientComputationFailed = Get(2720);
+        public static readonly SystemError InvalidGradientSampling = Get(2721);
+        public static readonly SystemError ZeroGradientRegion = Get(2722);
+
+        // Streamline Operations (2730-2739)
+        public static readonly SystemError StreamlineIntegrationFailed = Get(2730);
+        public static readonly SystemError InvalidStreamlineSeeds = Get(2731);
+        public static readonly SystemError StreamlineDivergence = Get(2732);
+        public static readonly SystemError MaxStepsExceeded = Get(2733);
+
+        // Isosurface Operations (2740-2749)
+        public static readonly SystemError IsosurfaceExtractionFailed = Get(2740);
+        public static readonly SystemError InvalidIsovalue = Get(2741);
+        public static readonly SystemError MarchingCubesFailed = Get(2742);
+        public static readonly SystemError InvalidScalarField = Get(2743);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
