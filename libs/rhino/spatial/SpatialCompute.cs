@@ -450,6 +450,7 @@ internal static class SpatialCompute {
         double cx = c.X - p.X;
         double cy = c.Y - p.Y;
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
+        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
         double adjustedDet = orientation > 0.0 ? det : -det;
         return adjustedDet > context.AbsoluteTolerance;
     }
