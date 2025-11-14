@@ -235,12 +235,20 @@ internal static class FieldsCompute {
                 }
             }
 
-            Mesh mesh = new();
-            mesh.Vertices.AddVertices(vertices);
-            _ = mesh.Faces.AddFaces(faces);
-            _ = mesh.Normals.ComputeNormals();
-            _ = mesh.Compact();
-            meshes[isoIdx] = mesh;
+            // Validate: if no triangles/vertices, return error for this isovalue
+            return (vertices.Count == 0 || faces.Count == 0)
+                ? ResultFactory.Create<Mesh[]>(
+                    error: E.Geometry.InvalidIsovalue.WithContext($"No isosurface found for isovalue {isovalue}"),
+                )
+                : (() => {
+                    Mesh mesh = new();
+                    mesh.Vertices.AddVertices(vertices);
+                    _ = mesh.Faces.AddFaces(faces);
+                    _ = mesh.Normals.ComputeNormals();
+                    _ = mesh.Compact();
+                    meshes[isoIdx] = mesh;
+                    return (Result<Mesh[]>)null;
+                })();
         }
 
         return ResultFactory.Create(value: meshes);
