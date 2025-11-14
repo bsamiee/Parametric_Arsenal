@@ -125,8 +125,8 @@ internal static class FieldsCompute {
                         false => 0,  // Stop iteration
                         true => ((Func<int>)(() => {
                             current += delta;
+                            pathBuffer[stepCount] = current;
                             stepCount++;
-                            pathBuffer[stepCount - 1] = current;
                             return 1;
                         }))(),
                     };
