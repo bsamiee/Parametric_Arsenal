@@ -4,66 +4,66 @@ using Rhino;
 
 namespace Arsenal.Rhino.Morphology;
 
-/// <summary>Morphology operation configuration: constants, validation modes, operation mappings.</summary>
+/// <summary>Morphology operation configuration constants and dispatch tables.</summary>
 internal static class MorphologyConfig {
-    /// <summary>Minimum cage control points (cube=8 vertices).</summary>
+    /// <summary>Minimum cage control points for trilinear interpolation (cube=8).</summary>
     internal const int MinCageControlPoints = 8;
 
-    /// <summary>Maximum subdivision levels to prevent exponential growth.</summary>
+    /// <summary>Maximum subdivision levels to prevent exponential face growth.</summary>
     internal const int MaxSubdivisionLevels = 5;
 
     /// <summary>Maximum smoothing iterations to prevent infinite loops.</summary>
     internal const int MaxSmoothingIterations = 1000;
 
-    /// <summary>Sharp edge detection threshold (30°).</summary>
+    /// <summary>Feature edge detection threshold: 30° in radians.</summary>
     internal static readonly double FeatureAngleRadians = RhinoMath.ToRadians(30.0);
 
-    /// <summary>Minimum triangle angle for quality validation (5°).</summary>
+    /// <summary>Minimum triangle angle threshold for quality validation: 5° in radians.</summary>
     internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
 
-    /// <summary>Degenerate triangle threshold (max/min edge ratio).</summary>
+    /// <summary>Degenerate triangle detection: maximum aspect ratio (max/min edge).</summary>
     internal const double AspectRatioThreshold = 10.0;
 
-    /// <summary>Taubin λ parameter (positive smoothing).</summary>
+    /// <summary>Taubin smoothing: λ parameter for positive smoothing step.</summary>
     internal const double TaubinLambda = 0.6307;
 
-    /// <summary>Taubin μ parameter (negative unshrinking, must be &lt; -λ).</summary>
+    /// <summary>Taubin smoothing: μ parameter for negative unshrinking step (must be &lt; -λ).</summary>
     internal const double TaubinMu = -0.6732;
 
-    /// <summary>RMS convergence threshold multiplier (×tolerance).</summary>
+    /// <summary>RMS convergence threshold: multiplier × absolute tolerance.</summary>
     internal const double ConvergenceMultiplier = 100.0;
 
     /// <summary>Mean curvature flow timestep safety factor.</summary>
     internal const double CurvatureFlowTimestepFactor = 0.01;
 
-    /// <summary>Loop β-weight for valence-3 vertices (3/16).</summary>
+    /// <summary>Loop subdivision: β-weight for valence-3 vertices (3/16).</summary>
     internal const double LoopBetaValence3 = 0.1875;
 
-    /// <summary>Loop β-weight for valence-6 vertices (1/16).</summary>
+    /// <summary>Loop subdivision: β-weight for valence-6 vertices (1/16).</summary>
     internal const double LoopBetaValence6 = 0.0625;
 
-    /// <summary>Loop centering weight (5/8).</summary>
+    /// <summary>Loop subdivision: centering weight (5/8).</summary>
     internal const double LoopCenterWeight = 0.625;
 
-    /// <summary>Loop neighbor contribution base (3/8).</summary>
+    /// <summary>Loop subdivision: neighbor contribution base (3/8).</summary>
     internal const double LoopNeighborBase = 0.375;
 
-    /// <summary>Loop cosine multiplier for irregular valence (1/4).</summary>
+    /// <summary>Loop subdivision: cosine multiplier for irregular valence (1/4).</summary>
     internal const double LoopCosineMultiplier = 0.25;
 
-    /// <summary>Loop edge midpoint weight (3/8 per endpoint).</summary>
+    /// <summary>Loop subdivision: edge midpoint weight (3/8 per endpoint).</summary>
     internal const double LoopEdgeMidpointWeight = 0.375;
 
-    /// <summary>Loop edge opposite weight (1/8 per vertex).</summary>
+    /// <summary>Loop subdivision: edge opposite weight (1/8 per vertex).</summary>
     internal const double LoopEdgeOppositeWeight = 0.125;
 
-    /// <summary>Butterfly midpoint weight (1/2).</summary>
+    /// <summary>Butterfly subdivision: midpoint weight (1/2).</summary>
     internal const double ButterflyMidpointWeight = 0.5;
 
-    /// <summary>Butterfly opposite vertex weight (1/8 each).</summary>
+    /// <summary>Butterfly subdivision: opposite vertex weight (1/8 each).</summary>
     internal const double ButterflyOppositeWeight = 0.125;
 
-    /// <summary>Butterfly wing vertex weight (-1/16 each).</summary>
+    /// <summary>Butterfly subdivision: wing vertex weight (-1/16 each).</summary>
     internal const double ButterflyWingWeight = 0.0625;
 
     /// <summary>Uniform Laplacian weight (neighbor average).</summary>
@@ -78,7 +78,7 @@ internal static class MorphologyConfig {
     /// <summary>Mesh reduction minimum target face count.</summary>
     internal const int MinReductionFaceCount = 4;
 
-    /// <summary>Mesh reduction accuracy range [0.0, 1.0] where 0=fast, 1=accurate.</summary>
+    /// <summary>Mesh reduction: accuracy range [0.0=fast, 1.0=accurate].</summary>
     internal const double MinReductionAccuracy = 0.0;
     internal const double MaxReductionAccuracy = 1.0;
     internal const double DefaultReductionAccuracy = 0.5;
@@ -98,7 +98,7 @@ internal static class MorphologyConfig {
     /// <summary>Remesh edge collapse length threshold (target × factor).</summary>
     internal const double RemeshCollapseThresholdFactor = 0.75;
 
-    /// <summary>Remesh uniformity score weight for edge length deviation.</summary>
+    /// <summary>Remeshing: uniformity score weight for edge length deviation.</summary>
     internal const double RemeshUniformityWeight = 0.8;
 
     /// <summary>RBF Gaussian kernel width parameter.</summary>
@@ -110,13 +110,13 @@ internal static class MorphologyConfig {
     /// <summary>Cotangent weight clamping threshold for obtuse triangles.</summary>
     internal const double CotangentClampMin = 0.0;
 
-    /// <summary>Adaptive subdivision quality threshold: aspect ratio maximum.</summary>
+    /// <summary>Adaptive subdivision: maximum aspect ratio quality threshold.</summary>
     internal const double AdaptiveAspectRatioThreshold = 3.0;
 
-    /// <summary>Adaptive subdivision quality threshold: minimum angle (15°).</summary>
+    /// <summary>Adaptive subdivision: minimum angle threshold 15° in radians.</summary>
     internal static readonly double AdaptiveMinAngleThreshold = RhinoMath.ToRadians(15.0);
 
-    /// <summary>Operation validation mode dispatch by (operation ID, input type).</summary>
+    /// <summary>Validation mode dispatch: (operation ID, input type) → validation flags.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
             [(1, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.Topology,

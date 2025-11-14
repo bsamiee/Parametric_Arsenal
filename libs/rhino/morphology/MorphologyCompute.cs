@@ -9,9 +9,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Morphology;
 
-/// <summary>Morphology algorithm orchestration with convergence and quality tracking.</summary>
+/// <summary>Morphology algorithm implementations with convergence tracking.</summary>
 internal static class MorphologyCompute {
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
         GeometryBase _,
@@ -102,7 +102,7 @@ internal static class MorphologyCompute {
             : Point3d.Origin;
     }
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
@@ -135,7 +135,7 @@ internal static class MorphologyCompute {
                         : ResultFactory.Create(value: result);
                 }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideLoop(Mesh mesh) =>
         !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
             ? null
@@ -206,7 +206,7 @@ internal static class MorphologyCompute {
                 return subdivided;
             }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideButterfly(Mesh mesh) =>
         !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
             ? null
@@ -293,7 +293,7 @@ internal static class MorphologyCompute {
                 return subdivided;
             }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SmoothWithConvergence(
         Mesh mesh,
         int maxIterations,
@@ -354,7 +354,7 @@ internal static class MorphologyCompute {
                 }
             }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> OffsetMesh(
         Mesh mesh,
         double distance,
@@ -371,7 +371,7 @@ internal static class MorphologyCompute {
                         : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
                 }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> ReduceMesh(
         Mesh mesh,
         int targetFaceCount,
@@ -400,7 +400,7 @@ internal static class MorphologyCompute {
                             : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
                     }))();
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RemeshIsotropic(
         Mesh mesh,
         double targetEdgeLength,
@@ -459,7 +459,7 @@ internal static class MorphologyCompute {
                 }))();
     }
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
 
@@ -486,7 +486,7 @@ internal static class MorphologyCompute {
         return updated;
     }
 
-    [Pure]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         double[] aspectRatios = new double[mesh.Faces.Count];
         double[] minAngles = new double[mesh.Faces.Count];

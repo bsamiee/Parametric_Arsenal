@@ -15,11 +15,11 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Mesh morphology operations: cage deformation, subdivision, smoothing, evolution.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
-    /// <summary>Morphology result marker for polymorphic dispatch.</summary>
+    /// <summary>Marker interface for polymorphic morphology result dispatch.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for polymorphic result dispatch")]
     public interface IMorphologyResult;
 
-    /// <summary>Cage deformation result with displacement and volume tracking.</summary>
+    /// <summary>Cage deformation result with displacement and volume ratio metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
         GeometryBase Deformed,
@@ -34,7 +34,7 @@ public static class Morphology {
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
 
-    /// <summary>Subdivision result with quality metrics and face counts.</summary>
+    /// <summary>Subdivision result with edge lengths, aspect ratios, and triangle angle metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SubdivisionResult(
         Mesh Subdivided,
@@ -51,7 +51,7 @@ public static class Morphology {
             $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
 
-    /// <summary>Smoothing result with convergence tracking and quality metrics.</summary>
+    /// <summary>Smoothing result with convergence status and RMS displacement metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SmoothingResult(
         Mesh Smoothed,
@@ -66,7 +66,7 @@ public static class Morphology {
             $"Smoothing | Iterations={this.IterationsPerformed} | RMS={this.RMSDisplacement:E2} | Quality={this.QualityScore:F3} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Mesh offset result with distance metrics and degeneracy tracking.</summary>
+    /// <summary>Mesh offset result with actual distance and degeneracy detection.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record OffsetResult(
         Mesh Offset,
@@ -82,7 +82,7 @@ public static class Morphology {
             $"MeshOffset | Dist={this.ActualDistance:F3} | V: {this.OriginalVertexCount}→{this.OffsetVertexCount} | F: {this.OriginalFaceCount}→{this.OffsetFaceCount}{(this.HasDegeneracies ? " [degenerate]" : "")}");
     }
 
-    /// <summary>Mesh reduction result with quality metrics and reduction statistics.</summary>
+    /// <summary>Mesh reduction result with reduction ratio and quality score.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ReductionResult(
         Mesh Reduced,
@@ -99,7 +99,7 @@ public static class Morphology {
             $"MeshReduce | Faces: {this.OriginalFaceCount}→{this.ReducedFaceCount} ({this.ReductionRatio * 100.0:F1}%) | Quality={this.QualityScore:F3} | AspectRatio={this.MeanAspectRatio:F2}");
     }
 
-    /// <summary>Isotropic remeshing result with edge uniformity and convergence metrics.</summary>
+    /// <summary>Isotropic remeshing result with edge uniformity and convergence status.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record RemeshResult(
         Mesh Remeshed,
@@ -118,22 +118,23 @@ public static class Morphology {
     }
 
     /// <summary>Unified morphology operation entry with polymorphic dispatch via (operation ID, parameters tuple).</summary>
-    /// <remarks>Operation IDs: 1=CageDeform (cage,original[],deformed[]), 2=CatmullClark (levels), 3=Loop (levels), 4=Butterfly (levels), 10=Laplacian (iters,lockBoundary), 11=Taubin (iters,λ,μ), 20=MeanCurvature (timeStep,iters).</remarks>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,
         (byte Operation, object Parameters) spec,
         IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
-            ? UnifiedOperation.Apply(
+        !MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) || executor is null
+            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
+                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"))
+            : UnifiedOperation.Apply(
                 input: input,
                 operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
                 config: new OperationConfig<T, IMorphologyResult> {
                     Context = context,
                     ValidationMode = MorphologyConfig.ValidationModes.TryGetValue((spec.Operation, typeof(T)), out V mode) ? mode : V.Standard,
-                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{(MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName) ? opName ?? $"Op{spec.Operation}" : $"Op{spec.Operation}")}"),
+                    OperationName = string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Morphology.{(MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName) ? opName ?? $"Op{spec.Operation}" : $"Op{spec.Operation}")}"),
                     EnableDiagnostics = false,
-                })
-            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+                });
 }
