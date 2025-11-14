@@ -81,10 +81,7 @@ public static class Fields {
                 vectorField: vectorField,
                 grid: gridPoints,
                 resolution: spec.Resolution,
-                gridDelta: new Vector3d(
-                    (bounds.Max.X - bounds.Min.X) / (spec.Resolution - 1),
-                    (bounds.Max.Y - bounds.Min.Y) / (spec.Resolution - 1),
-                    (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
         };
 
     /// <summary>Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F, row-major grid order, zero derivatives at boundaries.</summary>
@@ -101,10 +98,7 @@ public static class Fields {
                 vectorField: vectorField,
                 grid: gridPoints,
                 resolution: spec.Resolution,
-                gridDelta: new Vector3d(
-                    (bounds.Max.X - bounds.Min.X) / (spec.Resolution - 1),
-                    (bounds.Max.Y - bounds.Min.Y) / (spec.Resolution - 1),
-                    (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
         };
 
     /// <summary>Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f, row-major grid order, zero second derivatives at boundaries.</summary>
@@ -121,10 +115,7 @@ public static class Fields {
                 scalarField: scalarField,
                 grid: gridPoints,
                 resolution: spec.Resolution,
-                gridDelta: new Vector3d(
-                    (bounds.Max.X - bounds.Min.X) / (spec.Resolution - 1),
-                    (bounds.Max.Y - bounds.Min.Y) / (spec.Resolution - 1),
-                    (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
         };
 
     /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A, Coulomb gauge approximation via x-axis line integral (limited to simple fields).</summary>
@@ -141,10 +132,7 @@ public static class Fields {
                 vectorField: magneticField,
                 grid: gridPoints,
                 resolution: spec.Resolution,
-                gridDelta: new Vector3d(
-                    (bounds.Max.X - bounds.Min.X) / (spec.Resolution - 1),
-                    (bounds.Max.Y - bounds.Min.Y) / (spec.Resolution - 1),
-                    (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
         };
 
     /// <summary>Interpolate scalar field at query point: (field, grid, query) → scalar value.</summary>

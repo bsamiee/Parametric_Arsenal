@@ -246,7 +246,7 @@ internal static class FieldsCompute {
         BoundingBox bounds,
         byte interpolationMethod) {
         return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearestScalar(query: query, scalarField: scalarField, grid: grid),
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, scalarField, grid),
             FieldsConfig.InterpolationTrilinear => InterpolateTrilinearScalar(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds),
             _ => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
         };
@@ -261,66 +261,39 @@ internal static class FieldsCompute {
         BoundingBox bounds,
         byte interpolationMethod) {
         return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearestVector(query: query, vectorField: vectorField, grid: grid),
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, vectorField, grid),
             FieldsConfig.InterpolationTrilinear => InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds),
             _ => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
         };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalar(Point3d query, double[] scalarField, Point3d[] grid) {
-        return grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? InterpolateNearestScalarRTree(query: query, scalarField: scalarField, grid: grid)
-            : InterpolateNearestScalarLinear(query: query, scalarField: scalarField, grid: grid);
+    private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
+        int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
+            ? FindNearestRTree(query, grid)
+            : FindNearestLinear(query, grid);
+        return nearestIdx >= 0
+            ? ResultFactory.Create(value: field[nearestIdx])
+            : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVector(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        return grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? InterpolateNearestVectorRTree(query: query, vectorField: vectorField, grid: grid)
-            : InterpolateNearestVectorLinear(query: query, vectorField: vectorField, grid: grid);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalarLinear(Point3d query, double[] scalarField, Point3d[] grid) {
+    private static int FindNearestLinear(Point3d query, Point3d[] grid) {
         double minDist = double.MaxValue;
         int nearestIdx = 0;
         for (int i = 0; i < grid.Length; i++) {
             double dist = query.DistanceTo(grid[i]);
             (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
         }
-        return ResultFactory.Create(value: scalarField[nearestIdx]);
+        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVectorLinear(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
-        for (int i = 0; i < grid.Length; i++) {
-            double dist = query.DistanceTo(grid[i]);
-            (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
-        }
-        return ResultFactory.Create(value: vectorField[nearestIdx]);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalarRTree(Point3d query, double[] scalarField, Point3d[] grid) {
+    private static int FindNearestRTree(Point3d query, Point3d[] grid) {
         using RTree tree = RTree.CreateFromPointArray(grid);
         int nearestIdx = -1;
         _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx >= 0
-            ? ResultFactory.Create(value: scalarField[nearestIdx])
-            : ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVectorRTree(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        using RTree tree = RTree.CreateFromPointArray(grid);
-        int nearestIdx = -1;
-        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx >= 0
-            ? ResultFactory.Create(value: vectorField[nearestIdx])
-            : ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
+        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -507,7 +480,7 @@ internal static class FieldsCompute {
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, RTree? tree, int resolution, BoundingBox bounds) =>
         tree is not null
             ? InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
-            : InterpolateNearestVector(query: query, vectorField: vectorField, grid: gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
+            : InterpolateNearest(query, vectorField, gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
