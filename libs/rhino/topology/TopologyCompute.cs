@@ -88,24 +88,54 @@ internal static class TopologyCompute {
                             2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
                             3 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
                             4 => ((Func<bool>)(() => {
-                                int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
-                                (int edgeA, int edgeB)[] nakedPairs = [.. (
-                                    from i in Enumerable.Range(0, nakedEdgeIndices.Length)
-                                    from j in Enumerable.Range(i + 1, nakedEdgeIndices.Length - i - 1)
-                                    let edgeI = copy.Edges[nakedEdgeIndices[i]]
-                                    let edgeJ = copy.Edges[nakedEdgeIndices[j]]
-                                    let distSS = edgeI.PointAtStart.DistanceTo(edgeJ.PointAtStart)
-                                    let distSE = edgeI.PointAtStart.DistanceTo(edgeJ.PointAtEnd)
-                                    let distES = edgeI.PointAtEnd.DistanceTo(edgeJ.PointAtStart)
-                                    let distEE = edgeI.PointAtEnd.DistanceTo(edgeJ.PointAtEnd)
-                                    let minDist = Math.Min(Math.Min(distSS, distSE), Math.Min(distES, distEE))
-                                    where minDist < threshold
-                                    select (nakedEdgeIndices[i], nakedEdgeIndices[j])),
-                                ];
-                                bool joinResult = nakedPairs.Length > 0 && nakedPairs.All(pair => copy.JoinEdges(edgeIndex0: pair.edgeA, edgeIndex1: pair.edgeB, joinTolerance: threshold, compact: false));
+                                bool joinedAny = false;
+                                int iteration = 0;
+                                while (iteration < TopologyConfig.MaxEdgesForNearMissAnalysis) {
+                                    int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
+                                    if (nakedEdgeIndices.Length == 0) {
+                                        break;
+                                    }
+                                    bool joinedThisPass = false;
+                                    for (int i = 0; i < nakedEdgeIndices.Length && !joinedThisPass; i++) {
+                                        int edgeIndexA = nakedEdgeIndices[i];
+                                        if (edgeIndexA >= copy.Edges.Count) {
+                                            continue;
+                                        }
+                                        BrepEdge edgeA = copy.Edges[edgeIndexA];
+                                        if (edgeA.Valence != EdgeAdjacency.Naked) {
+                                            continue;
+                                        }
+                                        for (int j = i + 1; j < nakedEdgeIndices.Length && !joinedThisPass; j++) {
+                                            int edgeIndexB = nakedEdgeIndices[j];
+                                            if (edgeIndexB >= copy.Edges.Count) {
+                                                continue;
+                                            }
+                                            BrepEdge edgeB = copy.Edges[edgeIndexB];
+                                            if (edgeB.Valence != EdgeAdjacency.Naked) {
+                                                continue;
+                                            }
+                                            double distSS = edgeA.PointAtStart.DistanceTo(edgeB.PointAtStart);
+                                            double distSE = edgeA.PointAtStart.DistanceTo(edgeB.PointAtEnd);
+                                            double distES = edgeA.PointAtEnd.DistanceTo(edgeB.PointAtStart);
+                                            double distEE = edgeA.PointAtEnd.DistanceTo(edgeB.PointAtEnd);
+                                            double minDist = Math.Min(Math.Min(distSS, distSE), Math.Min(distES, distEE));
+                                            if (minDist < threshold) {
+                                                if (copy.JoinEdges(edgeIndex0: edgeIndexA, edgeIndex1: edgeIndexB, joinTolerance: threshold, compact: false)) {
+                                                    joinedAny = true;
+                                                    joinedThisPass = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!joinedThisPass) {
+                                        break;
+                                    }
+                                    iteration++;
+                                }
                                 copy.Compact();
-                                return joinResult;
+                                return joinedAny;
                             }))(),
                             _ => ((Func<bool>)(() => {
                                 Brep[] components = copy.GetConnectedComponents() ?? [];
