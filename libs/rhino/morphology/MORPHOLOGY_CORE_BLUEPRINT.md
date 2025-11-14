@@ -44,18 +44,18 @@ internal static class MorphologyCore {
                     GeometryBase geometry = input is Mesh m ? m.DuplicateMesh() : input is Brep b ? b.DuplicateBrep() : null;
                     BoundingBox originalBounds = geometry?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
                     double originalVolume = originalBounds.Volume;
-                    
+
                     CageMorph morph = new(cage, originalPts, deformedPts);
                     bool success = geometry?.Transform(morph) ?? false;
-                    
+
                     BoundingBox deformedBounds = geometry?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
                     double deformedVolume = deformedBounds.Volume;
-                    
+
                     double[] displacements = [.. originalPts.Zip(deformedPts, (o, d) => o.DistanceTo(d)),];
                     double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
                     double meanDisp = displacements.Length > 0 ? displacements.Average() : 0.0;
                     double volumeRatio = originalVolume > RhinoMath.ZeroTolerance ? deformedVolume / originalVolume : 1.0;
-                    
+
                     return success && geometry is not null
                         ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                             value: [new Morphology.CageDeformResult(geometry, maxDisp, meanDisp, originalBounds, deformedBounds, volumeRatio),])
@@ -177,18 +177,18 @@ internal static class MorphologyCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
-        
+
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-            
+
             if (neighbors.Length is 0) {
                 updated[i] = positions[i];
                 continue;
             }
-            
+
             Point3d sum = Point3d.Origin;
             double weightSum = 0.0;
-            
+
             for (int j = 0; j < neighbors.Length; j++) {
                 int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
                 Point3d neighborPos = positions[meshVertIdx];
@@ -198,38 +198,38 @@ internal static class MorphologyCore {
                 sum += weight * neighborPos;
                 weightSum += weight;
             }
-            
+
             updated[i] = weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
         }
-        
+
         return updated;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep, IGeometryContext context) {
         Point3d[] updated = new Point3d[positions.Length];
-        
+
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-            
+
             if (neighbors.Length is 0) {
                 updated[i] = positions[i];
                 continue;
             }
-            
+
             Point3d laplacian = Point3d.Origin;
             for (int j = 0; j < neighbors.Length; j++) {
                 int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
                 laplacian += positions[meshVertIdx] - positions[i];
             }
             laplacian /= neighbors.Length;
-            
+
             Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
             double curvature = Vector3d.DotProduct(laplacian - Point3d.Origin, normal);
-            
+
             updated[i] = positions[i] + timeStep * curvature * normal;
         }
-        
+
         return updated;
     }
 
@@ -241,7 +241,7 @@ internal static class MorphologyCore {
         double[] edgeLengths = [.. Enumerable.Range(0, subdivided.TopologyEdges.Count)
             .Select(i => subdivided.TopologyEdges.EdgeLine(i).Length),
         ];
-        
+
         double[] aspectRatios = [.. Enumerable.Range(0, subdivided.Faces.Count)
             .Select(i => {
                 Point3d a = subdivided.Vertices[subdivided.Faces[i].A];
@@ -255,7 +255,7 @@ internal static class MorphologyCore {
                 return minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
             }),
         ];
-        
+
         double[] triangleAngles = [.. Enumerable.Range(0, subdivided.Faces.Count)
             .SelectMany(i => {
                 Point3d a = subdivided.Vertices[subdivided.Faces[i].A];
@@ -268,7 +268,7 @@ internal static class MorphologyCore {
                 };
             }),
         ];
-        
+
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [
                 new Morphology.SubdivisionResult(
@@ -292,12 +292,12 @@ internal static class MorphologyCore {
         double[] displacements = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
             .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),
         ];
-        
+
         double rms = displacements.Length > 0 ? Math.Sqrt(displacements.Select(d => d * d).Average()) : 0.0;
         double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
         double quality = MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0;
         bool converged = rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
-        
+
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [
                 new Morphology.SmoothingResult(smoothed, iterations, rms, maxDisp, quality, converged),

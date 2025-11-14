@@ -59,7 +59,7 @@ internal static class MorphologyCompute {
                 Mesh subdivided = new();
                 Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
                 int[] valences = [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => mesh.TopologyVertices.ConnectedTopologyVertices(i).Length),];
-                
+
                 Point3d[] newVerts = new Point3d[originalVerts.Length];
                 for (int i = 0; i < originalVerts.Length; i++) {
                     int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
@@ -71,7 +71,7 @@ internal static class MorphologyCompute {
                             : valence > 2
                                 ? (1.0 / valence) * (0.625 - Math.Pow(0.375 + 0.25 * Math.Cos(RhinoMath.TwoPI / valence), 2.0))
                                 : 0.0;
-                    
+
                     Point3d sum = Point3d.Origin;
                     for (int j = 0; j < neighbors.Length; j++) {
                         int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
@@ -79,23 +79,23 @@ internal static class MorphologyCompute {
                     }
                     newVerts[i] = (1.0 - valence * beta) * originalVerts[i] + beta * sum;
                 }
-                
+
                 for (int i = 0; i < newVerts.Length; i++) {
                     _ = subdivided.Vertices.Add(newVerts[i]);
                 }
-                
+
                 Dictionary<(int, int), int> edgeMidpoints = [];
                 for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
                     int a = mesh.Faces[faceIdx].A;
                     int b = mesh.Faces[faceIdx].B;
                     int c = mesh.Faces[faceIdx].C;
-                    
+
                     (int, int)[] edges = [
                         (Math.Min(a, b), Math.Max(a, b)),
                         (Math.Min(b, c), Math.Max(b, c)),
                         (Math.Min(c, a), Math.Max(c, a)),
                     ];
-                    
+
                     int[] midIndices = new int[3];
                     for (int e = 0; e < 3; e++) {
                         if (!edgeMidpoints.TryGetValue(edges[e], out int midIdx)) {
@@ -106,13 +106,13 @@ internal static class MorphologyCompute {
                         }
                         midIndices[e] = midIdx;
                     }
-                    
+
                     _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
                     _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
                     _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
                     _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
                 }
-                
+
                 subdivided.Normals.ComputeNormals();
                 subdivided.Compact();
                 return subdivided;
@@ -125,34 +125,34 @@ internal static class MorphologyCompute {
             : ((Func<Mesh>)(() => {
                 Mesh subdivided = new();
                 Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
-                
+
                 for (int i = 0; i < originalVerts.Length; i++) {
                     _ = subdivided.Vertices.Add(originalVerts[i]);
                 }
-                
+
                 Dictionary<(int, int), int> edgeMidpoints = [];
                 for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
                     int a = mesh.Faces[faceIdx].A;
                     int b = mesh.Faces[faceIdx].B;
                     int c = mesh.Faces[faceIdx].C;
-                    
+
                     (int, int)[] edges = [
                         (Math.Min(a, b), Math.Max(a, b)),
                         (Math.Min(b, c), Math.Max(b, c)),
                         (Math.Min(c, a), Math.Max(c, a)),
                     ];
-                    
+
                     int[] midIndices = new int[3];
                     for (int e = 0; e < 3; e++) {
                         if (!edgeMidpoints.TryGetValue(edges[e], out int midIdx)) {
                             int v1 = edges[e].Item1;
                             int v2 = edges[e].Item2;
                             Point3d mid = 0.5 * (originalVerts[v1] + originalVerts[v2]);
-                            
+
                             int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
                             int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
                             bool hasRegularStencil = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4;
-                            
+
                             (int opposite1, int opposite2) = hasRegularStencil
                                 ? ((Func<(int, int)>)(() => {
                                     int opp1 = -1;
@@ -168,7 +168,7 @@ internal static class MorphologyCompute {
                                     return (opp1, opp2);
                                 }))()
                                 : (-1, -1);
-                            
+
                             mid = opposite1 >= 0 && opposite2 >= 0
                                 ? ((Func<Point3d>)(() => {
                                     Point3d adjusted = mid + 0.125 * (originalVerts[opposite1] + originalVerts[opposite2]);
@@ -185,19 +185,19 @@ internal static class MorphologyCompute {
                                     return adjusted;
                                 }))()
                                 : mid;
-                            
+
                             midIdx = subdivided.Vertices.Add(mid);
                             edgeMidpoints[edges[e]] = midIdx;
                         }
                         midIndices[e] = midIdx;
                     }
-                    
+
                     _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
                     _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
                     _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
                     _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
                 }
-                
+
                 subdivided.Normals.ComputeNormals();
                 subdivided.Compact();
                 return subdivided;
@@ -216,43 +216,43 @@ internal static class MorphologyCompute {
                 Mesh smoothed = mesh.DuplicateMesh();
                 Point3d[] positions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
                 Point3d[] prevPositions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
-                
+
                 try {
                     for (int i = 0; i < smoothed.Vertices.Count; i++) {
                         positions[i] = smoothed.Vertices[i];
                         prevPositions[i] = positions[i];
                     }
-                    
+
                     int iterPerformed = 0;
                     bool converged = false;
                     double threshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
-                    
+
                     for (int iter = 0; iter < maxIterations && !converged; iter++) {
                         Point3d[] updated = updateFunc(smoothed, positions, context);
-                        
+
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
                             bool isBoundary = lockBoundary && mesh.TopologyVertices.ConnectedFaces(i).Length < 2;
                             positions[i] = isBoundary ? positions[i] : updated[i];
                             smoothed.Vertices.SetVertex(i, positions[i]);
                         }
-                        
+
                         smoothed.Normals.ComputeNormals();
                         iterPerformed++;
-                        
+
                         double rmsDisp = iter > 0
                             ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count)
                                 .Select(i => positions[i].DistanceTo(prevPositions[i]))
                                 .Select(d => d * d)
                                 .Average())
                             : double.MaxValue;
-                        
+
                         converged = rmsDisp < threshold;
-                        
+
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
                             prevPositions[i] = positions[i];
                         }
                     }
-                    
+
                     smoothed.Compact();
                     return converged || iterPerformed == maxIterations
                         ? ResultFactory.Create(value: smoothed)
@@ -267,34 +267,34 @@ internal static class MorphologyCompute {
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         double[] aspectRatios = new double[mesh.Faces.Count];
         double[] minAngles = new double[mesh.Faces.Count];
-        
+
         for (int i = 0; i < mesh.Faces.Count; i++) {
             Point3d a = mesh.Vertices[mesh.Faces[i].A];
             Point3d b = mesh.Vertices[mesh.Faces[i].B];
             Point3d c = mesh.Vertices[mesh.Faces[i].C];
-            
+
             double ab = a.DistanceTo(b);
             double bc = b.DistanceTo(c);
             double ca = c.DistanceTo(a);
-            
+
             double maxEdge = Math.Max(Math.Max(ab, bc), ca);
             double minEdge = Math.Min(Math.Min(ab, bc), ca);
             aspectRatios[i] = minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
-            
+
             Vector3d vAB = b - a;
             Vector3d vCA = a - c;
             Vector3d vBC = c - b;
-            
+
             double angleA = Vector3d.VectorAngle(vAB, -vCA);
             double angleB = Vector3d.VectorAngle(vBC, -vAB);
             double angleC = Vector3d.VectorAngle(vCA, -vBC);
-            
+
             minAngles[i] = Math.Min(Math.Min(angleA, angleB), angleC);
         }
-        
+
         double maxAspect = aspectRatios.Max();
         double minAngle = minAngles.Min();
-        
+
         return maxAspect > MorphologyConfig.AspectRatioThreshold
             ? ResultFactory.Create<Mesh>(error: E.Morphology.MeshQualityDegraded.WithContext($"MaxAspect: {maxAspect:F2}"))
             : minAngle < MorphologyConfig.MinAngleRadiansThreshold
