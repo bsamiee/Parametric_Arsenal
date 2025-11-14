@@ -222,14 +222,31 @@ internal static class FieldsConfig {
         table[94] = [0, 5, 9, 0, 6, 5, 0, 3, 6, 11, 6, 3, 8, 4, 7,];
         table[95] = [6, 5, 9, 6, 9, 11, 4, 7, 9, 7, 11, 9,];
 
-        // Cases 96-255 (remaining cases - pattern repeats with symmetry)
+        // Cases 96-255 (remaining cases - use complement symmetry)
         for (int i = 96; i < 256; i++) {
-            table[i] = table[i % 96].Length > 0 ? [.. table[i % 96]] : [];
+            int complement = 255 - i;
+            int[] baseCase = table[complement];
+            table[i] = baseCase.Length > 0 ? InvertTriangles(baseCase) : [];
         }
 
         return table;
     }
 
+    /// <summary>
+    /// Inverts the triangle winding for a marching cubes case.
+    /// Each triangle is represented by 3 consecutive edge indices.
+    /// </summary>
+    private static int[] InvertTriangles(int[] edges) {
+        int length = edges.Length;
+        int[] inverted = new int[length];
+        for (int i = 0; i < length; i += 3) {
+            // Reverse the order of each triangle
+            inverted[i] = edges[i + 2];
+            inverted[i + 1] = edges[i + 1];
+            inverted[i + 2] = edges[i];
+        }
+        return inverted;
+    }
     // ============================================================================
     // DISTANCE FIELD PARAMETERS (using RhinoMath for tolerance-based computations)
     // ============================================================================
