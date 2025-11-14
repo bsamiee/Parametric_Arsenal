@@ -73,6 +73,12 @@ public static class E {
             [2602] = "No primitives detected in geometry",
             [2603] = "No pattern detected in geometry collection",
 
+            // Field Operations (2700-2703)
+            [2700] = "Field bounds invalid or degenerate",
+            [2701] = "Invalid seed points for streamline tracing",
+            [2702] = "Isovalue outside scalar field range",
+            [2703] = "Scalar field data invalid or insufficient",
+
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
             [3000] = "Geometry must be valid",
@@ -208,6 +214,12 @@ public static class E {
         public static readonly SystemError DecompositionFailed = Get(2601);
         public static readonly SystemError NoPrimitivesDetected = Get(2602);
         public static readonly SystemError NoPatternDetected = Get(2603);
+
+        // Field Operations (2700-2703)
+        public static readonly SystemError InvalidFieldBounds = Get(2700);
+        public static readonly SystemError InvalidStreamlineSeeds = Get(2701);
+        public static readonly SystemError InvalidIsovalue = Get(2702);
+        public static readonly SystemError InvalidScalarField = Get(2703);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
