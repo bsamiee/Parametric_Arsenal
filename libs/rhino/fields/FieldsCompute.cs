@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
@@ -12,10 +11,7 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Dense fields algorithms: gradient, streamline, isosurface.</summary>
 [Pure]
 internal static class FieldsCompute {
-    // ============================================================================
     // GRADIENT FIELD COMPUTATION (central difference approximation)
-    // ============================================================================
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
         double[] distances,
@@ -75,10 +71,7 @@ internal static class FieldsCompute {
         }
     }
 
-    // ============================================================================
     // STREAMLINE INTEGRATION (RK4 with vector field interpolation)
-    // ============================================================================
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Curve[]> IntegrateStreamlines(
         Vector3d[] vectorField,
@@ -182,10 +175,7 @@ internal static class FieldsCompute {
             }))();
     }
 
-    // ============================================================================
     // ISOSURFACE EXTRACTION (marching cubes with 256-case lookup)
-    // ============================================================================
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,
@@ -205,14 +195,14 @@ internal static class FieldsCompute {
                     for (int k = 0; k < resolution - 1; k++) {
                         // Get 8 corner indices for this cube
                         int[] cornerIndices = [
-                            (i * resolution * resolution) + (j * resolution) + k,  // 0
-                            ((i + 1) * resolution * resolution) + (j * resolution) + k,  // 1
-                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + k,  // 2
-                            (i * resolution * resolution) + ((j + 1) * resolution) + k,  // 3
-                            (i * resolution * resolution) + (j * resolution) + (k + 1),  // 4
-                            ((i + 1) * resolution * resolution) + (j * resolution) + (k + 1),  // 5
-                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + (k + 1),  // 6
-                            (i * resolution * resolution) + ((j + 1) * resolution) + (k + 1),  // 7
+                            (i * resolution * resolution) + (j * resolution) + k,                       // 0
+                            ((i + 1) * resolution * resolution) + (j * resolution) + k,                 // 1
+                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + k,           // 2
+                            (i * resolution * resolution) + ((j + 1) * resolution) + k,                 // 3
+                            (i * resolution * resolution) + (j * resolution) + (k + 1),                 // 4
+                            ((i + 1) * resolution * resolution) + (j * resolution) + (k + 1),           // 5
+                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + (k + 1),     // 6
+                            (i * resolution * resolution) + ((j + 1) * resolution) + (k + 1),           // 7
                         ];
 
                         // Determine cube configuration (8 bits for 8 corners)

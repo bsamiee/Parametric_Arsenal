@@ -27,7 +27,7 @@ public static class Fields {
         public readonly BoundingBox? Bounds = bounds;
         /// <summary>Integration/sampling step size.</summary>
         public readonly double StepSize =
-            stepSize.HasValue && stepSize.Value >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
+            stepSize >= FieldsConfig.MinStepSize && stepSize.Value <= FieldsConfig.MaxStepSize
                 ? stepSize.Value
                 : FieldsConfig.DefaultStepSize;
     }

@@ -13,9 +13,7 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Fields dispatch registry.</summary>
 [Pure]
 internal static class FieldsCore {
-    // ============================================================================
     // OPERATION REGISTRY (byte + Type → execute function + integration method)
-    // ============================================================================
 
     /// <summary>Operation-type dispatch table: (operation, geometry type) → (execute function, integration method).</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)> OperationRegistry =
@@ -28,9 +26,7 @@ internal static class FieldsCore {
             static entry => (entry.Operation, entry.GeometryType),
             static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.IntegrationMethod));
 
-    // ============================================================================
     // DISTANCE FIELD EXECUTION (dispatched by geometry type)
-    // ============================================================================
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(

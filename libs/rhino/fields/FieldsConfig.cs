@@ -9,9 +9,7 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Configuration constants, byte operation codes, and dispatch tables for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    // ============================================================================
-    // OPERATION TYPE IDENTIFIERS (NO ENUMS - byte constants only)
-    // ============================================================================
+    // OPERATION TYPE IDENTIFIERS
 
     /// <summary>Distance field operation identifier.</summary>
     internal const byte OperationDistance = 0;
@@ -22,9 +20,7 @@ internal static class FieldsConfig {
     /// <summary>Isosurface extraction operation identifier.</summary>
     internal const byte OperationIsosurface = 3;
 
-    // ============================================================================
-    // INTEGRATION METHOD IDENTIFIERS (NO ENUMS - byte constants only)
-    // ============================================================================
+    // INTEGRATION METHOD IDENTIFIERS
 
     /// <summary>Euler forward integration method.</summary>
     internal const byte IntegrationEuler = 0;
@@ -35,9 +31,7 @@ internal static class FieldsConfig {
     /// <summary>Adaptive fourth-order Runge-Kutta with error control.</summary>
     internal const byte IntegrationAdaptiveRK4 = 3;
 
-    // ============================================================================
-    // GRID RESOLUTION CONSTANTS (derived from analysis of typical use cases)
-    // ============================================================================
+    // GRID RESOLUTION CONSTANTS
 
     /// <summary>Default grid resolution (32³ = 32,768 samples).</summary>
     internal const int DefaultResolution = 32;
@@ -46,9 +40,7 @@ internal static class FieldsConfig {
     /// <summary>Maximum grid resolution (256³ = 16,777,216 samples).</summary>
     internal const int MaxResolution = 256;
 
-    // ============================================================================
-    // INTEGRATION STEP PARAMETERS (using RhinoMath constants)
-    // ============================================================================
+    // INTEGRATION STEP PARAMETERS
 
     /// <summary>Default integration step size (1% of typical geometry scale).</summary>
     internal const double DefaultStepSize = 0.01;
@@ -66,25 +58,17 @@ internal static class FieldsConfig {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double GradientFiniteDifferenceStep = RhinoMath.SqrtEpsilon;
 
-    // ============================================================================
-    // RK4 INTEGRATION COEFFICIENTS (exact fractions for numerical accuracy)
-    // ============================================================================
+    // RK4 INTEGRATION COEFFICIENTS
 
     /// <summary>RK4 final stage weights: [k1/6, k2/3, k3/3, k4/6].</summary>
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     /// <summary>RK4 intermediate stage half-step multipliers: [0.5, 0.5, 1.0].</summary>
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
 
-    // ============================================================================
     // SPATIAL INDEXING THRESHOLDS (RTree vs linear search tradeoffs)
-    // ============================================================================
 
     /// <summary>Grid size threshold for RTree usage in streamline integration (RTree overhead justified above this size).</summary>
     internal const int StreamlineRTreeThreshold = 1000;
-
-    // ============================================================================
-    // BUFFER SIZE DISPATCH TABLE (operation + geometry type → buffer size)
-    // ============================================================================
 
     /// <summary>ArrayPool buffer sizes for distance field operations by geometry type.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), int> BufferSizes =
@@ -99,10 +83,6 @@ internal static class FieldsConfig {
             [(OperationIsosurface, typeof(void))] = 16384,
         }.ToFrozenDictionary();
 
-    // ============================================================================
-    // VALIDATION MODE DISPATCH TABLE (operation + geometry type → validation flags)
-    // ============================================================================
-
     /// <summary>Validation mode dispatch for operation-type pairs.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
@@ -116,15 +96,22 @@ internal static class FieldsConfig {
             [(OperationGradient, typeof(Surface))] = V.Standard | V.BoundingBox,
         }.ToFrozenDictionary();
 
-    // ============================================================================
     // MARCHING CUBES LOOKUP TABLE (256 cube configurations → triangle indices)
-    // ============================================================================
 
     /// <summary>Marching cubes edge vertex pairs: edge index → (vertex1, vertex2).</summary>
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
-        (0, 1), (1, 2), (2, 3), (3, 0),  // Bottom face edges 0-3
-        (4, 5), (5, 6), (6, 7), (7, 4),  // Top face edges 4-7
-        (0, 4), (1, 5), (2, 6), (3, 7),  // Vertical edges 8-11
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),  // Bottom face edges 0-3
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),  // Top face edges 4-7
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),  // Vertical edges 8-11
     ];
 
     /// <summary>Marching cubes triangle configuration table (simplified - 256 cases compressed).</summary>
@@ -254,9 +241,7 @@ internal static class FieldsConfig {
         }
         return inverted;
     }
-    // ============================================================================
-    // DISTANCE FIELD PARAMETERS (using RhinoMath for tolerance-based computations)
-    // ============================================================================
+    // DISTANCE FIELD PARAMETERS
 
     /// <summary>RTree threshold for switching from linear to spatial search.</summary>
     internal const int DistanceFieldRTreeThreshold = 100;
