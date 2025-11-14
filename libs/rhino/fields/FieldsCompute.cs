@@ -26,6 +26,7 @@ internal static class FieldsCompute {
 
         try {
             double h = FieldsConfig.GradientFiniteDifferenceStep;
+            double twoH = 2.0 * h;
 
             // Central difference: ∇f = [(f(x+h) - f(x-h))/(2h), (f(y+h) - f(y-h))/(2h), (f(z+h) - f(z-h))/(2h)]
             for (int i = 0; i < resolution; i++) {
@@ -34,7 +35,7 @@ internal static class FieldsCompute {
                         int idx = (i * resolution * resolution) + (j * resolution) + k;
 
                         double dfdx = (i < resolution - 1 && i > 0)
-                            ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / (2.0 * h)
+                            ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoH
                             : (i == 0 && resolution > 1)
                                 ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / h
                                 : (i == resolution - 1 && resolution > 1)
@@ -42,7 +43,7 @@ internal static class FieldsCompute {
                                     : 0.0;
 
                         double dfdy = (j < resolution - 1 && j > 0)
-                            ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / (2.0 * h)
+                            ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoH
                             : (j == 0 && resolution > 1)
                                 ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / h
                                 : (j == resolution - 1 && resolution > 1)
@@ -50,7 +51,7 @@ internal static class FieldsCompute {
                                     : 0.0;
 
                         double dfdz = (k < resolution - 1 && k > 0)
-                            ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / (2.0 * h)
+                            ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoH
                             : (k == 0 && resolution > 1)
                                 ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / h
                                 : (k == resolution - 1 && resolution > 1)

@@ -13,27 +13,13 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Fields dispatch registry and spatial acceleration.</summary>
 [Pure]
 internal static class FieldsCore {
-    /// <summary>3D grid sampling configuration.</summary>
+    /// <summary>3D grid sampling configuration (reserved for future grid-based optimizations).</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     internal readonly record struct SampleGrid(
         Point3d Origin,
         Vector3d Delta,
         int Resolution,
-        int TotalSamples) {
-        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Point3d GetPoint(int i, int j, int k) =>
-            new(
-                this.Origin.X + (i * this.Delta.X),
-                this.Origin.Y + (j * this.Delta.Y),
-                this.Origin.Z + (k * this.Delta.Z));
-
-        internal static SampleGrid Create(BoundingBox bounds, int resolution) =>
-            new(
-                Origin: bounds.Min,
-                Delta: (bounds.Max - bounds.Min) / (resolution - 1),
-                Resolution: resolution,
-                TotalSamples: resolution * resolution * resolution);
-    }
+        int TotalSamples);
 
     // ============================================================================
     // RTREE FACTORY FUNCTIONS (inline RTree construction - NO helper methods)
