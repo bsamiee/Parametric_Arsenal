@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
