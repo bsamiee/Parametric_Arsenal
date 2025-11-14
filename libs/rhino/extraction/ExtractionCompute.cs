@@ -428,8 +428,9 @@ internal static class ExtractionCompute {
         }
 
         double uLen = u.Length;
-        if (uLen <= context.AbsoluteTolerance)
+        if (uLen <= context.AbsoluteTolerance) {
             return (Vector3d.Zero, Vector3d.Zero, false);
+        }
 
         Vector3d uDir = u / uLen;
         for (int i = 0; i < candidates.Length; i++) {

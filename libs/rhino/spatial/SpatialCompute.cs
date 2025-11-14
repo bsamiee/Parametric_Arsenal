@@ -64,6 +64,18 @@ internal static class SpatialCompute {
         Random rng = new(SpatialConfig.KMeansSeed);
         double[] distSq = ArrayPool<double>.Shared.Rent(pts.Length);
 
+        Point3d SelectWeighted(double sumWeights) {
+            double target = rng.NextDouble() * sumWeights;
+            double cumulative = 0.0;
+            for (int j = 0; j < pts.Length; j++) {
+                cumulative += distSq[j];
+                if (cumulative >= target) {
+                    return pts[j];
+                }
+            }
+            return pts[^1];
+        }
+
         try {
             // K-means++ initialization with squared distances
             centroids[0] = pts[rng.Next(pts.Length)];
@@ -84,17 +96,7 @@ internal static class SpatialCompute {
 
                 centroids[i] = sum <= tol || sum <= 0.0
                     ? pts[rng.Next(pts.Length)]
-                    : ((Func<Point3d>)(() => {
-                        double target = rng.NextDouble() * sum;
-                        double cumulative = 0.0;
-                        for (int j = 0; j < pts.Length; j++) {
-                            cumulative += distSq[j];
-                            if (cumulative >= target) {
-                                return pts[j];
-                            }
-                        }
-                        return pts[^1];
-                    }))();
+                    : SelectWeighted(sum);
             }
 
             // Lloyd's algorithm with hot-path optimization
