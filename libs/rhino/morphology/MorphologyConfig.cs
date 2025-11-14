@@ -6,70 +6,70 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology operation configuration: constants, validation modes, operation mappings.</summary>
 internal static class MorphologyConfig {
-    /// <summary>Minimum control points required for cage deformation (cube vertices).</summary>
+    /// <summary>Minimum cage control points (cube=8 vertices).</summary>
     internal const int MinCageControlPoints = 8;
 
-    /// <summary>Maximum subdivision levels to prevent exponential face explosion.</summary>
+    /// <summary>Maximum subdivision levels to prevent exponential growth.</summary>
     internal const int MaxSubdivisionLevels = 5;
 
-    /// <summary>Maximum iterations for iterative smoothing algorithms to prevent infinite loops.</summary>
+    /// <summary>Maximum smoothing iterations to prevent infinite loops.</summary>
     internal const int MaxSmoothingIterations = 1000;
 
-    /// <summary>Feature edge angle threshold in radians (30 degrees) for sharp edge detection.</summary>
+    /// <summary>Sharp edge detection threshold (30°).</summary>
     internal static readonly double FeatureAngleRadians = RhinoMath.ToRadians(30.0);
 
-    /// <summary>Minimum acceptable triangle angle in radians (5 degrees) for quality validation.</summary>
+    /// <summary>Minimum triangle angle for quality validation (5°).</summary>
     internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
 
-    /// <summary>Aspect ratio threshold (max_edge / min_edge) indicating degenerate triangles.</summary>
+    /// <summary>Degenerate triangle threshold (max/min edge ratio).</summary>
     internal const double AspectRatioThreshold = 10.0;
 
-    /// <summary>Taubin smoothing lambda parameter (positive smoothing weight).</summary>
+    /// <summary>Taubin λ parameter (positive smoothing).</summary>
     internal const double TaubinLambda = 0.6307;
 
-    /// <summary>Taubin smoothing mu parameter (negative unshrinking weight, must be &lt; -lambda).</summary>
+    /// <summary>Taubin μ parameter (negative unshrinking, must be &lt; -λ).</summary>
     internal const double TaubinMu = -0.6732;
 
-    /// <summary>Convergence multiplier for RMS displacement threshold (context.AbsoluteTolerance * multiplier).</summary>
+    /// <summary>RMS convergence threshold multiplier (×tolerance).</summary>
     internal const double ConvergenceMultiplier = 100.0;
 
-    /// <summary>Mean curvature flow timestep safety factor relative to minimum edge length.</summary>
+    /// <summary>Mean curvature flow timestep safety factor.</summary>
     internal const double CurvatureFlowTimestepFactor = 0.01;
 
-    /// <summary>Loop subdivision β-weight for 3-valence vertices (3/16).</summary>
+    /// <summary>Loop β-weight for valence-3 vertices (3/16).</summary>
     internal const double LoopBetaValence3 = 0.1875;
 
-    /// <summary>Loop subdivision β-weight for 6-valence vertices (1/16) - regular case.</summary>
+    /// <summary>Loop β-weight for valence-6 vertices (1/16).</summary>
     internal const double LoopBetaValence6 = 0.0625;
 
-    /// <summary>Loop subdivision centering weight coefficient (5/8).</summary>
+    /// <summary>Loop centering weight (5/8).</summary>
     internal const double LoopCenterWeight = 0.625;
 
-    /// <summary>Loop subdivision neighbor contribution base (3/8).</summary>
+    /// <summary>Loop neighbor contribution base (3/8).</summary>
     internal const double LoopNeighborBase = 0.375;
 
-    /// <summary>Loop subdivision cosine multiplier for irregular valence (1/4).</summary>
+    /// <summary>Loop cosine multiplier for irregular valence (1/4).</summary>
     internal const double LoopCosineMultiplier = 0.25;
 
-    /// <summary>Loop edge midpoint weight for endpoints (3/8 each).</summary>
+    /// <summary>Loop edge midpoint weight (3/8 per endpoint).</summary>
     internal const double LoopEdgeMidpointWeight = 0.375;
 
-    /// <summary>Loop edge midpoint weight for opposite vertices (1/8 each).</summary>
+    /// <summary>Loop edge opposite weight (1/8 per vertex).</summary>
     internal const double LoopEdgeOppositeWeight = 0.125;
 
-    /// <summary>Butterfly subdivision simple midpoint weight (1/2).</summary>
+    /// <summary>Butterfly midpoint weight (1/2).</summary>
     internal const double ButterflyMidpointWeight = 0.5;
 
-    /// <summary>Butterfly subdivision opposite vertex positive weight (1/8 each).</summary>
+    /// <summary>Butterfly opposite vertex weight (1/8 each).</summary>
     internal const double ButterflyOppositeWeight = 0.125;
 
-    /// <summary>Butterfly subdivision wing vertex negative weight (-1/16 each).</summary>
+    /// <summary>Butterfly wing vertex weight (-1/16 each).</summary>
     internal const double ButterflyWingWeight = 0.0625;
 
-    /// <summary>Uniform Laplacian weight (simple average of neighbors).</summary>
+    /// <summary>Uniform Laplacian weight (neighbor average).</summary>
     internal const double UniformLaplacianWeight = 1.0;
 
-    /// <summary>Validation mode dispatch: maps (operation ID, input type) to validation flags.</summary>
+    /// <summary>Operation validation mode dispatch by (operation ID, input type).</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
             [(1, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.Topology,
@@ -82,7 +82,7 @@ internal static class MorphologyConfig {
             [(20, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
-    /// <summary>Operation name mapping for diagnostics and error messages.</summary>
+    /// <summary>Operation names for diagnostics.</summary>
     internal static readonly FrozenDictionary<byte, string> OperationNames =
         new Dictionary<byte, string> {
             [1] = "CageDeform",

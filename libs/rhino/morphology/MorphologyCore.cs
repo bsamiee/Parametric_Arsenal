@@ -11,7 +11,7 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology operation dispatch and execution core.</summary>
 internal static class MorphologyCore {
-    /// <summary>Primary operation dispatch table mapping (operation ID, input type) to executor function.</summary>
+    /// <summary>Operation dispatch table: (operation ID, type) → executor function.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), Func<object, object, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> OperationDispatch =
         new Dictionary<(byte, Type), Func<object, object, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> {
             [(MorphologyConfig.OpCageDeform, typeof(Mesh))] = ExecuteCageDeform,
@@ -174,7 +174,7 @@ internal static class MorphologyCore {
                         .Bind(evolved => ComputeSmoothingMetrics(mesh, evolved, iters, context));
                 }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
 
@@ -201,7 +201,7 @@ internal static class MorphologyCore {
         return updated;
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep, IGeometryContext _) {
         Point3d[] updated = new Point3d[positions.Length];
 
@@ -227,7 +227,7 @@ internal static class MorphologyCore {
         return updated;
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSubdivisionMetrics(
         Mesh original,
         Mesh subdivided,
@@ -277,7 +277,7 @@ internal static class MorphologyCore {
             ]);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSmoothingMetrics(
         Mesh original,
         Mesh smoothed,

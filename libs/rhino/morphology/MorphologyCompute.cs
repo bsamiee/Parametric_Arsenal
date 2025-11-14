@@ -142,8 +142,6 @@ internal static class MorphologyCompute {
             : ((Func<Mesh>)(() => {
                 Mesh subdivided = new();
                 Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
-                int[] valences = [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => mesh.TopologyVertices.ConnectedTopologyVertices(i).Length),];
-
                 Point3d[] newVerts = new Point3d[originalVerts.Length];
                 for (int i = 0; i < originalVerts.Length; i++) {
                     int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
@@ -356,7 +354,7 @@ internal static class MorphologyCompute {
                 }
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         double[] aspectRatios = new double[mesh.Faces.Count];
         double[] minAngles = new double[mesh.Faces.Count];
