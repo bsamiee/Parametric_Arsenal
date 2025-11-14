@@ -164,7 +164,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // LAPLACIAN FIELD COMPUTATION (∇²f for scalar field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
         double[] scalarField,
