@@ -37,7 +37,7 @@ internal static class AnalysisCore {
                         ? ResultFactory.Create(value: (Analysis.IResult)new Analysis.CurveData(
                             cv.PointAt(param), derivatives, cv.CurvatureAt(param).Length, frame,
                             frames,
-                            cv.IsClosed ? cv.TorsionAt(param) : 0, disc,
+                            cv.TorsionAt(param), disc,
                             [.. disc.Select(dp => cv.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
                             cv.GetLength(), amp.Centroid))
                         : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.CurveAnalysisFailed);
