@@ -122,9 +122,17 @@ public static class Orient {
                             Point3d pt = anchor ?? box.Center;
 
                             return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
-                                ? Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
-                                    ? ResultFactory.Create<Transform>(error: E.Geometry.ParallelVectorAlignment)
-                                    : ResultFactory.Create(value: Transform.Identity)
+                                ? Math.Abs((su * tu) - 1.0) < RhinoMath.SqrtEpsilon
+                                    ? ResultFactory.Create(value: Transform.Identity)
+                                    : Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
+                                        ? ((Func<Result<Transform>>)(() => {
+                                            Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(su, Vector3d.XAxis) : Vector3d.CrossProduct(su, Vector3d.YAxis);
+                                            bool normalized = axisCandidate.Unitize();
+                                            return normalized
+                                                ? ResultFactory.Create(value: Transform.Rotation(RhinoMath.PI, axisCandidate, pt))
+                                                : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
+                                        }))()
+                                        : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
                                 : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
                         }))(),
                     _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
