@@ -5,26 +5,25 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Fields dispatch registry.</summary>
+/// <summary>Fields dispatch registry with unified FrozenDictionary following SpatialCore pattern.</summary>
 [Pure]
 internal static class FieldsCore {
-    // OPERATION REGISTRY (byte + Type → execute function + integration method)
-
-    /// <summary>Operation-type dispatch table: (operation, geometry type) → (execute function, integration method).</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)> OperationRegistry =
-        new (byte Operation, Type GeometryType, Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)[] {
-            (FieldsConfig.OperationDistance, typeof(Mesh), ExecuteDistanceField<Mesh>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Brep), ExecuteDistanceField<Brep>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Curve), ExecuteDistanceField<Curve>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Surface), ExecuteDistanceField<Surface>, FieldsConfig.IntegrationRK4),
+    /// <summary>Unified operation dispatch table: (operation, geometry type) → (execute function, validation mode, buffer size, integration method).</summary>
+    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)> OperationRegistry =
+        new (byte Operation, Type GeometryType, Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)[] {
+            (FieldsConfig.OperationDistance, typeof(Mesh), ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096, FieldsConfig.IntegrationRK4),
+            (FieldsConfig.OperationDistance, typeof(Brep), ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192, FieldsConfig.IntegrationRK4),
+            (FieldsConfig.OperationDistance, typeof(Curve), ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
+            (FieldsConfig.OperationDistance, typeof(Surface), ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
         }.ToFrozenDictionary(
             static entry => (entry.Operation, entry.GeometryType),
-            static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.IntegrationMethod));
+            static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.ValidationMode, entry.BufferSize, entry.IntegrationMethod));
 
     // DISTANCE FIELD EXECUTION (dispatched by geometry type)
 

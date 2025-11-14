@@ -6,7 +6,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and dispatch tables for fields operations.</summary>
+/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
     // OPERATION TYPE IDENTIFIERS
@@ -19,6 +19,14 @@ internal static class FieldsConfig {
     internal const byte OperationStreamline = 2;
     /// <summary>Isosurface extraction operation identifier.</summary>
     internal const byte OperationIsosurface = 3;
+    /// <summary>Curl field operation identifier.</summary>
+    internal const byte OperationCurl = 4;
+    /// <summary>Divergence field operation identifier.</summary>
+    internal const byte OperationDivergence = 5;
+    /// <summary>Laplacian field operation identifier.</summary>
+    internal const byte OperationLaplacian = 6;
+    /// <summary>Vector potential field operation identifier.</summary>
+    internal const byte OperationVectorPotential = 7;
 
     // INTEGRATION METHOD IDENTIFIERS
 
@@ -28,8 +36,17 @@ internal static class FieldsConfig {
     internal const byte IntegrationRK2 = 1;
     /// <summary>Fourth-order Runge-Kutta integration method.</summary>
     internal const byte IntegrationRK4 = 2;
-    /// <summary>Adaptive fourth-order Runge-Kutta with error control.</summary>
+    /// <summary>Adaptive fourth-order Runge-Kutta with error control (Dormand-Prince RK45).</summary>
     internal const byte IntegrationAdaptiveRK4 = 3;
+
+    // INTERPOLATION METHOD IDENTIFIERS
+
+    /// <summary>Nearest neighbor interpolation (fastest, lowest quality).</summary>
+    internal const byte InterpolationNearest = 0;
+    /// <summary>Trilinear interpolation (balanced speed and quality).</summary>
+    internal const byte InterpolationTrilinear = 1;
+    /// <summary>Tricubic interpolation (slowest, highest quality).</summary>
+    internal const byte InterpolationTricubic = 2;
 
     // GRID RESOLUTION CONSTANTS
 
@@ -54,9 +71,9 @@ internal static class FieldsConfig {
     /// <summary>Adaptive step tolerance (RhinoMath.SqrtEpsilon for error control).</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double AdaptiveStepTolerance = RhinoMath.SqrtEpsilon;
-    /// <summary>Finite difference step for gradient computation (RhinoMath.SqrtEpsilon for numerical derivatives).</summary>
+    /// <summary>Finite difference step for gradient/curl/divergence/laplacian computation (RhinoMath.SqrtEpsilon for numerical derivatives).</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double GradientFiniteDifferenceStep = RhinoMath.SqrtEpsilon;
+    internal static readonly double FiniteDifferenceStep = RhinoMath.SqrtEpsilon;
 
     // RK4 INTEGRATION COEFFICIENTS
 
@@ -65,38 +82,30 @@ internal static class FieldsConfig {
     /// <summary>RK4 intermediate stage half-step multipliers: [0.5, 0.5, 1.0].</summary>
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
 
+    // DORMANT-PRINCE RK45 COEFFICIENTS (for adaptive integration)
+
+    /// <summary>Dormant-Prince RK45 Butcher tableau a coefficients.</summary>
+    internal static readonly double[][] RK45A = [
+        [],
+        [1.0 / 5.0,],
+        [3.0 / 40.0, 9.0 / 40.0,],
+        [44.0 / 45.0, -56.0 / 15.0, 32.0 / 9.0,],
+        [19372.0 / 6561.0, -25360.0 / 2187.0, 64448.0 / 6561.0, -212.0 / 729.0,],
+        [9017.0 / 3168.0, -355.0 / 33.0, 46732.0 / 5247.0, 49.0 / 176.0, -5103.0 / 18656.0,],
+    ];
+    /// <summary>Dormant-Prince RK45 Butcher tableau b coefficients (5th order).</summary>
+    internal static readonly double[] RK45B = [35.0 / 384.0, 0.0, 500.0 / 1113.0, 125.0 / 192.0, -2187.0 / 6784.0, 11.0 / 84.0,];
+    /// <summary>Dormant-Prince RK45 Butcher tableau b* coefficients (4th order for error estimate).</summary>
+    internal static readonly double[] RK45BStar = [5179.0 / 57600.0, 0.0, 7571.0 / 16695.0, 393.0 / 640.0, -92097.0 / 339200.0, 187.0 / 2100.0, 1.0 / 40.0,];
+
     // SPATIAL INDEXING THRESHOLDS (RTree vs linear search tradeoffs)
 
     /// <summary>Grid size threshold for RTree usage in streamline integration (RTree overhead justified above this size).</summary>
     internal const int StreamlineRTreeThreshold = 1000;
+    /// <summary>RTree threshold for switching from linear to spatial search in field operations.</summary>
+    internal const int FieldRTreeThreshold = 100;
 
-    /// <summary>ArrayPool buffer sizes for distance field operations by geometry type.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), int> BufferSizes =
-        new Dictionary<(byte, Type), int> {
-            [(OperationDistance, typeof(Mesh))] = 4096,
-            [(OperationDistance, typeof(Brep))] = 8192,
-            [(OperationDistance, typeof(Curve))] = 2048,
-            [(OperationDistance, typeof(Surface))] = 4096,
-            [(OperationGradient, typeof(Mesh))] = 8192,
-            [(OperationGradient, typeof(Brep))] = 16384,
-            [(OperationStreamline, typeof(void))] = 4096,
-            [(OperationIsosurface, typeof(void))] = 16384,
-        }.ToFrozenDictionary();
-
-    /// <summary>Validation mode dispatch for operation-type pairs.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), V> ValidationModes =
-        new Dictionary<(byte, Type), V> {
-            [(OperationDistance, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(OperationDistance, typeof(Brep))] = V.Standard | V.Topology,
-            [(OperationDistance, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(OperationDistance, typeof(Surface))] = V.Standard | V.BoundingBox,
-            [(OperationGradient, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(OperationGradient, typeof(Brep))] = V.Standard | V.Topology,
-            [(OperationGradient, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(OperationGradient, typeof(Surface))] = V.Standard | V.BoundingBox,
-        }.ToFrozenDictionary();
-
-    // MARCHING CUBES LOOKUP TABLE (256 cube configurations → triangle indices)
+    // MARCHING CUBES CONSTANTS
 
     /// <summary>Marching cubes edge vertex pairs: edge index → (vertex1, vertex2).</summary>
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
@@ -226,25 +235,19 @@ internal static class FieldsConfig {
         return table;
     }
 
-    /// <summary>
-    /// Inverts the triangle winding for a marching cubes case.
-    /// Each triangle is represented by 3 consecutive edge indices.
-    /// </summary>
     private static int[] InvertTriangles(int[] edges) {
         int length = edges.Length;
         int[] inverted = new int[length];
         for (int i = 0; i < length; i += 3) {
-            // Reverse the order of each triangle
             inverted[i] = edges[i + 2];
             inverted[i + 1] = edges[i + 1];
             inverted[i + 2] = edges[i];
         }
         return inverted;
     }
+
     // DISTANCE FIELD PARAMETERS
 
-    /// <summary>RTree threshold for switching from linear to spatial search.</summary>
-    internal const int DistanceFieldRTreeThreshold = 100;
     /// <summary>Inside/outside ray casting tolerance multiplier.</summary>
     internal const double InsideOutsideToleranceMultiplier = 10.0;
 }
