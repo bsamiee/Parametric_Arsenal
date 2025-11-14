@@ -289,7 +289,7 @@ internal static class ExtractionCore {
             .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
                 static group => group.Key,
-                static group => group.OrderBy(static entry => entry.Key.GeometryType, _specificityComparer)
+                static group => group.OrderByDescending(static entry => entry.Key.GeometryType, _specificityComparer)
                     .Select(static entry => (entry.Key.GeometryType, entry.Value))
                     .ToArray())
             .ToFrozenDictionary();
