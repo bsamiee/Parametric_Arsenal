@@ -11,8 +11,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Fields;
 
 /// <summary>Scalar and vector field operations for computational field analysis.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Fields is the primary API entry point")]
-public static class Fields {
+public static class Field {
     /// <summary>Field specification for grid resolution, bounds, and step size.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct FieldSpec(int resolution = FieldsConfig.DefaultResolution, BoundingBox? bounds = null, double? stepSize = null) {
@@ -32,7 +31,7 @@ public static class Fields {
         T geometry,
         FieldSpec spec,
         IGeometryContext context) where T : GeometryBase =>
-        FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> execute, byte integrationMethod) config) switch {
+        FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Field.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> execute, byte integrationMethod) config) switch {
             true => UnifiedOperation.Apply(
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<(Point3d[], double[])>>>)(item =>

@@ -50,15 +50,13 @@ internal static class FieldsCore {
     // ============================================================================
 
     /// <summary>Operation-type dispatch table: (operation, geometry type) → (execute function, integration method).</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)> OperationRegistry =
-        new (byte Operation, Type GeometryType, Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)[] {
-            (FieldsConfig.OperationDistance, typeof(Mesh), ExecuteDistanceField<Mesh>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Brep), ExecuteDistanceField<Brep>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Curve), ExecuteDistanceField<Curve>, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Surface), ExecuteDistanceField<Surface>, FieldsConfig.IntegrationRK4),
-        }.ToFrozenDictionary(
-            static entry => (entry.Operation, entry.GeometryType),
-            static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.IntegrationMethod));
+    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Field.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, byte IntegrationMethod)> OperationRegistry =
+        new Dictionary<(byte, Type), (Func<object, Field.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>, byte)> {
+            [(FieldsConfig.OperationDistance, typeof(Mesh))] = (ExecuteDistanceField<Mesh>, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Brep))] = (ExecuteDistanceField<Brep>, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Curve))] = (ExecuteDistanceField<Curve>, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Surface))] = (ExecuteDistanceField<Surface>, FieldsConfig.IntegrationRK4),
+        }.ToFrozenDictionary();
 
     // ============================================================================
     // DISTANCE FIELD EXECUTION (dispatched by geometry type)
@@ -67,7 +65,7 @@ internal static class FieldsCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
         object geometry,
-        Fields.FieldSpec spec,
+        Field.FieldSpec spec,
         IGeometryContext context) where T : GeometryBase {
         T typed = (T)geometry;
         BoundingBox bounds = spec.Bounds ?? typed.GetBoundingBox(accurate: true);
@@ -135,5 +133,29 @@ internal static class FieldsCore {
                 }
             }))(),
         };
+    }
+
+    /// <summary>3D grid sampling configuration.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    internal readonly struct SampleGrid {
+        internal readonly Point3d Origin;
+        internal readonly Vector3d Delta;
+        internal readonly int Resolution;
+        internal readonly int TotalSamples;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal SampleGrid(BoundingBox bounds, int resolution) {
+            this.Origin = bounds.Min;
+            this.Delta = (bounds.Max - bounds.Min) / (resolution - 1);
+            this.Resolution = resolution;
+            this.TotalSamples = resolution * resolution * resolution;
+        }
+
+        [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Point3d GetPoint(int i, int j, int k) =>
+            new(
+                this.Origin.X + (i * this.Delta.X),
+                this.Origin.Y + (j * this.Delta.Y),
+                this.Origin.Z + (k * this.Delta.Z));
     }
 }
