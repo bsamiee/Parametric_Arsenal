@@ -88,7 +88,7 @@ public static class Intersect {
 
     /// <summary>Analyzes intersection stability via spherical perturbation sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double StabilityScore, double PerturbationSensitivity, bool[] UnstableFlags)> AnalyzeStability(
+    public static Result<(double StabilityScore, double PerturbationSensitivity)> AnalyzeStability(
         IntersectionOutput baseIntersection,
         GeometryBase geometryA,
         GeometryBase geometryB,

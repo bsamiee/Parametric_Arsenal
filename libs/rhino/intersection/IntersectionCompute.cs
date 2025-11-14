@@ -167,12 +167,12 @@ internal static class IntersectionCompute {
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) {
+    internal static Result<(double Score, double Sensitivity)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
         return baseOutput.Points.Count switch {
-            0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
+            0 => ResultFactory.Create<(double, double)>(value: (1.0, 0.0)),
             int count => IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
                     (V modeA, V modeB) = entry.Swapped
@@ -183,18 +183,17 @@ internal static class IntersectionCompute {
                         .Bind(validA => validate(geomB, context, modeB)
                             .Bind(validB => IntersectionCore.NormalizeOptions(new Intersect.IntersectionOptions(), context)
                                 .Bind(normalized => {
-                                    int sqrtSamples = (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount));
-                                    (int phiSteps, int thetaSteps) = (sqrtSamples, (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / (double)sqrtSamples));
-                                    Vector3d[] directions = [.. Enumerable.Range(0, phiSteps)
-                                        .SelectMany(phiIndex => Enumerable.Range(0, thetaSteps)
-                                            .Select(thetaIndex => {
-                                                (double phi, double theta) = ((Math.PI * phiIndex) / phiSteps, (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
-                                                return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
-                                            }))
-                                        .Take(IntersectionConfig.StabilitySampleCount),
+                                    double goldenRatio = (1.0 + Math.Sqrt(5.0)) / 2.0;
+                                    Vector3d[] directions = [.. Enumerable.Range(0, IntersectionConfig.StabilitySampleCount)
+                                        .Select(index => {
+                                            double y = 1.0 - ((2.0 * index) / (IntersectionConfig.StabilitySampleCount - 1.0));
+                                            double radius = Math.Sqrt(1.0 - (y * y));
+                                            double theta = RhinoMath.TwoPI * index / goldenRatio;
+                                            return new Vector3d(Math.Cos(theta) * radius, y, Math.Sin(theta) * radius);
+                                        }),
                                     ];
                                     double perturbationDistance = validA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor;
-                                    Result<(double Score, double Sensitivity, bool[] UnstableFlags)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
+                                    Result<(double Score, double Sensitivity)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity)>(value: (1.0, 0.0));
 
                                     (double Delta, IDisposable? Resource) perturbAndIntersect(Vector3d direction, GeometryBase original) =>
                                         original switch {
@@ -223,15 +222,9 @@ internal static class IntersectionCompute {
                                     try {
                                         double[] filtered = [.. perturbations.Select(entry => entry.Delta).Where(delta => RhinoMath.IsValidDouble(delta))];
                                         return filtered.Length > 0
-                                            ? ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (
+                                            ? ResultFactory.Create<(double Score, double Sensitivity)>(value: (
                                                 Score: 1.0 / (1.0 + filtered.Average()),
-                                                Sensitivity: filtered.Max() / count,
-                                                UnstableFlags: [.. Enumerable.Range(0, count).Select(index => {
-                                                    int start = (int)Math.Round((double)index * filtered.Length / count);
-                                                    int end = (int)Math.Round((double)(index + 1) * filtered.Length / count);
-                                                    return filtered.Skip(start).Take(end - start).Any(delta => delta > 1.0);
-                                                }),
-                                                ]))
+                                                Sensitivity: filtered.Max() / count))
                                             : defaultResult;
                                     } finally {
                                         foreach ((double Delta, IDisposable? Resource) in perturbations) {
