@@ -94,22 +94,25 @@ internal static class FieldsCompute {
                     double twoDz = 2.0 * dz;
 
                     // Curl: ∇×F = [(∂Fz/∂y - ∂Fy/∂z), (∂Fx/∂z - ∂Fz/∂x), (∂Fy/∂x - ∂Fx/∂y)]
+                    int resolutionSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
+                        int baseI = i * resolutionSquared;
                         for (int j = 0; j < resolution; j++) {
+                            int baseJ = baseI + (j * resolution);
                             for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
+                                int idx = baseJ + k;
 
                                 // ∂Fz/∂y - ∂Fy/∂z
-                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[(i * resolution * resolution) + ((j + 1) * resolution) + k].Z - vectorField[(i * resolution * resolution) + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
-                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[(i * resolution * resolution) + (j * resolution) + (k + 1)].Y - vectorField[(i * resolution * resolution) + (j * resolution) + (k - 1)].Y) / twoDz : 0.0;
+                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
+                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
 
                                 // ∂Fx/∂z - ∂Fz/∂x
-                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[(i * resolution * resolution) + (j * resolution) + (k + 1)].X - vectorField[(i * resolution * resolution) + (j * resolution) + (k - 1)].X) / twoDz : 0.0;
-                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolution * resolution) + (j * resolution) + k].Z - vectorField[((i - 1) * resolution * resolution) + (j * resolution) + k].Z) / twoDx : 0.0;
+                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
+                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
 
                                 // ∂Fy/∂x - ∂Fx/∂y
-                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolution * resolution) + (j * resolution) + k].Y - vectorField[((i - 1) * resolution * resolution) + (j * resolution) + k].Y) / twoDx : 0.0;
-                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[(i * resolution * resolution) + ((j + 1) * resolution) + k].X - vectorField[(i * resolution * resolution) + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
+                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
+                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
 
                                 curl[idx] = new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
                             }
@@ -281,6 +284,20 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<double> InterpolateNearestScalar(Point3d query, double[] scalarField, Point3d[] grid) {
+        return grid.Length > FieldsConfig.FieldRTreeThreshold
+            ? InterpolateNearestScalarRTree(query: query, scalarField: scalarField, grid: grid)
+            : InterpolateNearestScalarLinear(query: query, scalarField: scalarField, grid: grid);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d> InterpolateNearestVector(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
+        return grid.Length > FieldsConfig.FieldRTreeThreshold
+            ? InterpolateNearestVectorRTree(query: query, vectorField: vectorField, grid: grid)
+            : InterpolateNearestVectorLinear(query: query, vectorField: vectorField, grid: grid);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<double> InterpolateNearestScalarLinear(Point3d query, double[] scalarField, Point3d[] grid) {
         double minDist = double.MaxValue;
         int nearestIdx = 0;
         for (int i = 0; i < grid.Length; i++) {
@@ -291,7 +308,7 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVector(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
+    private static Result<Vector3d> InterpolateNearestVectorLinear(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
         double minDist = double.MaxValue;
         int nearestIdx = 0;
         for (int i = 0; i < grid.Length; i++) {
@@ -302,10 +319,38 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<double> InterpolateNearestScalarRTree(Point3d query, double[] scalarField, Point3d[] grid) {
+        using RTree tree = RTree.CreateFromPointArray(grid);
+        int nearestIdx = -1;
+        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
+        return nearestIdx >= 0
+            ? ResultFactory.Create(value: scalarField[nearestIdx])
+            : ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d> InterpolateNearestVectorRTree(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
+        using RTree tree = RTree.CreateFromPointArray(grid);
+        int nearestIdx = -1;
+        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
+        return nearestIdx >= 0
+            ? ResultFactory.Create(value: vectorField[nearestIdx])
+            : ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<double> InterpolateTrilinearScalar(Point3d query, double[] scalarField, int resolution, BoundingBox bounds) {
         double dx = bounds.Max.X - bounds.Min.X;
         double dy = bounds.Max.Y - bounds.Min.Y;
         double dz = bounds.Max.Z - bounds.Min.Z;
+        return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
+            true => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
+            false => InterpolateTrilinearScalarInternal(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<double> InterpolateTrilinearScalarInternal(Point3d query, double[] scalarField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
         double normZ = (query.Z - bounds.Min.Z) / dz;
@@ -349,6 +394,14 @@ internal static class FieldsCompute {
         double dx = bounds.Max.X - bounds.Min.X;
         double dy = bounds.Max.Y - bounds.Min.Y;
         double dz = bounds.Max.Z - bounds.Min.Z;
+        return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
+            true => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
+            false => InterpolateTrilinearVectorInternal(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d> InterpolateTrilinearVectorInternal(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
         double normX = (query.X - bounds.Min.X) / dx;
         double normY = (query.Y - bounds.Min.Y) / dy;
         double normZ = (query.Z - bounds.Min.Z) / dz;
@@ -467,8 +520,8 @@ internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, RTree? tree, int resolution, BoundingBox bounds) =>
         tree is not null
-            ? InterpolateNearestVector(query: query, vectorField: vectorField, grid: gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
-            : InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
+            ? InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
+            : InterpolateNearestVector(query: query, vectorField: vectorField, grid: gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
 
     // ISOSURFACE EXTRACTION (marching cubes with 256-case lookup)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

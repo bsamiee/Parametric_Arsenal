@@ -68,7 +68,11 @@ public static class Fields {
                 gridDelta: gridDelta);
         });
 
-    /// <summary>Compute curl field: vector field → (grid points[], curl vectors[]) where curl = ∇×F.</summary>
+    /// <summary>
+    /// Compute curl field: vector field → (grid points[], curl vectors[]) where curl = ∇×F.
+    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
+    /// <para>Boundary conditions: derivatives set to zero at grid boundaries (assumes zero curl at edges).</para>
+    /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Curl)> CurlField(
         Vector3d[] vectorField,
@@ -88,7 +92,11 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F.</summary>
+    /// <summary>
+    /// Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F.
+    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
+    /// <para>Boundary conditions: derivatives set to zero at grid boundaries (assumes zero divergence at edges).</para>
+    /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Divergence)> DivergenceField(
         Vector3d[] vectorField,
@@ -108,7 +116,11 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f.</summary>
+    /// <summary>
+    /// Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f.
+    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
+    /// <para>Boundary conditions: second derivatives set to zero at grid boundaries (assumes zero curvature at edges).</para>
+    /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Laplacian)> LaplacianField(
         double[] scalarField,
@@ -128,7 +140,11 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A.</summary>
+    /// <summary>
+    /// Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A.
+    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
+    /// <para>WARNING: This is a simplified approximation using Coulomb gauge (∇·A = 0) with x-axis line integral only. Not suitable for general 3D fields requiring full gauge freedom.</para>
+    /// </summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Potential)> VectorPotentialField(
         Vector3d[] magneticField,
@@ -157,10 +173,17 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         byte interpolationMethod = FieldsConfig.InterpolationTrilinear) =>
-        (scalarField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<double>(
+        (scalarField.Length == gridPoints.Length, RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
+            (false, _) => ResultFactory.Create<double>(
                 error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points")),
-            true => FieldsCompute.InterpolateScalar(
+            (true, true) => FieldsCompute.InterpolateScalar(
+                query: query,
+                scalarField: scalarField,
+                grid: gridPoints,
+                resolution: spec.Resolution,
+                bounds: bounds,
+                interpolationMethod: FieldsConfig.InterpolationNearest),
+            (true, false) => FieldsCompute.InterpolateScalar(
                 query: query,
                 scalarField: scalarField,
                 grid: gridPoints,
@@ -178,10 +201,17 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         byte interpolationMethod = FieldsConfig.InterpolationTrilinear) =>
-        (vectorField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<Vector3d>(
+        (vectorField.Length == gridPoints.Length, RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
+            (false, _) => ResultFactory.Create<Vector3d>(
                 error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points")),
-            true => FieldsCompute.InterpolateVector(
+            (true, true) => FieldsCompute.InterpolateVector(
+                query: query,
+                vectorField: vectorField,
+                grid: gridPoints,
+                resolution: spec.Resolution,
+                bounds: bounds,
+                interpolationMethod: FieldsConfig.InterpolationNearest),
+            (true, false) => FieldsCompute.InterpolateVector(
                 query: query,
                 vectorField: vectorField,
                 grid: gridPoints,

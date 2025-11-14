@@ -40,8 +40,11 @@ internal static class FieldsCore {
             true => ((Func<Result<(Point3d[], double[])>>)(() => {
                 int resolution = RhinoMath.Clamp(spec.Resolution, FieldsConfig.MinResolution, FieldsConfig.MaxResolution);
                 int totalSamples = resolution * resolution * resolution;
-                Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(totalSamples);
-                double[] distances = ArrayPool<double>.Shared.Rent(totalSamples);
+                int bufferSize = FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Arsenal.Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config)
+                    ? (totalSamples > config.BufferSize ? totalSamples : config.BufferSize)
+                    : totalSamples;
+                Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(bufferSize);
+                double[] distances = ArrayPool<double>.Shared.Rent(bufferSize);
 
                 try {
                     // Inline grid sampling (NO helper method)
