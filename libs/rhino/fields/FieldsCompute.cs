@@ -12,7 +12,6 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Dense field algorithms: gradient, curl, divergence, laplacian, vector potential, interpolation, streamline, isosurface.</summary>
 [Pure]
 internal static class FieldsCompute {
-    // GRADIENT FIELD COMPUTATION (central difference approximation)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
         double[] distances,
@@ -30,7 +29,6 @@ internal static class FieldsCompute {
             double twoDy = 2.0 * dy;
             double twoDz = 2.0 * dz;
 
-            // Central difference: ∇f = [(f(x+dx) - f(x-dx))/(2dx), (f(y+dy) - f(y-dy))/(2dy), (f(z+dz) - f(z-dz))/(2dz)]
             for (int i = 0; i < resolution; i++) {
                 for (int j = 0; j < resolution; j++) {
                     for (int k = 0; k < resolution; k++) {
@@ -72,7 +70,6 @@ internal static class FieldsCompute {
         }
     }
 
-    // CURL FIELD COMPUTATION (∇×F for vector field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
         Vector3d[] vectorField,
@@ -93,7 +90,6 @@ internal static class FieldsCompute {
                     double twoDy = 2.0 * dy;
                     double twoDz = 2.0 * dz;
 
-                    // Curl: ∇×F = [(∂Fz/∂y - ∂Fy/∂z), (∂Fx/∂z - ∂Fz/∂x), (∂Fy/∂x - ∂Fx/∂y)]
                     int resolutionSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         int baseI = i * resolutionSquared;
@@ -102,15 +98,12 @@ internal static class FieldsCompute {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = baseJ + k;
 
-                                // ∂Fz/∂y - ∂Fy/∂z
                                 double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
                                 double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
 
-                                // ∂Fx/∂z - ∂Fz/∂x
                                 double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
                                 double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
 
-                                // ∂Fy/∂x - ∂Fx/∂y
                                 double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
                                 double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
 
@@ -128,7 +121,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // DIVERGENCE FIELD COMPUTATION (∇·F for vector field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
         Vector3d[] vectorField,
@@ -149,7 +141,6 @@ internal static class FieldsCompute {
                     double twoDy = 2.0 * dy;
                     double twoDz = 2.0 * dz;
 
-                    // Divergence: ∇·F = ∂Fx/∂x + ∂Fy/∂y + ∂Fz/∂z
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -173,7 +164,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // LAPLACIAN FIELD COMPUTATION (∇²f for scalar field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
         double[] scalarField,
@@ -191,7 +181,6 @@ internal static class FieldsCompute {
                     double dy2 = gridDelta.Y * gridDelta.Y;
                     double dz2 = gridDelta.Z * gridDelta.Z;
 
-                    // Laplacian: ∇²f = ∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -215,7 +204,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // VECTOR POTENTIAL FIELD (find A where B = ∇×A)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Potential)> ComputeVectorPotential(
         Vector3d[] vectorField,
@@ -229,8 +217,6 @@ internal static class FieldsCompute {
                 int totalSamples = vectorField.Length;
                 Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                 try {
-                    // Vector potential via line integrals: A = ∫B·dl (gauge choice: Coulomb gauge ∇·A = 0)
-                    // Simplified: A_i(x,y,z) = ∫₀ˣ B_i(x',y,z) dx' for Coulomb gauge
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -251,7 +237,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // FIELD INTERPOLATION (trilinear for scalar/vector fields)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<double> InterpolateScalar(
         Point3d query,
@@ -261,7 +246,7 @@ internal static class FieldsCompute {
         BoundingBox bounds,
         byte interpolationMethod) {
         return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearestScalar(query: query, scalarField: scalarField, grid: grid),
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, scalarField, grid),
             FieldsConfig.InterpolationTrilinear => InterpolateTrilinearScalar(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds),
             _ => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
         };
@@ -276,66 +261,39 @@ internal static class FieldsCompute {
         BoundingBox bounds,
         byte interpolationMethod) {
         return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearestVector(query: query, vectorField: vectorField, grid: grid),
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, vectorField, grid),
             FieldsConfig.InterpolationTrilinear => InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds),
             _ => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
         };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalar(Point3d query, double[] scalarField, Point3d[] grid) {
-        return grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? InterpolateNearestScalarRTree(query: query, scalarField: scalarField, grid: grid)
-            : InterpolateNearestScalarLinear(query: query, scalarField: scalarField, grid: grid);
+    private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
+        int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
+            ? FindNearestRTree(query, grid)
+            : FindNearestLinear(query, grid);
+        return nearestIdx >= 0
+            ? ResultFactory.Create(value: field[nearestIdx])
+            : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVector(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        return grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? InterpolateNearestVectorRTree(query: query, vectorField: vectorField, grid: grid)
-            : InterpolateNearestVectorLinear(query: query, vectorField: vectorField, grid: grid);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalarLinear(Point3d query, double[] scalarField, Point3d[] grid) {
+    private static int FindNearestLinear(Point3d query, Point3d[] grid) {
         double minDist = double.MaxValue;
         int nearestIdx = 0;
         for (int i = 0; i < grid.Length; i++) {
             double dist = query.DistanceTo(grid[i]);
             (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
         }
-        return ResultFactory.Create(value: scalarField[nearestIdx]);
+        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVectorLinear(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
-        for (int i = 0; i < grid.Length; i++) {
-            double dist = query.DistanceTo(grid[i]);
-            (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
-        }
-        return ResultFactory.Create(value: vectorField[nearestIdx]);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateNearestScalarRTree(Point3d query, double[] scalarField, Point3d[] grid) {
+    private static int FindNearestRTree(Point3d query, Point3d[] grid) {
         using RTree tree = RTree.CreateFromPointArray(grid);
         int nearestIdx = -1;
         _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx >= 0
-            ? ResultFactory.Create(value: scalarField[nearestIdx])
-            : ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateNearestVectorRTree(Point3d query, Vector3d[] vectorField, Point3d[] grid) {
-        using RTree tree = RTree.CreateFromPointArray(grid);
-        int nearestIdx = -1;
-        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx >= 0
-            ? ResultFactory.Create(value: vectorField[nearestIdx])
-            : ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("RTree search failed"));
+        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -345,48 +303,46 @@ internal static class FieldsCompute {
         double dz = bounds.Max.Z - bounds.Min.Z;
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => InterpolateTrilinearScalarInternal(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
+            false => ((Func<Result<double>>)(() => {
+                int resSquared = resolution * resolution;
+                double normX = (query.X - bounds.Min.X) / dx;
+                double normY = (query.Y - bounds.Min.Y) / dy;
+                double normZ = (query.Z - bounds.Min.Z) / dz;
+                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
+                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
+                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
+
+                int i0 = (int)fi;
+                int j0 = (int)fj;
+                int k0 = (int)fk;
+                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
+                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
+                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
+
+                double tx = fi - i0;
+                double ty = fj - j0;
+                double tz = fk - k0;
+
+                double c000 = scalarField[(i0 * resSquared) + (j0 * resolution) + k0];
+                double c001 = scalarField[(i0 * resSquared) + (j0 * resolution) + k1];
+                double c010 = scalarField[(i0 * resSquared) + (j1 * resolution) + k0];
+                double c011 = scalarField[(i0 * resSquared) + (j1 * resolution) + k1];
+                double c100 = scalarField[(i1 * resSquared) + (j0 * resolution) + k0];
+                double c101 = scalarField[(i1 * resSquared) + (j0 * resolution) + k1];
+                double c110 = scalarField[(i1 * resSquared) + (j1 * resolution) + k0];
+                double c111 = scalarField[(i1 * resSquared) + (j1 * resolution) + k1];
+
+                double c00 = c000 + (tx * (c100 - c000));
+                double c01 = c001 + (tx * (c101 - c001));
+                double c10 = c010 + (tx * (c110 - c010));
+                double c11 = c011 + (tx * (c111 - c011));
+
+                double c0 = c00 + (ty * (c10 - c00));
+                double c1 = c01 + (ty * (c11 - c01));
+
+                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+            }))(),
         };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateTrilinearScalarInternal(Point3d query, double[] scalarField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
-        double normX = (query.X - bounds.Min.X) / dx;
-        double normY = (query.Y - bounds.Min.Y) / dy;
-        double normZ = (query.Z - bounds.Min.Z) / dz;
-        double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-        double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-        double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
-
-        int i0 = (int)fi;
-        int j0 = (int)fj;
-        int k0 = (int)fk;
-        int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-        int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-        int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
-
-        double tx = fi - i0;
-        double ty = fj - j0;
-        double tz = fk - k0;
-
-        double c000 = scalarField[(i0 * resolution * resolution) + (j0 * resolution) + k0];
-        double c001 = scalarField[(i0 * resolution * resolution) + (j0 * resolution) + k1];
-        double c010 = scalarField[(i0 * resolution * resolution) + (j1 * resolution) + k0];
-        double c011 = scalarField[(i0 * resolution * resolution) + (j1 * resolution) + k1];
-        double c100 = scalarField[(i1 * resolution * resolution) + (j0 * resolution) + k0];
-        double c101 = scalarField[(i1 * resolution * resolution) + (j0 * resolution) + k1];
-        double c110 = scalarField[(i1 * resolution * resolution) + (j1 * resolution) + k0];
-        double c111 = scalarField[(i1 * resolution * resolution) + (j1 * resolution) + k1];
-
-        double c00 = c000 + (tx * (c100 - c000));
-        double c01 = c001 + (tx * (c101 - c001));
-        double c10 = c010 + (tx * (c110 - c010));
-        double c11 = c011 + (tx * (c111 - c011));
-
-        double c0 = c00 + (ty * (c10 - c00));
-        double c1 = c01 + (ty * (c11 - c01));
-
-        return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -396,51 +352,48 @@ internal static class FieldsCompute {
         double dz = bounds.Max.Z - bounds.Min.Z;
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
             true => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => InterpolateTrilinearVectorInternal(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds, dx: dx, dy: dy, dz: dz),
+            false => ((Func<Result<Vector3d>>)(() => {
+                int resSquared = resolution * resolution;
+                double normX = (query.X - bounds.Min.X) / dx;
+                double normY = (query.Y - bounds.Min.Y) / dy;
+                double normZ = (query.Z - bounds.Min.Z) / dz;
+                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
+                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
+                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
+
+                int i0 = (int)fi;
+                int j0 = (int)fj;
+                int k0 = (int)fk;
+                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
+                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
+                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
+
+                double tx = fi - i0;
+                double ty = fj - j0;
+                double tz = fk - k0;
+
+                Vector3d c000 = vectorField[(i0 * resSquared) + (j0 * resolution) + k0];
+                Vector3d c001 = vectorField[(i0 * resSquared) + (j0 * resolution) + k1];
+                Vector3d c010 = vectorField[(i0 * resSquared) + (j1 * resolution) + k0];
+                Vector3d c011 = vectorField[(i0 * resSquared) + (j1 * resolution) + k1];
+                Vector3d c100 = vectorField[(i1 * resSquared) + (j0 * resolution) + k0];
+                Vector3d c101 = vectorField[(i1 * resSquared) + (j0 * resolution) + k1];
+                Vector3d c110 = vectorField[(i1 * resSquared) + (j1 * resolution) + k0];
+                Vector3d c111 = vectorField[(i1 * resSquared) + (j1 * resolution) + k1];
+
+                Vector3d c00 = c000 + (tx * (c100 - c000));
+                Vector3d c01 = c001 + (tx * (c101 - c001));
+                Vector3d c10 = c010 + (tx * (c110 - c010));
+                Vector3d c11 = c011 + (tx * (c111 - c011));
+
+                Vector3d c0 = c00 + (ty * (c10 - c00));
+                Vector3d c1 = c01 + (ty * (c11 - c01));
+
+                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+            }))(),
         };
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateTrilinearVectorInternal(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds, double dx, double dy, double dz) {
-        double normX = (query.X - bounds.Min.X) / dx;
-        double normY = (query.Y - bounds.Min.Y) / dy;
-        double normZ = (query.Z - bounds.Min.Z) / dz;
-        double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-        double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-        double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
-
-        int i0 = (int)fi;
-        int j0 = (int)fj;
-        int k0 = (int)fk;
-        int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-        int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-        int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
-
-        double tx = fi - i0;
-        double ty = fj - j0;
-        double tz = fk - k0;
-
-        Vector3d c000 = vectorField[(i0 * resolution * resolution) + (j0 * resolution) + k0];
-        Vector3d c001 = vectorField[(i0 * resolution * resolution) + (j0 * resolution) + k1];
-        Vector3d c010 = vectorField[(i0 * resolution * resolution) + (j1 * resolution) + k0];
-        Vector3d c011 = vectorField[(i0 * resolution * resolution) + (j1 * resolution) + k1];
-        Vector3d c100 = vectorField[(i1 * resolution * resolution) + (j0 * resolution) + k0];
-        Vector3d c101 = vectorField[(i1 * resolution * resolution) + (j0 * resolution) + k1];
-        Vector3d c110 = vectorField[(i1 * resolution * resolution) + (j1 * resolution) + k0];
-        Vector3d c111 = vectorField[(i1 * resolution * resolution) + (j1 * resolution) + k1];
-
-        Vector3d c00 = c000 + (tx * (c100 - c000));
-        Vector3d c01 = c001 + (tx * (c101 - c001));
-        Vector3d c10 = c010 + (tx * (c110 - c010));
-        Vector3d c11 = c011 + (tx * (c111 - c011));
-
-        Vector3d c0 = c00 + (ty * (c10 - c00));
-        Vector3d c1 = c01 + (ty * (c11 - c01));
-
-        return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
-    }
-
-    // STREAMLINE INTEGRATION (RK4 with adaptive step control and vector field interpolation)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Curve[]> IntegrateStreamlines(
         Vector3d[] vectorField,
@@ -521,9 +474,8 @@ internal static class FieldsCompute {
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, RTree? tree, int resolution, BoundingBox bounds) =>
         tree is not null
             ? InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
-            : InterpolateNearestVector(query: query, vectorField: vectorField, grid: gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
+            : InterpolateNearest(query, vectorField, gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
 
-    // ISOSURFACE EXTRACTION (marching cubes with 256-case lookup)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,
