@@ -44,7 +44,7 @@ public static class Fields {
                     config.Execute(item, spec, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result])),
                 config: new OperationConfig<T, (Point3d[], double[])> {
                     Context = context,
-                    ValidationMode = FieldsCore.OperationRegistry[(FieldsConfig.OperationDistance, typeof(T))].ValidationMode,
+                    ValidationMode = config.ValidationMode,
                     OperationName = $"Fields.DistanceField.{typeof(T).Name}",
                     EnableDiagnostics = false,
                 }).Map(results => results[0]),
