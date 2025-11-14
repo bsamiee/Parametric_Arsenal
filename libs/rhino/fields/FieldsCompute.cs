@@ -90,6 +90,11 @@ internal static class FieldsCompute {
         Curve[] streamlines = new Curve[seeds.Length];
         Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
 
+        // Build RTree for O(log n) nearest neighbor queries when grid is large
+        using RTree? tree = gridPoints.Length > FieldsConfig.StreamlineRTreeThreshold
+            ? RTree.CreateFromPointArray(gridPoints)
+            : null;
+
         try {
             for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
                 Point3d current = seeds[seedIdx];
@@ -97,24 +102,24 @@ internal static class FieldsCompute {
                 pathBuffer[stepCount++] = current;
 
                 for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
-                    Vector3d k1 = InterpolateVectorField(vectorField, gridPoints, current);
+                    Vector3d k1 = InterpolateVectorField(vectorField, gridPoints, current, tree);
 
                     // RK4 requires sequential computation: k2 depends on k1, k3 depends on k2, k4 depends on k3
                     Vector3d k2 = integrationMethod switch {
                         0 => k1,  // Euler: use k1 for all
-                        1 or 2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1)),
+                        1 or 2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree),
                         _ => k1,
                     };
 
                     Vector3d k3 = integrationMethod switch {
                         0 or 1 => k1,  // Euler/RK2: not used
-                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2)),  // RK4: use k2
+                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), tree),  // RK4: use k2
                         _ => k1,
                     };
 
                     Vector3d k4 = integrationMethod switch {
                         0 or 1 => k1,  // Euler/RK2: not used
-                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3)),  // RK4: use k3
+                        2 or 3 => InterpolateVectorField(vectorField, gridPoints, current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), tree),  // RK4: use k3
                         _ => k1,
                     };
 
@@ -152,15 +157,29 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d InterpolateVectorField(Vector3d[] field, Point3d[] grid, Point3d query) {
-        // Nearest neighbor interpolation (inline - NO helper method)
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
-        for (int i = 0; i < grid.Length; i++) {
-            double dist = query.DistanceTo(grid[i]);
-            (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
-        }
-        return field[nearestIdx];
+    private static Vector3d InterpolateVectorField(Vector3d[] field, Point3d[] grid, Point3d query, RTree? tree) {
+        // Use RTree for O(log n) nearest neighbor when available, fallback to O(n) linear search for small grids
+        return tree is not null
+            ? ((Func<Vector3d>)(() => {
+                double minDist = double.MaxValue;
+                int nearestIdx = 0;
+                _ = tree.Search(
+                    sphere: new Sphere(query, double.MaxValue),
+                    callback: (_, args) => {
+                        double dist = query.DistanceTo(grid[args.Id]);
+                        (nearestIdx, minDist) = dist < minDist ? (args.Id, dist) : (nearestIdx, minDist);
+                    });
+                return field[nearestIdx];
+            }))()
+            : ((Func<Vector3d>)(() => {
+                double minDist = double.MaxValue;
+                int nearestIdx = 0;
+                for (int i = 0; i < grid.Length; i++) {
+                    double dist = query.DistanceTo(grid[i]);
+                    (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
+                }
+                return field[nearestIdx];
+            }))();
     }
 
     // ============================================================================

@@ -76,6 +76,13 @@ internal static class FieldsConfig {
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
 
     // ============================================================================
+    // SPATIAL INDEXING THRESHOLDS (RTree vs linear search tradeoffs)
+    // ============================================================================
+
+    /// <summary>Grid size threshold for RTree usage in streamline integration (RTree overhead justified above this size).</summary>
+    internal const int StreamlineRTreeThreshold = 1000;
+
+    // ============================================================================
     // BUFFER SIZE DISPATCH TABLE (operation + geometry type → buffer size)
     // ============================================================================
 
