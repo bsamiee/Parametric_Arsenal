@@ -12,6 +12,101 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Morphology algorithm orchestration with convergence and quality tracking.</summary>
 internal static class MorphologyCompute {
     [Pure]
+    internal static Result<GeometryBase> CageDeform(
+        GeometryBase geometry,
+        GeometryBase _,
+        Point3d[] originalControlPoints,
+        Point3d[] deformedControlPoints,
+        IGeometryContext __) =>
+        originalControlPoints.Length != deformedControlPoints.Length
+            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}")))
+            : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
+                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}")))
+                : ((Func<Result<GeometryBase>>)(() => {
+                    BoundingBox cageBounds = new(originalControlPoints);
+                    if (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance) {
+                        return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"));
+                    }
+
+                    GeometryBase? deformed = geometry switch {
+                        Mesh m => m.DuplicateMesh(),
+                        Brep b => b.DuplicateBrep(),
+                        _ => null,
+                    };
+
+                    if (deformed is null) {
+                        return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
+                    }
+
+                    Point3d[] vertices = deformed switch {
+                        Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
+                        Brep b => [.. b.Vertices.Select(v => v.Location),],
+                        _ => [],
+                    };
+
+                    Point3d[] deformedVerts = new Point3d[vertices.Length];
+                    for (int i = 0; i < vertices.Length; i++) {
+                        Point3d localCoord = ComputeLocalCoordinates(vertices[i], originalControlPoints, cageBounds);
+                        deformedVerts[i] = RhinoMath.IsValidDouble(localCoord.X) && RhinoMath.IsValidDouble(localCoord.Y) && RhinoMath.IsValidDouble(localCoord.Z)
+                            ? InterpolateDeformedPosition(localCoord, deformedControlPoints)
+                            : vertices[i];
+                    }
+
+                    bool success = deformed switch {
+                        Mesh meshDeformed => ((Func<bool>)(() => {
+                            for (int i = 0; i < deformedVerts.Length; i++) {
+                                meshDeformed.Vertices[i] = new Point3f((float)deformedVerts[i].X, (float)deformedVerts[i].Y, (float)deformedVerts[i].Z);
+                            }
+                            return meshDeformed.Normals.ComputeNormals() && meshDeformed.Compact();
+                        }))(),
+                        Brep brepDeformed => ((Func<bool>)(() => {
+                            for (int i = 0; i < Math.Min(deformedVerts.Length, brepDeformed.Vertices.Count); i++) {
+                                brepDeformed.Vertices[i].Location = deformedVerts[i];
+                            }
+                            return brepDeformed.IsValid;
+                        }))(),
+                        _ => false,
+                    };
+
+                    return success
+                        ? ResultFactory.Create(value: deformed)
+                        : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
+                }))();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Point3d ComputeLocalCoordinates(Point3d point, Point3d[] _, BoundingBox bounds) {
+        Vector3d localVec = point - bounds.Min;
+        Vector3d spanVec = bounds.Max - bounds.Min;
+        return new Point3d(
+            RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
+            RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
+            RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Point3d InterpolateDeformedPosition(Point3d localCoord, Point3d[] deformedControlPoints) {
+        double u = localCoord.X;
+        double v = localCoord.Y;
+        double w = localCoord.Z;
+        double u1 = 1.0 - u;
+        double v1 = 1.0 - v;
+        double w1 = 1.0 - w;
+
+        int minPoints = Math.Min(deformedControlPoints.Length, MorphologyConfig.MinCageControlPoints);
+        return minPoints >= MorphologyConfig.MinCageControlPoints
+            ? Point3d.Origin +
+                (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
+                (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
+                (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
+                (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
+                (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
+                (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
+                (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
+                (u * v * w * (deformedControlPoints[7] - Point3d.Origin))
+            : Point3d.Origin;
+    }
+
+    [Pure]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,

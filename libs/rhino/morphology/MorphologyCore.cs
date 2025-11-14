@@ -29,49 +29,35 @@ internal static class MorphologyCore {
         object input,
         object parameters,
         IGeometryContext context) =>
-        parameters switch {
-            (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts) when originalPts.Length == deformedPts.Length && originalPts.Length >= MorphologyConfig.MinCageControlPoints =>
-                ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
-                    GeometryBase? geometry = input is Mesh m ? m.DuplicateMesh() : input is Brep b ? b.DuplicateBrep() : null;
-                    BoundingBox originalBounds = geometry?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
+        parameters is not (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts)
+            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                error: E.Geometry.InsufficientParameters.WithContext("Expected: (GeometryBase cage, Point3d[] original, Point3d[] deformed)"))
+            : input is not Mesh and not Brep
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                    error: E.Geometry.InvalidGeometryType.WithContext($"Type: {input.GetType().Name}"))
+                : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                    GeometryBase inputGeom = (GeometryBase)input;
+                    BoundingBox originalBounds = inputGeom.GetBoundingBox(accurate: false);
                     double originalVolume = originalBounds.Volume;
 
-                    // NOTE: CageMorph is not available in current Rhino SDK - implementing simple transform for now
-                    bool success = geometry is not null;
-                    Transform xform = Transform.Identity;
-                    if (success && originalPts.Length > 0) {
-                        Vector3d avgDisplacement = Vector3d.Zero;
-                        for (int i = 0; i < originalPts.Length; i++) {
-                            avgDisplacement += deformedPts[i] - originalPts[i];
-                        }
-                        avgDisplacement /= originalPts.Length;
-                        xform = Transform.Translation(avgDisplacement);
-                        success = geometry?.Transform(xform) ?? false;
-                    }
+                    Result<GeometryBase> deformResult = MorphologyCompute.CageDeform(inputGeom, cage, originalPts, deformedPts, context);
+                    return deformResult.IsSuccess
+                        ? ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                            GeometryBase deformed = deformResult.Value;
+                            BoundingBox deformedBounds = deformed.GetBoundingBox(accurate: false);
+                            double deformedVolume = deformedBounds.Volume;
+                            double[] displacements = [.. originalPts.Zip(deformedPts, (o, d) => o.DistanceTo(d)),];
+                            double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
+                            double meanDisp = displacements.Length > 0 ? displacements.Average() : 0.0;
+                            double volumeRatio = RhinoMath.IsValidDouble(originalVolume) && originalVolume > RhinoMath.ZeroTolerance
+                                ? deformedVolume / originalVolume
+                                : 1.0;
 
-                    BoundingBox deformedBounds = geometry?.GetBoundingBox(accurate: false) ?? BoundingBox.Empty;
-                    double deformedVolume = deformedBounds.Volume;
-
-                    double[] displacements = [.. originalPts.Zip(deformedPts, (o, d) => o.DistanceTo(d)),];
-                    double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
-                    double meanDisp = displacements.Length > 0 ? displacements.Average() : 0.0;
-                    double volumeRatio = originalVolume > RhinoMath.ZeroTolerance ? deformedVolume / originalVolume : 1.0;
-
-                    return success && geometry is not null
-                        ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                            value: [new Morphology.CageDeformResult(geometry, maxDisp, meanDisp, originalBounds, deformedBounds, volumeRatio),])
-                        : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                            error: E.Geometry.Morphology.CageDeformFailed.WithContext("Transform returned false or geometry null"));
-                }))(),
-            (GeometryBase, Point3d[] o, Point3d[] d) when o.Length != d.Length =>
-                ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                    error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {o.Length}, Deformed: {d.Length}")),
-            (GeometryBase, Point3d[] o, Point3d[]) when o.Length < MorphologyConfig.MinCageControlPoints =>
-                ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                    error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {o.Length}, Required: {MorphologyConfig.MinCageControlPoints}")),
-            _ => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                error: E.Geometry.InsufficientParameters.WithContext("Expected: (GeometryBase cage, Point3d[] original, Point3d[] deformed)")),
-        };
+                            return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                                value: [new Morphology.CageDeformResult(deformed, maxDisp, meanDisp, originalBounds, deformedBounds, volumeRatio),]);
+                        }))()
+                        : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: deformResult.Error);
+                }))();
 
     [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideCatmullClark(
