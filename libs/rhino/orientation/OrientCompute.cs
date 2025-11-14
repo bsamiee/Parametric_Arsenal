@@ -25,47 +25,58 @@ internal static class OrientCompute {
                     ? ResultFactory.Create<(Transform, double, byte[])>(error: E.Validation.ToleranceAbsoluteInvalid)
                     : validBrep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
                         ? ((Func<Result<(Transform, double, byte[])>>)(() => {
-                            using VolumeMassProperties? vmp = validBrep.IsSolid && validBrep.IsManifold ? VolumeMassProperties.Compute(validBrep) : null;
-                            Vector3d diag1 = new(1, 1, 0);
-                            Vector3d diag2 = new(1, 0, 1);
-                            Vector3d diag3 = new(0, 1, 1);
-                            _ = diag1.Unitize();
-                            _ = diag2.Unitize();
-                            _ = diag3.Unitize();
-                            Plane[] testPlanes = [
-                                new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
-                                new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
-                                new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
-                                new Plane(box.Center, diag1, Vector3d.ZAxis),
-                                new Plane(box.Center, diag2, Vector3d.YAxis),
-                                new Plane(box.Center, diag3, Vector3d.XAxis),
-                            ];
+                            Result<Point3d> centroidResult = OrientCore.ExtractCentroid(validBrep, useMassProperties: true);
+                            return (criteria, centroidResult.IsSuccess) switch {
+                                (2, false) => ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.CentroidExtractionFailed),
+                                _ => ((Func<Result<(Transform, double, byte[])>>)(() => {
+                                    Vector3d diag1 = new(1, 1, 0);
+                                    Vector3d diag2 = new(1, 0, 1);
+                                    Vector3d diag3 = new(0, 1, 1);
+                                    _ = diag1.Unitize();
+                                    _ = diag2.Unitize();
+                                    _ = diag3.Unitize();
+                                    Plane[] testPlanes = [
+                                        new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
+                                        new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
+                                        new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
+                                        new Plane(box.Center, diag1, Vector3d.ZAxis),
+                                        new Plane(box.Center, diag2, Vector3d.YAxis),
+                                        new Plane(box.Center, diag3, Vector3d.XAxis),
+                                    ];
 
-                            (Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
-                                Transform xf = Transform.PlaneToPlane(plane, Plane.WorldXY);
-                                using Brep test = (Brep)validBrep.Duplicate();
-                                return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<byte>())
-                                    : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
-                                        ? (xf, criteria switch {
-                                            1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
-                                            2 => vmp is not null && testBox.Diagonal.Length > tolerance ? Math.Max(0.0, 1.0 - (Math.Abs(testBox.Center.Z - vmp.Centroid.Z) / testBox.Diagonal.Length)) : 0.0,
-                                            3 => ((Math.Abs(testBox.Max.X - testBox.Min.X) <= tolerance ? 1 : 0)
-                                                + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
-                                                + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
-                                                    0 => 0.0,
-                                                    int degeneracy and >= 1 and <= 3 => degeneracy / (double)OrientConfig.MaxDegeneracyDimensions,
+                                    (Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
+                                        Transform xf = Transform.PlaneToPlane(plane, Plane.WorldXY);
+                                        using Brep test = (Brep)validBrep.Duplicate();
+                                        return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<byte>())
+                                            : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
+                                                ? (xf, criteria switch {
+                                                    1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
+                                                    2 => centroidResult.IsSuccess && testBox.Diagonal.Length > tolerance
+                                                        ? ((Func<double>)(() => {
+                                                            Point3d centroid = centroidResult.Value;
+                                                            centroid.Transform(xf);
+                                                            return Math.Max(0.0, 1.0 - (Math.Abs(centroid.Z) / testBox.Diagonal.Length));
+                                                        }))()
+                                                        : 0.0,
+                                                    3 => ((Math.Abs(testBox.Max.X - testBox.Min.X) <= tolerance ? 1 : 0)
+                                                        + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
+                                                        + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
+                                                            0 => 0.0,
+                                                            int degeneracy and >= 1 and <= 3 => degeneracy / (double)OrientConfig.MaxDegeneracyDimensions,
+                                                            _ => 0.0,
+                                                        },
+                                                    4 => (testBox.Min.Z >= -tolerance ? OrientConfig.OrientationScoreWeight1 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientConfig.OrientationScoreWeight2 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientConfig.LowProfileAspectRatio) ? OrientConfig.OrientationScoreWeight3 : 0.0),
                                                     _ => 0.0,
-                                                },
-                                            4 => (testBox.Min.Z >= -tolerance ? OrientConfig.OrientationScoreWeight1 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientConfig.OrientationScoreWeight2 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientConfig.LowProfileAspectRatio) ? OrientConfig.OrientationScoreWeight3 : 0.0),
-                                            _ => 0.0,
-                                        }, criteria is >= 1 and <= 4 ? [criteria,] : Array.Empty<byte>())
-                                        : (Transform.Identity, 0.0, Array.Empty<byte>());
-                            }),
-                            ];
+                                                }, criteria is >= 1 and <= 4 ? [criteria,] : Array.Empty<byte>())
+                                                : (Transform.Identity, 0.0, Array.Empty<byte>());
+                                    }),
+                                    ];
 
-                            return results.MaxBy(r => r.Item2) is (Transform best, double bestScore, byte[] met) && bestScore > 0
-                                ? ResultFactory.Create(value: (best, bestScore, met))
-                                : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
+                                    return results.MaxBy(r => r.Item2) is (Transform best, double bestScore, byte[] met) && bestScore > 0
+                                        ? ResultFactory.Create(value: (best, bestScore, met))
+                                        : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
+                                }))();
+                            };
                         }))()
                         : ResultFactory.Create<(Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));
 
