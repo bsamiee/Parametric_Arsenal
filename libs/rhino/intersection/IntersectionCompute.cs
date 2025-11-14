@@ -148,13 +148,21 @@ internal static class IntersectionCompute {
                                                 ? ResultFactory.Create(value: toArrays(brepPairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                        (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0) && (meshB.Vertices.Count > 0) && Math.Min(meshA.Vertices.Count, IntersectionConfig.MaxNearMissSamples) is int sampleCount
-                                            ? Enumerable.Range(0, sampleCount)
-                                                .Select(index => new Point3d(meshA.Vertices[index * meshA.Vertices.Count / sampleCount]))
-                                                .Select(point => meshB.ClosestMeshPoint(point, 0.0) is MeshPoint meshPoint && meshPoint.Point.IsValid
+                                        (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0)
+                                                && (meshB.Vertices.Count > 0)
+                                                && Math.Min(meshA.Vertices.Count, IntersectionConfig.MaxNearMissSamples) is int samplesA
+                                                && Math.Min(meshB.Vertices.Count, IntersectionConfig.MaxNearMissSamples) is int samplesB
+                                            ? Enumerable.Range(0, samplesA)
+                                                .Select(index => new Point3d(meshA.Vertices[index * meshA.Vertices.Count / samplesA]))
+                                                .Select(point => meshB.ClosestMeshPoint(point, searchRadius) is MeshPoint meshPoint && meshPoint.Point.IsValid
                                                     ? (PointA: point, PointB: meshPoint.Point, Distance: point.DistanceTo(meshPoint.Point))
                                                     : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                                .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid)
+                                                .Concat(Enumerable.Range(0, samplesB)
+                                                    .Select(index => new Point3d(meshB.Vertices[index * meshB.Vertices.Count / samplesB]))
+                                                    .Select(point => meshA.ClosestMeshPoint(point, searchRadius) is MeshPoint meshPoint && meshPoint.Point.IsValid
+                                                        ? (PointA: meshPoint.Point, PointB: point, Distance: meshPoint.Point.DistanceTo(point))
+                                                        : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue)))
+                                                .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] meshPairs && meshPairs.Length > 0
                                                 ? ResultFactory.Create(value: toArrays(meshPairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
