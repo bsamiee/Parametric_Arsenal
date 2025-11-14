@@ -69,6 +69,53 @@ internal static class MorphologyConfig {
     /// <summary>Uniform Laplacian weight (neighbor average).</summary>
     internal const double UniformLaplacianWeight = 1.0;
 
+    /// <summary>Mesh offset minimum distance threshold (0.001 mm).</summary>
+    internal const double MinOffsetDistance = 0.001;
+
+    /// <summary>Mesh offset maximum distance threshold (1000 mm).</summary>
+    internal const double MaxOffsetDistance = 1000.0;
+
+    /// <summary>Mesh reduction minimum target face count.</summary>
+    internal const int MinReductionFaceCount = 4;
+
+    /// <summary>Mesh reduction accuracy range [0.0, 1.0] where 0=fast, 1=accurate.</summary>
+    internal const double MinReductionAccuracy = 0.0;
+    internal const double MaxReductionAccuracy = 1.0;
+    internal const double DefaultReductionAccuracy = 0.5;
+
+    /// <summary>Remesh minimum edge length (absolute tolerance multiplier).</summary>
+    internal const double RemeshMinEdgeLengthFactor = 0.1;
+
+    /// <summary>Remesh maximum edge length (bounding box diagonal fraction).</summary>
+    internal const double RemeshMaxEdgeLengthFactor = 0.5;
+
+    /// <summary>Remesh maximum iterations to prevent infinite loops.</summary>
+    internal const int MaxRemeshIterations = 100;
+
+    /// <summary>Remesh edge split length threshold (target × factor).</summary>
+    internal const double RemeshSplitThresholdFactor = 1.33;
+
+    /// <summary>Remesh edge collapse length threshold (target × factor).</summary>
+    internal const double RemeshCollapseThresholdFactor = 0.75;
+
+    /// <summary>Remesh uniformity score weight for edge length deviation.</summary>
+    internal const double RemeshUniformityWeight = 0.8;
+
+    /// <summary>RBF Gaussian kernel width parameter.</summary>
+    internal const double RBFKernelWidth = 1.0;
+
+    /// <summary>RBF regularization parameter (Tikhonov).</summary>
+    internal const double RBFRegularization = 1e-6;
+
+    /// <summary>Cotangent weight clamping threshold for obtuse triangles.</summary>
+    internal const double CotangentClampMin = 0.0;
+
+    /// <summary>Adaptive subdivision quality threshold: aspect ratio maximum.</summary>
+    internal const double AdaptiveAspectRatioThreshold = 3.0;
+
+    /// <summary>Adaptive subdivision quality threshold: minimum angle (15°).</summary>
+    internal static readonly double AdaptiveMinAngleThreshold = RhinoMath.ToRadians(15.0);
+
     /// <summary>Operation validation mode dispatch by (operation ID, input type).</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
@@ -79,7 +126,12 @@ internal static class MorphologyConfig {
             [(4, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
             [(10, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
             [(11, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
+            [(12, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
+            [(13, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(14, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
+            [(15, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
             [(20, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
+            [(21, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
     /// <summary>Operation names for diagnostics.</summary>
@@ -89,9 +141,15 @@ internal static class MorphologyConfig {
             [2] = "SubdivideCatmullClark",
             [3] = "SubdivideLoop",
             [4] = "SubdivideButterfly",
+            [5] = "CageDeformRBF",
             [10] = "SmoothLaplacian",
             [11] = "SmoothTaubin",
+            [12] = "MeshOffset",
+            [13] = "MeshReduce",
+            [14] = "MeshRemesh",
+            [15] = "AdaptiveSubdivision",
             [20] = "EvolveMeanCurvature",
+            [21] = "SmoothLaplacianCotangent",
         }.ToFrozenDictionary();
 
     /// <summary>Operation ID constants for internal use.</summary>
@@ -99,7 +157,13 @@ internal static class MorphologyConfig {
     internal const byte OpSubdivideCatmullClark = 2;
     internal const byte OpSubdivideLoop = 3;
     internal const byte OpSubdivideButterfly = 4;
+    internal const byte OpCageDeformRBF = 5;
     internal const byte OpSmoothLaplacian = 10;
     internal const byte OpSmoothTaubin = 11;
+    internal const byte OpOffset = 12;
+    internal const byte OpReduce = 13;
+    internal const byte OpRemesh = 14;
+    internal const byte OpAdaptiveSubdivision = 15;
     internal const byte OpEvolveMeanCurvature = 20;
+    internal const byte OpSmoothLaplacianCotangent = 21;
 }
