@@ -66,7 +66,7 @@ internal static class MorphologyCompute {
                                         ? ResultFactory.Create(value: deformed)
                                         : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
                                 }))();
-                    }))();
+                        }))();
                 }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -332,7 +332,8 @@ internal static class MorphologyCompute {
                         iterPerformed++;
 
                         double[] distances = [.. Enumerable.Range(0, smoothed.Vertices.Count)
-                            .Select(i => positions[i].DistanceTo(prevPositions[i])),];
+                            .Select(i => positions[i].DistanceTo(prevPositions[i])),
+                        ];
                         double[] distSquares = [.. distances.Select(static d => d * d),];
                         double rmsDisp = iter > 0
                             ? Math.Sqrt(distSquares.Average())

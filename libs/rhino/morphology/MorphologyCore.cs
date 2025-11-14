@@ -211,11 +211,11 @@ internal static class MorphologyCore {
                 ? positions[i]
                 : ((Func<Point3d>)(() => {
                     Point3d laplacian = Point3d.Origin;
-            for (int j = 0; j < neighbors.Length; j++) {
-                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
-                laplacian += positions[meshVertIdx] - positions[i];
-            }
-            laplacian /= neighbors.Length;
+                    for (int j = 0; j < neighbors.Length; j++) {
+                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                        laplacian += positions[meshVertIdx] - positions[i];
+                    }
+                    laplacian /= neighbors.Length;
 
                     Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
                     Vector3d laplacianVec = laplacian - Point3d.Origin;
@@ -284,7 +284,8 @@ internal static class MorphologyCore {
         int iterations,
         IGeometryContext context) {
         double[] displacements = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
-            .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),];
+            .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),
+        ];
 
         double[] squares = [.. displacements.Select(static d => d * d),];
         double rms = displacements.Length > 0 ? Math.Sqrt(squares.Average()) : 0.0;
