@@ -467,6 +467,8 @@ internal static class SpatialCompute {
                     double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
                     double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
                     if (Math.Abs(orientation) <= orientationTolerance) {
+                        // Mark circumcenter as invalid for degenerate/collinear triangles.
+                        // Point3d.Unset is used as a sentinel; see IsValid check at line 482.
                         circumcenters[ti] = Point3d.Unset;
                         continue;
                     }
