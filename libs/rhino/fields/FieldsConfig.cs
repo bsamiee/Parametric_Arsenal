@@ -6,19 +6,13 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and dispatch tables for fields operations.</summary>
+/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
     // OPERATION TYPE IDENTIFIERS
 
     /// <summary>Distance field operation identifier.</summary>
     internal const byte OperationDistance = 0;
-    /// <summary>Gradient field operation identifier.</summary>
-    internal const byte OperationGradient = 1;
-    /// <summary>Streamline tracing operation identifier.</summary>
-    internal const byte OperationStreamline = 2;
-    /// <summary>Isosurface extraction operation identifier.</summary>
-    internal const byte OperationIsosurface = 3;
 
     // INTEGRATION METHOD IDENTIFIERS
 
@@ -28,8 +22,13 @@ internal static class FieldsConfig {
     internal const byte IntegrationRK2 = 1;
     /// <summary>Fourth-order Runge-Kutta integration method.</summary>
     internal const byte IntegrationRK4 = 2;
-    /// <summary>Adaptive fourth-order Runge-Kutta with error control.</summary>
-    internal const byte IntegrationAdaptiveRK4 = 3;
+
+    // INTERPOLATION METHOD IDENTIFIERS
+
+    /// <summary>Nearest neighbor interpolation (fastest, lowest quality).</summary>
+    internal const byte InterpolationNearest = 0;
+    /// <summary>Trilinear interpolation (balanced speed and quality).</summary>
+    internal const byte InterpolationTrilinear = 1;
 
     // GRID RESOLUTION CONSTANTS
 
@@ -51,12 +50,6 @@ internal static class FieldsConfig {
     internal const double MaxStepSize = 1.0;
     /// <summary>Maximum streamline integration steps (prevents infinite loops).</summary>
     internal const int MaxStreamlineSteps = 10000;
-    /// <summary>Adaptive step tolerance (RhinoMath.SqrtEpsilon for error control).</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double AdaptiveStepTolerance = RhinoMath.SqrtEpsilon;
-    /// <summary>Finite difference step for gradient computation (RhinoMath.SqrtEpsilon for numerical derivatives).</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double GradientFiniteDifferenceStep = RhinoMath.SqrtEpsilon;
 
     // RK4 INTEGRATION COEFFICIENTS
 
@@ -69,34 +62,10 @@ internal static class FieldsConfig {
 
     /// <summary>Grid size threshold for RTree usage in streamline integration (RTree overhead justified above this size).</summary>
     internal const int StreamlineRTreeThreshold = 1000;
+    /// <summary>RTree threshold for switching from linear to spatial search in field operations.</summary>
+    internal const int FieldRTreeThreshold = 100;
 
-    /// <summary>ArrayPool buffer sizes for distance field operations by geometry type.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), int> BufferSizes =
-        new Dictionary<(byte, Type), int> {
-            [(OperationDistance, typeof(Mesh))] = 4096,
-            [(OperationDistance, typeof(Brep))] = 8192,
-            [(OperationDistance, typeof(Curve))] = 2048,
-            [(OperationDistance, typeof(Surface))] = 4096,
-            [(OperationGradient, typeof(Mesh))] = 8192,
-            [(OperationGradient, typeof(Brep))] = 16384,
-            [(OperationStreamline, typeof(void))] = 4096,
-            [(OperationIsosurface, typeof(void))] = 16384,
-        }.ToFrozenDictionary();
-
-    /// <summary>Validation mode dispatch for operation-type pairs.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), V> ValidationModes =
-        new Dictionary<(byte, Type), V> {
-            [(OperationDistance, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(OperationDistance, typeof(Brep))] = V.Standard | V.Topology,
-            [(OperationDistance, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(OperationDistance, typeof(Surface))] = V.Standard | V.BoundingBox,
-            [(OperationGradient, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(OperationGradient, typeof(Brep))] = V.Standard | V.Topology,
-            [(OperationGradient, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(OperationGradient, typeof(Surface))] = V.Standard | V.BoundingBox,
-        }.ToFrozenDictionary();
-
-    // MARCHING CUBES LOOKUP TABLE (256 cube configurations → triangle indices)
+    // MARCHING CUBES CONSTANTS
 
     /// <summary>Marching cubes edge vertex pairs: edge index → (vertex1, vertex2).</summary>
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
@@ -226,25 +195,19 @@ internal static class FieldsConfig {
         return table;
     }
 
-    /// <summary>
-    /// Inverts the triangle winding for a marching cubes case.
-    /// Each triangle is represented by 3 consecutive edge indices.
-    /// </summary>
     private static int[] InvertTriangles(int[] edges) {
         int length = edges.Length;
         int[] inverted = new int[length];
         for (int i = 0; i < length; i += 3) {
-            // Reverse the order of each triangle
             inverted[i] = edges[i + 2];
             inverted[i + 1] = edges[i + 1];
             inverted[i + 2] = edges[i];
         }
         return inverted;
     }
+
     // DISTANCE FIELD PARAMETERS
 
-    /// <summary>RTree threshold for switching from linear to spatial search.</summary>
-    internal const int DistanceFieldRTreeThreshold = 100;
     /// <summary>Inside/outside ray casting tolerance multiplier.</summary>
     internal const double InsideOutsideToleranceMultiplier = 10.0;
 }

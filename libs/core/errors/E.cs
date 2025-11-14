@@ -73,11 +73,16 @@ public static class E {
             [2602] = "No primitives detected in geometry",
             [2603] = "No pattern detected in geometry collection",
 
-            // Field Operations (2700-2703)
+            // Field Operations (2700-2708)
             [2700] = "Field bounds invalid or degenerate",
             [2701] = "Invalid seed points for streamline tracing",
             [2702] = "Isovalue outside scalar field range",
             [2703] = "Scalar field data invalid or insufficient",
+            [2704] = "Curl field computation failed or invalid",
+            [2705] = "Divergence field computation failed or invalid",
+            [2706] = "Laplacian field computation failed or invalid",
+            [2707] = "Vector potential field computation failed or invalid",
+            [2708] = "Field interpolation failed or invalid query point",
 
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
@@ -215,11 +220,16 @@ public static class E {
         public static readonly SystemError NoPrimitivesDetected = Get(2602);
         public static readonly SystemError NoPatternDetected = Get(2603);
 
-        // Field Operations (2700-2703)
+        // Field Operations (2700-2708)
         public static readonly SystemError InvalidFieldBounds = Get(2700);
         public static readonly SystemError InvalidStreamlineSeeds = Get(2701);
         public static readonly SystemError InvalidIsovalue = Get(2702);
         public static readonly SystemError InvalidScalarField = Get(2703);
+        public static readonly SystemError InvalidCurlComputation = Get(2704);
+        public static readonly SystemError InvalidDivergenceComputation = Get(2705);
+        public static readonly SystemError InvalidLaplacianComputation = Get(2706);
+        public static readonly SystemError InvalidVectorPotentialComputation = Get(2707);
+        public static readonly SystemError InvalidFieldInterpolation = Get(2708);
     }
 
     /// <summary>Validation errors (3000-3999).</summary>
