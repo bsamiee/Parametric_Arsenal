@@ -25,8 +25,6 @@ internal static class FieldsCore {
             static entry => (entry.Operation, entry.GeometryType),
             static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.ValidationMode, entry.BufferSize, entry.IntegrationMethod));
 
-    // DISTANCE FIELD EXECUTION (dispatched by geometry type)
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
         object geometry,
@@ -47,7 +45,6 @@ internal static class FieldsCore {
                 double[] distances = ArrayPool<double>.Shared.Rent(bufferSize);
 
                 try {
-                    // Inline grid sampling (NO helper method)
                     Vector3d delta = (bounds.Max - bounds.Min) / (resolution - 1);
                     int gridIndex = 0;
                     for (int i = 0; i < resolution; i++) {
@@ -60,7 +57,6 @@ internal static class FieldsCore {
                         }
                     }
 
-                    // Inline distance computation (NO helper method)
                     for (int i = 0; i < totalSamples; i++) {
                         Point3d closest = typed switch {
                             Mesh m => m.ClosestPoint(grid[i]),

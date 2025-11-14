@@ -68,11 +68,7 @@ public static class Fields {
                 gridDelta: gridDelta);
         });
 
-    /// <summary>
-    /// Compute curl field: vector field → (grid points[], curl vectors[]) where curl = ∇×F.
-    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
-    /// <para>Boundary conditions: derivatives set to zero at grid boundaries (assumes zero curl at edges).</para>
-    /// </summary>
+    /// <summary>Compute curl field: vector field → (grid points[], curl vectors[]) where curl = ∇×F, row-major grid order, zero derivatives at boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Curl)> CurlField(
         Vector3d[] vectorField,
@@ -92,11 +88,7 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>
-    /// Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F.
-    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
-    /// <para>Boundary conditions: derivatives set to zero at grid boundaries (assumes zero divergence at edges).</para>
-    /// </summary>
+    /// <summary>Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F, row-major grid order, zero derivatives at boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Divergence)> DivergenceField(
         Vector3d[] vectorField,
@@ -116,11 +108,7 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>
-    /// Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f.
-    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
-    /// <para>Boundary conditions: second derivatives set to zero at grid boundaries (assumes zero curvature at edges).</para>
-    /// </summary>
+    /// <summary>Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f, row-major grid order, zero second derivatives at boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Laplacian)> LaplacianField(
         double[] scalarField,
@@ -140,11 +128,7 @@ public static class Fields {
                     (bounds.Max.Z - bounds.Min.Z) / (spec.Resolution - 1))),
         };
 
-    /// <summary>
-    /// Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A.
-    /// <para>Grid points must be in row-major order: x varies fastest, then y, then z (i.e., [x₀,y₀,z₀], [x₁,y₀,z₀], ..., [xₙ,yₙ,zₙ]).</para>
-    /// <para>WARNING: This is a simplified approximation using Coulomb gauge (∇·A = 0) with x-axis line integral only. Not suitable for general 3D fields requiring full gauge freedom.</para>
-    /// </summary>
+    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A, Coulomb gauge approximation via x-axis line integral (limited to simple fields).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Potential)> VectorPotentialField(
         Vector3d[] magneticField,

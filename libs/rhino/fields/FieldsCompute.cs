@@ -12,7 +12,6 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Dense field algorithms: gradient, curl, divergence, laplacian, vector potential, interpolation, streamline, isosurface.</summary>
 [Pure]
 internal static class FieldsCompute {
-    // GRADIENT FIELD COMPUTATION (central difference approximation)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
         double[] distances,
@@ -30,7 +29,6 @@ internal static class FieldsCompute {
             double twoDy = 2.0 * dy;
             double twoDz = 2.0 * dz;
 
-            // Central difference: ∇f = [(f(x+dx) - f(x-dx))/(2dx), (f(y+dy) - f(y-dy))/(2dy), (f(z+dz) - f(z-dz))/(2dz)]
             for (int i = 0; i < resolution; i++) {
                 for (int j = 0; j < resolution; j++) {
                     for (int k = 0; k < resolution; k++) {
@@ -72,7 +70,6 @@ internal static class FieldsCompute {
         }
     }
 
-    // CURL FIELD COMPUTATION (∇×F for vector field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
         Vector3d[] vectorField,
@@ -93,7 +90,6 @@ internal static class FieldsCompute {
                     double twoDy = 2.0 * dy;
                     double twoDz = 2.0 * dz;
 
-                    // Curl: ∇×F = [(∂Fz/∂y - ∂Fy/∂z), (∂Fx/∂z - ∂Fz/∂x), (∂Fy/∂x - ∂Fx/∂y)]
                     int resolutionSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         int baseI = i * resolutionSquared;
@@ -102,15 +98,12 @@ internal static class FieldsCompute {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = baseJ + k;
 
-                                // ∂Fz/∂y - ∂Fy/∂z
                                 double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
                                 double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
 
-                                // ∂Fx/∂z - ∂Fz/∂x
                                 double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
                                 double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
 
-                                // ∂Fy/∂x - ∂Fx/∂y
                                 double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
                                 double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
 
@@ -128,7 +121,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // DIVERGENCE FIELD COMPUTATION (∇·F for vector field)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
         Vector3d[] vectorField,
@@ -149,7 +141,6 @@ internal static class FieldsCompute {
                     double twoDy = 2.0 * dy;
                     double twoDz = 2.0 * dz;
 
-                    // Divergence: ∇·F = ∂Fx/∂x + ∂Fy/∂y + ∂Fz/∂z
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -191,7 +182,6 @@ internal static class FieldsCompute {
                     double dy2 = gridDelta.Y * gridDelta.Y;
                     double dz2 = gridDelta.Z * gridDelta.Z;
 
-                    // Laplacian: ∇²f = ∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -215,7 +205,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // VECTOR POTENTIAL FIELD (find A where B = ∇×A)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Potential)> ComputeVectorPotential(
         Vector3d[] vectorField,
@@ -229,8 +218,6 @@ internal static class FieldsCompute {
                 int totalSamples = vectorField.Length;
                 Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                 try {
-                    // Vector potential via line integrals: A = ∫B·dl (gauge choice: Coulomb gauge ∇·A = 0)
-                    // Simplified: A_i(x,y,z) = ∫₀ˣ B_i(x',y,z) dx' for Coulomb gauge
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
@@ -251,7 +238,6 @@ internal static class FieldsCompute {
         };
     }
 
-    // FIELD INTERPOLATION (trilinear for scalar/vector fields)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<double> InterpolateScalar(
         Point3d query,
@@ -440,7 +426,6 @@ internal static class FieldsCompute {
         return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
     }
 
-    // STREAMLINE INTEGRATION (RK4 with adaptive step control and vector field interpolation)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Curve[]> IntegrateStreamlines(
         Vector3d[] vectorField,
@@ -523,7 +508,6 @@ internal static class FieldsCompute {
             ? InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
             : InterpolateNearestVector(query: query, vectorField: vectorField, grid: gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
 
-    // ISOSURFACE EXTRACTION (marching cubes with 256-case lookup)
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,

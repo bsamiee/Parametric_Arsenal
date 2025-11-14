@@ -6,65 +6,31 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    // OPERATION TYPE IDENTIFIERS
-
-    /// <summary>Distance field operation identifier.</summary>
     internal const byte OperationDistance = 0;
 
-    // INTEGRATION METHOD IDENTIFIERS
-
-    /// <summary>Euler forward integration method.</summary>
     internal const byte IntegrationEuler = 0;
-    /// <summary>Second-order Runge-Kutta integration method.</summary>
     internal const byte IntegrationRK2 = 1;
-    /// <summary>Fourth-order Runge-Kutta integration method.</summary>
     internal const byte IntegrationRK4 = 2;
 
-    // INTERPOLATION METHOD IDENTIFIERS
-
-    /// <summary>Nearest neighbor interpolation (fastest, lowest quality).</summary>
     internal const byte InterpolationNearest = 0;
-    /// <summary>Trilinear interpolation (balanced speed and quality).</summary>
     internal const byte InterpolationTrilinear = 1;
 
-    // GRID RESOLUTION CONSTANTS
-
-    /// <summary>Default grid resolution (32³ = 32,768 samples).</summary>
     internal const int DefaultResolution = 32;
-    /// <summary>Minimum grid resolution (8³ = 512 samples).</summary>
     internal const int MinResolution = 8;
-    /// <summary>Maximum grid resolution (256³ = 16,777,216 samples).</summary>
     internal const int MaxResolution = 256;
 
-    // INTEGRATION STEP PARAMETERS
-
-    /// <summary>Default integration step size (1% of typical geometry scale).</summary>
     internal const double DefaultStepSize = 0.01;
-    /// <summary>Minimum step size (RhinoMath.SqrtEpsilon for numerical stability).</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
-    /// <summary>Maximum step size (prevents overshooting field features).</summary>
     internal const double MaxStepSize = 1.0;
-    /// <summary>Maximum streamline integration steps (prevents infinite loops).</summary>
     internal const int MaxStreamlineSteps = 10000;
 
-    // RK4 INTEGRATION COEFFICIENTS
-
-    /// <summary>RK4 final stage weights: [k1/6, k2/3, k3/3, k4/6].</summary>
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
-    /// <summary>RK4 intermediate stage half-step multipliers: [0.5, 0.5, 1.0].</summary>
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
 
-    // SPATIAL INDEXING THRESHOLDS (RTree vs linear search tradeoffs)
-
-    /// <summary>Grid size threshold for RTree usage in streamline integration (RTree overhead justified above this size).</summary>
     internal const int StreamlineRTreeThreshold = 1000;
-    /// <summary>RTree threshold for switching from linear to spatial search in field operations.</summary>
     internal const int FieldRTreeThreshold = 100;
 
-    // MARCHING CUBES CONSTANTS
-
-    /// <summary>Marching cubes edge vertex pairs: edge index → (vertex1, vertex2).</summary>
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
         (1, 2),
@@ -77,10 +43,9 @@ internal static class FieldsConfig {
         (0, 4),
         (1, 5),
         (2, 6),
-        (3, 7),  // Vertical edges 8-11
+        (3, 7),
     ];
 
-    /// <summary>Marching cubes triangle configuration table (simplified - 256 cases compressed).</summary>
     internal static readonly int[][] MarchingCubesTable = GenerateMarchingCubesTable();
 
     private static int[][] GenerateMarchingCubesTable() {
@@ -182,7 +147,6 @@ internal static class FieldsConfig {
         table[94] = [0, 5, 9, 0, 6, 5, 0, 3, 6, 11, 6, 3, 8, 4, 7,];
         table[95] = [6, 5, 9, 6, 9, 11, 4, 7, 9, 7, 11, 9,];
 
-        // Cases 96-255 (remaining cases - use complement symmetry)
         for (int i = 96; i < 256; i++) {
             int complement = 255 - i;
             int[] baseCase = table[complement];
@@ -203,8 +167,5 @@ internal static class FieldsConfig {
         return inverted;
     }
 
-    // DISTANCE FIELD PARAMETERS
-
-    /// <summary>Inside/outside ray casting tolerance multiplier.</summary>
     internal const double InsideOutsideToleranceMultiplier = 10.0;
 }
