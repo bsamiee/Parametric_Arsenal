@@ -152,21 +152,21 @@ internal static class FieldsConfig {
         for (int i = 96; i < 256; i++) {
             int complement = 255 - i;
             int[] baseCase = table[complement];
-            table[i] = baseCase.Length > 0 ? InvertTriangles(baseCase) : [];
+            table[i] = baseCase.Length > 0
+                ? ((Func<int[]>)(() => {
+                    int length = baseCase.Length;
+                    int[] inverted = new int[length];
+                    for (int j = 0; j < length; j += 3) {
+                        inverted[j] = baseCase[j + 2];
+                        inverted[j + 1] = baseCase[j + 1];
+                        inverted[j + 2] = baseCase[j];
+                    }
+                    return inverted;
+                }))()
+                : [];
         }
 
         return table;
-    }
-
-    private static int[] InvertTriangles(int[] edges) {
-        int length = edges.Length;
-        int[] inverted = new int[length];
-        for (int i = 0; i < length; i += 3) {
-            inverted[i] = edges[i + 2];
-            inverted[i + 1] = edges[i + 1];
-            inverted[i + 2] = edges[i];
-        }
-        return inverted;
     }
 
     internal const double InsideOutsideToleranceMultiplier = 10.0;
