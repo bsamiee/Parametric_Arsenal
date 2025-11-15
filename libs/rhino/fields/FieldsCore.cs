@@ -39,7 +39,7 @@ internal static class FieldsCore {
                 int resolution = RhinoMath.Clamp(spec.Resolution, FieldsConfig.MinResolution, FieldsConfig.MaxResolution);
                 int totalSamples = resolution * resolution * resolution;
                 int bufferSize = OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod) config)
-                    ? (totalSamples > config.BufferSize ? totalSamples : config.BufferSize)
+                    ? Math.Max(totalSamples, config.BufferSize)
                     : totalSamples;
                 Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(bufferSize);
                 double[] distances = ArrayPool<double>.Shared.Rent(bufferSize);
@@ -48,11 +48,12 @@ internal static class FieldsCore {
                     Vector3d delta = (bounds.Max - bounds.Min) / (resolution - 1);
                     int gridIndex = 0;
                     for (int i = 0; i < resolution; i++) {
-                        double x = bounds.Min.X + (i * delta.X);
                         for (int j = 0; j < resolution; j++) {
-                            double y = bounds.Min.Y + (j * delta.Y);
                             for (int k = 0; k < resolution; k++) {
-                                grid[gridIndex++] = new Point3d(x, y, bounds.Min.Z + (k * delta.Z));
+                                grid[gridIndex++] = new Point3d(
+                                    bounds.Min.X + (i * delta.X),
+                                    bounds.Min.Y + (j * delta.Y),
+                                    bounds.Min.Z + (k * delta.Z));
                             }
                         }
                     }
