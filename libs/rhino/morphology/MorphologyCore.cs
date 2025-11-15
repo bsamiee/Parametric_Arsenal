@@ -196,18 +196,22 @@ internal static class MorphologyCore {
 
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            if (neighbors.Length is 0) {
+                updated[i] = positions[i];
+                continue;
+            }
             Point3d currentPos = positions[i];
-            (Point3d sum, double weightSum) = neighbors.Aggregate(
-                (Sum: Point3d.Origin, WeightSum: 0.0),
-                (acc, neighborIdx) => {
-                    int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0];
-                    Point3d neighborPos = positions[meshVertIdx];
-                    double weight = useCotangent
-                        ? MorphologyConfig.UniformLaplacianWeight / Math.Max(currentPos.DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                        : MorphologyConfig.UniformLaplacianWeight;
-                    return (Sum: acc.Sum + (weight * neighborPos), WeightSum: acc.WeightSum + weight);
-                });
-            updated[i] = neighbors.Length is 0 ? currentPos : (weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : currentPos);
+            (Vector3d weightedSum, double weightSum) = (Vector3d.Zero, 0.0);
+            for (int j = 0; j < neighbors.Length; j++) {
+                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                Point3d neighborPos = positions[meshVertIdx];
+                double weight = useCotangent
+                    ? MorphologyConfig.UniformLaplacianWeight / Math.Max(currentPos.DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                    : MorphologyConfig.UniformLaplacianWeight;
+                weightedSum += weight * (Vector3d)neighborPos;
+                weightSum += weight;
+            }
+            updated[i] = weightSum > RhinoMath.ZeroTolerance ? (Point3d)(weightedSum / weightSum) : currentPos;
         }
 
         return updated;
@@ -293,12 +297,13 @@ internal static class MorphologyCore {
         int iterations,
         IGeometryContext context) {
         int vertCount = Math.Min(original.Vertices.Count, smoothed.Vertices.Count);
-        double[] displacements = [.. Enumerable.Range(0, vertCount)
-            .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),
-        ];
-        (double rms, double maxDisp) = displacements.Length > 0
-            ? (Math.Sqrt(displacements.Average(static d => d * d)), displacements.Max())
-            : (0.0, 0.0);
+        (double sumSq, double maxDisp) = (0.0, 0.0);
+        for (int i = 0; i < vertCount; i++) {
+            double dist = ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]);
+            sumSq += dist * dist;
+            maxDisp = Math.Max(maxDisp, dist);
+        }
+        double rms = vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0;
         double quality = MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0;
         bool converged = rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
 
@@ -353,14 +358,16 @@ internal static class MorphologyCore {
         double targetEdge,
         int maxIters,
         IGeometryContext context) {
-        double[] edgeLengths = [.. Enumerable.Range(0, remeshed.TopologyEdges.Count)
-            .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length),
-        ];
-        double mean = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
-        double stdDev = edgeLengths.Length > 0 ? Math.Sqrt(edgeLengths.Average(e => {
-            double diff = e - mean;
-            return diff * diff;
-        })) : 0.0;
+        int edgeCount = remeshed.TopologyEdges.Count;
+        (double sum, double sumSq) = (0.0, 0.0);
+        for (int i = 0; i < edgeCount; i++) {
+            double len = remeshed.TopologyEdges.EdgeLine(i).Length;
+            sum += len;
+            sumSq += len * len;
+        }
+        double mean = edgeCount > 0 ? sum / edgeCount : 0.0;
+        double variance = edgeCount > 0 ? (sumSq / edgeCount) - (mean * mean) : 0.0;
+        double stdDev = Math.Sqrt(Math.Max(variance, 0.0));
         (double uniformity, bool converged) = (
             mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / mean) : 0.0,
             Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * MorphologyConfig.RemeshConvergenceThreshold));
