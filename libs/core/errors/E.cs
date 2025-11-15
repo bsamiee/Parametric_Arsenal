@@ -115,6 +115,19 @@ public static class E {
             [2816] = "Reduction accuracy parameter out of valid range",
             [2817] = "Remeshing iteration limit exceeded without convergence",
 
+            // Fitting Operations (2900-2910)
+            [2900] = "Fitting operation failed: numerical instability or invalid configuration",
+            [2901] = "Curve degree out of valid range [1, 11]",
+            [2902] = "Control point count below minimum for specified degree",
+            [2903] = "Insufficient points for least-squares fitting",
+            [2904] = "Iterative optimization failed to converge within maximum iterations",
+            [2905] = "Surface fitting requires rectangular point grid",
+            [2906] = "Parameterization method failed: coincident points or zero-length curve",
+            [2907] = "Constraint violation: fitted geometry exceeds tolerance threshold",
+            [2908] = "Laplacian smoothing failed: non-manifold control point structure",
+            [2909] = "Isogeometric refinement failed: knot insertion produced invalid structure",
+            [2910] = "Surface fairing failed: thin-plate energy minimization diverged",
+
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
             [3000] = "Geometry must be valid",
@@ -293,6 +306,21 @@ public static class E {
             public static readonly SystemError OffsetDistanceInvalid = Get(2815);
             public static readonly SystemError ReductionAccuracyInvalid = Get(2816);
             public static readonly SystemError RemeshIterationLimitExceeded = Get(2817);
+        }
+
+        /// <summary>Fitting operation errors (2900-2910).</summary>
+        public static class Fitting {
+            public static readonly SystemError FittingFailed = Get(2900);
+            public static readonly SystemError InvalidDegree = Get(2901);
+            public static readonly SystemError InvalidControlPointCount = Get(2902);
+            public static readonly SystemError InsufficientPoints = Get(2903);
+            public static readonly SystemError ConvergenceFailed = Get(2904);
+            public static readonly SystemError InvalidPointGrid = Get(2905);
+            public static readonly SystemError ParameterizationFailed = Get(2906);
+            public static readonly SystemError ConstraintViolation = Get(2907);
+            public static readonly SystemError SmoothingFailed = Get(2908);
+            public static readonly SystemError IsogeometricRefinementFailed = Get(2909);
+            public static readonly SystemError SurfaceFairingFailed = Get(2910);
         }
     }
 

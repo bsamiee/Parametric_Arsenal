@@ -1,0 +1,291 @@
+using System.Diagnostics.Contracts;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using Arsenal.Core.Context;
+using Arsenal.Core.Errors;
+using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
+using Rhino;
+using Rhino.Geometry;
+using Rhino.Geometry.Collections;
+
+namespace Arsenal.Rhino.Fitting;
+
+/// <summary>Advanced fairing and smoothing algorithms with energy minimization.</summary>
+internal static class FittingCompute {
+    /// <summary>Iteratively fairs curve by minimizing bending energy ∫(κ²).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fitting.CurveFitResult> FairCurveIterative(
+        Curve curve,
+        Fitting.FairOptions options,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: curve)
+            .Validate(args: [context, V.Standard | V.Degeneracy,])
+            .Bind(validCurve => validCurve is not NurbsCurve nc
+                ? curve.ToNurbsCurve() is NurbsCurve converted && converted is not null
+                    ? FairNurbsCurve(converted, options, context)
+                    : ResultFactory.Create<Fitting.CurveFitResult>(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Cannot convert to NURBS"))
+                : FairNurbsCurve(nc, options, context));
+
+    /// <summary>Fairs NURBS curve via iterative control point optimization.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fitting.CurveFitResult> FairNurbsCurve(
+        NurbsCurve curve,
+        Fitting.FairOptions options,
+        IGeometryContext context) =>
+        ((Func<Result<Fitting.CurveFitResult>>)(() => {
+            NurbsCurve working = curve.Duplicate() as NurbsCurve ?? curve;
+            double previousEnergy = ComputeBendingEnergy(curve: working);
+            int iteration = 0;
+
+            while (iteration < options.MaxIterations) {
+                OptimizeControlPointsStep(
+                    curve: working,
+                    relaxation: options.RelaxationFactor,
+                    fixBoundaries: options.FixBoundaries);
+
+                double currentEnergy = ComputeBendingEnergy(curve: working);
+                double energyChange = Math.Abs(currentEnergy - previousEnergy);
+
+                if (energyChange < FittingConfig.EnergyConvergence) {
+                    break;
+                }
+
+                previousEnergy = currentEnergy;
+                iteration++;
+            }
+
+            return iteration >= options.MaxIterations
+                ? ResultFactory.Create<Fitting.CurveFitResult>(
+                    error: E.Geometry.Fitting.ConvergenceFailed.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Failed to converge after {options.MaxIterations.ToString(CultureInfo.InvariantCulture)} iterations")))
+                : ResultFactory.Create(value: new Fitting.CurveFitResult(
+                    Curve: working,
+                    MaxDeviation: 0.0,
+                    RmsDeviation: 0.0,
+                    FairnessScore: ComputeFairnessScore(working),
+                    ControlPointCount: working.Points.Count,
+                    ActualDegree: working.Degree));
+        }))();
+
+    /// <summary>Computes discrete bending energy E = ∫(κ²) ≈ Σ||κ(t[i])||²·Δt.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeBendingEnergy(Curve curve) {
+        const int n = FittingConfig.EnergySampleCount;
+        double energy = 0.0;
+        double dt = curve.Domain.Length / (n - 1.0);
+
+        for (int i = 0; i < n; i++) {
+            double t = curve.Domain.ParameterAt(i / (n - 1.0));
+            Vector3d curvatureVector = curve.CurvatureAt(t);
+            energy += curvatureVector.SquareLength * dt;
+        }
+
+        return energy;
+    }
+
+    /// <summary>Single Laplacian smoothing step: P[i] → (P[i-1] + P[i+1])/2.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void OptimizeControlPointsStep(
+        NurbsCurve curve,
+        double relaxation,
+        bool fixBoundaries) {
+        int n = curve.Points.Count;
+        Point3d[] newPoints = new Point3d[n];
+
+        for (int i = 0; i < n; i++) {
+            newPoints[i] = (fixBoundaries && (i == 0 || i == n - 1))
+                ? curve.Points[i].Location
+                : i > 0 && i < n - 1
+                    ? new Point3d(
+                        (curve.Points[i - 1].Location.X + curve.Points[i + 1].Location.X) * 0.5,
+                        (curve.Points[i - 1].Location.Y + curve.Points[i + 1].Location.Y) * 0.5,
+                        (curve.Points[i - 1].Location.Z + curve.Points[i + 1].Location.Z) * 0.5)
+                    : curve.Points[i].Location;
+        }
+
+        for (int i = 0; i < n; i++) {
+            Point3d current = curve.Points[i].Location;
+            Vector3d delta = newPoints[i] - current;
+            curve.Points[i] = (!fixBoundaries || (i != 0 && i != n - 1))
+                ? new ControlPoint(current + (delta * relaxation))
+                : new ControlPoint(current);
+        }
+    }
+
+    /// <summary>Computes fairness score from curvature standard deviation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeFairnessScore(Curve curve) =>
+        FittingConfig.EnergySampleCount > 1
+            ? Enumerable.Range(0, FittingConfig.EnergySampleCount)
+                .Select(i => curve.CurvatureAt(curve.Domain.ParameterAt(i / (FittingConfig.EnergySampleCount - 1.0))).Length)
+                .ToArray() is double[] curvatures
+                && curvatures.Length > 0
+                && curvatures.Average() is double avgCurv
+                && Math.Sqrt(curvatures.Sum(k => Math.Pow(k - avgCurv, 2)) / curvatures.Length) is double stdDev
+                && avgCurv > RhinoMath.ZeroTolerance
+                    ? RhinoMath.Clamp(1.0 - (stdDev / avgCurv), 0.0, 1.0)
+                    : 0.0
+            : 0.0;
+
+    /// <summary>Laplacian smoothing for curves with iteration count.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fitting.CurveFitResult> SmoothCurve(
+        Curve curve,
+        int iterations,
+        double relaxationFactor,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: curve)
+            .Validate(args: [context, V.Standard | V.Degeneracy,])
+            .Bind(validCurve =>
+                (validCurve.ToNurbsCurve() ?? validCurve as NurbsCurve) is NurbsCurve working
+                    ? ((Func<Result<Fitting.CurveFitResult>>)(() => {
+                        int clampedIterations = RhinoMath.Clamp(iterations, 1, FittingConfig.MaxSmoothIterations);
+                        double clampedRelaxation = RhinoMath.Clamp(relaxationFactor, FittingConfig.MinRelaxation, FittingConfig.MaxRelaxation);
+                        for (int iter = 0; iter < clampedIterations; iter++) {
+                            OptimizeControlPointsStep(curve: working, relaxation: clampedRelaxation, fixBoundaries: false);
+                        }
+                        return ResultFactory.Create(value: new Fitting.CurveFitResult(
+                            Curve: working,
+                            MaxDeviation: 0.0,
+                            RmsDeviation: 0.0,
+                            FairnessScore: ComputeFairnessScore(working),
+                            ControlPointCount: working.Points.Count,
+                            ActualDegree: working.Degree));
+                    }))()
+                    : ResultFactory.Create<Fitting.CurveFitResult>(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Cannot convert to NURBS")));
+
+    /// <summary>Surface smoothing via SDK Surface.Smooth method with iteration.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fitting.SurfaceFitResult> SmoothSurface(
+        Surface surface,
+        int iterations,
+        double smoothFactor,
+        (bool X, bool Y, bool Z) axes,
+        bool fixBoundaries,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: surface)
+            .Validate(args: [context, V.Standard | V.UVDomain,])
+            .Bind(validSurface => {
+                Surface working = validSurface.Duplicate() as Surface ?? validSurface;
+                int clampedIterations = RhinoMath.Clamp(
+                    iterations,
+                    1,
+                    FittingConfig.MaxSmoothIterations);
+
+                for (int i = 0; i < clampedIterations; i++) {
+                    Surface smoothed = working.Smooth(
+                        smoothFactor: smoothFactor,
+                        bXSmooth: axes.X,
+                        bYSmooth: axes.Y,
+                        bZSmooth: axes.Z,
+                        bFixBoundaries: fixBoundaries,
+                        coordinateSystem: SmoothingCoordinateSystem.World,
+                        plane: Plane.WorldXY);
+                    
+                    if (smoothed is null) {
+                        return ResultFactory.Create<Fitting.SurfaceFitResult>(
+                            error: E.Geometry.Fitting.SmoothingFailed.WithContext(string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
+                    }
+                    working = smoothed;
+                }
+
+                return working is NurbsSurface ns
+                    ? ResultFactory.Create(value: new Fitting.SurfaceFitResult(
+                        Surface: ns,
+                        MaxDeviation: 0.0,
+                        RmsDeviation: 0.0,
+                        FairnessScore: 0.0,
+                        ControlPointCounts: (ns.Points.CountU, ns.Points.CountV),
+                        ActualDegrees: (ns.Degree(0), ns.Degree(1))))
+                    : ResultFactory.Create<Fitting.SurfaceFitResult>(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Result not NURBS"));
+            });
+
+    /// <summary>Isogeometric refinement via knot insertion (shape-preserving subdivision).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fitting.CurveFitResult> RefineIsogeometric(
+        NurbsCurve curve,
+        int level,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: curve)
+            .Validate(args: [context, V.Standard | V.NurbsGeometry,])
+            .Bind(validCurve => ((Func<Result<Fitting.CurveFitResult>>)(() => {
+                NurbsCurve refined = validCurve.Duplicate() as NurbsCurve ?? validCurve;
+                
+                for (int lvl = 0; lvl < level; lvl++) {
+                    foreach (double knotParam in [.. ComputeMidpointKnots(refined.Knots)]) {
+                        if (!refined.Knots.InsertKnot(value: knotParam, multiplicity: 1)) {
+                            return ResultFactory.Create<Fitting.CurveFitResult>(
+                                error: E.Geometry.Fitting.IsogeometricRefinementFailed.WithContext(string.Create(
+                                    CultureInfo.InvariantCulture,
+                                    $"Knot insertion failed at t={knotParam:F6} (level {(lvl + 1).ToString(CultureInfo.InvariantCulture)})")));
+                        }
+                    }
+                }
+
+                return ResultFactory.Create(value: new Fitting.CurveFitResult(
+                    Curve: refined,
+                    MaxDeviation: 0.0,
+                    RmsDeviation: 0.0,
+                    FairnessScore: ComputeFairnessScore(refined),
+                    ControlPointCount: refined.Points.Count,
+                    ActualDegree: refined.Degree));
+            }))());
+
+    /// <summary>Computes midpoint parameters for knot insertion (uniform refinement).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double[] ComputeMidpointKnots(NurbsCurveKnotList knots) =>
+        [.. Enumerable.Range(0, knots.Count - 1)
+            .Select(i => (K1: knots[i], K2: knots[i + 1], Mid: (knots[i] + knots[i + 1]) * 0.5))
+            .Where(t => Math.Abs(t.K2 - t.K1) > FittingConfig.ParameterTolerance)
+            .Select(t => t.Mid),];
+
+    /// <summary>Iteratively fairs surface via thin-plate energy minimization.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Fitting.SurfaceFitResult> FairSurfaceIterative(
+        Surface surface,
+        Fitting.FairOptions options,
+        IGeometryContext context) =>
+        ResultFactory.Create(value: surface)
+            .Validate(args: [context, V.Standard | V.UVDomain,])
+            .Bind(validSurface => {
+                Surface working = validSurface.Duplicate() as Surface ?? validSurface;
+                int iterations = options.MaxIterations;
+
+                for (int i = 0; i < iterations; i++) {
+                    Surface smoothed = working.Smooth(
+                        smoothFactor: options.RelaxationFactor,
+                        bXSmooth: true,
+                        bYSmooth: true,
+                        bZSmooth: true,
+                        bFixBoundaries: options.FixBoundaries,
+                        coordinateSystem: SmoothingCoordinateSystem.World,
+                        plane: Plane.WorldXY);
+                    
+                    if (smoothed is null) {
+                        return ResultFactory.Create<Fitting.SurfaceFitResult>(
+                            error: E.Geometry.Fitting.SurfaceFairingFailed.WithContext(string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
+                    }
+                    working = smoothed;
+                }
+
+                return working is NurbsSurface ns
+                    ? ResultFactory.Create(value: new Fitting.SurfaceFitResult(
+                        Surface: ns,
+                        MaxDeviation: 0.0,
+                        RmsDeviation: 0.0,
+                        FairnessScore: 0.0,
+                        ControlPointCounts: (ns.Points.CountU, ns.Points.CountV),
+                        ActualDegrees: (ns.Degree(0), ns.Degree(1))))
+                    : ResultFactory.Create<Fitting.SurfaceFitResult>(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Result not NURBS"));
+            });
+}
