@@ -71,54 +71,47 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
+    internal static Result<(Point3d[], Vector3d[])> ComputeCurl(
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] curl = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-                try {
-                    double dx = gridDelta.X;
-                    double dy = gridDelta.Y;
-                    double dz = gridDelta.Z;
-                    double twoDx = 2.0 * dx;
-                    double twoDy = 2.0 * dy;
-                    double twoDz = 2.0 * dz;
+        if (vectorField.Length != grid.Length) {
+            return ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"));
+        }
+        if (resolution < FieldsConfig.MinResolution) {
+            return ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+        }
 
-                    int resolutionSquared = resolution * resolution;
-                    for (int i = 0; i < resolution; i++) {
-                        int baseI = i * resolutionSquared;
-                        for (int j = 0; j < resolution; j++) {
-                            int baseJ = baseI + (j * resolution);
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = baseJ + k;
+        int totalSamples = vectorField.Length;
+        Vector3d[] curl = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
+        try {
+            (double dx, double dy, double dz) = (gridDelta.X, gridDelta.Y, gridDelta.Z);
+            (double twoDx, double twoDy, double twoDz) = (2.0 * dx, 2.0 * dy, 2.0 * dz);
+            int resolutionSquared = resolution * resolution;
 
-                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
-                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
-
-                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
-                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
-
-                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
-                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
-
-                                curl[idx] = new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
-                            }
-                        }
+            for (int i = 0; i < resolution; i++) {
+                int baseI = i * resolutionSquared;
+                for (int j = 0; j < resolution; j++) {
+                    int baseJ = baseI + (j * resolution);
+                    for (int k = 0; k < resolution; k++) {
+                        int idx = baseJ + k;
+                        double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
+                        double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
+                        double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
+                        double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
+                        double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
+                        double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
+                        curl[idx] = new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
                     }
-
-                    Vector3d[] finalCurl = [.. curl[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Curl: finalCurl));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(curl, clearArray: true);
                 }
-            }))(),
-        };
+            }
+
+            Vector3d[] finalCurl = [.. curl[..totalSamples]];
+            return ResultFactory.Create(value: (Grid: grid, Curl: finalCurl));
+        } finally {
+            ArrayPool<Vector3d>.Shared.Return(curl, clearArray: true);
+        }
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -127,19 +120,18 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                double[] divergence = ArrayPool<double>.Shared.Rent(totalSamples);
-                try {
-                    double dx = gridDelta.X;
-                    double dy = gridDelta.Y;
-                    double dz = gridDelta.Z;
-                    double twoDx = 2.0 * dx;
-                    double twoDy = 2.0 * dy;
-                    double twoDz = 2.0 * dz;
+        if (vectorField.Length != grid.Length) {
+            return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"));
+        }
+        if (resolution < FieldsConfig.MinResolution) {
+            return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+        }
+
+        int totalSamples = vectorField.Length;
+        double[] divergence = ArrayPool<double>.Shared.Rent(totalSamples);
+        try {
+            (double dx, double dy, double dz) = (gridDelta.X, gridDelta.Y, gridDelta.Z);
+            (double twoDx, double twoDy, double twoDz) = (2.0 * dx, 2.0 * dy, 2.0 * dz);
 
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
@@ -155,13 +147,11 @@ internal static class FieldsCompute {
                         }
                     }
 
-                    double[] finalDivergence = [.. divergence[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Divergence: finalDivergence));
-                } finally {
-                    ArrayPool<double>.Shared.Return(divergence, clearArray: true);
-                }
-            }))(),
-        };
+            double[] finalDivergence = [.. divergence[..totalSamples]];
+            return ResultFactory.Create(value: (Grid: grid, Divergence: finalDivergence));
+        } finally {
+            ArrayPool<double>.Shared.Return(divergence, clearArray: true);
+        }
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -170,38 +160,35 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        return (scalarField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = scalarField.Length;
-                double[] laplacian = ArrayPool<double>.Shared.Rent(totalSamples);
-                try {
-                    double dx2 = gridDelta.X * gridDelta.X;
-                    double dy2 = gridDelta.Y * gridDelta.Y;
-                    double dz2 = gridDelta.Z * gridDelta.Z;
+        if (scalarField.Length != grid.Length) {
+            return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"));
+        }
+        if (resolution < FieldsConfig.MinResolution) {
+            return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+        }
 
-                    for (int i = 0; i < resolution; i++) {
-                        for (int j = 0; j < resolution; j++) {
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
+        int totalSamples = scalarField.Length;
+        double[] laplacian = ArrayPool<double>.Shared.Rent(totalSamples);
+        try {
+            (double dx2, double dy2, double dz2) = (gridDelta.X * gridDelta.X, gridDelta.Y * gridDelta.Y, gridDelta.Z * gridDelta.Z);
 
-                                double d2f_dx2 = (i > 0 && i < resolution - 1) ? (scalarField[((i + 1) * resolution * resolution) + (j * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx2 : 0.0;
-                                double d2f_dy2 = (j > 0 && j < resolution - 1) ? (scalarField[(i * resolution * resolution) + ((j + 1) * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy2 : 0.0;
-                                double d2f_dz2 = (k > 0 && k < resolution - 1) ? (scalarField[(i * resolution * resolution) + (j * resolution) + (k + 1)] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz2 : 0.0;
-
-                                laplacian[idx] = d2f_dx2 + d2f_dy2 + d2f_dz2;
-                            }
-                        }
+            for (int i = 0; i < resolution; i++) {
+                for (int j = 0; j < resolution; j++) {
+                    for (int k = 0; k < resolution; k++) {
+                        int idx = (i * resolution * resolution) + (j * resolution) + k;
+                        double d2f_dx2 = (i > 0 && i < resolution - 1) ? (scalarField[((i + 1) * resolution * resolution) + (j * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx2 : 0.0;
+                        double d2f_dy2 = (j > 0 && j < resolution - 1) ? (scalarField[(i * resolution * resolution) + ((j + 1) * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy2 : 0.0;
+                        double d2f_dz2 = (k > 0 && k < resolution - 1) ? (scalarField[(i * resolution * resolution) + (j * resolution) + (k + 1)] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz2 : 0.0;
+                        laplacian[idx] = d2f_dx2 + d2f_dy2 + d2f_dz2;
                     }
-
-                    double[] finalLaplacian = [.. laplacian[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Laplacian: finalLaplacian));
-                } finally {
-                    ArrayPool<double>.Shared.Return(laplacian, clearArray: true);
                 }
-            }))(),
-        };
+            }
+
+            double[] finalLaplacian = [.. laplacian[..totalSamples]];
+            return ResultFactory.Create(value: (Grid: grid, Laplacian: finalLaplacian));
+        } finally {
+            ArrayPool<double>.Shared.Return(laplacian, clearArray: true);
+        }
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
