@@ -869,16 +869,16 @@ internal static class FieldsCompute {
                 double trace = a + d + f;
                 double p = ((b * b) + (c * c) + (e * e)) + ((((a - d) * (a - d)) + ((a - f) * (a - f)) + ((d - f) * (d - f))) / 6.0);
                 double q = ((a - (trace / 3.0)) * (((d - (trace / 3.0)) * (f - (trace / 3.0))) - (e * e))) - (b * ((b * (f - (trace / 3.0))) - (c * e))) + (c * ((b * e) - (c * (d - (trace / 3.0)))));
-                double phi = q / (2.0 * System.Math.Pow(p, 1.5)) switch {
-                    double r when r <= -1.0 => System.Math.PI / 3.0,
+                double phi = q / (2.0 * Math.Pow(p, 1.5)) switch {
+                    double r when r <= -1.0 => Math.PI / 3.0,
                     double r when r >= 1.0 => 0.0,
-                    double r => System.Math.Acos(r) / 3.0,
+                    double r => Math.Acos(r) / 3.0,
                 };
 
-                double sqrtP = System.Math.Sqrt(p);
-                double lambda1 = (trace / 3.0) + (2.0 * sqrtP * System.Math.Cos(phi));
-                double lambda2 = (trace / 3.0) - (sqrtP * (System.Math.Cos(phi) + (System.Math.Sqrt(3.0) * System.Math.Sin(phi))));
-                double lambda3 = (trace / 3.0) - (sqrtP * (System.Math.Cos(phi) - (System.Math.Sqrt(3.0) * System.Math.Sin(phi))));
+                double sqrtP = Math.Sqrt(p);
+                double lambda1 = (trace / 3.0) + (2.0 * sqrtP * Math.Cos(phi));
+                double lambda2 = (trace / 3.0) - (sqrtP * (Math.Cos(phi) + (Math.Sqrt(3.0) * Math.Sin(phi))));
+                double lambda3 = (trace / 3.0) - (sqrtP * (Math.Cos(phi) - (Math.Sqrt(3.0) * Math.Sin(phi))));
 
                 Vector3d v1 = ComputeEigenvector3x3(matrix, lambda1);
                 Vector3d v2 = ComputeEigenvector3x3(matrix, lambda2);
@@ -956,7 +956,7 @@ internal static class FieldsCompute {
                         }))(),
                     };
                 }
-                double stdDev = validCount > 0 ? System.Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
+                double stdDev = validCount > 0 ? Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
 
                 return ResultFactory.Create(value: new Fields.FieldStatistics(
                     Min: min,

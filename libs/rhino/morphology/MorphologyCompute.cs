@@ -391,7 +391,7 @@ internal static class MorphologyCompute {
             allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
             accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * 10),
             normalizeSize: false,
-            cancelToken: System.Threading.CancellationToken.None,
+            cancelToken: CancellationToken.None,
             progress: null,
             problemDescription: out string _,
             threaded: false);
