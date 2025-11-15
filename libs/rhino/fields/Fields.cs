@@ -245,7 +245,7 @@ public static class Fields {
                 isovalues: isovalues),
         };
 
-    /// <summary>Compute Hessian field (second derivative matrix): scalar field → (grid points[], hessian matrices[3,3][]).</summary>
+    /// <summary>Compute Hessian field (second derivative matrix): scalar field → (grid points[], hessian matrices[3,3][]). Assumes uniform grid spacing derived from bounds and resolution; non-uniform grids will produce incorrect second derivatives.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
     public static Result<(Point3d[] Grid, double[,][] Hessian)> HessianField(

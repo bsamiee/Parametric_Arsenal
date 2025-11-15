@@ -423,7 +423,8 @@ internal static class FieldsCompute {
 
                     Vector3d k2 = integrationMethod switch {
                         0 => k1,
-                        1 or 2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree: tree, resolution: resolution, bounds: bounds),
+                        1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), tree: tree, resolution: resolution, bounds: bounds),
+                        2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree: tree, resolution: resolution, bounds: bounds),
                         _ => k1,
                     };
 
@@ -864,8 +865,51 @@ internal static class FieldsCompute {
 
         return isDiagonal switch {
             true => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
-            false => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
+            false => ((Func<(double[], Vector3d[])>)(() => {
+                double trace = a + d + f;
+                double p = ((b * b) + (c * c) + (e * e)) + ((((a - d) * (a - d)) + ((a - f) * (a - f)) + ((d - f) * (d - f))) / 6.0);
+                double q = ((a - (trace / 3.0)) * (((d - (trace / 3.0)) * (f - (trace / 3.0))) - (e * e))) - (b * ((b * (f - (trace / 3.0))) - (c * e))) + (c * ((b * e) - (c * (d - (trace / 3.0)))));
+                double phi = q / (2.0 * System.Math.Pow(p, 1.5)) switch {
+                    double r when r <= -1.0 => System.Math.PI / 3.0,
+                    double r when r >= 1.0 => 0.0,
+                    double r => System.Math.Acos(r) / 3.0,
+                };
+
+                double sqrtP = System.Math.Sqrt(p);
+                double lambda1 = (trace / 3.0) + (2.0 * sqrtP * System.Math.Cos(phi));
+                double lambda2 = (trace / 3.0) - (sqrtP * (System.Math.Cos(phi) + (System.Math.Sqrt(3.0) * System.Math.Sin(phi))));
+                double lambda3 = (trace / 3.0) - (sqrtP * (System.Math.Cos(phi) - (System.Math.Sqrt(3.0) * System.Math.Sin(phi))));
+
+                Vector3d v1 = ComputeEigenvector3x3(matrix, lambda1);
+                Vector3d v2 = ComputeEigenvector3x3(matrix, lambda2);
+                Vector3d v3 = ComputeEigenvector3x3(matrix, lambda3);
+
+                return ([lambda1, lambda2, lambda3,], [v1, v2, v3,]);
+            }))(),
         };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate")]
+    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) {
+        double a = matrix[0, 0] - eigenvalue;
+        double b = matrix[0, 1];
+        double c = matrix[0, 2];
+        double d = matrix[1, 1] - eigenvalue;
+        double e = matrix[1, 2];
+        double f = matrix[2, 2] - eigenvalue;
+
+        Vector3d cross1 = new((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b));
+        Vector3d cross2 = new((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c));
+        Vector3d cross3 = new((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d));
+
+        Vector3d result = cross1.Length > cross2.Length
+            ? (cross1.Length > cross3.Length ? cross1 : cross3)
+            : (cross2.Length > cross3.Length ? cross2 : cross3);
+
+        return result.Length > RhinoMath.ZeroTolerance
+            ? result / result.Length
+            : new(1, 0, 0);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -881,6 +925,7 @@ internal static class FieldsCompute {
                 double sum = 0.0;
                 int minIdx = 0;
                 int maxIdx = 0;
+                int validCount = 0;
 
                 for (int i = 0; i < scalarField.Length; i++) {
                     double value = scalarField[i];
@@ -889,6 +934,7 @@ internal static class FieldsCompute {
                         false => 0,
                         true => ((Func<int>)(() => {
                             sum += value;
+                            validCount++;
                             (min, minIdx) = value < min ? (value, i) : (min, minIdx);
                             (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
                             return 1;
@@ -896,13 +942,21 @@ internal static class FieldsCompute {
                     };
                 }
 
-                double mean = sum / scalarField.Length;
+                double mean = validCount > 0 ? sum / validCount : 0.0;
                 double sumSquaredDiff = 0.0;
                 for (int i = 0; i < scalarField.Length; i++) {
-                    double diff = scalarField[i] - mean;
-                    sumSquaredDiff += diff * diff;
+                    double value = scalarField[i];
+                    bool validValue = RhinoMath.IsValidDouble(value);
+                    _ = validValue switch {
+                        false => 0,
+                        true => ((Func<int>)(() => {
+                            double diff = value - mean;
+                            sumSquaredDiff += diff * diff;
+                            return 1;
+                        }))(),
+                    };
                 }
-                double stdDev = System.Math.Sqrt(sumSquaredDiff / scalarField.Length);
+                double stdDev = validCount > 0 ? System.Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
 
                 return ResultFactory.Create(value: new Fields.FieldStatistics(
                     Min: min,
