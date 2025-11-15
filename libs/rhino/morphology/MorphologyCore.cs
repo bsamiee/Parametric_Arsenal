@@ -208,7 +208,7 @@ internal static class MorphologyCore {
                 double weight = useCotangent
                     ? MorphologyConfig.UniformLaplacianWeight / Math.Max(currentPos.DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
                     : MorphologyConfig.UniformLaplacianWeight;
-                weightedSum += weight * (neighborPos - Point3d.Origin);
+                weightedSum += weight * (Vector3d)neighborPos;
                 weightSum += weight;
             }
             updated[i] = weightSum > RhinoMath.ZeroTolerance ? Point3d.Origin + (weightedSum / weightSum) : currentPos;
