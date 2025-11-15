@@ -88,7 +88,7 @@ public static class E {
             [2007] = "Invalid or unsupported geometry type",
             [2008] = "Unsupported configuration for operation and geometry type combination",
 
-            // Morphology Operations (2800-2820)
+            // Morphology Operations (2800-2817)
             [2800] = "Cage-based deformation failed",
             [2801] = "Cage control point count mismatch between original and deformed arrays",
             [2802] = "Insufficient cage control points (minimum 8 required)",
@@ -103,13 +103,10 @@ public static class E {
             [2811] = "Mesh offset operation failed",
             [2812] = "Reduction target face count invalid or unreachable",
             [2813] = "Isotropic remeshing failed",
-            [2814] = "RBF interpolation matrix singular or ill-conditioned",
-            [2815] = "Cotangent-weighted smoothing failed",
-            [2816] = "Adaptive subdivision quality threshold not met",
-            [2817] = "Remesh target edge length invalid or out of range",
-            [2818] = "Offset distance invalid or produces degenerate geometry",
-            [2819] = "Reduction accuracy parameter out of valid range",
-            [2820] = "Remeshing iteration limit exceeded without convergence",
+            [2814] = "Remesh target edge length invalid or out of range",
+            [2815] = "Offset distance invalid or produces degenerate geometry",
+            [2816] = "Reduction accuracy parameter out of valid range",
+            [2817] = "Remeshing iteration limit exceeded without convergence",
 
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
@@ -262,7 +259,7 @@ public static class E {
         public static readonly SystemError InvalidGeometryType = Get(2007);
         public static readonly SystemError UnsupportedConfiguration = Get(2008);
 
-        /// <summary>Morphology operation errors (2800-2820).</summary>
+        /// <summary>Morphology operation errors (2800-2817).</summary>
         public static class Morphology {
             public static readonly SystemError CageDeformFailed = Get(2800);
             public static readonly SystemError CageControlPointMismatch = Get(2801);
@@ -278,13 +275,10 @@ public static class E {
             public static readonly SystemError MeshOffsetFailed = Get(2811);
             public static readonly SystemError ReductionTargetInvalid = Get(2812);
             public static readonly SystemError RemeshingFailed = Get(2813);
-            public static readonly SystemError RBFInterpolationFailed = Get(2814);
-            public static readonly SystemError CotangentSmoothingFailed = Get(2815);
-            public static readonly SystemError AdaptiveSubdivisionQualityNotMet = Get(2816);
-            public static readonly SystemError RemeshTargetEdgeLengthInvalid = Get(2817);
-            public static readonly SystemError OffsetDistanceInvalid = Get(2818);
-            public static readonly SystemError ReductionAccuracyInvalid = Get(2819);
-            public static readonly SystemError RemeshIterationLimitExceeded = Get(2820);
+            public static readonly SystemError RemeshTargetEdgeLengthInvalid = Get(2814);
+            public static readonly SystemError OffsetDistanceInvalid = Get(2815);
+            public static readonly SystemError ReductionAccuracyInvalid = Get(2816);
+            public static readonly SystemError RemeshIterationLimitExceeded = Get(2817);
         }
     }
 

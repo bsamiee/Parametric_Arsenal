@@ -198,7 +198,7 @@ internal static class MorphologyCore {
                     .Bind(remeshed => ComputeRemeshMetrics(remeshed, targetEdge, maxIters, context));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
+    internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
 
         for (int i = 0; i < positions.Length; i++) {
