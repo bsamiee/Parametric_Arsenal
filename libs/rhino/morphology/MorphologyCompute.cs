@@ -320,8 +320,15 @@ internal static class MorphologyCompute {
                         iterPerformed++;
 
                         double rmsDisp = iter > 0
-                            ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count)
-                                .Average(i => Math.Pow(positions[i].DistanceTo(prevPositions[i]), 2.0)))
+                            ? (() => {
+                                double sumSq = 0.0;
+                                int count = smoothed.Vertices.Count;
+                                for (int i = 0; i < count; i++) {
+                                    double dist = positions[i].DistanceTo(prevPositions[i]);
+                                    sumSq += dist * dist;
+                                }
+                                return Math.Sqrt(sumSq / count);
+                            })()
                             : double.MaxValue;
                         converged = rmsDisp < threshold;
 
