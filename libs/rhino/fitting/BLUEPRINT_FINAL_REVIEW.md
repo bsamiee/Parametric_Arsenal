@@ -274,7 +274,7 @@ internal static readonly FrozenDictionary<(Type, FitOperation), (V, string)> Ope
 - `Result<Fitting.CurveFitResult>` not `var result`
 
 ### No `if`/`else` - Pattern Matching Only
-✅ Verified examples:
+✅ Verified examples (Note: `if` without `else` for guard clauses is acceptable per CLAUDE.md line 23):
 ```csharp
 // ✅ CORRECT - Switch expression (FittingCore.cs lines 39-74)
 degree switch {
@@ -296,6 +296,13 @@ validCurve is not NurbsCurve nc
         ? FairNurbsCurve(converted, options, context)
         : ResultFactory.Create<Fitting.CurveFitResult>(...)
     : FairNurbsCurve(nc, options, context)
+
+// ✅ CORRECT - while loops (FittingCompute.cs line 55, matches existing patterns in AnalysisCore.cs, SpatialCompute.cs)
+while (iteration < options.MaxIterations) { ... }
+
+// ✅ CORRECT - Guard clause if (FittingCompute.cs line 64, 244 - immediate break/return)
+if (energyChange < FittingConfig.EnergyConvergence) { break; }
+if (!inserted) { return ResultFactory.Create<...>(...); }
 ```
 
 ### No Helper Methods - Dense Inline Code

@@ -119,11 +119,11 @@ internal static class FittingCompute {
         }
 
         for (int i = 0; i < n; i++) {
-            if (!fixBoundaries || (i != 0 && i != n - 1)) {
-                Point3d current = curve.Points[i].Location;
-                Vector3d delta = newPoints[i] - current;
-                curve.Points[i] = new ControlPoint(current + (delta * relaxation));
-            }
+            Point3d current = curve.Points[i].Location;
+            Vector3d delta = newPoints[i] - current;
+            curve.Points[i] = (!fixBoundaries || (i != 0 && i != n - 1))
+                ? new ControlPoint(current + (delta * relaxation))
+                : new ControlPoint(current);
         }
     }
 
@@ -260,22 +260,12 @@ internal static class FittingCompute {
 
     /// <summary>Computes midpoint parameters for knot insertion (uniform refinement).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double[] ComputeMidpointKnots(NurbsCurveKnotList knots) {
-        int count = knots.Count;
-        List<double> midpoints = new(capacity: count);
-        
-        for (int i = 0; i < count - 1; i++) {
-            double k1 = knots[i];
-            double k2 = knots[i + 1];
-            double mid = (k1 + k2) * 0.5;
-            
-            if (Math.Abs(k2 - k1) > FittingConfig.ParameterTolerance) {
-                midpoints.Add(mid);
-            }
-        }
-        
-        return [.. midpoints];
-    }
+    private static double[] ComputeMidpointKnots(NurbsCurveKnotList knots) =>
+        Enumerable.Range(0, knots.Count - 1)
+            .Select(i => (K1: knots[i], K2: knots[i + 1], Mid: (knots[i] + knots[i + 1]) * 0.5))
+            .Where(t => Math.Abs(t.K2 - t.K1) > FittingConfig.ParameterTolerance)
+            .Select(t => t.Mid)
+            .ToArray();
 
     /// <summary>Iteratively fairs surface via thin-plate energy minimization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
