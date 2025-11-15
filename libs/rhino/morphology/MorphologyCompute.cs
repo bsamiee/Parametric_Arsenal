@@ -306,14 +306,9 @@ internal static class MorphologyCompute {
                         _ = smoothed.Normals.ComputeNormals();
                         iterPerformed++;
 
-                        double[] distances = [.. Enumerable.Range(0, smoothed.Vertices.Count)
-                            .Select(i => positions[i].DistanceTo(prevPositions[i])),
-                        ];
-                        double[] distSquares = [.. distances.Select(static d => d * d),];
                         double rmsDisp = iter > 0
-                            ? Math.Sqrt(distSquares.Average())
+                            ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count).Average(i => Math.Pow(positions[i].DistanceTo(prevPositions[i]), 2.0)))
                             : double.MaxValue;
-
                         converged = rmsDisp < threshold;
 
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
@@ -425,26 +420,13 @@ internal static class MorphologyCompute {
         double[] minAngles = new double[mesh.Faces.Count];
 
         for (int i = 0; i < mesh.Faces.Count; i++) {
-            Point3d a = mesh.Vertices[mesh.Faces[i].A];
-            Point3d b = mesh.Vertices[mesh.Faces[i].B];
-            Point3d c = mesh.Vertices[mesh.Faces[i].C];
-
-            double ab = a.DistanceTo(b);
-            double bc = b.DistanceTo(c);
-            double ca = c.DistanceTo(a);
-
-            double maxEdge = Math.Max(Math.Max(ab, bc), ca);
-            double minEdge = Math.Min(Math.Min(ab, bc), ca);
+            (Point3d a, Point3d b, Point3d c) = (mesh.Vertices[mesh.Faces[i].A], mesh.Vertices[mesh.Faces[i].B], mesh.Vertices[mesh.Faces[i].C]);
+            (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
+            (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
             aspectRatios[i] = minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
 
-            Vector3d vAB = b - a;
-            Vector3d vCA = a - c;
-            Vector3d vBC = c - b;
-
-            double angleA = Vector3d.VectorAngle(vAB, -vCA);
-            double angleB = Vector3d.VectorAngle(vBC, -vAB);
-            double angleC = Vector3d.VectorAngle(vCA, -vBC);
-
+            (Vector3d vAB, Vector3d vCA, Vector3d vBC) = (b - a, a - c, c - b);
+            (double angleA, double angleB, double angleC) = (Vector3d.VectorAngle(vAB, -vCA), Vector3d.VectorAngle(vBC, -vAB), Vector3d.VectorAngle(vCA, -vBC));
             minAngles[i] = Math.Min(Math.Min(angleA, angleB), angleC);
         }
 
