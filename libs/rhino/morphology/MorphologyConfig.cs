@@ -92,6 +92,18 @@ internal static class MorphologyConfig {
     /// <summary>Remeshing: uniformity score weight for edge length deviation.</summary>
     internal const double RemeshUniformityWeight = 0.8;
 
+    /// <summary>Rhino Mesh.Reduce accuracy parameter scale factor (maps [0,1] to integer range).</summary>
+    internal const int ReductionAccuracyScale = 10;
+
+    /// <summary>Mesh reduction target tolerance factor (allows 10% overshoot).</summary>
+    internal const double ReductionTargetTolerance = 1.1;
+
+    /// <summary>Edge split parameter for midpoint calculation (0.5 = geometric center).</summary>
+    internal const double EdgeMidpointParameter = 0.5;
+
+    /// <summary>Remesh convergence threshold factor (relative to target edge length).</summary>
+    internal const double RemeshConvergenceThreshold = 0.1;
+
     /// <summary>Validation mode dispatch: (operation ID, input type) → validation flags.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {

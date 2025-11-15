@@ -379,7 +379,7 @@ internal static class MorphologyCore {
         })) : 0.0;
         (double uniformity, bool converged) = (
             mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / mean) : 0.0,
-            Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * 0.1));
+            Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * MorphologyConfig.RemeshConvergenceThreshold));
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, maxIters, converged, 0, remeshed.Faces.Count),]);

@@ -274,7 +274,7 @@ internal static class MorphologyCompute {
         bool lockBoundary,
         Func<Mesh, Point3d[], IGeometryContext, Point3d[]> updateFunc,
         IGeometryContext context) =>
-        maxIterations is <= 0 or > 1000
+        maxIterations is <= 0 or > MorphologyConfig.MaxSmoothingIterations
             ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Iterations: {maxIterations}")))
             : ((Func<Result<Mesh>>)(() => {
                 Mesh smoothed = mesh.DuplicateMesh();
@@ -361,13 +361,13 @@ internal static class MorphologyCompute {
                         bool success = reduced.Reduce(
                             desiredPolygonCount: targetFaceCount,
                             allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
-                            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * 10),
+                            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * MorphologyConfig.ReductionAccuracyScale),
                             normalizeSize: false,
                             cancelToken: CancellationToken.None,
                             progress: null,
                             problemDescription: out string _,
                             threaded: false);
-                        return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * 1.1
+                        return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * MorphologyConfig.ReductionTargetTolerance
                             ? ResultFactory.Create(value: reduced)
                             : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
                     }))();
@@ -395,7 +395,7 @@ internal static class MorphologyCompute {
                     for (int iter = 0; iter < maxIterations; iter++) {
                         for (int i = remeshed.TopologyEdges.Count - 1; i >= 0; i--) {
                             Line edge = remeshed.TopologyEdges.EdgeLine(i);
-                            _ = edge.Length > splitThreshold && remeshed.Vertices.Add(edge.PointAt(0.5)) >= 0;
+                            _ = edge.Length > splitThreshold && remeshed.Vertices.Add(edge.PointAt(MorphologyConfig.EdgeMidpointParameter)) >= 0;
                         }
 
                         Point3d[] positions = [.. Enumerable.Range(0, remeshed.Vertices.Count).Select(i => (Point3d)remeshed.Vertices[i]),];
