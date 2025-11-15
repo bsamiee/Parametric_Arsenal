@@ -34,23 +34,6 @@ public static class Morphology {
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
 
-    /// <summary>Subdivision result with edge and triangle quality metrics.</summary>
-    [DebuggerDisplay("{DebuggerDisplay}")]
-    public sealed record SubdivisionResult(
-        Mesh Subdivided,
-        int OriginalFaceCount,
-        int SubdividedFaceCount,
-        double MinEdgeLength,
-        double MaxEdgeLength,
-        double MeanEdgeLength,
-        double MeanAspectRatio,
-        double MinTriangleAngleRadians) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
-            CultureInfo.InvariantCulture,
-            $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
-    }
-
     /// <summary>Smoothing result with convergence and displacement metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SmoothingResult(
@@ -80,6 +63,23 @@ public static class Morphology {
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshOffset | Dist={this.ActualDistance:F3} | V: {this.OriginalVertexCount}→{this.OffsetVertexCount} | F: {this.OriginalFaceCount}→{this.OffsetFaceCount}{(this.HasDegeneracies ? " [degenerate]" : "")}");
+    }
+
+    /// <summary>Subdivision result with edge and triangle quality metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record SubdivisionResult(
+        Mesh Subdivided,
+        int OriginalFaceCount,
+        int SubdividedFaceCount,
+        double MinEdgeLength,
+        double MaxEdgeLength,
+        double MeanEdgeLength,
+        double MeanAspectRatio,
+        double MinTriangleAngleRadians) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
 
     /// <summary>Mesh reduction result with ratio and quality metrics.</summary>
