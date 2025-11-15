@@ -17,56 +17,46 @@ internal static class FieldsCompute {
         double[] distances,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) {
-        int totalSamples = distances.Length;
-        Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-
-        try {
-            double dx = gridDelta.X;
-            double dy = gridDelta.Y;
-            double dz = gridDelta.Z;
-            double twoDx = 2.0 * dx;
-            double twoDy = 2.0 * dy;
-            double twoDz = 2.0 * dz;
-            int resSquared = resolution * resolution;
-
-            for (int i = 0; i < resolution; i++) {
-                for (int j = 0; j < resolution; j++) {
-                    for (int k = 0; k < resolution; k++) {
-                        int idx = (i * resSquared) + (j * resolution) + k;
-
-                        double dfdx = (i, resolution) switch {
-                            (var x, var r) when x > 0 && x < r - 1 => (distances[idx + resSquared] - distances[idx - resSquared]) / twoDx,
-                            (0, > 1) => (distances[idx + resSquared] - distances[idx]) / dx,
-                            (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[idx - resSquared]) / dx,
-                            _ => 0.0,
-                        };
-
-                        double dfdy = (j, resolution) switch {
-                            (var y, var r) when y > 0 && y < r - 1 => (distances[idx + resolution] - distances[idx - resolution]) / twoDy,
-                            (0, > 1) => (distances[idx + resolution] - distances[idx]) / dy,
-                            (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[idx - resolution]) / dy,
-                            _ => 0.0,
-                        };
-
-                        double dfdz = (k, resolution) switch {
-                            (var z, var r) when z > 0 && z < r - 1 => (distances[idx + 1] - distances[idx - 1]) / twoDz,
-                            (0, > 1) => (distances[idx + 1] - distances[idx]) / dz,
-                            (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[idx - 1]) / dz,
-                            _ => 0.0,
-                        };
-
-                        gradients[idx] = new Vector3d(dfdx, dfdy, dfdz);
+        Vector3d gridDelta) =>
+        ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+            int totalSamples = distances.Length;
+            Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
+            try {
+                (double dx, double dy, double dz) = (gridDelta.X, gridDelta.Y, gridDelta.Z);
+                (double twoDx, double twoDy, double twoDz) = (2.0 * dx, 2.0 * dy, 2.0 * dz);
+                int resSquared = resolution * resolution;
+                for (int i = 0; i < resolution; i++) {
+                    for (int j = 0; j < resolution; j++) {
+                        for (int k = 0; k < resolution; k++) {
+                            int idx = (i * resSquared) + (j * resolution) + k;
+                            double dfdx = (i, resolution) switch {
+                                (var x, var r) when x > 0 && x < r - 1 => (distances[idx + resSquared] - distances[idx - resSquared]) / twoDx,
+                                (0, > 1) => (distances[idx + resSquared] - distances[idx]) / dx,
+                                (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[idx - resSquared]) / dx,
+                                _ => 0.0,
+                            };
+                            double dfdy = (j, resolution) switch {
+                                (var y, var r) when y > 0 && y < r - 1 => (distances[idx + resolution] - distances[idx - resolution]) / twoDy,
+                                (0, > 1) => (distances[idx + resolution] - distances[idx]) / dy,
+                                (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[idx - resolution]) / dy,
+                                _ => 0.0,
+                            };
+                            double dfdz = (k, resolution) switch {
+                                (var z, var r) when z > 0 && z < r - 1 => (distances[idx + 1] - distances[idx - 1]) / twoDz,
+                                (0, > 1) => (distances[idx + 1] - distances[idx]) / dz,
+                                (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[idx - 1]) / dz,
+                                _ => 0.0,
+                            };
+                            gradients[idx] = new Vector3d(dfdx, dfdy, dfdz);
+                        }
                     }
                 }
+                Vector3d[] finalGradients = [.. gradients[..totalSamples]];
+                return ResultFactory.Create(value: (Grid: grid, Gradients: finalGradients));
+            } finally {
+                ArrayPool<Vector3d>.Shared.Return(gradients, clearArray: true);
             }
-
-            Vector3d[] finalGradients = [.. gradients[..totalSamples]];
-            return ResultFactory.Create(value: (Grid: grid, Gradients: finalGradients));
-        } finally {
-            ArrayPool<Vector3d>.Shared.Return(gradients, clearArray: true);
-        }
-    }
+        }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
@@ -397,74 +387,56 @@ internal static class FieldsCompute {
         byte integrationMethod,
         int resolution,
         BoundingBox bounds,
-        IGeometryContext context) {
-        Curve[] streamlines = new Curve[seeds.Length];
-        Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
-
-        using RTree? tree = gridPoints.Length > FieldsConfig.StreamlineRTreeThreshold
-            ? RTree.CreateFromPointArray(gridPoints)
-            : null;
-
-        try {
-            for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
-                Point3d current = seeds[seedIdx];
-                int stepCount = 0;
-                pathBuffer[stepCount++] = current;
-
-                for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
-                    Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, tree: tree, resolution: resolution, bounds: bounds);
-                    double k1Magnitude = k1.Length;
-
-                    Vector3d k2 = integrationMethod switch {
-                        0 => k1,
-                        1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), tree: tree, resolution: resolution, bounds: bounds),
-                        2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree: tree, resolution: resolution, bounds: bounds),
-                        _ => k1,
-                    };
-
-                    Vector3d k3 = integrationMethod switch {
-                        0 or 1 => k1,
-                        2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), tree: tree, resolution: resolution, bounds: bounds),
-                        _ => k1,
-                    };
-
-                    Vector3d k4 = integrationMethod switch {
-                        0 or 1 => k1,
-                        2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), tree: tree, resolution: resolution, bounds: bounds),
-                        _ => k1,
-                    };
-
-                    Vector3d delta = integrationMethod switch {
-                        0 => stepSize * k1,
-                        1 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2)),
-                        2 or 3 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4)),
-                        _ => Vector3d.Zero,
-                    };
-
-                    Point3d nextPoint = current + delta;
-                    bool shouldContinue = bounds.Contains(nextPoint)
-                        && k1Magnitude >= FieldsConfig.MinFieldMagnitude
-                        && delta.Length >= RhinoMath.ZeroTolerance
-                        && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
-
-                    if (shouldContinue) {
-                        current = nextPoint;
-                        pathBuffer[stepCount++] = current;
+        IGeometryContext context) =>
+        ((Func<Result<Curve[]>>)(() => {
+            Curve[] streamlines = new Curve[seeds.Length];
+            Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
+            using RTree? tree = gridPoints.Length > FieldsConfig.StreamlineRTreeThreshold ? RTree.CreateFromPointArray(gridPoints) : null;
+            try {
+                for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
+                    Point3d current = seeds[seedIdx];
+                    int stepCount = 0;
+                    pathBuffer[stepCount++] = current;
+                    for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
+                        Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, tree: tree, resolution: resolution, bounds: bounds);
+                        double k1Magnitude = k1.Length;
+                        Vector3d k2 = integrationMethod switch {
+                            0 => k1,
+                            1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), tree: tree, resolution: resolution, bounds: bounds),
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree: tree, resolution: resolution, bounds: bounds),
+                            _ => k1,
+                        };
+                        Vector3d k3 = integrationMethod switch {
+                            0 or 1 => k1,
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), tree: tree, resolution: resolution, bounds: bounds),
+                            _ => k1,
+                        };
+                        Vector3d k4 = integrationMethod switch {
+                            0 or 1 => k1,
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), tree: tree, resolution: resolution, bounds: bounds),
+                            _ => k1,
+                        };
+                        Vector3d delta = integrationMethod switch {
+                            0 => stepSize * k1,
+                            1 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2)),
+                            2 or 3 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4)),
+                            _ => Vector3d.Zero,
+                        };
+                        Point3d nextPoint = current + delta;
+                        bool shouldContinue = bounds.Contains(nextPoint) && k1Magnitude >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
+                        if (shouldContinue) {
+                            current = nextPoint;
+                            pathBuffer[stepCount++] = current;
+                        }
+                        step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
                     }
-
-                    step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
+                    streamlines[seedIdx] = stepCount > 1 ? Curve.CreateInterpolatedCurve([.. pathBuffer[..stepCount]], degree: 3) : new LineCurve(seeds[seedIdx], seeds[seedIdx] + new Vector3d(context.AbsoluteTolerance, 0, 0));
                 }
-
-                streamlines[seedIdx] = stepCount > 1
-                    ? Curve.CreateInterpolatedCurve([.. pathBuffer[..stepCount]], degree: 3)
-                    : new LineCurve(seeds[seedIdx], seeds[seedIdx] + new Vector3d(context.AbsoluteTolerance, 0, 0));
+                return ResultFactory.Create(value: streamlines);
+            } finally {
+                ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
             }
-
-            return ResultFactory.Create(value: streamlines);
-        } finally {
-            ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
-        }
-    }
+        }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, RTree? tree, int resolution, BoundingBox bounds) =>
@@ -477,71 +449,61 @@ internal static class FieldsCompute {
         double[] scalarField,
         Point3d[] gridPoints,
         int resolution,
-        double[] isovalues) {
-        Mesh[] meshes = new Mesh[isovalues.Length];
-
-        for (int isoIdx = 0; isoIdx < isovalues.Length; isoIdx++) {
-            double isovalue = isovalues[isoIdx];
-            List<Point3f> vertices = [];
-            List<MeshFace> faces = [];
-
-            for (int i = 0; i < resolution - 1; i++) {
-                for (int j = 0; j < resolution - 1; j++) {
-                    for (int k = 0; k < resolution - 1; k++) {
-                        int[] cornerIndices = [
-                            (i * resolution * resolution) + (j * resolution) + k,
-                            ((i + 1) * resolution * resolution) + (j * resolution) + k,
-                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + k,
-                            (i * resolution * resolution) + ((j + 1) * resolution) + k,
-                            (i * resolution * resolution) + (j * resolution) + (k + 1),
-                            ((i + 1) * resolution * resolution) + (j * resolution) + (k + 1),
-                            ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + (k + 1),
-                            (i * resolution * resolution) + ((j + 1) * resolution) + (k + 1),
-                        ];
-
-                        int cubeIndex = 0;
-                        for (int c = 0; c < 8; c++) {
-                            cubeIndex = scalarField[cornerIndices[c]] < isovalue ? cubeIndex | (1 << c) : cubeIndex;
-                        }
-
-                        int[] triangleEdges = FieldsConfig.MarchingCubesTable[cubeIndex];
-
-                        if (triangleEdges.Length > 0) {
-                            Point3f[] edgeVertices = new Point3f[12];
-
-                            for (int e = 0; e < triangleEdges.Length; e++) {
-                                int edgeIdx = triangleEdges[e];
-                                (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
-                                double f1 = scalarField[cornerIndices[v1]];
-                                double f2 = scalarField[cornerIndices[v2]];
-                                double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
-                                Point3d p1 = gridPoints[cornerIndices[v1]];
-                                Point3d p2 = gridPoints[cornerIndices[v2]];
-                                edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
+        double[] isovalues) =>
+        ((Func<Result<Mesh[]>>)(() => {
+            Mesh[] meshes = new Mesh[isovalues.Length];
+            for (int isoIdx = 0; isoIdx < isovalues.Length; isoIdx++) {
+                double isovalue = isovalues[isoIdx];
+                List<Point3f> vertices = [];
+                List<MeshFace> faces = [];
+                for (int i = 0; i < resolution - 1; i++) {
+                    for (int j = 0; j < resolution - 1; j++) {
+                        for (int k = 0; k < resolution - 1; k++) {
+                            int[] cornerIndices = [
+                                (i * resolution * resolution) + (j * resolution) + k,
+                                ((i + 1) * resolution * resolution) + (j * resolution) + k,
+                                ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + k,
+                                (i * resolution * resolution) + ((j + 1) * resolution) + k,
+                                (i * resolution * resolution) + (j * resolution) + (k + 1),
+                                ((i + 1) * resolution * resolution) + (j * resolution) + (k + 1),
+                                ((i + 1) * resolution * resolution) + ((j + 1) * resolution) + (k + 1),
+                                (i * resolution * resolution) + ((j + 1) * resolution) + (k + 1),
+                            ];
+                            int cubeIndex = 0;
+                            for (int c = 0; c < 8; c++) {
+                                cubeIndex = scalarField[cornerIndices[c]] < isovalue ? cubeIndex | (1 << c) : cubeIndex;
                             }
-
-                            for (int t = 0; t < triangleEdges.Length; t += 3) {
-                                int vIdx = vertices.Count;
-                                vertices.Add(edgeVertices[triangleEdges[t]]);
-                                vertices.Add(edgeVertices[triangleEdges[t + 1]]);
-                                vertices.Add(edgeVertices[triangleEdges[t + 2]]);
-                                faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
+                            int[] triangleEdges = FieldsConfig.MarchingCubesTable[cubeIndex];
+                            if (triangleEdges.Length > 0) {
+                                Point3f[] edgeVertices = new Point3f[12];
+                                for (int e = 0; e < triangleEdges.Length; e++) {
+                                    int edgeIdx = triangleEdges[e];
+                                    (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
+                                    (double f1, double f2) = (scalarField[cornerIndices[v1]], scalarField[cornerIndices[v2]]);
+                                    double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
+                                    (Point3d p1, Point3d p2) = (gridPoints[cornerIndices[v1]], gridPoints[cornerIndices[v2]]);
+                                    edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
+                                }
+                                for (int t = 0; t < triangleEdges.Length; t += 3) {
+                                    int vIdx = vertices.Count;
+                                    vertices.Add(edgeVertices[triangleEdges[t]]);
+                                    vertices.Add(edgeVertices[triangleEdges[t + 1]]);
+                                    vertices.Add(edgeVertices[triangleEdges[t + 2]]);
+                                    faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
+                                }
                             }
                         }
                     }
                 }
+                Mesh mesh = new();
+                mesh.Vertices.AddVertices(vertices);
+                _ = mesh.Faces.AddFaces(faces);
+                _ = mesh.Normals.ComputeNormals();
+                _ = mesh.Compact();
+                meshes[isoIdx] = mesh;
             }
-
-            Mesh mesh = new();
-            mesh.Vertices.AddVertices(vertices);
-            _ = mesh.Faces.AddFaces(faces);
-            _ = mesh.Normals.ComputeNormals();
-            _ = mesh.Compact();
-            meshes[isoIdx] = mesh;
-        }
-
-        return ResultFactory.Create(value: meshes);
-    }
+            return ResultFactory.Create(value: meshes);
+        }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
@@ -865,26 +827,24 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate")]
-    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) {
-        double a = matrix[0, 0] - eigenvalue;
-        double b = matrix[0, 1];
-        double c = matrix[0, 2];
-        double d = matrix[1, 1] - eigenvalue;
-        double e = matrix[1, 2];
-        double f = matrix[2, 2] - eigenvalue;
-
-        Vector3d cross1 = new((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b));
-        Vector3d cross2 = new((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c));
-        Vector3d cross3 = new((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d));
-
-        Vector3d result = cross1.Length > cross2.Length
-            ? (cross1.Length > cross3.Length ? cross1 : cross3)
-            : (cross2.Length > cross3.Length ? cross2 : cross3);
-
-        return result.Length > RhinoMath.ZeroTolerance
-            ? result / result.Length
-            : new(1, 0, 0);
-    }
+    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) =>
+        ((Func<Vector3d>)(() => {
+            (double a, double b, double c, double d, double e, double f) = (
+                matrix[0, 0] - eigenvalue,
+                matrix[0, 1],
+                matrix[0, 2],
+                matrix[1, 1] - eigenvalue,
+                matrix[1, 2],
+                matrix[2, 2] - eigenvalue);
+            (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
+                new Vector3d((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b)),
+                new Vector3d((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c)),
+                new Vector3d((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d)));
+            Vector3d result = cross1.Length > cross2.Length
+                ? (cross1.Length > cross3.Length ? cross1 : cross3)
+                : (cross2.Length > cross3.Length ? cross2 : cross3);
+            return result.Length > RhinoMath.ZeroTolerance ? result / result.Length : new Vector3d(1, 0, 0);
+        }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Fields.FieldStatistics> ComputeFieldStatistics(

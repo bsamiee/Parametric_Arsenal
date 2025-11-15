@@ -207,42 +207,36 @@ internal static class SpatialCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
-        int[] assignments = [.. Enumerable.Range(0, pts.Length),];
-        int targetClusters = pts.Length - k;
-        int[] clusterRepresentatives = [.. Enumerable.Range(0, pts.Length),];
-
-        for (int iteration = 0; iteration < targetClusters; iteration++) {
-            (int repr1, int repr2, double minDist) = (0, 1, double.MaxValue);
-
-            for (int i = 0; i < pts.Length; i++) {
-                int cluster1 = assignments[i];
-                if (cluster1 != clusterRepresentatives[cluster1]) {
-                    continue;
-                }
-
-                for (int j = i + 1; j < pts.Length; j++) {
-                    int cluster2 = assignments[j];
-                    if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
+    internal static int[] HierarchicalAssign(Point3d[] pts, int k) =>
+        ((Func<int[]>)(() => {
+            int[] assignments = [.. Enumerable.Range(0, pts.Length),];
+            int targetClusters = pts.Length - k;
+            int[] clusterRepresentatives = [.. Enumerable.Range(0, pts.Length),];
+            for (int iteration = 0; iteration < targetClusters; iteration++) {
+                (int repr1, int repr2, double minDist) = (0, 1, double.MaxValue);
+                for (int i = 0; i < pts.Length; i++) {
+                    int cluster1 = assignments[i];
+                    if (cluster1 != clusterRepresentatives[cluster1]) {
                         continue;
                     }
-
-                    double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
-                    (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
+                    for (int j = i + 1; j < pts.Length; j++) {
+                        int cluster2 = assignments[j];
+                        if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
+                            continue;
+                        }
+                        double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
+                        (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
+                    }
+                }
+                for (int i = 0; i < assignments.Length; i++) {
+                    assignments[i] = assignments[i] == repr2 ? repr1 : assignments[i] > repr2 ? assignments[i] - 1 : assignments[i];
+                }
+                if (repr2 < clusterRepresentatives.Length) {
+                    clusterRepresentatives[repr2] = clusterRepresentatives[repr1];
                 }
             }
-
-            for (int i = 0; i < assignments.Length; i++) {
-                assignments[i] = assignments[i] == repr2 ? repr1 : assignments[i] > repr2 ? assignments[i] - 1 : assignments[i];
-            }
-
-            if (repr2 < clusterRepresentatives.Length) {
-                clusterRepresentatives[repr2] = clusterRepresentatives[repr1];
-            }
-        }
-
-        return assignments;
-    }
+            return assignments;
+        }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>

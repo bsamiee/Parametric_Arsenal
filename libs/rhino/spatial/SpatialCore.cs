@@ -78,21 +78,22 @@ internal static class SpatialCore {
 
     /// <summary>Execute RTree range search with ArrayPool buffer for zero allocation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
-        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-        int count = 0;
-        try {
-            void Collect(object? sender, RTreeEventArgs args) => count = count >= buffer.Length ? count : (buffer[count] = args.Id) is var _ ? count + 1 : count;
-            _ = queryShape switch {
-                Sphere sphere => tree.Search(sphere, Collect),
-                BoundingBox box => tree.Search(box, Collect),
-                _ => false,
-            };
-            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
-        } finally {
-            ArrayPool<int>.Shared.Return(buffer, clearArray: true);
-        }
-    }
+    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) =>
+        ((Func<Result<IReadOnlyList<int>>>)(() => {
+            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+            int count = 0;
+            try {
+                void Collect(object? sender, RTreeEventArgs args) => count = count >= buffer.Length ? count : (buffer[count] = args.Id) is var _ ? count + 1 : count;
+                _ = queryShape switch {
+                    Sphere sphere => tree.Search(sphere, Collect),
+                    BoundingBox box => tree.Search(box, Collect),
+                    _ => false,
+                };
+                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+            } finally {
+                ArrayPool<int>.Shared.Return(buffer, clearArray: true);
+            }
+        }))();
 
     /// <summary>Execute k-nearest or distance-limited proximity search via RTree.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -111,20 +112,21 @@ internal static class SpatialCore {
 
     /// <summary>Execute mesh face overlap detection between two RTrees with tolerance.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
-        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-        int count = 0;
-        try {
-            return RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
-                if (count + 1 < buffer.Length) {
-                    buffer[count++] = args.Id;
-                    buffer[count++] = args.IdB;
-                }
-            })
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
-        } finally {
-            ArrayPool<int>.Shared.Return(buffer, clearArray: true);
-        }
-    }
+    private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) =>
+        ((Func<Result<IReadOnlyList<int>>>)(() => {
+            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+            int count = 0;
+            try {
+                return RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
+                    if (count + 1 < buffer.Length) {
+                        buffer[count++] = args.Id;
+                        buffer[count++] = args.IdB;
+                    }
+                })
+                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
+                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
+            } finally {
+                ArrayPool<int>.Shared.Return(buffer, clearArray: true);
+            }
+        }))();
 }
