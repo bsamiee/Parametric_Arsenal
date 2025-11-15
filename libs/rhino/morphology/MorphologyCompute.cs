@@ -48,7 +48,7 @@ internal static class MorphologyCompute {
                                             RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
                                             RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
                                             RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
-                                        deformedVerts[i] = RhinoMath.IsValidDouble(localCoord.X) && RhinoMath.IsValidDouble(localCoord.Y) && RhinoMath.IsValidDouble(localCoord.Z) && deformedControlPoints.Length >= MorphologyConfig.MinCageControlPoints
+                                        deformedVerts[i] = deformedControlPoints.Length >= MorphologyConfig.MinCageControlPoints
                                             ? ((Func<Point3d>)(() => {
                                                 (double u, double v, double w) = (localCoord.X, localCoord.Y, localCoord.Z);
                                                 (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
@@ -140,7 +140,10 @@ internal static class MorphologyCompute {
                         : valence is 6
                             ? MorphologyConfig.LoopBetaValence6
                             : valence > 2
-                                ? (((1.0 / valence) * (MorphologyConfig.LoopCenterWeight - Math.Pow((MorphologyConfig.LoopNeighborBase + ((MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence)))), 2.0))))
+                                ? ((Func<double>)(() => {
+                                    double temp = MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence));
+                                    return (1.0 / valence) * (MorphologyConfig.LoopCenterWeight - (temp * temp));
+                                }))()
                                 : 0.0;
 
                     Point3d sum = Point3d.Origin;
@@ -307,7 +310,10 @@ internal static class MorphologyCompute {
                         iterPerformed++;
 
                         double rmsDisp = iter > 0
-                            ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count).Average(i => Math.Pow(positions[i].DistanceTo(prevPositions[i]), 2.0)))
+                            ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count).Average(i => {
+                                double dist = positions[i].DistanceTo(prevPositions[i]);
+                                return dist * dist;
+                            }))
                             : double.MaxValue;
                         converged = rmsDisp < threshold;
 

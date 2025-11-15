@@ -373,7 +373,10 @@ internal static class MorphologyCore {
             .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length),
         ];
         double mean = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
-        double stdDev = edgeLengths.Length > 0 ? Math.Sqrt(edgeLengths.Average(e => Math.Pow(e - mean, 2.0))) : 0.0;
+        double stdDev = edgeLengths.Length > 0 ? Math.Sqrt(edgeLengths.Average(e => {
+            double diff = e - mean;
+            return diff * diff;
+        })) : 0.0;
         (double uniformity, bool converged) = (
             mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / mean) : 0.0,
             Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * 0.1));
