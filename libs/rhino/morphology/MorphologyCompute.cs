@@ -39,7 +39,14 @@ internal static class MorphologyCompute {
                         return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
                     }
                     Point3d[] vertices = deformed switch {
-                        Mesh m => Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]).ToArray(),
+                        Mesh m => (
+                            int count = m.Vertices.Count;
+                            Point3d[] arr = new Point3d[count];
+                            for (int i = 0; i < count; i++) {
+                                arr[i] = (Point3d)m.Vertices[i];
+                            }
+                            arr
+                        ),
                         Brep b => b.Vertices.Select(static v => v.Location).ToArray(),
                         _ => [],
                     };
