@@ -153,16 +153,8 @@ internal static class FieldsConfig {
             int complement = 255 - i;
             int[] baseCase = table[complement];
             table[i] = baseCase.Length > 0
-                ? ((Func<int[]>)(() => {
-                    int length = baseCase.Length;
-                    int[] inverted = new int[length];
-                    for (int j = 0; j < length; j += 3) {
-                        inverted[j] = baseCase[j + 2];
-                        inverted[j + 1] = baseCase[j + 1];
-                        inverted[j + 2] = baseCase[j];
-                    }
-                    return inverted;
-                }))()
+                ? [.. Enumerable.Range(0, baseCase.Length / 3)
+                    .SelectMany(t => new[] { baseCase[(t * 3) + 2], baseCase[(t * 3) + 1], baseCase[t * 3], })]
                 : [];
         }
 
