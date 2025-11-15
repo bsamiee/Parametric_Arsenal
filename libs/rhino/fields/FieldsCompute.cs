@@ -197,31 +197,32 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-                try {
-                    for (int i = 0; i < resolution; i++) {
-                        for (int j = 0; j < resolution; j++) {
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
-                                potential[idx] = i > 0
-                                    ? potential[((i - 1) * resolution * resolution) + (j * resolution) + k] + (gridDelta.X * vectorField[idx])
-                                    : Vector3d.Zero;
-                            }
-                        }
-                    }
+        if (vectorField.Length != grid.Length) {
+            return ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points"));
+        }
+        if (resolution < FieldsConfig.MinResolution) {
+            return ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+        }
 
-                    Vector3d[] finalPotential = [.. potential[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(potential, clearArray: true);
+        int totalSamples = vectorField.Length;
+        Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
+        try {
+            for (int i = 0; i < resolution; i++) {
+                for (int j = 0; j < resolution; j++) {
+                    for (int k = 0; k < resolution; k++) {
+                        int idx = (i * resolution * resolution) + (j * resolution) + k;
+                        potential[idx] = i > 0
+                            ? potential[((i - 1) * resolution * resolution) + (j * resolution) + k] + (gridDelta.X * vectorField[idx])
+                            : Vector3d.Zero;
+                    }
                 }
-            }))(),
-        };
+            }
+
+            Vector3d[] finalPotential = [.. potential[..totalSamples]];
+            return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
+        } finally {
+            ArrayPool<Vector3d>.Shared.Return(potential, clearArray: true);
+        }
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
