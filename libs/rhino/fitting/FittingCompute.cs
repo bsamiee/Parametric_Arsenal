@@ -118,15 +118,16 @@ internal static class FittingCompute {
     /// <summary>Computes fairness score from curvature standard deviation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeFairnessScore(Curve curve) =>
-        FittingConfig.EnergySampleCount > 0
-        && Enumerable.Range(0, FittingConfig.EnergySampleCount)
-            .Select(i => curve.CurvatureAt(curve.Domain.ParameterAt(i / (FittingConfig.EnergySampleCount - 1.0))).Length)
-            .ToArray() is double[] curvatures
-        && curvatures.Length > 0
-        && curvatures.Average() is double avgCurv
-        && Math.Sqrt(curvatures.Sum(k => Math.Pow(k - avgCurv, 2)) / curvatures.Length) is double stdDev
-        && avgCurv > RhinoMath.ZeroTolerance
-            ? RhinoMath.Clamp(1.0 - (stdDev / avgCurv), 0.0, 1.0)
+        FittingConfig.EnergySampleCount > 1
+            ? Enumerable.Range(0, FittingConfig.EnergySampleCount)
+                .Select(i => curve.CurvatureAt(curve.Domain.ParameterAt(i / (FittingConfig.EnergySampleCount - 1.0))).Length)
+                .ToArray() is double[] curvatures
+                && curvatures.Length > 0
+                && curvatures.Average() is double avgCurv
+                && Math.Sqrt(curvatures.Sum(k => Math.Pow(k - avgCurv, 2)) / curvatures.Length) is double stdDev
+                && avgCurv > RhinoMath.ZeroTolerance
+                    ? RhinoMath.Clamp(1.0 - (stdDev / avgCurv), 0.0, 1.0)
+                    : 0.0
             : 0.0;
 
     /// <summary>Laplacian smoothing for curves with iteration count.</summary>
@@ -214,8 +215,8 @@ internal static class FittingCompute {
         IGeometryContext context) =>
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.NurbsGeometry,])
-            .Bind(validCurve => {
-                using NurbsCurve refined = validCurve.Duplicate() as NurbsCurve ?? validCurve;
+            .Bind(validCurve => ((Func<Result<Fitting.CurveFitResult>>)(() => {
+                NurbsCurve refined = validCurve.Duplicate() as NurbsCurve ?? validCurve;
                 
                 for (int lvl = 0; lvl < level; lvl++) {
                     foreach (double knotParam in [.. ComputeMidpointKnots(refined.Knots)]) {
@@ -235,7 +236,7 @@ internal static class FittingCompute {
                     FairnessScore: ComputeFairnessScore(refined),
                     ControlPointCount: refined.Points.Count,
                     ActualDegree: refined.Degree));
-            });
+            }))());
 
     /// <summary>Computes midpoint parameters for knot insertion (uniform refinement).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

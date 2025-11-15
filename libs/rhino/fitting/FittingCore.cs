@@ -109,7 +109,7 @@ internal static class FittingCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double EvaluateBasis(int i, int p, double u, double[] knots) =>
         p == 0
-            ? (u >= knots[i] && u < knots[i + 1] ? 1.0 : 0.0)
+            ? (u >= knots[i] && (u < knots[i + 1] || (i == knots.Length - 2 && Math.Abs(u - knots[i + 1]) < RhinoMath.ZeroTolerance)) ? 1.0 : 0.0)
             : (knots[i + p] - knots[i] > RhinoMath.ZeroTolerance
                 ? ((u - knots[i]) / (knots[i + p] - knots[i])) * EvaluateBasis(i, p - 1, u, knots)
                 : 0.0) +
@@ -155,9 +155,8 @@ internal static class FittingCore {
         }
 
         Point3d[] controlPoints = new Point3d[numControlPoints];
-        double[] buffer = ArrayPool<double>.Shared.Rent(numControlPoints);
-        try {
-            for (int col = 0; col < numControlPoints; col++) {
+
+        for (int col = 0; col < numControlPoints; col++) {
                 int pivotRow = col;
                 double maxPivot = Math.Abs(NtN[col, col]);
 
@@ -207,10 +206,7 @@ internal static class FittingCore {
                 controlPoints[i] = sum;
             }
 
-            return ResultFactory.Create(value: controlPoints);
-        } finally {
-            ArrayPool<double>.Shared.Return(buffer, clearArray: true);
-        }
+        return ResultFactory.Create(value: controlPoints);
     }
 
     /// <summary>Constructs NurbsCurve from control points and computes quality metrics.</summary>
@@ -222,22 +218,25 @@ internal static class FittingCore {
         Point3d[] originalPoints,
         double tolerance,
         IGeometryContext context) =>
-        NurbsCurve.Create(periodic: false, degree: degree, points: controlPoints) is NurbsCurve curve && curve.IsValid
-            ? ComputeDeviation(fitted: curve, original: originalPoints)
-                .Bind(dev => dev.MaxDev > tolerance
-                    ? ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Geometry.Fitting.ConstraintViolation.WithContext(string.Create(
-                            CultureInfo.InvariantCulture,
-                            $"Max deviation {dev.MaxDev.ToString("E3", CultureInfo.InvariantCulture)} exceeds tolerance {tolerance.ToString("E3", CultureInfo.InvariantCulture)}")))
-                    : ResultFactory.Create(value: new Fitting.CurveFitResult(
-                        Curve: curve,
-                        MaxDeviation: dev.MaxDev,
-                        RmsDeviation: dev.RmsDev,
-                        FairnessScore: ComputeFairnessScore(curve: curve),
-                        ControlPointCount: controlPoints.Length,
-                        ActualDegree: curve.Degree)))
-            : ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Geometry.Fitting.FittingFailed.WithContext("Failed to construct valid NURBS curve"));
+        ((Func<Result<Fitting.CurveFitResult>>)(() => {
+            NurbsCurve curve = NurbsCurve.Create(periodic: false, degree: degree, points: controlPoints);
+            return curve is not null && curve.IsValid
+                ? ComputeDeviation(fitted: curve, original: originalPoints)
+                    .Bind(dev => dev.MaxDev > tolerance
+                        ? ResultFactory.Create<Fitting.CurveFitResult>(
+                            error: E.Geometry.Fitting.ConstraintViolation.WithContext(string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Max deviation {dev.MaxDev.ToString("E3", CultureInfo.InvariantCulture)} exceeds tolerance {tolerance.ToString("E3", CultureInfo.InvariantCulture)}")))
+                        : ResultFactory.Create(value: new Fitting.CurveFitResult(
+                            Curve: curve,
+                            MaxDeviation: dev.MaxDev,
+                            RmsDeviation: dev.RmsDev,
+                            FairnessScore: ComputeFairnessScore(curve: curve),
+                            ControlPointCount: controlPoints.Length,
+                            ActualDegree: curve.Degree)))
+                : ResultFactory.Create<Fitting.CurveFitResult>(
+                    error: E.Geometry.Fitting.FittingFailed.WithContext("Failed to construct valid NURBS curve"));
+        }))();
 
     /// <summary>Computes max/RMS deviation between fitted curve and original points.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -261,15 +260,16 @@ internal static class FittingCore {
     /// <summary>Computes fairness score from curvature variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeFairnessScore(Curve curve) =>
-        FittingConfig.EnergySampleCount > 0
-        && Enumerable.Range(0, FittingConfig.EnergySampleCount)
-            .Select(i => curve.CurvatureAt(curve.Domain.ParameterAt(i / (FittingConfig.EnergySampleCount - 1.0))).Length)
-            .ToArray() is double[] curvatures
-        && curvatures.Length > 0
-        && curvatures.Average() is double avgCurv
-        && Math.Sqrt(curvatures.Sum(k => Math.Pow(k - avgCurv, 2)) / curvatures.Length) is double stdDev
-        && avgCurv > RhinoMath.ZeroTolerance
-            ? RhinoMath.Clamp(1.0 - (stdDev / avgCurv), 0.0, 1.0)
+        FittingConfig.EnergySampleCount > 1
+            ? Enumerable.Range(0, FittingConfig.EnergySampleCount)
+                .Select(i => curve.CurvatureAt(curve.Domain.ParameterAt(i / (FittingConfig.EnergySampleCount - 1.0))).Length)
+                .ToArray() is double[] curvatures
+                && curvatures.Length > 0
+                && curvatures.Average() is double avgCurv
+                && Math.Sqrt(curvatures.Sum(k => Math.Pow(k - avgCurv, 2)) / curvatures.Length) is double stdDev
+                && avgCurv > RhinoMath.ZeroTolerance
+                    ? RhinoMath.Clamp(1.0 - (stdDev / avgCurv), 0.0, 1.0)
+                    : 0.0
             : 0.0;
 
     /// <summary>Rebuilds curve with validation and quality computation.</summary>
@@ -300,13 +300,13 @@ internal static class FittingCore {
     /// <summary>Fits surface from point grid (placeholder - full implementation similar to curve).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Fitting.SurfaceFitResult> FitSurfaceFromGrid(
-        Point3d[,] _,
-        int __,
-        int ___,
-        int? ____,
-        int? _____,
-        double ______,
-        IGeometryContext _______) =>
+        Point3d[,] points,
+        int uDegree,
+        int vDegree,
+        int? uControlPoints,
+        int? vControlPoints,
+        double tolerance,
+        IGeometryContext context) =>
         ResultFactory.Create<Fitting.SurfaceFitResult>(
             error: E.Geometry.Fitting.FittingFailed.WithContext("Surface fitting implementation pending"));
 
