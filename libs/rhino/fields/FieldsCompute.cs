@@ -28,30 +28,31 @@ internal static class FieldsCompute {
             double twoDx = 2.0 * dx;
             double twoDy = 2.0 * dy;
             double twoDz = 2.0 * dz;
+            int resSquared = resolution * resolution;
 
             for (int i = 0; i < resolution; i++) {
                 for (int j = 0; j < resolution; j++) {
                     for (int k = 0; k < resolution; k++) {
-                        int idx = (i * resolution * resolution) + (j * resolution) + k;
+                        int idx = (i * resSquared) + (j * resolution) + k;
 
                         double dfdx = (i, resolution) switch {
-                            (var x, var r) when x > 0 && x < r - 1 => (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoDx,
-                            (0, > 1) => (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / dx,
-                            (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx,
+                            (var x, var r) when x > 0 && x < r - 1 => (distances[idx + resSquared] - distances[idx - resSquared]) / twoDx,
+                            (0, > 1) => (distances[idx + resSquared] - distances[idx]) / dx,
+                            (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[idx - resSquared]) / dx,
                             _ => 0.0,
                         };
 
                         double dfdy = (j, resolution) switch {
-                            (var y, var r) when y > 0 && y < r - 1 => (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoDy,
-                            (0, > 1) => (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / dy,
-                            (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy,
+                            (var y, var r) when y > 0 && y < r - 1 => (distances[idx + resolution] - distances[idx - resolution]) / twoDy,
+                            (0, > 1) => (distances[idx + resolution] - distances[idx]) / dy,
+                            (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[idx - resolution]) / dy,
                             _ => 0.0,
                         };
 
                         double dfdz = (k, resolution) switch {
-                            (var z, var r) when z > 0 && z < r - 1 => (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoDz,
-                            (0, > 1) => (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / dz,
-                            (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz,
+                            (var z, var r) when z > 0 && z < r - 1 => (distances[idx + 1] - distances[idx - 1]) / twoDz,
+                            (0, > 1) => (distances[idx + 1] - distances[idx]) / dz,
+                            (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[idx - 1]) / dz,
                             _ => 0.0,
                         };
 
@@ -95,14 +96,14 @@ internal static class FieldsCompute {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = baseJ + k;
 
-                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].Z - vectorField[baseI + ((j - 1) * resolution) + k].Z) / twoDy : 0.0;
-                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].Y - vectorField[baseJ + (k - 1)].Y) / twoDz : 0.0;
+                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].Z - vectorField[idx - resolution].Z) / twoDy : 0.0;
+                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].Y - vectorField[idx - 1].Y) / twoDz : 0.0;
 
-                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[baseJ + (k + 1)].X - vectorField[baseJ + (k - 1)].X) / twoDz : 0.0;
-                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Z - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Z) / twoDx : 0.0;
+                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].X - vectorField[idx - 1].X) / twoDz : 0.0;
+                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resolutionSquared].Z - vectorField[idx - resolutionSquared].Z) / twoDx : 0.0;
 
-                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolutionSquared) + (j * resolution) + k].Y - vectorField[((i - 1) * resolutionSquared) + (j * resolution) + k].Y) / twoDx : 0.0;
-                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[baseI + ((j + 1) * resolution) + k].X - vectorField[baseI + ((j - 1) * resolution) + k].X) / twoDy : 0.0;
+                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resolutionSquared].Y - vectorField[idx - resolutionSquared].Y) / twoDx : 0.0;
+                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].X - vectorField[idx - resolution].X) / twoDy : 0.0;
 
                                 curl[idx] = new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
                             }
@@ -138,14 +139,15 @@ internal static class FieldsCompute {
                     double twoDy = 2.0 * dy;
                     double twoDz = 2.0 * dz;
 
+                    int resSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
+                                int idx = (i * resSquared) + (j * resolution) + k;
 
-                                double dFx_dx = (i < resolution - 1 && i > 0) ? (vectorField[((i + 1) * resolution * resolution) + (j * resolution) + k].X - vectorField[((i - 1) * resolution * resolution) + (j * resolution) + k].X) / twoDx : 0.0;
-                                double dFy_dy = (j < resolution - 1 && j > 0) ? (vectorField[(i * resolution * resolution) + ((j + 1) * resolution) + k].Y - vectorField[(i * resolution * resolution) + ((j - 1) * resolution) + k].Y) / twoDy : 0.0;
-                                double dFz_dz = (k < resolution - 1 && k > 0) ? (vectorField[(i * resolution * resolution) + (j * resolution) + (k + 1)].Z - vectorField[(i * resolution * resolution) + (j * resolution) + (k - 1)].Z) / twoDz : 0.0;
+                                double dFx_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resSquared].X - vectorField[idx - resSquared].X) / twoDx : 0.0;
+                                double dFy_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].Y - vectorField[idx - resolution].Y) / twoDy : 0.0;
+                                double dFz_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].Z - vectorField[idx - 1].Z) / twoDz : 0.0;
 
                                 divergence[idx] = dFx_dx + dFy_dy + dFz_dz;
                             }
@@ -177,15 +179,16 @@ internal static class FieldsCompute {
                     double dx2 = gridDelta.X * gridDelta.X;
                     double dy2 = gridDelta.Y * gridDelta.Y;
                     double dz2 = gridDelta.Z * gridDelta.Z;
+                    int resSquared = resolution * resolution;
 
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
+                                int idx = (i * resSquared) + (j * resolution) + k;
 
-                                double d2f_dx2 = (i > 0 && i < resolution - 1) ? (scalarField[((i + 1) * resolution * resolution) + (j * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx2 : 0.0;
-                                double d2f_dy2 = (j > 0 && j < resolution - 1) ? (scalarField[(i * resolution * resolution) + ((j + 1) * resolution) + k] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy2 : 0.0;
-                                double d2f_dz2 = (k > 0 && k < resolution - 1) ? (scalarField[(i * resolution * resolution) + (j * resolution) + (k + 1)] - (2.0 * scalarField[idx]) + scalarField[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz2 : 0.0;
+                                double d2f_dx2 = (i > 0 && i < resolution - 1) ? (scalarField[idx + resSquared] - (2.0 * scalarField[idx]) + scalarField[idx - resSquared]) / dx2 : 0.0;
+                                double d2f_dy2 = (j > 0 && j < resolution - 1) ? (scalarField[idx + resolution] - (2.0 * scalarField[idx]) + scalarField[idx - resolution]) / dy2 : 0.0;
+                                double d2f_dz2 = (k > 0 && k < resolution - 1) ? (scalarField[idx + 1] - (2.0 * scalarField[idx]) + scalarField[idx - 1]) / dz2 : 0.0;
 
                                 laplacian[idx] = d2f_dx2 + d2f_dy2 + d2f_dz2;
                             }
@@ -439,20 +442,15 @@ internal static class FieldsCompute {
                     };
 
                     Point3d nextPoint = current + delta;
-                    bool inBounds = bounds.Contains(nextPoint);
-                    bool fieldTooWeak = k1Magnitude < FieldsConfig.MinFieldMagnitude;
-                    bool stepTooSmall = delta.Length < RhinoMath.ZeroTolerance;
-                    bool shouldContinue = inBounds && !fieldTooWeak && !stepTooSmall && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
+                    bool shouldContinue = bounds.Contains(nextPoint)
+                        && k1Magnitude >= FieldsConfig.MinFieldMagnitude
+                        && delta.Length >= RhinoMath.ZeroTolerance
+                        && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
 
-                    _ = shouldContinue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            current = nextPoint;
-                            pathBuffer[stepCount] = current;
-                            stepCount++;
-                            return 1;
-                        }))(),
-                    };
+                    if (shouldContinue) {
+                        current = nextPoint;
+                        pathBuffer[stepCount++] = current;
+                    }
 
                     step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
                 }
@@ -508,32 +506,28 @@ internal static class FieldsCompute {
 
                         int[] triangleEdges = FieldsConfig.MarchingCubesTable[cubeIndex];
 
-                        _ = triangleEdges.Length switch {
-                            0 => 0,
-                            _ => ((Func<int>)(() => {
-                                Point3f[] edgeVertices = new Point3f[12];
+                        if (triangleEdges.Length > 0) {
+                            Point3f[] edgeVertices = new Point3f[12];
 
-                                for (int e = 0; e < triangleEdges.Length; e++) {
-                                    int edgeIdx = triangleEdges[e];
-                                    (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
-                                    double f1 = scalarField[cornerIndices[v1]];
-                                    double f2 = scalarField[cornerIndices[v2]];
-                                    double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
-                                    Point3d p1 = gridPoints[cornerIndices[v1]];
-                                    Point3d p2 = gridPoints[cornerIndices[v2]];
-                                    edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
-                                }
+                            for (int e = 0; e < triangleEdges.Length; e++) {
+                                int edgeIdx = triangleEdges[e];
+                                (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
+                                double f1 = scalarField[cornerIndices[v1]];
+                                double f2 = scalarField[cornerIndices[v2]];
+                                double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
+                                Point3d p1 = gridPoints[cornerIndices[v1]];
+                                Point3d p2 = gridPoints[cornerIndices[v2]];
+                                edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
+                            }
 
-                                for (int t = 0; t < triangleEdges.Length; t += 3) {
-                                    int vIdx = vertices.Count;
-                                    vertices.Add(edgeVertices[triangleEdges[t]]);
-                                    vertices.Add(edgeVertices[triangleEdges[t + 1]]);
-                                    vertices.Add(edgeVertices[triangleEdges[t + 2]]);
-                                    faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
-                                }
-                                return 1;
-                            }))(),
-                        };
+                            for (int t = 0; t < triangleEdges.Length; t += 3) {
+                                int vIdx = vertices.Count;
+                                vertices.Add(edgeVertices[triangleEdges[t]]);
+                                vertices.Add(edgeVertices[triangleEdges[t + 1]]);
+                                vertices.Add(edgeVertices[triangleEdges[t + 2]]);
+                                faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
+                            }
+                        }
                     }
                 }
             }
@@ -789,42 +783,37 @@ internal static class FieldsCompute {
             (_, _, false) => ResultFactory.Create<Fields.CriticalPoint[]>(error: E.Geometry.InvalidCriticalPointDetection.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
             (true, true, true) => ((Func<Result<Fields.CriticalPoint[]>>)(() => {
                 List<Fields.CriticalPoint> criticalPoints = [];
+                int resSquared = resolution * resolution;
 
                 for (int i = 1; i < resolution - 1; i++) {
                     for (int j = 1; j < resolution - 1; j++) {
                         for (int k = 1; k < resolution - 1; k++) {
-                            int idx = (i * resolution * resolution) + (j * resolution) + k;
-                            Vector3d gradient = gradientField[idx];
+                            int idx = (i * resSquared) + (j * resolution) + k;
 
-                            bool isCritical = gradient.Length < FieldsConfig.MinFieldMagnitude;
-                            _ = isCritical switch {
-                                false => 0,
-                                true => ((Func<int>)(() => {
-                                    double[,] localHessian = new double[3, 3];
-                                    for (int row = 0; row < 3; row++) {
-                                        for (int col = 0; col < 3; col++) {
-                                            localHessian[row, col] = hessian[row, col][idx];
-                                        }
+                            if (gradientField[idx].Length < FieldsConfig.MinFieldMagnitude) {
+                                double[,] localHessian = new double[3, 3];
+                                for (int row = 0; row < 3; row++) {
+                                    for (int col = 0; col < 3; col++) {
+                                        localHessian[row, col] = hessian[row, col][idx];
                                     }
+                                }
 
-                                    (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
-                                    int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
-                                    int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
-                                    byte criticalType = (positiveCount, negativeCount) switch {
-                                        (3, 0) => FieldsConfig.CriticalPointMinimum,
-                                        (0, 3) => FieldsConfig.CriticalPointMaximum,
-                                        _ => FieldsConfig.CriticalPointSaddle,
-                                    };
+                                (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
+                                int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
+                                int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
+                                byte criticalType = (positiveCount, negativeCount) switch {
+                                    (3, 0) => FieldsConfig.CriticalPointMinimum,
+                                    (0, 3) => FieldsConfig.CriticalPointMaximum,
+                                    _ => FieldsConfig.CriticalPointSaddle,
+                                };
 
-                                    criticalPoints.Add(new Fields.CriticalPoint(
-                                        Location: grid[idx],
-                                        Type: criticalType,
-                                        Value: scalarField[idx],
-                                        Eigenvectors: eigenvectors,
-                                        Eigenvalues: eigenvalues));
-                                    return 1;
-                                }))(),
-                            };
+                                criticalPoints.Add(new Fields.CriticalPoint(
+                                    Location: grid[idx],
+                                    Type: criticalType,
+                                    Value: scalarField[idx],
+                                    Eigenvectors: eigenvectors,
+                                    Eigenvalues: eigenvalues));
+                            }
                         }
                     }
                 }
@@ -914,32 +903,22 @@ internal static class FieldsCompute {
 
                 for (int i = 0; i < scalarField.Length; i++) {
                     double value = scalarField[i];
-                    bool validValue = RhinoMath.IsValidDouble(value);
-                    _ = validValue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            sum += value;
-                            validCount++;
-                            (min, minIdx) = value < min ? (value, i) : (min, minIdx);
-                            (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
-                            return 1;
-                        }))(),
-                    };
+                    if (RhinoMath.IsValidDouble(value)) {
+                        sum += value;
+                        validCount++;
+                        (min, minIdx) = value < min ? (value, i) : (min, minIdx);
+                        (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
+                    }
                 }
 
                 double mean = validCount > 0 ? sum / validCount : 0.0;
                 double sumSquaredDiff = 0.0;
                 for (int i = 0; i < scalarField.Length; i++) {
                     double value = scalarField[i];
-                    bool validValue = RhinoMath.IsValidDouble(value);
-                    _ = validValue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            double diff = value - mean;
-                            sumSquaredDiff += diff * diff;
-                            return 1;
-                        }))(),
-                    };
+                    if (RhinoMath.IsValidDouble(value)) {
+                        double diff = value - mean;
+                        sumSquaredDiff += diff * diff;
+                    }
                 }
                 double stdDev = validCount > 0 ? Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
 
