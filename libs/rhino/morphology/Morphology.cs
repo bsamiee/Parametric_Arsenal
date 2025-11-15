@@ -123,18 +123,18 @@ public static class Morphology {
         T input,
         (byte Operation, object Parameters) spec,
         IGeometryContext context) where T : GeometryBase =>
-        !MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) || executor is null
-            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"))
-            : UnifiedOperation.Apply(
+        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
+            ? UnifiedOperation.Apply(
                 input: input,
                 operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
                 config: new OperationConfig<T, IMorphologyResult> {
                     Context = context,
-                    ValidationMode = MorphologyConfig.ValidationModes.TryGetValue((spec.Operation, typeof(T)), out V mode) ? mode : V.Standard,
+                    ValidationMode = MorphologyConfig.ValidationModes.GetValueOrDefault((spec.Operation, typeof(T)), defaultValue: V.Standard),
                     OperationName = MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName)
                         ? string.Create(CultureInfo.InvariantCulture, $"Morphology.{opName}")
                         : string.Create(CultureInfo.InvariantCulture, $"Morphology.Op{spec.Operation}"),
                     EnableDiagnostics = false,
-                });
+                })
+            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
+                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
 }
