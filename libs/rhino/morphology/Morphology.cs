@@ -132,9 +132,9 @@ public static class Morphology {
                 config: new OperationConfig<T, IMorphologyResult> {
                     Context = context,
                     ValidationMode = MorphologyConfig.ValidationModes.TryGetValue((spec.Operation, typeof(T)), out V mode) ? mode : V.Standard,
-                    OperationName = string.Create(
-                        CultureInfo.InvariantCulture,
-                        $"Morphology.{(MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName) ? opName ?? $"Op{spec.Operation}" : $"Op{spec.Operation}")}"),
+                    OperationName = MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName)
+                        ? string.Create(CultureInfo.InvariantCulture, $"Morphology.{opName}")
+                        : string.Create(CultureInfo.InvariantCulture, $"Morphology.Op{spec.Operation}"),
                     EnableDiagnostics = false,
                 });
 }
