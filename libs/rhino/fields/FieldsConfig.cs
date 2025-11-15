@@ -8,6 +8,8 @@ namespace Arsenal.Rhino.Fields;
 internal static class FieldsConfig {
     internal const byte OperationDistance = 0;
 
+    internal const byte IntegrationEuler = 0;
+    internal const byte IntegrationRK2 = 1;
     internal const byte IntegrationRK4 = 2;
 
     internal const byte InterpolationNearest = 0;
@@ -22,12 +24,18 @@ internal static class FieldsConfig {
     internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
     internal const double MaxStepSize = 1.0;
     internal const int MaxStreamlineSteps = 10000;
+    internal const double MinFieldMagnitude = 1e-10;
 
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
+    internal const double RK2HalfStep = 0.5;
 
     internal const int StreamlineRTreeThreshold = 1000;
     internal const int FieldRTreeThreshold = 100;
+
+    internal const byte CriticalPointMinimum = 0;
+    internal const byte CriticalPointMaximum = 1;
+    internal const byte CriticalPointSaddle = 2;
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
@@ -166,4 +174,8 @@ internal static class FieldsConfig {
     }
 
     internal const double InsideOutsideToleranceMultiplier = 10.0;
+
+    /// <summary>Critical point detection: eigenvalue threshold for classification.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 }

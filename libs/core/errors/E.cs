@@ -73,16 +73,23 @@ public static class E {
             [2602] = "No primitives detected in geometry",
             [2603] = "No pattern detected in geometry collection",
 
-            // Field Operations (2700-2708)
+            // Field Operations (2700-2715)
             [2700] = "Field bounds invalid or degenerate",
             [2701] = "Invalid seed points for streamline tracing",
-            [2702] = "Isovalue outside scalar field range",
+            [2702] = "Isovalue outside scalar field range or invalid",
             [2703] = "Scalar field data invalid or insufficient",
             [2704] = "Curl field computation failed or invalid",
             [2705] = "Divergence field computation failed or invalid",
             [2706] = "Laplacian field computation failed or invalid",
             [2707] = "Vector potential field computation failed or invalid",
             [2708] = "Field interpolation failed or invalid query point",
+            [2709] = "Hessian field computation failed or invalid",
+            [2710] = "Directional derivative computation failed or invalid direction",
+            [2711] = "Field magnitude computation failed or mismatched field/grid lengths",
+            [2712] = "Field normalization failed or mismatched field/grid lengths",
+            [2713] = "Critical point detection failed or insufficient data",
+            [2714] = "Field statistics computation failed or insufficient data",
+            [2715] = "Field composition operation failed or mismatched dimensions",
 
             // General Geometry Type Errors (2007-2008)
             [2007] = "Invalid or unsupported geometry type",
@@ -237,7 +244,7 @@ public static class E {
         public static readonly SystemError NoPrimitivesDetected = Get(2602);
         public static readonly SystemError NoPatternDetected = Get(2603);
 
-        // Field Operations (2700-2708)
+        // Field Operations (2700-2715)
         public static readonly SystemError InvalidFieldBounds = Get(2700);
         public static readonly SystemError InvalidStreamlineSeeds = Get(2701);
         public static readonly SystemError InvalidIsovalue = Get(2702);
@@ -247,6 +254,13 @@ public static class E {
         public static readonly SystemError InvalidLaplacianComputation = Get(2706);
         public static readonly SystemError InvalidVectorPotentialComputation = Get(2707);
         public static readonly SystemError InvalidFieldInterpolation = Get(2708);
+        public static readonly SystemError InvalidHessianComputation = Get(2709);
+        public static readonly SystemError InvalidDirectionalDerivative = Get(2710);
+        public static readonly SystemError InvalidFieldMagnitude = Get(2711);
+        public static readonly SystemError InvalidFieldNormalization = Get(2712);
+        public static readonly SystemError InvalidCriticalPointDetection = Get(2713);
+        public static readonly SystemError InvalidFieldStatistics = Get(2714);
+        public static readonly SystemError InvalidFieldComposition = Get(2715);
 
         // General Geometry Type Errors (2007-2008)
         public static readonly SystemError InvalidGeometryType = Get(2007);
