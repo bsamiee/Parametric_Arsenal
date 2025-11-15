@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -29,14 +30,14 @@ internal static class FittingCompute {
 
     /// <summary>Fairs NURBS curve via iterative control point optimization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     private static Result<Fitting.CurveFitResult> FairNurbsCurve(
         NurbsCurve curve,
         Fitting.FairOptions options,
-        IGeometryContext context) {
+        IGeometryContext _) {
         NurbsCurve working = curve.Duplicate() as NurbsCurve ?? curve;
         double previousEnergy = ComputeBendingEnergy(curve: working);
         int iteration = 0;
-        double tolerance = options.Tolerance ?? context.AbsoluteTolerance;
 
         while (iteration < options.MaxIterations) {
             OptimizeControlPointsStep(
@@ -57,8 +58,9 @@ internal static class FittingCompute {
 
         return iteration >= options.MaxIterations
             ? ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Fitting.ConvergenceFailed.WithContext(
-                    $"Failed to converge after {options.MaxIterations} iterations"))
+                error: E.Fitting.ConvergenceFailed.WithContext(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Failed to converge after {options.MaxIterations.ToString(CultureInfo.InvariantCulture)} iterations")))
             : ResultFactory.Create(value: new Fitting.CurveFitResult(
                 Curve: working,
                 MaxDeviation: 0.0,
@@ -129,6 +131,7 @@ internal static class FittingCompute {
 
     /// <summary>Laplacian smoothing for curves with iteration count.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     internal static Result<Fitting.CurveFitResult> SmoothCurve(
         Curve curve,
         int iterations,
@@ -196,7 +199,9 @@ internal static class FittingCompute {
                     
                     if (smoothed is null) {
                         return ResultFactory.Create<Fitting.SurfaceFitResult>(
-                            error: E.Fitting.SmoothingFailed.WithContext($"Iteration {i + 1} failed"));
+                            error: E.Fitting.SmoothingFailed.WithContext(string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
                     }
                     working = smoothed;
                 }
@@ -222,17 +227,15 @@ internal static class FittingCompute {
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.NurbsGeometry,])
             .Bind(validCurve => {
-                NurbsCurve refined = validCurve.Duplicate() as NurbsCurve ?? validCurve;
+                using NurbsCurve refined = validCurve.Duplicate() as NurbsCurve ?? validCurve;
                 
                 for (int lvl = 0; lvl < level; lvl++) {
-                    double[] knotSpans = ComputeMidpointKnots(refined.Knots);
-                    
-                    foreach (double knotParam in knotSpans) {
-                        bool inserted = refined.Knots.InsertKnot(value: knotParam, multiplicity: 1);
-                        if (!inserted) {
+                    foreach (double knotParam in [.. ComputeMidpointKnots(refined.Knots)]) {
+                        if (!refined.Knots.InsertKnot(value: knotParam, multiplicity: 1)) {
                             return ResultFactory.Create<Fitting.CurveFitResult>(
-                                error: E.Fitting.IsogeometricRefinementFailed.WithContext(
-                                    $"Knot insertion failed at t={knotParam:F6} (level {lvl + 1})"));
+                                error: E.Fitting.IsogeometricRefinementFailed.WithContext(string.Create(
+                                    CultureInfo.InvariantCulture,
+                                    $"Knot insertion failed at t={knotParam:F6} (level {(lvl + 1).ToString(CultureInfo.InvariantCulture)})")));
                         }
                     }
                 }
@@ -249,11 +252,10 @@ internal static class FittingCompute {
     /// <summary>Computes midpoint parameters for knot insertion (uniform refinement).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double[] ComputeMidpointKnots(NurbsCurveKnotList knots) =>
-        Enumerable.Range(0, knots.Count - 1)
+        [.. Enumerable.Range(0, knots.Count - 1)
             .Select(i => (K1: knots[i], K2: knots[i + 1], Mid: (knots[i] + knots[i + 1]) * 0.5))
             .Where(t => Math.Abs(t.K2 - t.K1) > FittingConfig.ParameterTolerance)
-            .Select(t => t.Mid)
-            .ToArray();
+            .Select(t => t.Mid),];
 
     /// <summary>Iteratively fairs surface via thin-plate energy minimization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -279,7 +281,9 @@ internal static class FittingCompute {
                     
                     if (smoothed is null) {
                         return ResultFactory.Create<Fitting.SurfaceFitResult>(
-                            error: E.Fitting.SurfaceFairingFailed.WithContext($"Iteration {i + 1} failed"));
+                            error: E.Fitting.SurfaceFairingFailed.WithContext(string.Create(
+                                CultureInfo.InvariantCulture,
+                                $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
                     }
                     working = smoothed;
                 }

@@ -94,6 +94,7 @@ public static class Fitting {
 
     /// <summary>Fits NURBS surface from point grid via least-squares.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "2D array required for surface point grid")]
     public static Result<SurfaceFitResult> FitSurface(
         Point3d[,] points,
         FitOptions options,

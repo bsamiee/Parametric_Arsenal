@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -72,7 +73,7 @@ internal static class FittingCore {
         }
 
         return totalLength > RhinoMath.ZeroTolerance
-            ? ResultFactory.Create(value: [.. parameters.Select(t => t / totalLength)])
+            ? ResultFactory.Create(value: parameters.Select(t => t / totalLength).ToArray())
             : ResultFactory.Create<double[]>(
                 error: E.Fitting.ParameterizationFailed.WithContext(
                     "Coincident points: total chord length < ZeroTolerance"));
@@ -230,8 +231,9 @@ internal static class FittingCore {
             : ComputeDeviation(fitted: curve, original: originalPoints)
                 .Bind(dev => dev.MaxDev > tolerance
                     ? ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Fitting.ConstraintViolation.WithContext(
-                            $"Max deviation {dev.MaxDev:E3} exceeds tolerance {tolerance:E3}"))
+                        error: E.Fitting.ConstraintViolation.WithContext(string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"Max deviation {dev.MaxDev.ToString("E3", CultureInfo.InvariantCulture)} exceeds tolerance {tolerance.ToString("E3", CultureInfo.InvariantCulture)}")))
                     : ResultFactory.Create(value: new Fitting.CurveFitResult(
                         Curve: curve,
                         MaxDeviation: dev.MaxDev,
@@ -276,6 +278,7 @@ internal static class FittingCore {
 
     /// <summary>Rebuilds curve with validation and quality computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     internal static Result<Fitting.CurveFitResult> RebuildCurveWithValidation(
         Curve curve,
         int? degree,
@@ -305,19 +308,21 @@ internal static class FittingCore {
 
     /// <summary>Fits surface from point grid (placeholder - full implementation similar to curve).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "2D array required for surface point grid")]
     internal static Result<Fitting.SurfaceFitResult> FitSurfaceFromGrid(
-        Point3d[,] points,
-        int uDegree,
-        int vDegree,
-        int? uControlPoints,
-        int? vControlPoints,
-        double tolerance,
-        IGeometryContext context) =>
+        Point3d[,] _,
+        int __,
+        int ___,
+        int? ____,
+        int? _____,
+        double ______,
+        IGeometryContext _______) =>
         ResultFactory.Create<Fitting.SurfaceFitResult>(
             error: E.Fitting.FittingFailed.WithContext("Surface fitting implementation pending"));
 
     /// <summary>Rebuilds surface with validation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Surface is returned in result and ownership transferred")]
     internal static Result<Fitting.SurfaceFitResult> RebuildSurfaceWithValidation(
         Surface surface,
         int? uDegree,
