@@ -270,30 +270,24 @@ internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
         int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? FindNearestRTree(query, grid)
-            : FindNearestLinear(query, grid);
+            ? ((Func<int>)(() => {
+                using RTree tree = RTree.CreateFromPointArray(grid);
+                int idx = -1;
+                _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => idx = args.Id);
+                return idx;
+            }))()
+            : ((Func<int>)(() => {
+                double minDist = double.MaxValue;
+                int idx = 0;
+                for (int i = 0; i < grid.Length; i++) {
+                    double dist = query.DistanceTo(grid[i]);
+                    (idx, minDist) = dist < minDist ? (i, dist) : (idx, minDist);
+                }
+                return idx;
+            }))();
         return nearestIdx >= 0
             ? ResultFactory.Create(value: field[nearestIdx])
             : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FindNearestLinear(Point3d query, Point3d[] grid) {
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
-        for (int i = 0; i < grid.Length; i++) {
-            double dist = query.DistanceTo(grid[i]);
-            (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
-        }
-        return nearestIdx;
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FindNearestRTree(Point3d query, Point3d[] grid) {
-        using RTree tree = RTree.CreateFromPointArray(grid);
-        int nearestIdx = -1;
-        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -453,17 +447,12 @@ internal static class FieldsCompute {
                     bool stepTooSmall = delta.Length < RhinoMath.ZeroTolerance;
                     bool shouldContinue = inBounds && !fieldTooWeak && !stepTooSmall && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
 
-                    _ = shouldContinue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            current = nextPoint;
-                            pathBuffer[stepCount] = current;
-                            stepCount++;
-                            return 1;
-                        }))(),
-                    };
-
-                    step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
+                    if (!shouldContinue) {
+                        step = FieldsConfig.MaxStreamlineSteps;
+                        continue;
+                    }
+                    current = nextPoint;
+                    pathBuffer[stepCount++] = current;
                 }
 
                 streamlines[seedIdx] = stepCount > 1
@@ -517,32 +506,29 @@ internal static class FieldsCompute {
 
                         int[] triangleEdges = FieldsConfig.MarchingCubesTable[cubeIndex];
 
-                        _ = triangleEdges.Length switch {
-                            0 => 0,
-                            _ => ((Func<int>)(() => {
-                                Point3f[] edgeVertices = new Point3f[12];
+                        if (triangleEdges.Length == 0) {
+                            continue;
+                        }
 
-                                for (int e = 0; e < triangleEdges.Length; e++) {
-                                    int edgeIdx = triangleEdges[e];
-                                    (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
-                                    double f1 = scalarField[cornerIndices[v1]];
-                                    double f2 = scalarField[cornerIndices[v2]];
-                                    double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
-                                    Point3d p1 = gridPoints[cornerIndices[v1]];
-                                    Point3d p2 = gridPoints[cornerIndices[v2]];
-                                    edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
-                                }
+                        Point3f[] edgeVertices = new Point3f[12];
+                        for (int e = 0; e < triangleEdges.Length; e++) {
+                            int edgeIdx = triangleEdges[e];
+                            (int v1, int v2) = FieldsConfig.EdgeVertexPairs[edgeIdx];
+                            double f1 = scalarField[cornerIndices[v1]];
+                            double f2 = scalarField[cornerIndices[v2]];
+                            double t = RhinoMath.EpsilonEquals(f2, f1, epsilon: RhinoMath.ZeroTolerance) ? 0.5 : (isovalue - f1) / (f2 - f1);
+                            Point3d p1 = gridPoints[cornerIndices[v1]];
+                            Point3d p2 = gridPoints[cornerIndices[v2]];
+                            edgeVertices[edgeIdx] = new Point3f((float)(p1.X + (t * (p2.X - p1.X))), (float)(p1.Y + (t * (p2.Y - p1.Y))), (float)(p1.Z + (t * (p2.Z - p1.Z))));
+                        }
 
-                                for (int t = 0; t < triangleEdges.Length; t += 3) {
-                                    int vIdx = vertices.Count;
-                                    vertices.Add(edgeVertices[triangleEdges[t]]);
-                                    vertices.Add(edgeVertices[triangleEdges[t + 1]]);
-                                    vertices.Add(edgeVertices[triangleEdges[t + 2]]);
-                                    faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
-                                }
-                                return 1;
-                            }))(),
-                        };
+                        for (int t = 0; t < triangleEdges.Length; t += 3) {
+                            int vIdx = vertices.Count;
+                            vertices.Add(edgeVertices[triangleEdges[t]]);
+                            vertices.Add(edgeVertices[triangleEdges[t + 1]]);
+                            vertices.Add(edgeVertices[triangleEdges[t + 2]]);
+                            faces.Add(new MeshFace(vIdx, vIdx + 1, vIdx + 2));
+                        }
                     }
                 }
             }
@@ -804,30 +790,32 @@ internal static class FieldsCompute {
                         for (int k = 1; k < resolution - 1; k++) {
                             int idx = (i * resolution * resolution) + (j * resolution) + k;
                             Vector3d gradient = gradientField[idx];
+                            if (gradient.Length >= FieldsConfig.MinFieldMagnitude) {
+                                continue;
+                            }
 
-                            bool isCritical = gradient.Length < FieldsConfig.MinFieldMagnitude;
-                            _ = isCritical switch {
-                                false => 0,
-                                true => ((Func<int>)(() => {
-                                    double[,] localHessian = new double[3, 3];
-                                    for (int row = 0; row < 3; row++) {
-                                        for (int col = 0; col < 3; col++) {
-                                            localHessian[row, col] = hessian[row, col][idx];
-                                        }
-                                    }
+                            double[,] localHessian = new double[3, 3];
+                            for (int row = 0; row < 3; row++) {
+                                for (int col = 0; col < 3; col++) {
+                                    localHessian[row, col] = hessian[row, col][idx];
+                                }
+                            }
 
-                                    (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
-                                    byte criticalType = ClassifyCriticalPoint(eigenvalues);
-
-                                    criticalPoints.Add(new Fields.CriticalPoint(
-                                        Location: grid[idx],
-                                        Type: criticalType,
-                                        Value: scalarField[idx],
-                                        Eigenvectors: eigenvectors,
-                                        Eigenvalues: eigenvalues));
-                                    return 1;
-                                }))(),
+                            (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
+                            int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
+                            int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
+                            byte criticalType = (positiveCount, negativeCount) switch {
+                                (3, 0) => FieldsConfig.CriticalPointMinimum,
+                                (0, 3) => FieldsConfig.CriticalPointMaximum,
+                                _ => FieldsConfig.CriticalPointSaddle,
                             };
+
+                            criticalPoints.Add(new Fields.CriticalPoint(
+                                Location: grid[idx],
+                                Type: criticalType,
+                                Value: scalarField[idx],
+                                Eigenvectors: eigenvectors,
+                                Eigenvalues: eigenvalues));
                         }
                     }
                 }
@@ -835,18 +823,6 @@ internal static class FieldsCompute {
                 Fields.CriticalPoint[] result = [.. criticalPoints];
                 return ResultFactory.Create(value: result);
             }))(),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static byte ClassifyCriticalPoint(double[] eigenvalues) {
-        int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
-        int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
-
-        return (positiveCount, negativeCount) switch {
-            (3, 0) => FieldsConfig.CriticalPointMinimum,
-            (0, 3) => FieldsConfig.CriticalPointMaximum,
-            _ => FieldsConfig.CriticalPointSaddle,
         };
     }
 
@@ -929,32 +905,24 @@ internal static class FieldsCompute {
 
                 for (int i = 0; i < scalarField.Length; i++) {
                     double value = scalarField[i];
-                    bool validValue = RhinoMath.IsValidDouble(value);
-                    _ = validValue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            sum += value;
-                            validCount++;
-                            (min, minIdx) = value < min ? (value, i) : (min, minIdx);
-                            (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
-                            return 1;
-                        }))(),
-                    };
+                    if (!RhinoMath.IsValidDouble(value)) {
+                        continue;
+                    }
+                    sum += value;
+                    validCount++;
+                    (min, minIdx) = value < min ? (value, i) : (min, minIdx);
+                    (max, maxIdx) = value > max ? (value, i) : (max, maxIdx);
                 }
 
                 double mean = validCount > 0 ? sum / validCount : 0.0;
                 double sumSquaredDiff = 0.0;
                 for (int i = 0; i < scalarField.Length; i++) {
                     double value = scalarField[i];
-                    bool validValue = RhinoMath.IsValidDouble(value);
-                    _ = validValue switch {
-                        false => 0,
-                        true => ((Func<int>)(() => {
-                            double diff = value - mean;
-                            sumSquaredDiff += diff * diff;
-                            return 1;
-                        }))(),
-                    };
+                    if (!RhinoMath.IsValidDouble(value)) {
+                        continue;
+                    }
+                    double diff = value - mean;
+                    sumSquaredDiff += diff * diff;
                 }
                 double stdDev = validCount > 0 ? Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
 
