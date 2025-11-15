@@ -211,7 +211,7 @@ internal static class MorphologyCore {
                 weightedSum += weight * (Vector3d)neighborPos;
                 weightSum += weight;
             }
-            updated[i] = weightSum > RhinoMath.ZeroTolerance ? Point3d.Origin + (weightedSum / weightSum) : currentPos;
+            updated[i] = weightSum > RhinoMath.ZeroTolerance ? (Point3d)(weightedSum / weightSum) : currentPos;
         }
 
         return updated;
