@@ -9,7 +9,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Dense field algorithms: gradient, curl, divergence, laplacian, hessian, vector potential, interpolation, streamline, isosurface, critical points, statistics.</summary>
+/// <summary>Dense field computation algorithms for gradient, curl, divergence, Laplacian, Hessian, vector potential, interpolation, streamlines, isosurfaces, critical points, and statistics.</summary>
 [Pure]
 internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -34,29 +34,26 @@ internal static class FieldsCompute {
                     for (int k = 0; k < resolution; k++) {
                         int idx = (i * resolution * resolution) + (j * resolution) + k;
 
-                        double dfdx = (i < resolution - 1 && i > 0)
-                            ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoDx
-                            : (i == 0 && resolution > 1)
-                                ? (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / dx
-                                : (i == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx
-                                    : 0.0;
+                        double dfdx = (i, resolution) switch {
+                            (var x, var r) when x > 0 && x < r - 1 => (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / twoDx,
+                            (0, > 1) => (distances[((i + 1) * resolution * resolution) + (j * resolution) + k] - distances[idx]) / dx,
+                            (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[((i - 1) * resolution * resolution) + (j * resolution) + k]) / dx,
+                            _ => 0.0,
+                        };
 
-                        double dfdy = (j < resolution - 1 && j > 0)
-                            ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoDy
-                            : (j == 0 && resolution > 1)
-                                ? (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / dy
-                                : (j == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy
-                                    : 0.0;
+                        double dfdy = (j, resolution) switch {
+                            (var y, var r) when y > 0 && y < r - 1 => (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / twoDy,
+                            (0, > 1) => (distances[(i * resolution * resolution) + ((j + 1) * resolution) + k] - distances[idx]) / dy,
+                            (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[(i * resolution * resolution) + ((j - 1) * resolution) + k]) / dy,
+                            _ => 0.0,
+                        };
 
-                        double dfdz = (k < resolution - 1 && k > 0)
-                            ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoDz
-                            : (k == 0 && resolution > 1)
-                                ? (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / dz
-                                : (k == resolution - 1 && resolution > 1)
-                                    ? (distances[idx] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz
-                                    : 0.0;
+                        double dfdz = (k, resolution) switch {
+                            (var z, var r) when z > 0 && z < r - 1 => (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / twoDz,
+                            (0, > 1) => (distances[(i * resolution * resolution) + (j * resolution) + (k + 1)] - distances[idx]) / dz,
+                            (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[(i * resolution * resolution) + (j * resolution) + (k - 1)]) / dz,
+                            _ => 0.0,
+                        };
 
                         gradients[idx] = new Vector3d(dfdx, dfdy, dfdz);
                     }
@@ -270,30 +267,24 @@ internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
         int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? FindNearestRTree(query, grid)
-            : FindNearestLinear(query, grid);
+            ? ((Func<int>)(() => {
+                using RTree tree = RTree.CreateFromPointArray(grid);
+                int idx = -1;
+                _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => idx = args.Id);
+                return idx;
+            }))()
+            : ((Func<int>)(() => {
+                double minDist = double.MaxValue;
+                int idx = 0;
+                for (int i = 0; i < grid.Length; i++) {
+                    double dist = query.DistanceTo(grid[i]);
+                    (idx, minDist) = dist < minDist ? (i, dist) : (idx, minDist);
+                }
+                return idx;
+            }))();
         return nearestIdx >= 0
             ? ResultFactory.Create(value: field[nearestIdx])
             : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FindNearestLinear(Point3d query, Point3d[] grid) {
-        double minDist = double.MaxValue;
-        int nearestIdx = 0;
-        for (int i = 0; i < grid.Length; i++) {
-            double dist = query.DistanceTo(grid[i]);
-            (nearestIdx, minDist) = dist < minDist ? (i, dist) : (nearestIdx, minDist);
-        }
-        return nearestIdx;
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int FindNearestRTree(Point3d query, Point3d[] grid) {
-        using RTree tree = RTree.CreateFromPointArray(grid);
-        int nearestIdx = -1;
-        _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => nearestIdx = args.Id);
-        return nearestIdx;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -817,7 +808,13 @@ internal static class FieldsCompute {
                                     }
 
                                     (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
-                                    byte criticalType = ClassifyCriticalPoint(eigenvalues);
+                                    int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
+                                    int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
+                                    byte criticalType = (positiveCount, negativeCount) switch {
+                                        (3, 0) => FieldsConfig.CriticalPointMinimum,
+                                        (0, 3) => FieldsConfig.CriticalPointMaximum,
+                                        _ => FieldsConfig.CriticalPointSaddle,
+                                    };
 
                                     criticalPoints.Add(new Fields.CriticalPoint(
                                         Location: grid[idx],
@@ -835,18 +832,6 @@ internal static class FieldsCompute {
                 Fields.CriticalPoint[] result = [.. criticalPoints];
                 return ResultFactory.Create(value: result);
             }))(),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static byte ClassifyCriticalPoint(double[] eigenvalues) {
-        int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
-        int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
-
-        return (positiveCount, negativeCount) switch {
-            (3, 0) => FieldsConfig.CriticalPointMinimum,
-            (0, 3) => FieldsConfig.CriticalPointMaximum,
-            _ => FieldsConfig.CriticalPointSaddle,
         };
     }
 
