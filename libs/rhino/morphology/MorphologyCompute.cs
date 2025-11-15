@@ -17,255 +17,276 @@ internal static class MorphologyCompute {
         GeometryBase _,
         Point3d[] originalControlPoints,
         Point3d[] deformedControlPoints,
-        IGeometryContext __) =>
-        originalControlPoints.Length != deformedControlPoints.Length
-            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}")))
-            : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
-                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}")))
-                : ((Func<Result<GeometryBase>>)(() => {
-                    BoundingBox cageBounds = new(originalControlPoints);
-                    return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
-                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
-                        : ((Func<Result<GeometryBase>>)(() => {
-                            GeometryBase? deformed = geometry switch {
-                                Mesh m => m.DuplicateMesh(),
-                                Brep b => b.DuplicateBrep(),
-                                _ => null,
-                            };
-                            return deformed is null
-                                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")))
-                                : ((Func<Result<GeometryBase>>)(() => {
-                                    Point3d[] vertices = deformed switch {
-                                        Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
-                                        Brep b => [.. b.Vertices.Select(v => v.Location),],
-                                        _ => [],
-                                    };
-                                    Vector3d spanVec = cageBounds.Max - cageBounds.Min;
-                                    Point3d[] deformedVerts = new Point3d[vertices.Length];
-                                    for (int i = 0; i < vertices.Length; i++) {
-                                        Vector3d localVec = vertices[i] - cageBounds.Min;
-                                        Point3d localCoord = new(
-                                            RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
-                                            RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
-                                            RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
-                                        deformedVerts[i] = deformedControlPoints.Length >= MorphologyConfig.MinCageControlPoints
-                                            ? ((Func<Point3d>)(() => {
-                                                (double u, double v, double w) = (localCoord.X, localCoord.Y, localCoord.Z);
-                                                (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
-                                                return Point3d.Origin +
-                                                    (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
-                                                    (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
-                                                    (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
-                                                    (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
-                                                    (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
-                                                    (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
-                                                    (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
-                                                    (u * v * w * (deformedControlPoints[7] - Point3d.Origin));
-                                            }))()
-                                            : vertices[i];
-                                    }
-                                    bool success = deformed switch {
-                                        Mesh meshDeformed => ((Func<bool>)(() => {
-                                            for (int i = 0; i < deformedVerts.Length; i++) {
-                                                meshDeformed.Vertices[i] = new Point3f((float)deformedVerts[i].X, (float)deformedVerts[i].Y, (float)deformedVerts[i].Z);
-                                            }
-                                            return meshDeformed.Normals.ComputeNormals() && meshDeformed.Compact();
-                                        }))(),
-                                        Brep brepDeformed => ((Func<bool>)(() => {
-                                            for (int i = 0; i < Math.Min(deformedVerts.Length, brepDeformed.Vertices.Count); i++) {
-                                                brepDeformed.Vertices[i].Location = deformedVerts[i];
-                                            }
-                                            return brepDeformed.IsValid;
-                                        }))(),
-                                        _ => false,
-                                    };
-                                    return success
-                                        ? ResultFactory.Create(value: deformed)
-                                        : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
-                                }))();
-                        }))();
-                }))();
+        IGeometryContext __) {
+        if (originalControlPoints.Length != deformedControlPoints.Length) {
+            return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}")));
+        }
+
+        if (originalControlPoints.Length < MorphologyConfig.MinCageControlPoints) {
+            return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}")));
+        }
+
+        BoundingBox cageBounds = new(originalControlPoints);
+        if (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance) {
+            return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"));
+        }
+
+        GeometryBase? deformed = geometry switch {
+            Mesh m => m.DuplicateMesh(),
+            Brep b => b.DuplicateBrep(),
+            _ => null,
+        };
+
+        if (deformed is null) {
+            return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
+        }
+
+        Point3d[] vertices = deformed switch {
+            Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
+            Brep b => [.. b.Vertices.Select(static v => v.Location),],
+            _ => [],
+        };
+        Vector3d spanVec = cageBounds.Max - cageBounds.Min;
+        Point3d[] deformedVerts = new Point3d[vertices.Length];
+        for (int i = 0; i < vertices.Length; i++) {
+            Vector3d localVec = vertices[i] - cageBounds.Min;
+            (double u, double v, double w) = (
+                RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
+                RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
+                RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
+            (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
+            deformedVerts[i] = Point3d.Origin +
+                (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
+                (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
+                (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
+                (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
+                (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
+                (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
+                (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
+                (u * v * w * (deformedControlPoints[7] - Point3d.Origin));
+        }
+
+        bool success = deformed switch {
+            Mesh meshDeformed => ApplyMeshDeformation(meshDeformed, deformedVerts),
+            Brep brepDeformed => ApplyBrepDeformation(brepDeformed, deformedVerts),
+            _ => false,
+        };
+
+        return success
+            ? ResultFactory.Create(value: deformed)
+            : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ApplyMeshDeformation(Mesh mesh, Point3d[] deformedVerts) {
+        for (int i = 0; i < deformedVerts.Length; i++) {
+            mesh.Vertices[i] = new Point3f((float)deformedVerts[i].X, (float)deformedVerts[i].Y, (float)deformedVerts[i].Z);
+        }
+        return mesh.Normals.ComputeNormals() && mesh.Compact();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ApplyBrepDeformation(Brep brep, Point3d[] deformedVerts) {
+        for (int i = 0; i < Math.Min(deformedVerts.Length, brep.Vertices.Count); i++) {
+            brep.Vertices[i].Location = deformedVerts[i];
+        }
+        return brep.IsValid;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
         int levels,
-        IGeometryContext context) =>
-        levels <= 0
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Levels: {levels}")))
-            : levels > MorphologyConfig.MaxSubdivisionLevels
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionLevelExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxSubdivisionLevels}")))
-                : ((Func<Result<Mesh>>)(() => {
-                    Mesh current = mesh.DuplicateMesh();
-                    Mesh result = current;
-                    int failedLevel = -1;
-                    for (int level = 0; level < levels && failedLevel < 0; level++) {
-                        Mesh? next = algorithm switch {
-                            MorphologyConfig.OpSubdivideCatmullClark => current?.DuplicateMesh(),
-                            MorphologyConfig.OpSubdivideLoop => current is not null ? SubdivideLoop(current) : null,
-                            MorphologyConfig.OpSubdivideButterfly => current is not null ? SubdivideButterfly(current) : null,
-                            _ => null,
-                        };
-                        bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
-                        _ = !valid ? ((Func<int>)(() => { next?.Dispose(); failedLevel = level; return 0; }))() : 0;
-                        _ = valid && level > 0 && level < levels - 1 && current is not null && next is not null ? ((Func<int>)(() => { current.Dispose(); return 0; }))() : 0;
-                        current = valid && next is not null ? next : current!;
-                        result = valid && next is not null ? next : result;
-                    }
-                    return failedLevel is 0
-                        ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {failedLevel}, Algorithm: {algorithm}")))
-                        : ResultFactory.Create(value: result);
-                }))();
+        IGeometryContext context) {
+        if (levels <= 0) {
+            return ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Levels: {levels}")));
+        }
+
+        if (levels > MorphologyConfig.MaxSubdivisionLevels) {
+            return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionLevelExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxSubdivisionLevels}")));
+        }
+
+        Mesh current = mesh.DuplicateMesh();
+        Mesh result = current;
+        for (int level = 0; level < levels; level++) {
+            Mesh? next = algorithm switch {
+                MorphologyConfig.OpSubdivideCatmullClark => current?.DuplicateMesh(),
+                MorphologyConfig.OpSubdivideLoop => current is not null ? SubdivideLoop(current) : null,
+                MorphologyConfig.OpSubdivideButterfly => current is not null ? SubdivideButterfly(current) : null,
+                _ => null,
+            };
+            bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
+            if (!valid) {
+                next?.Dispose();
+                return level is 0
+                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")))
+                    : ResultFactory.Create(value: result);
+            }
+
+            if (level > 0 && level < levels - 1) {
+                current.Dispose();
+            }
+            current = next!;
+            result = next!;
+        }
+
+        return ResultFactory.Create(value: result);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Mesh? SubdivideLoop(Mesh mesh) =>
-        !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
-            ? null
-            : ((Func<Mesh>)(() => {
-                Mesh subdivided = new();
-                Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
-                Point3d[] newVerts = new Point3d[originalVerts.Length];
-                for (int i = 0; i < originalVerts.Length; i++) {
-                    int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-                    int valence = neighbors.Length;
-                    double beta = valence is 3
-                        ? MorphologyConfig.LoopBetaValence3
-                        : valence is 6
-                            ? MorphologyConfig.LoopBetaValence6
-                            : valence > 2
-                                ? ((Func<double>)(() => {
-                                    double temp = MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence));
-                                    return (1.0 / valence) * (MorphologyConfig.LoopCenterWeight - (temp * temp));
-                                }))()
-                                : 0.0;
+    private static Mesh? SubdivideLoop(Mesh mesh) {
+        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) {
+            return null;
+        }
 
-                    Point3d sum = Point3d.Origin;
-                    for (int j = 0; j < neighbors.Length; j++) {
-                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
-                        sum += originalVerts[meshVertIdx];
-                    }
-                    newVerts[i] = ((1.0 - (valence * beta)) * originalVerts[i]) + (beta * sum);
+        Mesh subdivided = new();
+        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
+        Point3d[] newVerts = new Point3d[originalVerts.Length];
+        for (int i = 0; i < originalVerts.Length; i++) {
+            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            int valence = neighbors.Length;
+            double beta = valence is 3
+                ? MorphologyConfig.LoopBetaValence3
+                : valence is 6
+                    ? MorphologyConfig.LoopBetaValence6
+                    : valence > 2
+                        ? (v => {
+                            double temp = MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / v));
+                            return (1.0 / v) * (MorphologyConfig.LoopCenterWeight - (temp * temp));
+                        })(valence)
+                        : 0.0;
+
+            Point3d sum = Point3d.Origin;
+            for (int j = 0; j < neighbors.Length; j++) {
+                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                sum += originalVerts[meshVertIdx];
+            }
+            newVerts[i] = ((1.0 - (valence * beta)) * originalVerts[i]) + (beta * sum);
+        }
+
+        for (int i = 0; i < newVerts.Length; i++) {
+            _ = subdivided.Vertices.Add(newVerts[i]);
+        }
+
+        Dictionary<(int, int), int> edgeMidpoints = [];
+        for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
+            (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
+            (int, int)[] edges = [
+                (Math.Min(a, b), Math.Max(a, b)),
+                (Math.Min(b, c), Math.Max(b, c)),
+                (Math.Min(c, a), Math.Max(c, a)),
+            ];
+
+            int[] midIndices = new int[3];
+            for (int e = 0; e < 3; e++) {
+                if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
+                    midIndices[e] = existingMidIdx;
+                } else {
+                    (Vector3d v1, Vector3d v2, Vector3d va, Vector3d vb, Vector3d vc) = (
+                        originalVerts[edges[e].Item1] - Point3d.Origin,
+                        originalVerts[edges[e].Item2] - Point3d.Origin,
+                        originalVerts[a] - Point3d.Origin,
+                        originalVerts[b] - Point3d.Origin,
+                        originalVerts[c] - Point3d.Origin);
+                    Point3d mid = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (va + vb + vc - v1 - v2));
+                    int newMidIdx = subdivided.Vertices.Add(mid);
+                    edgeMidpoints[edges[e]] = newMidIdx;
+                    midIndices[e] = newMidIdx;
                 }
+            }
 
-                for (int i = 0; i < newVerts.Length; i++) {
-                    _ = subdivided.Vertices.Add(newVerts[i]);
-                }
+            _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
+            _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
+            _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
+            _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
+        }
 
-                Dictionary<(int, int), int> edgeMidpoints = [];
-                for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
-                    (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
-                    (int, int)[] edges = [
-                        (Math.Min(a, b), Math.Max(a, b)),
-                        (Math.Min(b, c), Math.Max(b, c)),
-                        (Math.Min(c, a), Math.Max(c, a)),
-                    ];
-
-                    int[] midIndices = new int[3];
-                    for (int e = 0; e < 3; e++) {
-                        midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
-                            ? existingMidIdx
-                            : ((Func<int>)(() => {
-                                (Vector3d v1, Vector3d v2, Vector3d va, Vector3d vb, Vector3d vc) = (
-                                    originalVerts[edges[e].Item1] - Point3d.Origin,
-                                    originalVerts[edges[e].Item2] - Point3d.Origin,
-                                    originalVerts[a] - Point3d.Origin,
-                                    originalVerts[b] - Point3d.Origin,
-                                    originalVerts[c] - Point3d.Origin);
-                                Point3d mid = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (va + vb + vc - v1 - v2));
-                                int newMidIdx = subdivided.Vertices.Add(mid);
-                                edgeMidpoints[edges[e]] = newMidIdx;
-                                return newMidIdx;
-                            }))();
-                    }
-
-                    _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
-                    _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
-                    _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
-                    _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
-                }
-
-                _ = subdivided.Normals.ComputeNormals();
-                _ = subdivided.Compact();
-                return subdivided;
-            }))();
+        _ = subdivided.Normals.ComputeNormals();
+        _ = subdivided.Compact();
+        return subdivided;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Mesh? SubdivideButterfly(Mesh mesh) =>
-        !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
-            ? null
-            : ((Func<Mesh>)(() => {
-                Mesh subdivided = new();
-                Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
+    private static Mesh? SubdivideButterfly(Mesh mesh) {
+        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) {
+            return null;
+        }
 
-                for (int i = 0; i < originalVerts.Length; i++) {
-                    _ = subdivided.Vertices.Add(originalVerts[i]);
-                }
+        Mesh subdivided = new();
+        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
 
-                Dictionary<(int, int), int> edgeMidpoints = [];
-                for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
-                    (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
-                    (int, int)[] edges = [
-                        (Math.Min(a, b), Math.Max(a, b)),
-                        (Math.Min(b, c), Math.Max(b, c)),
-                        (Math.Min(c, a), Math.Max(c, a)),
-                    ];
+        for (int i = 0; i < originalVerts.Length; i++) {
+            _ = subdivided.Vertices.Add(originalVerts[i]);
+        }
 
-                    int[] midIndices = new int[3];
-                    for (int e = 0; e < 3; e++) {
-                        midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
-                            ? existingMidIdx
-                            : ((Func<int>)(() => {
-                                (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
-                                Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
-                                int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
-                                int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
-                                bool hasRegularStencil = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4;
-                                (int opposite1, int opposite2) = hasRegularStencil
-                                    ? ((Func<(int, int)>)(() => {
-                                        int opp1 = -1;
-                                        int opp2 = -1;
-                                        for (int fi = 0; fi < mesh.Faces.Count; fi++) {
-                                            int[] faceVerts = [mesh.Faces[fi].A, mesh.Faces[fi].B, mesh.Faces[fi].C,];
-                                            bool hasV1 = Array.IndexOf(faceVerts, v1) >= 0;
-                                            bool hasV2 = Array.IndexOf(faceVerts, v2) >= 0;
-                                            int opp = hasV1 && hasV2 ? faceVerts.First(v => v != v1 && v != v2) : -1;
-                                            opp1 = opp >= 0 && opp1 < 0 ? opp : opp1;
-                                            opp2 = opp >= 0 && opp1 >= 0 && opp != opp1 ? opp : opp2;
-                                        }
-                                        return (opp1, opp2);
-                                    }))()
-                                    : (-1, -1);
-                                mid = opposite1 >= 0 && opposite2 >= 0
-                                    ? ((Func<Point3d>)(() => {
-                                        Vector3d vmid = mid - Point3d.Origin;
-                                        Vector3d adjusted = vmid + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
-                                        int[] wings = [
-                                            .. v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2),
-                                            .. v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2),
-                                        ];
-                                        for (int w = 0; w < wings.Length && w < 4; w++) {
-                                            adjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
-                                        }
-                                        return Point3d.Origin + adjusted;
-                                    }))()
-                                    : mid;
-                                int newMidIdx = subdivided.Vertices.Add(mid);
-                                edgeMidpoints[edges[e]] = newMidIdx;
-                                return newMidIdx;
-                            }))();
+        Dictionary<(int, int), int> edgeMidpoints = [];
+        for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
+            (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
+            (int, int)[] edges = [
+                (Math.Min(a, b), Math.Max(a, b)),
+                (Math.Min(b, c), Math.Max(b, c)),
+                (Math.Min(c, a), Math.Max(c, a)),
+            ];
+
+            int[] midIndices = new int[3];
+            for (int e = 0; e < 3; e++) {
+                if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
+                    midIndices[e] = existingMidIdx;
+                } else {
+                    (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
+                    Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
+                    int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
+                    int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
+                    bool hasRegularStencil = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4;
+
+                    (int opposite1, int opposite2) = hasRegularStencil
+                        ? FindButterflyOpposites(mesh, v1, v2)
+                        : (-1, -1);
+
+                    if (opposite1 >= 0 && opposite2 >= 0) {
+                        Vector3d adjusted = (mid - Point3d.Origin) + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
+                        int[] wings = [
+                            .. v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2),
+                            .. v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2),
+                        ];
+                        for (int w = 0; w < wings.Length && w < 4; w++) {
+                            adjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
+                        }
+                        mid = Point3d.Origin + adjusted;
                     }
 
-                    _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
-                    _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
-                    _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
-                    _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
+                    int newMidIdx = subdivided.Vertices.Add(mid);
+                    edgeMidpoints[edges[e]] = newMidIdx;
+                    midIndices[e] = newMidIdx;
                 }
+            }
 
-                _ = subdivided.Normals.ComputeNormals();
-                _ = subdivided.Compact();
-                return subdivided;
-            }))();
+            _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
+            _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
+            _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
+            _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
+        }
+
+        _ = subdivided.Normals.ComputeNormals();
+        _ = subdivided.Compact();
+        return subdivided;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (int, int) FindButterflyOpposites(Mesh mesh, int v1, int v2) {
+        int opp1 = -1;
+        int opp2 = -1;
+        for (int fi = 0; fi < mesh.Faces.Count; fi++) {
+            int[] faceVerts = [mesh.Faces[fi].A, mesh.Faces[fi].B, mesh.Faces[fi].C,];
+            bool hasV1 = Array.IndexOf(faceVerts, v1) >= 0;
+            bool hasV2 = Array.IndexOf(faceVerts, v2) >= 0;
+            int opp = hasV1 && hasV2 ? faceVerts.First(v => v != v1 && v != v2) : -1;
+            opp1 = opp >= 0 && opp1 < 0 ? opp : opp1;
+            opp2 = opp >= 0 && opp1 >= 0 && opp != opp1 ? opp : opp2;
+        }
+        return (opp1, opp2);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SmoothWithConvergence(

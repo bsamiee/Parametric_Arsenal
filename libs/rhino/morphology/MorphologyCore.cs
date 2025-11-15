@@ -38,29 +38,22 @@ internal static class MorphologyCore {
             : input is not Mesh and not Brep
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                     error: E.Geometry.InvalidGeometryType.WithContext($"Type: {input.GetType().Name}"))
-                : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
-                    GeometryBase inputGeom = (GeometryBase)input;
-                    BoundingBox originalBounds = inputGeom.GetBoundingBox(accurate: false);
-                    double originalVolume = originalBounds.Volume;
+                : MorphologyCompute.CageDeform((GeometryBase)input, cage, originalPts, deformedPts, context)
+                    .Bind(deformed => {
+                        GeometryBase inputGeom = (GeometryBase)input;
+                        BoundingBox originalBounds = inputGeom.GetBoundingBox(accurate: false);
+                        BoundingBox deformedBounds = deformed.GetBoundingBox(accurate: false);
+                        double[] displacements = [.. originalPts.Zip(deformedPts, static (o, d) => o.DistanceTo(d)),];
+                        (double maxDisp, double meanDisp) = displacements.Length > 0
+                            ? (displacements.Max(), displacements.Average())
+                            : (0.0, 0.0);
+                        double volumeRatio = RhinoMath.IsValidDouble(originalBounds.Volume) && originalBounds.Volume > RhinoMath.ZeroTolerance
+                            ? deformedBounds.Volume / originalBounds.Volume
+                            : 1.0;
 
-                    Result<GeometryBase> deformResult = MorphologyCompute.CageDeform(inputGeom, cage, originalPts, deformedPts, context);
-                    return deformResult.IsSuccess
-                        ? ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
-                            GeometryBase deformed = deformResult.Value;
-                            BoundingBox deformedBounds = deformed.GetBoundingBox(accurate: false);
-                            double deformedVolume = deformedBounds.Volume;
-                            double[] displacements = [.. originalPts.Zip(deformedPts, (o, d) => o.DistanceTo(d)),];
-                            double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
-                            double meanDisp = displacements.Length > 0 ? displacements.Average() : 0.0;
-                            double volumeRatio = RhinoMath.IsValidDouble(originalVolume) && originalVolume > RhinoMath.ZeroTolerance
-                                ? deformedVolume / originalVolume
-                                : 1.0;
-
-                            return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                                value: [new Morphology.CageDeformResult(deformed, maxDisp, meanDisp, originalBounds, deformedBounds, volumeRatio),]);
-                        }))()
-                        : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: deformResult.Error);
-                }))();
+                        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                            value: [new Morphology.CageDeformResult(deformed, maxDisp, meanDisp, originalBounds, deformedBounds, volumeRatio),]);
+                    });
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideCatmullClark(
@@ -203,22 +196,23 @@ internal static class MorphologyCore {
 
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-            updated[i] = neighbors.Length is 0
-                ? positions[i]
-                : ((Func<Point3d>)(() => {
-                    Point3d sum = Point3d.Origin;
-                    double weightSum = 0.0;
-                    for (int j = 0; j < neighbors.Length; j++) {
-                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
-                        Point3d neighborPos = positions[meshVertIdx];
-                        double weight = useCotangent
-                            ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                            : MorphologyConfig.UniformLaplacianWeight;
-                        sum += (weight * neighborPos);
-                        weightSum += weight;
-                    }
-                    return weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
-                }))();
+            if (neighbors.Length is 0) {
+                updated[i] = positions[i];
+                continue;
+            }
+
+            Point3d sum = Point3d.Origin;
+            double weightSum = 0.0;
+            for (int j = 0; j < neighbors.Length; j++) {
+                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                Point3d neighborPos = positions[meshVertIdx];
+                double weight = useCotangent
+                    ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                    : MorphologyConfig.UniformLaplacianWeight;
+                sum += (weight * neighborPos);
+                weightSum += weight;
+            }
+            updated[i] = weightSum > RhinoMath.ZeroTolerance ? sum / weightSum : positions[i];
         }
 
         return updated;
@@ -230,21 +224,21 @@ internal static class MorphologyCore {
 
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
-            updated[i] = neighbors.Length is 0
-                ? positions[i]
-                : ((Func<Point3d>)(() => {
-                    Point3d laplacian = Point3d.Origin;
-                    for (int j = 0; j < neighbors.Length; j++) {
-                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
-                        laplacian += positions[meshVertIdx] - positions[i];
-                    }
-                    laplacian /= neighbors.Length;
+            if (neighbors.Length is 0) {
+                updated[i] = positions[i];
+                continue;
+            }
 
-                    Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
-                    Vector3d laplacianVec = laplacian - Point3d.Origin;
-                    double curvature = normal * laplacianVec;
-                    return positions[i] + ((timeStep * curvature) * normal);
-                }))();
+            Point3d laplacian = Point3d.Origin;
+            for (int j = 0; j < neighbors.Length; j++) {
+                int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
+                laplacian += positions[meshVertIdx] - positions[i];
+            }
+            laplacian /= neighbors.Length;
+
+            Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
+            double curvature = normal * (laplacian - Point3d.Origin);
+            updated[i] = positions[i] + ((timeStep * curvature) * normal);
         }
 
         return updated;
@@ -306,15 +300,15 @@ internal static class MorphologyCore {
         Mesh smoothed,
         int iterations,
         IGeometryContext context) {
-        double[] displacements = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
+        int vertCount = Math.Min(original.Vertices.Count, smoothed.Vertices.Count);
+        double[] displacements = [.. Enumerable.Range(0, vertCount)
             .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),
         ];
         (double rms, double maxDisp) = displacements.Length > 0
             ? (Math.Sqrt(displacements.Average(static d => d * d)), displacements.Max())
             : (0.0, 0.0);
-        (double quality, bool converged) = (
-            MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0,
-            rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier);
+        double quality = MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0;
+        bool converged = rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.SmoothingResult(smoothed, iterations, rms, maxDisp, quality, converged),]);
@@ -344,20 +338,18 @@ internal static class MorphologyCore {
         double reductionRatio = original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0;
         double[] aspectRatios = [.. Enumerable.Range(0, reduced.Faces.Count)
             .Select(i => {
-                Point3d a = reduced.Vertices[reduced.Faces[i].A];
-                Point3d b = reduced.Vertices[reduced.Faces[i].B];
-                Point3d c = reduced.Vertices[reduced.Faces[i].C];
+                (Point3d a, Point3d b, Point3d c) = (reduced.Vertices[reduced.Faces[i].A], reduced.Vertices[reduced.Faces[i].B], reduced.Vertices[reduced.Faces[i].C]);
                 (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
                 (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
                 return minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
             }),
         ];
         double[] edgeLengths = [.. Enumerable.Range(0, reduced.TopologyEdges.Count).Select(i => reduced.TopologyEdges.EdgeLine(i).Length),];
-        (double quality, double meanAspect, double minEdge, double maxEdge) = (
-            MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0,
-            aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
-            edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
-            edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0);
+        double quality = MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0;
+        double meanAspect = aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0;
+        (double minEdge, double maxEdge) = edgeLengths.Length > 0
+            ? (edgeLengths.Min(), edgeLengths.Max())
+            : (0.0, 0.0);
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.ReductionResult(reduced, original.Faces.Count, reduced.Faces.Count, reductionRatio, quality, meanAspect, minEdge, maxEdge),]);
