@@ -108,16 +108,10 @@ internal static class MorphologyCompute {
                             _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
-                        if (!valid) {
-                            next?.Dispose();
-                            failedLevel = level;
-                        } else {
-                            if (level > 0 && level < levels - 1 && current is not null && next is not null) {
-                                current.Dispose();
-                            }
-                            current = next!;
-                            result = next!;
-                        }
+                        _ = !valid ? ((Func<int>)(() => { next?.Dispose(); failedLevel = level; return 0; }))() : 0;
+                        _ = valid && level > 0 && level < levels - 1 && current is not null && next is not null ? ((Func<int>)(() => { current.Dispose(); return 0; }))() : 0;
+                        current = valid && next is not null ? next : current!;
+                        result = valid && next is not null ? next : result;
                     }
                     return failedLevel is 0
                         ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {failedLevel}, Algorithm: {algorithm}")))
