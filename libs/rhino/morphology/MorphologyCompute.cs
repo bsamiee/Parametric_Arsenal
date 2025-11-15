@@ -40,11 +40,28 @@ internal static class MorphologyCompute {
                                         Brep b => [.. b.Vertices.Select(v => v.Location),],
                                         _ => [],
                                     };
+                                    Vector3d spanVec = cageBounds.Max - cageBounds.Min;
                                     Point3d[] deformedVerts = new Point3d[vertices.Length];
                                     for (int i = 0; i < vertices.Length; i++) {
-                                        Point3d localCoord = ComputeLocalCoordinates(vertices[i], originalControlPoints, cageBounds);
-                                        deformedVerts[i] = RhinoMath.IsValidDouble(localCoord.X) && RhinoMath.IsValidDouble(localCoord.Y) && RhinoMath.IsValidDouble(localCoord.Z)
-                                            ? InterpolateDeformedPosition(localCoord, deformedControlPoints)
+                                        Vector3d localVec = vertices[i] - cageBounds.Min;
+                                        Point3d localCoord = new(
+                                            RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
+                                            RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
+                                            RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
+                                        deformedVerts[i] = deformedControlPoints.Length >= MorphologyConfig.MinCageControlPoints
+                                            ? ((Func<Point3d>)(() => {
+                                                (double u, double v, double w) = (localCoord.X, localCoord.Y, localCoord.Z);
+                                                (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
+                                                return Point3d.Origin +
+                                                    (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
+                                                    (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
+                                                    (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
+                                                    (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
+                                                    (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
+                                                    (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
+                                                    (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
+                                                    (u * v * w * (deformedControlPoints[7] - Point3d.Origin));
+                                            }))()
                                             : vertices[i];
                                     }
                                     bool success = deformed switch {
@@ -70,39 +87,6 @@ internal static class MorphologyCompute {
                 }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d ComputeLocalCoordinates(Point3d point, Point3d[] _, BoundingBox bounds) {
-        Vector3d localVec = point - bounds.Min;
-        Vector3d spanVec = bounds.Max - bounds.Min;
-        return new Point3d(
-            RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
-            RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
-            RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d InterpolateDeformedPosition(Point3d localCoord, Point3d[] deformedControlPoints) {
-        double u = localCoord.X;
-        double v = localCoord.Y;
-        double w = localCoord.Z;
-        double u1 = 1.0 - u;
-        double v1 = 1.0 - v;
-        double w1 = 1.0 - w;
-
-        int minPoints = Math.Min(deformedControlPoints.Length, MorphologyConfig.MinCageControlPoints);
-        return minPoints >= MorphologyConfig.MinCageControlPoints
-            ? Point3d.Origin +
-                (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
-                (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
-                (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
-                (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
-                (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
-                (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
-                (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
-                (u * v * w * (deformedControlPoints[7] - Point3d.Origin))
-            : Point3d.Origin;
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
@@ -124,8 +108,7 @@ internal static class MorphologyCompute {
                             _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
-                        _ = !valid ? ((Func<int>)(() => { next?.Dispose(); return 0; }))() : 0;
-                        failedLevel = !valid ? level : failedLevel;
+                        _ = !valid ? ((Func<int>)(() => { next?.Dispose(); failedLevel = level; return 0; }))() : 0;
                         _ = valid && level > 0 && level < levels - 1 && current is not null && next is not null ? ((Func<int>)(() => { current.Dispose(); return 0; }))() : 0;
                         current = valid && next is not null ? next : current!;
                         result = valid && next is not null ? next : result;
@@ -151,7 +134,10 @@ internal static class MorphologyCompute {
                         : valence is 6
                             ? MorphologyConfig.LoopBetaValence6
                             : valence > 2
-                                ? (((1.0 / valence) * (MorphologyConfig.LoopCenterWeight - Math.Pow((MorphologyConfig.LoopNeighborBase + ((MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence)))), 2.0))))
+                                ? ((Func<double>)(() => {
+                                    double temp = MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence));
+                                    return (1.0 / valence) * (MorphologyConfig.LoopCenterWeight - (temp * temp));
+                                }))()
                                 : 0.0;
 
                     Point3d sum = Point3d.Origin;
@@ -168,10 +154,7 @@ internal static class MorphologyCompute {
 
                 Dictionary<(int, int), int> edgeMidpoints = [];
                 for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
-                    int a = mesh.Faces[faceIdx].A;
-                    int b = mesh.Faces[faceIdx].B;
-                    int c = mesh.Faces[faceIdx].C;
-
+                    (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
                     (int, int)[] edges = [
                         (Math.Min(a, b), Math.Max(a, b)),
                         (Math.Min(b, c), Math.Max(b, c)),
@@ -183,11 +166,12 @@ internal static class MorphologyCompute {
                         midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
                             ? existingMidIdx
                             : ((Func<int>)(() => {
-                                Vector3d v1 = originalVerts[edges[e].Item1] - Point3d.Origin;
-                                Vector3d v2 = originalVerts[edges[e].Item2] - Point3d.Origin;
-                                Vector3d va = originalVerts[a] - Point3d.Origin;
-                                Vector3d vb = originalVerts[b] - Point3d.Origin;
-                                Vector3d vc = originalVerts[c] - Point3d.Origin;
+                                (Vector3d v1, Vector3d v2, Vector3d va, Vector3d vb, Vector3d vc) = (
+                                    originalVerts[edges[e].Item1] - Point3d.Origin,
+                                    originalVerts[edges[e].Item2] - Point3d.Origin,
+                                    originalVerts[a] - Point3d.Origin,
+                                    originalVerts[b] - Point3d.Origin,
+                                    originalVerts[c] - Point3d.Origin);
                                 Point3d mid = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (va + vb + vc - v1 - v2));
                                 int newMidIdx = subdivided.Vertices.Add(mid);
                                 edgeMidpoints[edges[e]] = newMidIdx;
@@ -220,10 +204,7 @@ internal static class MorphologyCompute {
 
                 Dictionary<(int, int), int> edgeMidpoints = [];
                 for (int faceIdx = 0; faceIdx < mesh.Faces.Count; faceIdx++) {
-                    int a = mesh.Faces[faceIdx].A;
-                    int b = mesh.Faces[faceIdx].B;
-                    int c = mesh.Faces[faceIdx].C;
-
+                    (int a, int b, int c) = (mesh.Faces[faceIdx].A, mesh.Faces[faceIdx].B, mesh.Faces[faceIdx].C);
                     (int, int)[] edges = [
                         (Math.Min(a, b), Math.Max(a, b)),
                         (Math.Min(b, c), Math.Max(b, c)),
@@ -235,8 +216,7 @@ internal static class MorphologyCompute {
                         midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
                             ? existingMidIdx
                             : ((Func<int>)(() => {
-                                int v1 = edges[e].Item1;
-                                int v2 = edges[e].Item2;
+                                (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
                                 Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
                                 int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
                                 int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
@@ -259,21 +239,15 @@ internal static class MorphologyCompute {
                                 mid = opposite1 >= 0 && opposite2 >= 0
                                     ? ((Func<Point3d>)(() => {
                                         Vector3d vmid = mid - Point3d.Origin;
-                                        Vector3d vopp1 = originalVerts[opposite1] - Point3d.Origin;
-                                        Vector3d vopp2 = originalVerts[opposite2] - Point3d.Origin;
-                                        Point3d adjusted = Point3d.Origin + vmid + (MorphologyConfig.ButterflyOppositeWeight * (vopp1 + vopp2));
-                                        int[] wing1 = [.. v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2),];
-                                        int[] wing2 = [.. v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2),];
-                                        Vector3d vadjusted = adjusted - Point3d.Origin;
-                                        for (int w = 0; w < wing1.Length && w < 2; w++) {
-                                            int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing1[w])[0];
-                                            vadjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[meshVertIdx] - Point3d.Origin);
+                                        Vector3d adjusted = vmid + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
+                                        int[] wings = [
+                                            .. v1Neighbors.Where(n => n != v2 && n != opposite1 && n != opposite2).Take(2),
+                                            .. v2Neighbors.Where(n => n != v1 && n != opposite1 && n != opposite2).Take(2),
+                                        ];
+                                        for (int w = 0; w < wings.Length && w < 4; w++) {
+                                            adjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
                                         }
-                                        for (int w = 0; w < wing2.Length && w < 2; w++) {
-                                            int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(wing2[w])[0];
-                                            vadjusted -= MorphologyConfig.ButterflyWingWeight * (originalVerts[meshVertIdx] - Point3d.Origin);
-                                        }
-                                        return Point3d.Origin + vadjusted;
+                                        return Point3d.Origin + adjusted;
                                     }))()
                                     : mid;
                                 int newMidIdx = subdivided.Vertices.Add(mid);
@@ -329,14 +303,12 @@ internal static class MorphologyCompute {
                         _ = smoothed.Normals.ComputeNormals();
                         iterPerformed++;
 
-                        double[] distances = [.. Enumerable.Range(0, smoothed.Vertices.Count)
-                            .Select(i => positions[i].DistanceTo(prevPositions[i])),
-                        ];
-                        double[] distSquares = [.. distances.Select(static d => d * d),];
                         double rmsDisp = iter > 0
-                            ? Math.Sqrt(distSquares.Average())
+                            ? Math.Sqrt(Enumerable.Range(0, smoothed.Vertices.Count).Average(i => {
+                                double dist = positions[i].DistanceTo(prevPositions[i]);
+                                return dist * dist;
+                            }))
                             : double.MaxValue;
-
                         converged = rmsDisp < threshold;
 
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
@@ -359,21 +331,17 @@ internal static class MorphologyCompute {
         Mesh mesh,
         double distance,
         bool _,
-        IGeometryContext __) {
-        Mesh? offset = !RhinoMath.IsValidDouble(distance) || Math.Abs(distance) < MorphologyConfig.MinOffsetDistance
-            ? null
-            : Math.Abs(distance) > MorphologyConfig.MaxOffsetDistance
-                ? null
-                : mesh.Offset(distance);
-
-        return !RhinoMath.IsValidDouble(distance) || Math.Abs(distance) < MorphologyConfig.MinOffsetDistance
+        IGeometryContext __) =>
+        !RhinoMath.IsValidDouble(distance) || Math.Abs(distance) < MorphologyConfig.MinOffsetDistance
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}")))
             : Math.Abs(distance) > MorphologyConfig.MaxOffsetDistance
                 ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}")))
-                : offset?.IsValid is true
-                    ? ResultFactory.Create(value: offset)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
-    }
+                : ((Func<Result<Mesh>>)(() => {
+                    Mesh? offset = mesh.Offset(distance);
+                    return offset?.IsValid is true
+                        ? ResultFactory.Create(value: offset)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
+                }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> ReduceMesh(
@@ -381,31 +349,28 @@ internal static class MorphologyCompute {
         int targetFaceCount,
         bool _,
         double accuracy,
-        IGeometryContext __) {
-        Mesh reduced = targetFaceCount < MorphologyConfig.MinReductionFaceCount || targetFaceCount >= mesh.Faces.Count || !RhinoMath.IsValidDouble(accuracy) || accuracy < MorphologyConfig.MinReductionAccuracy || accuracy > MorphologyConfig.MaxReductionAccuracy
-            ? mesh
-            : mesh.DuplicateMesh();
-
-        bool success = targetFaceCount >= MorphologyConfig.MinReductionFaceCount && targetFaceCount < mesh.Faces.Count && RhinoMath.IsValidDouble(accuracy) && accuracy >= MorphologyConfig.MinReductionAccuracy && accuracy <= MorphologyConfig.MaxReductionAccuracy && reduced.Reduce(
-            desiredPolygonCount: targetFaceCount,
-            allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
-            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * 10),
-            normalizeSize: false,
-            cancelToken: CancellationToken.None,
-            progress: null,
-            problemDescription: out string _,
-            threaded: false);
-
-        return targetFaceCount < MorphologyConfig.MinReductionFaceCount
+        IGeometryContext __) =>
+        targetFaceCount < MorphologyConfig.MinReductionFaceCount
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}")))
             : targetFaceCount >= mesh.Faces.Count
                 ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount} >= Current: {mesh.Faces.Count}")))
                 : !RhinoMath.IsValidDouble(accuracy) || accuracy < MorphologyConfig.MinReductionAccuracy || accuracy > MorphologyConfig.MaxReductionAccuracy
                     ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Accuracy: {accuracy:F3}")))
-                    : success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * 1.1
-                        ? ResultFactory.Create(value: reduced)
-                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
-    }
+                    : ((Func<Result<Mesh>>)(() => {
+                        Mesh reduced = mesh.DuplicateMesh();
+                        bool success = reduced.Reduce(
+                            desiredPolygonCount: targetFaceCount,
+                            allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
+                            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * 10),
+                            normalizeSize: false,
+                            cancelToken: CancellationToken.None,
+                            progress: null,
+                            problemDescription: out string _,
+                            threaded: false);
+                        return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * 1.1
+                            ? ResultFactory.Create(value: reduced)
+                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
+                    }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RemeshIsotropic(
@@ -455,26 +420,13 @@ internal static class MorphologyCompute {
         double[] minAngles = new double[mesh.Faces.Count];
 
         for (int i = 0; i < mesh.Faces.Count; i++) {
-            Point3d a = mesh.Vertices[mesh.Faces[i].A];
-            Point3d b = mesh.Vertices[mesh.Faces[i].B];
-            Point3d c = mesh.Vertices[mesh.Faces[i].C];
-
-            double ab = a.DistanceTo(b);
-            double bc = b.DistanceTo(c);
-            double ca = c.DistanceTo(a);
-
-            double maxEdge = Math.Max(Math.Max(ab, bc), ca);
-            double minEdge = Math.Min(Math.Min(ab, bc), ca);
+            (Point3d a, Point3d b, Point3d c) = (mesh.Vertices[mesh.Faces[i].A], mesh.Vertices[mesh.Faces[i].B], mesh.Vertices[mesh.Faces[i].C]);
+            (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
+            (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
             aspectRatios[i] = minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
 
-            Vector3d vAB = b - a;
-            Vector3d vCA = a - c;
-            Vector3d vBC = c - b;
-
-            double angleA = Vector3d.VectorAngle(vAB, -vCA);
-            double angleB = Vector3d.VectorAngle(vBC, -vAB);
-            double angleC = Vector3d.VectorAngle(vCA, -vBC);
-
+            (Vector3d vAB, Vector3d vCA, Vector3d vBC) = (b - a, a - c, c - b);
+            (double angleA, double angleB, double angleC) = (Vector3d.VectorAngle(vAB, -vCA), Vector3d.VectorAngle(vBC, -vAB), Vector3d.VectorAngle(vCA, -vBC));
             minAngles[i] = Math.Min(Math.Min(angleA, angleB), angleC);
         }
 

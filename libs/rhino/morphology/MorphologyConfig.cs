@@ -15,9 +15,6 @@ internal static class MorphologyConfig {
     /// <summary>Maximum smoothing iterations to prevent infinite loops.</summary>
     internal const int MaxSmoothingIterations = 1000;
 
-    /// <summary>Feature edge detection threshold: 30° in radians.</summary>
-    internal static readonly double FeatureAngleRadians = RhinoMath.ToRadians(30.0);
-
     /// <summary>Minimum triangle angle threshold for quality validation: 5° in radians.</summary>
     internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
 
@@ -32,9 +29,6 @@ internal static class MorphologyConfig {
 
     /// <summary>RMS convergence threshold: multiplier × absolute tolerance.</summary>
     internal const double ConvergenceMultiplier = 100.0;
-
-    /// <summary>Mean curvature flow timestep safety factor.</summary>
-    internal const double CurvatureFlowTimestepFactor = 0.01;
 
     /// <summary>Loop subdivision: β-weight for valence-3 vertices (3/16).</summary>
     internal const double LoopBetaValence3 = 0.1875;

@@ -16,10 +16,10 @@ namespace Arsenal.Rhino.Morphology;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
     /// <summary>Marker interface for polymorphic morphology result dispatch.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for polymorphic result dispatch")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
-    /// <summary>Cage deformation result with displacement and volume ratio metrics.</summary>
+    /// <summary>Cage deformation result with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
         GeometryBase Deformed,
@@ -34,7 +34,7 @@ public static class Morphology {
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
 
-    /// <summary>Subdivision result with edge lengths, aspect ratios, and triangle angle metrics.</summary>
+    /// <summary>Subdivision result with edge and triangle quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SubdivisionResult(
         Mesh Subdivided,
@@ -51,7 +51,7 @@ public static class Morphology {
             $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
 
-    /// <summary>Smoothing result with convergence status and RMS displacement metrics.</summary>
+    /// <summary>Smoothing result with convergence and displacement metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SmoothingResult(
         Mesh Smoothed,
@@ -66,7 +66,7 @@ public static class Morphology {
             $"Smoothing | Iterations={this.IterationsPerformed} | RMS={this.RMSDisplacement:E2} | Quality={this.QualityScore:F3} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Mesh offset result with actual distance and degeneracy detection.</summary>
+    /// <summary>Mesh offset result with distance and degeneracy metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record OffsetResult(
         Mesh Offset,
@@ -82,7 +82,7 @@ public static class Morphology {
             $"MeshOffset | Dist={this.ActualDistance:F3} | V: {this.OriginalVertexCount}→{this.OffsetVertexCount} | F: {this.OriginalFaceCount}→{this.OffsetFaceCount}{(this.HasDegeneracies ? " [degenerate]" : "")}");
     }
 
-    /// <summary>Mesh reduction result with reduction ratio and quality score.</summary>
+    /// <summary>Mesh reduction result with ratio and quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ReductionResult(
         Mesh Reduced,
@@ -99,7 +99,7 @@ public static class Morphology {
             $"MeshReduce | Faces: {this.OriginalFaceCount}→{this.ReducedFaceCount} ({this.ReductionRatio * 100.0:F1}%) | Quality={this.QualityScore:F3} | AspectRatio={this.MeanAspectRatio:F2}");
     }
 
-    /// <summary>Isotropic remeshing result with edge uniformity and convergence status.</summary>
+    /// <summary>Isotropic remeshing result with uniformity and convergence metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record RemeshResult(
         Mesh Remeshed,
@@ -117,7 +117,7 @@ public static class Morphology {
             $"Remesh | Target={this.TargetEdgeLength:F3} | Mean={this.MeanEdgeLength:F3} | StdDev={this.EdgeLengthStdDev:F3} | Uniformity={this.UniformityScore:F3} | Iter={this.IterationsPerformed} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Unified morphology operation entry with polymorphic dispatch via (operation ID, parameters tuple).</summary>
+    /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,

@@ -309,17 +309,15 @@ internal static class MorphologyCore {
         double[] displacements = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
             .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i])),
         ];
-
-        double[] squares = [.. displacements.Select(static d => d * d),];
-        double rms = displacements.Length > 0 ? Math.Sqrt(squares.Average()) : 0.0;
-        double maxDisp = displacements.Length > 0 ? displacements.Max() : 0.0;
-        double quality = MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0;
-        bool converged = rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
+        (double rms, double maxDisp) = displacements.Length > 0
+            ? (Math.Sqrt(displacements.Average(static d => d * d)), displacements.Max())
+            : (0.0, 0.0);
+        (double quality, bool converged) = (
+            MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0,
+            rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier);
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [
-                new Morphology.SmoothingResult(smoothed, iterations, rms, maxDisp, quality, converged),
-            ]);
+            value: [new Morphology.SmoothingResult(smoothed, iterations, rms, maxDisp, quality, converged),]);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -328,26 +326,14 @@ internal static class MorphologyCore {
         Mesh offset,
         double _,
         IGeometryContext context) {
-        Point3d[] originalVerts = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, offset.Vertices.Count))
-            .Select(i => (Point3d)original.Vertices[i]),
-        ];
-        Point3d[] offsetVerts = [.. Enumerable.Range(0, Math.Min(original.Vertices.Count, offset.Vertices.Count))
-            .Select(i => (Point3d)offset.Vertices[i]),
-        ];
-        double[] displacements = [.. originalVerts.Zip(offsetVerts, (o, off) => o.DistanceTo(off)),];
-        double actualDist = displacements.Length > 0 ? displacements.Average() : 0.0;
+        int minCount = Math.Min(original.Vertices.Count, offset.Vertices.Count);
+        double actualDist = minCount > 0
+            ? Enumerable.Range(0, minCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]))
+            : 0.0;
         bool hasDegen = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.OffsetResult(
-                offset,
-                actualDist,
-                hasDegen,
-                original.Vertices.Count,
-                offset.Vertices.Count,
-                original.Faces.Count,
-                offset.Faces.Count),
-            ]);
+            value: [new Morphology.OffsetResult(offset, actualDist, hasDegen, original.Vertices.Count, offset.Vertices.Count, original.Faces.Count, offset.Faces.Count),]);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -355,44 +341,26 @@ internal static class MorphologyCore {
         Mesh original,
         Mesh reduced,
         IGeometryContext context) {
-        double reductionRatio = original.Faces.Count > 0
-            ? (double)reduced.Faces.Count / original.Faces.Count
-            : 1.0;
-
+        double reductionRatio = original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0;
         double[] aspectRatios = [.. Enumerable.Range(0, reduced.Faces.Count)
             .Select(i => {
                 Point3d a = reduced.Vertices[reduced.Faces[i].A];
                 Point3d b = reduced.Vertices[reduced.Faces[i].B];
                 Point3d c = reduced.Vertices[reduced.Faces[i].C];
-                double ab = a.DistanceTo(b);
-                double bc = b.DistanceTo(c);
-                double ca = c.DistanceTo(a);
-                double maxEdge = Math.Max(Math.Max(ab, bc), ca);
-                double minEdge = Math.Min(Math.Min(ab, bc), ca);
+                (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
+                (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
                 return minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
             }),
         ];
-
-        double[] edgeLengths = [.. Enumerable.Range(0, reduced.TopologyEdges.Count)
-            .Select(i => reduced.TopologyEdges.EdgeLine(i).Length),
-        ];
-
-        double quality = MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0;
-        double meanAspect = aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0;
-        double minEdge = edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0;
-        double maxEdge = edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0;
+        double[] edgeLengths = [.. Enumerable.Range(0, reduced.TopologyEdges.Count).Select(i => reduced.TopologyEdges.EdgeLine(i).Length),];
+        (double quality, double meanAspect, double minEdge, double maxEdge) = (
+            MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0,
+            aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+            edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+            edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0);
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.ReductionResult(
-                reduced,
-                original.Faces.Count,
-                reduced.Faces.Count,
-                reductionRatio,
-                quality,
-                meanAspect,
-                minEdge,
-                maxEdge),
-            ]);
+            value: [new Morphology.ReductionResult(reduced, original.Faces.Count, reduced.Faces.Count, reductionRatio, quality, meanAspect, minEdge, maxEdge),]);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -404,29 +372,16 @@ internal static class MorphologyCore {
         double[] edgeLengths = [.. Enumerable.Range(0, remeshed.TopologyEdges.Count)
             .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length),
         ];
-
         double mean = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
-        double[] squares = [.. edgeLengths.Select(e => Math.Pow(e - mean, 2.0)),];
-        double variance = edgeLengths.Length > 0
-            ? squares.Average()
-            : 0.0;
-        double stdDev = Math.Sqrt(variance);
-        double uniformity = mean > context.AbsoluteTolerance
-            ? Math.Exp(-stdDev / mean)
-            : 0.0;
-        bool converged = Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * 0.1);
+        double stdDev = edgeLengths.Length > 0 ? Math.Sqrt(edgeLengths.Average(e => {
+            double diff = e - mean;
+            return diff * diff;
+        })) : 0.0;
+        (double uniformity, bool converged) = (
+            mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / mean) : 0.0,
+            Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * 0.1));
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.RemeshResult(
-                remeshed,
-                targetEdge,
-                mean,
-                stdDev,
-                uniformity,
-                maxIters,
-                converged,
-                0,
-                remeshed.Faces.Count),
-            ]);
+            value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, maxIters, converged, 0, remeshed.Faces.Count),]);
     }
 }
