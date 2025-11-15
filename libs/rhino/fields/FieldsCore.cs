@@ -16,14 +16,12 @@ namespace Arsenal.Rhino.Fields;
 internal static class FieldsCore {
     /// <summary>Unified operation dispatch table: (operation, geometry type) → (execute function, validation mode, buffer size, integration method).</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)> OperationRegistry =
-        new (byte Operation, Type GeometryType, Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)[] {
-            (FieldsConfig.OperationDistance, typeof(Mesh), ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Brep), ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Curve), ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
-            (FieldsConfig.OperationDistance, typeof(Surface), ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
-        }.ToFrozenDictionary(
-            static entry => (entry.Operation, entry.GeometryType),
-            static entry => ((Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>)entry.Execute, entry.ValidationMode, entry.BufferSize, entry.IntegrationMethod));
+        new Dictionary<(byte, Type), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>, V, int, byte)> {
+            [(FieldsConfig.OperationDistance, typeof(Mesh))] = (ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Brep))] = (ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Curve))] = (ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
+            [(FieldsConfig.OperationDistance, typeof(Surface))] = (ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
+        }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
