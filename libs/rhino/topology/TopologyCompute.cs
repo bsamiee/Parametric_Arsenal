@@ -83,11 +83,11 @@ internal static class TopologyCompute {
                         byte currentStrategy = (byte)index;
                         Brep copy = validBrep.DuplicateBrep();
                         bool success = currentStrategy switch {
-                            0 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
-                            1 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                            2 => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
-                            3 => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                            4 => ((Func<bool>)(() => {
+                            TopologyConfig.StrategyConservativeRepair => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
+                            TopologyConfig.StrategyModerateJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            TopologyConfig.StrategyAggressiveJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
+                            TopologyConfig.StrategyCombined => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            TopologyConfig.StrategyTargetedJoin => ((Func<bool>)(() => {
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;
                                 for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
