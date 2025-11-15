@@ -115,6 +115,28 @@ public static class E {
             [2816] = "Reduction accuracy parameter out of valid range",
             [2817] = "Remeshing iteration limit exceeded without convergence",
 
+            // Fitting Operations (2900-2919)
+            [2900] = "Fitting operation failed: numerical instability or invalid configuration",
+            [2901] = "Curve degree out of valid range [1, 11]",
+            [2902] = "Control point count below minimum for specified degree",
+            [2903] = "Insufficient points for least-squares fitting",
+            [2904] = "Iterative optimization failed to converge within maximum iterations",
+            [2905] = "Fitting tolerance parameter invalid or out of range",
+            [2906] = "Knot vector structure invalid or incompatible with degree/control points",
+            [2907] = "Geometry type or parameter combination not supported for fitting",
+            [2908] = "Surface fitting requires rectangular point grid",
+            [2909] = "Control point optimization produced degenerate geometry",
+            [2910] = "Parameterization method failed: coincident points or zero-length curve",
+            [2911] = "Constraint violation: fitted geometry exceeds tolerance threshold",
+            [2912] = "Bending energy computation failed: invalid curvature data",
+            [2913] = "Laplacian smoothing failed: non-manifold control point structure",
+            [2914] = "LSPIA refinement failed: iteration limit exceeded without convergence",
+            [2915] = "Automatic degree selection failed: no valid degree found in range",
+            [2916] = "Constrained fitting failed: incompatible boundary conditions",
+            [2917] = "Multi-patch decomposition failed: invalid patch grid specification",
+            [2918] = "Isogeometric refinement failed: knot insertion produced invalid structure",
+            [2919] = "Surface fairing failed: thin-plate energy minimization diverged",
+
             // Validation Errors (3000-3999)
             // Core Validation (3000-3800)
             [3000] = "Geometry must be valid",
@@ -293,6 +315,30 @@ public static class E {
             public static readonly SystemError OffsetDistanceInvalid = Get(2815);
             public static readonly SystemError ReductionAccuracyInvalid = Get(2816);
             public static readonly SystemError RemeshIterationLimitExceeded = Get(2817);
+        }
+
+        /// <summary>Fitting operation errors (2900-2919).</summary>
+        public static class Fitting {
+            public static readonly SystemError FittingFailed = Get(2900);
+            public static readonly SystemError InvalidDegree = Get(2901);
+            public static readonly SystemError InvalidControlPointCount = Get(2902);
+            public static readonly SystemError InsufficientPoints = Get(2903);
+            public static readonly SystemError ConvergenceFailed = Get(2904);
+            public static readonly SystemError InvalidTolerance = Get(2905);
+            public static readonly SystemError InvalidKnotVector = Get(2906);
+            public static readonly SystemError UnsupportedConfiguration = Get(2907);
+            public static readonly SystemError InvalidPointGrid = Get(2908);
+            public static readonly SystemError DegenerateGeometry = Get(2909);
+            public static readonly SystemError ParameterizationFailed = Get(2910);
+            public static readonly SystemError ConstraintViolation = Get(2911);
+            public static readonly SystemError EnergyComputationFailed = Get(2912);
+            public static readonly SystemError SmoothingFailed = Get(2913);
+            public static readonly SystemError LSPIAFailed = Get(2914);
+            public static readonly SystemError AutoDegreeSelectionFailed = Get(2915);
+            public static readonly SystemError ConstrainedFittingFailed = Get(2916);
+            public static readonly SystemError MultiPatchFailed = Get(2917);
+            public static readonly SystemError IsogeometricRefinementFailed = Get(2918);
+            public static readonly SystemError SurfaceFairingFailed = Get(2919);
         }
     }
 
