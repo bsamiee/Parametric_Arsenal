@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using Arsenal.Core.Validation;
 using Rhino;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Morphology;
 
@@ -9,17 +10,17 @@ internal static class MorphologyConfig {
     /// <summary>Validation mode dispatch: (operation ID, input type) → validation flags.</summary>
     internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
         new Dictionary<(byte, Type), V> {
-            [(1, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.Topology,
-            [(1, typeof(global::Rhino.Geometry.Brep))] = V.Standard | V.Topology,
-            [(2, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(3, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(4, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(10, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
-            [(11, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
-            [(12, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
-            [(13, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(14, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
-            [(20, typeof(global::Rhino.Geometry.Mesh))] = V.Standard | V.MeshSpecific,
+            [(1, typeof(Mesh))] = V.Standard | V.Topology,
+            [(1, typeof(Brep))] = V.Standard | V.Topology,
+            [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(3, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(4, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(10, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(11, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(12, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(13, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
+            [(14, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+            [(20, typeof(Mesh))] = V.Standard | V.MeshSpecific,
         }.ToFrozenDictionary();
 
     /// <summary>Operation names for diagnostics.</summary>
