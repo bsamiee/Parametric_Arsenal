@@ -25,55 +25,55 @@ internal static class FittingCompute {
                 ? curve.ToNurbsCurve() is NurbsCurve converted && converted is not null
                     ? FairNurbsCurve(converted, options, context)
                     : ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Cannot convert to NURBS"))
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Cannot convert to NURBS"))
                 : FairNurbsCurve(nc, options, context));
 
     /// <summary>Fairs NURBS curve via iterative control point optimization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     private static Result<Fitting.CurveFitResult> FairNurbsCurve(
         NurbsCurve curve,
         Fitting.FairOptions options,
-        IGeometryContext _) {
-        NurbsCurve working = curve.Duplicate() as NurbsCurve ?? curve;
-        double previousEnergy = ComputeBendingEnergy(curve: working);
-        int iteration = 0;
+        IGeometryContext context) =>
+        ((Func<Result<Fitting.CurveFitResult>>)(() => {
+            NurbsCurve working = curve.Duplicate() as NurbsCurve ?? curve;
+            double previousEnergy = ComputeBendingEnergy(curve: working);
+            int iteration = 0;
 
-        while (iteration < options.MaxIterations) {
-            OptimizeControlPointsStep(
-                curve: working,
-                relaxation: options.RelaxationFactor,
-                fixBoundaries: options.FixBoundaries);
+            while (iteration < options.MaxIterations) {
+                OptimizeControlPointsStep(
+                    curve: working,
+                    relaxation: options.RelaxationFactor,
+                    fixBoundaries: options.FixBoundaries);
 
-            double currentEnergy = ComputeBendingEnergy(curve: working);
-            double energyChange = Math.Abs(currentEnergy - previousEnergy);
+                double currentEnergy = ComputeBendingEnergy(curve: working);
+                double energyChange = Math.Abs(currentEnergy - previousEnergy);
 
-            if (energyChange < FittingConfig.EnergyConvergence) {
-                break;
+                if (energyChange < FittingConfig.EnergyConvergence) {
+                    break;
+                }
+
+                previousEnergy = currentEnergy;
+                iteration++;
             }
 
-            previousEnergy = currentEnergy;
-            iteration++;
-        }
-
-        return iteration >= options.MaxIterations
-            ? ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Fitting.ConvergenceFailed.WithContext(string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"Failed to converge after {options.MaxIterations.ToString(CultureInfo.InvariantCulture)} iterations")))
-            : ResultFactory.Create(value: new Fitting.CurveFitResult(
-                Curve: working,
-                MaxDeviation: 0.0,
-                RmsDeviation: 0.0,
-                FairnessScore: ComputeFairnessScore(working),
-                ControlPointCount: working.Points.Count,
-                ActualDegree: working.Degree));
-    }
+            return iteration >= options.MaxIterations
+                ? ResultFactory.Create<Fitting.CurveFitResult>(
+                    error: E.Geometry.Fitting.ConvergenceFailed.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Failed to converge after {options.MaxIterations.ToString(CultureInfo.InvariantCulture)} iterations")))
+                : ResultFactory.Create(value: new Fitting.CurveFitResult(
+                    Curve: working,
+                    MaxDeviation: 0.0,
+                    RmsDeviation: 0.0,
+                    FairnessScore: ComputeFairnessScore(working),
+                    ControlPointCount: working.Points.Count,
+                    ActualDegree: working.Degree));
+        }))();
 
     /// <summary>Computes discrete bending energy E = ∫(κ²) ≈ Σ||κ(t[i])||²·Δt.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeBendingEnergy(Curve curve) {
-        int n = FittingConfig.EnergySampleCount;
+        const int n = FittingConfig.EnergySampleCount;
         double energy = 0.0;
         double dt = curve.Domain.Length / (n - 1.0);
 
@@ -131,7 +131,6 @@ internal static class FittingCompute {
 
     /// <summary>Laplacian smoothing for curves with iteration count.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     internal static Result<Fitting.CurveFitResult> SmoothCurve(
         Curve curve,
         int iterations,
@@ -139,25 +138,13 @@ internal static class FittingCompute {
         IGeometryContext context) =>
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.Degeneracy,])
-            .Bind(validCurve => {
-                int clampedIterations = RhinoMath.Clamp(
-                    iterations,
-                    1,
-                    FittingConfig.MaxSmoothIterations);
-                double clampedRelaxation = RhinoMath.Clamp(
-                    relaxationFactor,
-                    FittingConfig.MinRelaxation,
-                    FittingConfig.MaxRelaxation);
-                NurbsCurve working = validCurve.ToNurbsCurve() ?? validCurve as NurbsCurve;
-                return working is null
-                    ? ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Cannot convert to NURBS"))
-                    : ((Func<Result<Fitting.CurveFitResult>>)(() => {
+            .Bind(validCurve =>
+                (validCurve.ToNurbsCurve() ?? validCurve as NurbsCurve) is NurbsCurve working
+                    ? ((Func<Result<Fitting.CurveFitResult>>)(() => {
+                        int clampedIterations = RhinoMath.Clamp(iterations, 1, FittingConfig.MaxSmoothIterations);
+                        double clampedRelaxation = RhinoMath.Clamp(relaxationFactor, FittingConfig.MinRelaxation, FittingConfig.MaxRelaxation);
                         for (int iter = 0; iter < clampedIterations; iter++) {
-                            OptimizeControlPointsStep(
-                                curve: working,
-                                relaxation: clampedRelaxation,
-                                fixBoundaries: false);
+                            OptimizeControlPointsStep(curve: working, relaxation: clampedRelaxation, fixBoundaries: false);
                         }
                         return ResultFactory.Create(value: new Fitting.CurveFitResult(
                             Curve: working,
@@ -166,8 +153,9 @@ internal static class FittingCompute {
                             FairnessScore: ComputeFairnessScore(working),
                             ControlPointCount: working.Points.Count,
                             ActualDegree: working.Degree));
-                    }))();
-            });
+                    }))()
+                    : ResultFactory.Create<Fitting.CurveFitResult>(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Cannot convert to NURBS")));
 
     /// <summary>Surface smoothing via SDK Surface.Smooth method with iteration.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -199,7 +187,7 @@ internal static class FittingCompute {
                     
                     if (smoothed is null) {
                         return ResultFactory.Create<Fitting.SurfaceFitResult>(
-                            error: E.Fitting.SmoothingFailed.WithContext(string.Create(
+                            error: E.Geometry.Fitting.SmoothingFailed.WithContext(string.Create(
                                 CultureInfo.InvariantCulture,
                                 $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
                     }
@@ -215,7 +203,7 @@ internal static class FittingCompute {
                         ControlPointCounts: (ns.Points.CountU, ns.Points.CountV),
                         ActualDegrees: (ns.Degree(0), ns.Degree(1))))
                     : ResultFactory.Create<Fitting.SurfaceFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Result not NURBS"));
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Result not NURBS"));
             });
 
     /// <summary>Isogeometric refinement via knot insertion (shape-preserving subdivision).</summary>
@@ -233,7 +221,7 @@ internal static class FittingCompute {
                     foreach (double knotParam in [.. ComputeMidpointKnots(refined.Knots)]) {
                         if (!refined.Knots.InsertKnot(value: knotParam, multiplicity: 1)) {
                             return ResultFactory.Create<Fitting.CurveFitResult>(
-                                error: E.Fitting.IsogeometricRefinementFailed.WithContext(string.Create(
+                                error: E.Geometry.Fitting.IsogeometricRefinementFailed.WithContext(string.Create(
                                     CultureInfo.InvariantCulture,
                                     $"Knot insertion failed at t={knotParam:F6} (level {(lvl + 1).ToString(CultureInfo.InvariantCulture)})")));
                         }
@@ -281,7 +269,7 @@ internal static class FittingCompute {
                     
                     if (smoothed is null) {
                         return ResultFactory.Create<Fitting.SurfaceFitResult>(
-                            error: E.Fitting.SurfaceFairingFailed.WithContext(string.Create(
+                            error: E.Geometry.Fitting.SurfaceFairingFailed.WithContext(string.Create(
                                 CultureInfo.InvariantCulture,
                                 $"Iteration {(i + 1).ToString(CultureInfo.InvariantCulture)} failed")));
                     }
@@ -297,6 +285,6 @@ internal static class FittingCompute {
                         ControlPointCounts: (ns.Points.CountU, ns.Points.CountV),
                         ActualDegrees: (ns.Degree(0), ns.Degree(1))))
                     : ResultFactory.Create<Fitting.SurfaceFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Result not NURBS"));
+                        error: E.Geometry.Fitting.FittingFailed.WithContext("Result not NURBS"));
             });
 }

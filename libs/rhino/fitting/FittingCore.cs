@@ -24,14 +24,14 @@ internal static class FittingCore {
         IGeometryContext context) =>
         degree switch {
             < FittingConfig.MinDegree => ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Fitting.InvalidDegree.WithContext(
+                error: E.Geometry.Fitting.InvalidDegree.WithContext(
                     $"Degree must be >= {FittingConfig.MinDegree}, got {degree}")),
             > FittingConfig.MaxDegree => ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Fitting.InvalidDegree.WithContext(
+                error: E.Geometry.Fitting.InvalidDegree.WithContext(
                     $"Degree must be <= {FittingConfig.MaxDegree}, got {degree}")),
             _ when controlPointCount.HasValue && controlPointCount.Value < FittingConfig.MinControlPoints(degree) =>
                 ResultFactory.Create<Fitting.CurveFitResult>(
-                    error: E.Fitting.InvalidControlPointCount.WithContext(
+                    error: E.Geometry.Fitting.InvalidControlPointCount.WithContext(
                         $"Need >= {FittingConfig.MinControlPoints(degree)} control points for degree {degree}")),
             _ => ComputeChordParameters(points: points, power: FittingConfig.ChordPowerStandard)
                 .Bind(parameters => {
@@ -75,7 +75,7 @@ internal static class FittingCore {
         return totalLength > RhinoMath.ZeroTolerance
             ? ResultFactory.Create(value: parameters.Select(t => t / totalLength).ToArray())
             : ResultFactory.Create<double[]>(
-                error: E.Fitting.ParameterizationFailed.WithContext(
+                error: E.Geometry.Fitting.ParameterizationFailed.WithContext(
                     "Coincident points: total chord length < ZeroTolerance"));
     }
 
@@ -171,7 +171,7 @@ internal static class FittingCore {
 
                 if (maxPivot < FittingConfig.PivotTolerance) {
                     return ResultFactory.Create<Point3d[]>(
-                        error: E.Fitting.FittingFailed.WithContext(
+                        error: E.Geometry.Fitting.FittingFailed.WithContext(
                             $"Singular matrix at column {col}"));
                 }
 
@@ -193,14 +193,16 @@ internal static class FittingCore {
                     for (int k = col; k < numControlPoints; k++) {
                         NtN[row, k] -= factor * NtN[col, k];
                     }
-                    NtD[row] -= factor * NtD[col];
+                    Vector3d scaled = NtD[col] - Point3d.Origin;
+                    NtD[row] = Point3d.Origin + (NtD[row] - Point3d.Origin - (factor * scaled));
                 }
             }
 
             for (int i = numControlPoints - 1; i >= 0; i--) {
                 Point3d sum = NtD[i];
                 for (int j = i + 1; j < numControlPoints; j++) {
-                    sum -= NtN[i, j] * controlPoints[j];
+                    Vector3d scaled = controlPoints[j] - Point3d.Origin;
+                    sum = Point3d.Origin + (sum - Point3d.Origin - (NtN[i, j] * scaled));
                 }
                 controlPoints[i] = sum;
             }
@@ -219,19 +221,12 @@ internal static class FittingCore {
         int degree,
         Point3d[] originalPoints,
         double tolerance,
-        IGeometryContext context) {
-        NurbsCurve curve = NurbsCurve.Create(
-            periodic: false,
-            degree: degree,
-            points: controlPoints);
-
-        return curve is null || !curve.IsValid
-            ? ResultFactory.Create<Fitting.CurveFitResult>(
-                error: E.Fitting.FittingFailed.WithContext("Failed to construct valid NURBS curve"))
-            : ComputeDeviation(fitted: curve, original: originalPoints)
+        IGeometryContext context) =>
+        NurbsCurve.Create(periodic: false, degree: degree, points: controlPoints) is NurbsCurve curve && curve.IsValid
+            ? ComputeDeviation(fitted: curve, original: originalPoints)
                 .Bind(dev => dev.MaxDev > tolerance
                     ? ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Fitting.ConstraintViolation.WithContext(string.Create(
+                        error: E.Geometry.Fitting.ConstraintViolation.WithContext(string.Create(
                             CultureInfo.InvariantCulture,
                             $"Max deviation {dev.MaxDev.ToString("E3", CultureInfo.InvariantCulture)} exceeds tolerance {tolerance.ToString("E3", CultureInfo.InvariantCulture)}")))
                     : ResultFactory.Create(value: new Fitting.CurveFitResult(
@@ -240,8 +235,9 @@ internal static class FittingCore {
                         RmsDeviation: dev.RmsDev,
                         FairnessScore: ComputeFairnessScore(curve: curve),
                         ControlPointCount: controlPoints.Length,
-                        ActualDegree: curve.Degree)));
-    }
+                        ActualDegree: curve.Degree)))
+            : ResultFactory.Create<Fitting.CurveFitResult>(
+                error: E.Geometry.Fitting.FittingFailed.WithContext("Failed to construct valid NURBS curve"));
 
     /// <summary>Computes max/RMS deviation between fitted curve and original points.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -252,7 +248,7 @@ internal static class FittingCore {
         double sumSqDev = 0.0;
 
         for (int i = 0; i < original.Length; i++) {
-            Point3d closest = fitted.ClosestPoint(testPoint: original[i], maximumDistance: double.MaxValue);
+            Point3d closest = fitted.ClosestPoint(testPoint: original[i], t: out _);
             double dev = original[i].DistanceTo(closest);
             maxDev = dev > maxDev ? dev : maxDev;
             sumSqDev += dev * dev;
@@ -278,7 +274,6 @@ internal static class FittingCore {
 
     /// <summary>Rebuilds curve with validation and quality computation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Curve is returned in result and ownership transferred")]
     internal static Result<Fitting.CurveFitResult> RebuildCurveWithValidation(
         Curve curve,
         int? degree,
@@ -287,28 +282,23 @@ internal static class FittingCore {
         IGeometryContext context) =>
         ResultFactory.Create(value: curve)
             .Validate(args: [context, V.Standard | V.Degeneracy,])
-            .Bind(validCurve => {
-                int targetDegree = degree ?? validCurve.Degree;
-                int targetPoints = controlPointCount ?? (validCurve is NurbsCurve nc ? nc.Points.Count : FittingConfig.MinControlPoints(targetDegree));
-                Curve rebuilt = validCurve.Rebuild(
-                    pointCount: targetPoints,
-                    degree: targetDegree,
-                    preserveTangents: preserveTangents);
-                return rebuilt is NurbsCurve result && result.IsValid
-                    ? ResultFactory.Create(value: new Fitting.CurveFitResult(
-                        Curve: result,
-                        MaxDeviation: 0.0,
-                        RmsDeviation: 0.0,
-                        FairnessScore: ComputeFairnessScore(curve: result),
-                        ControlPointCount: result.Points.Count,
-                        ActualDegree: result.Degree))
-                    : ResultFactory.Create<Fitting.CurveFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Rebuild produced invalid curve"));
-            });
+            .Bind(validCurve =>
+                validCurve.Rebuild(
+                    pointCount: controlPointCount ?? (validCurve is NurbsCurve nc ? nc.Points.Count : FittingConfig.MinControlPoints(degree ?? validCurve.Degree)),
+                    degree: degree ?? validCurve.Degree,
+                    preserveTangents: preserveTangents) is NurbsCurve result && result.IsValid
+                        ? ResultFactory.Create(value: new Fitting.CurveFitResult(
+                            Curve: result,
+                            MaxDeviation: 0.0,
+                            RmsDeviation: 0.0,
+                            FairnessScore: ComputeFairnessScore(curve: result),
+                            ControlPointCount: result.Points.Count,
+                            ActualDegree: result.Degree))
+                        : ResultFactory.Create<Fitting.CurveFitResult>(
+                            error: E.Geometry.Fitting.FittingFailed.WithContext("Rebuild produced invalid curve")));
 
     /// <summary>Fits surface from point grid (placeholder - full implementation similar to curve).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "2D array required for surface point grid")]
     internal static Result<Fitting.SurfaceFitResult> FitSurfaceFromGrid(
         Point3d[,] _,
         int __,
@@ -318,11 +308,10 @@ internal static class FittingCore {
         double ______,
         IGeometryContext _______) =>
         ResultFactory.Create<Fitting.SurfaceFitResult>(
-            error: E.Fitting.FittingFailed.WithContext("Surface fitting implementation pending"));
+            error: E.Geometry.Fitting.FittingFailed.WithContext("Surface fitting implementation pending"));
 
     /// <summary>Rebuilds surface with validation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "Surface is returned in result and ownership transferred")]
     internal static Result<Fitting.SurfaceFitResult> RebuildSurfaceWithValidation(
         Surface surface,
         int? uDegree,
@@ -332,25 +321,19 @@ internal static class FittingCore {
         IGeometryContext context) =>
         ResultFactory.Create(value: surface)
             .Validate(args: [context, V.Standard | V.UVDomain,])
-            .Bind(validSurface => {
-                int targetUDegree = uDegree ?? (validSurface is NurbsSurface ns ? ns.Degree(0) : FittingConfig.DefaultSurfaceDegree);
-                int targetVDegree = vDegree ?? (validSurface is NurbsSurface ns2 ? ns2.Degree(1) : FittingConfig.DefaultSurfaceDegree);
-                int targetUPoints = uControlPoints ?? FittingConfig.MinControlPoints(targetUDegree);
-                int targetVPoints = vControlPoints ?? FittingConfig.MinControlPoints(targetVDegree);
-                Surface rebuilt = validSurface.Rebuild(
-                    uPointCount: targetUPoints,
-                    vPointCount: targetVPoints,
-                    uDegree: targetUDegree,
-                    vDegree: targetVDegree);
-                return rebuilt is NurbsSurface result && result.IsValid
-                    ? ResultFactory.Create(value: new Fitting.SurfaceFitResult(
-                        Surface: result,
-                        MaxDeviation: 0.0,
-                        RmsDeviation: 0.0,
-                        FairnessScore: 0.0,
-                        ControlPointCounts: (result.Points.CountU, result.Points.CountV),
-                        ActualDegrees: (result.Degree(0), result.Degree(1))))
-                    : ResultFactory.Create<Fitting.SurfaceFitResult>(
-                        error: E.Fitting.FittingFailed.WithContext("Rebuild produced invalid surface"));
-            });
+            .Bind(validSurface =>
+                validSurface.Rebuild(
+                    uPointCount: uControlPoints ?? FittingConfig.MinControlPoints(uDegree ?? (validSurface is NurbsSurface ns ? ns.Degree(0) : FittingConfig.DefaultSurfaceDegree)),
+                    vPointCount: vControlPoints ?? FittingConfig.MinControlPoints(vDegree ?? (validSurface is NurbsSurface ns2 ? ns2.Degree(1) : FittingConfig.DefaultSurfaceDegree)),
+                    uDegree: uDegree ?? (validSurface is NurbsSurface ns3 ? ns3.Degree(0) : FittingConfig.DefaultSurfaceDegree),
+                    vDegree: vDegree ?? (validSurface is NurbsSurface ns4 ? ns4.Degree(1) : FittingConfig.DefaultSurfaceDegree)) is NurbsSurface result && result.IsValid
+                        ? ResultFactory.Create(value: new Fitting.SurfaceFitResult(
+                            Surface: result,
+                            MaxDeviation: 0.0,
+                            RmsDeviation: 0.0,
+                            FairnessScore: 0.0,
+                            ControlPointCounts: (result.Points.CountU, result.Points.CountV),
+                            ActualDegrees: (result.Degree(0), result.Degree(1))))
+                        : ResultFactory.Create<Fitting.SurfaceFitResult>(
+                            error: E.Geometry.Fitting.FittingFailed.WithContext("Rebuild produced invalid surface")));
 }

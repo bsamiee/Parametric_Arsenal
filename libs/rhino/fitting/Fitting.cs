@@ -89,27 +89,26 @@ public static class Fitting {
                 preserveTangents: options.PreserveTangents,
                 context: context)
             : ResultFactory.Create<CurveFitResult>(
-                error: E.Fitting.InsufficientPoints.WithContext(
+                error: E.Geometry.Fitting.InsufficientPoints.WithContext(
                     $"Minimum {FittingConfig.MinPointsForCurveFit} points required, got {points.Length}"));
 
     /// <summary>Fits NURBS surface from point grid via least-squares.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "2D array required for surface point grid")]
     public static Result<SurfaceFitResult> FitSurface(
         Point3d[,] points,
         FitOptions options,
         IGeometryContext context) =>
         points.GetLength(0) >= FittingConfig.MinPointsForSurfaceFit && points.GetLength(1) >= FittingConfig.MinPointsForSurfaceFit
             ? FittingCore.FitSurfaceFromGrid(
-                points: points,
-                uDegree: options.Degree ?? FittingConfig.DefaultSurfaceDegree,
-                vDegree: options.Degree ?? FittingConfig.DefaultSurfaceDegree,
-                uControlPoints: options.ControlPointCount,
-                vControlPoints: options.ControlPointCount,
-                tolerance: options.Tolerance ?? context.AbsoluteTolerance,
-                context: context)
+                points,
+                options.Degree ?? FittingConfig.DefaultSurfaceDegree,
+                options.Degree ?? FittingConfig.DefaultSurfaceDegree,
+                options.ControlPointCount,
+                options.ControlPointCount,
+                options.Tolerance ?? context.AbsoluteTolerance,
+                context)
             : ResultFactory.Create<SurfaceFitResult>(
-                error: E.Fitting.InvalidPointGrid.WithContext(
+                error: E.Geometry.Fitting.InvalidPointGrid.WithContext(
                     $"Minimum {FittingConfig.MinPointsForSurfaceFit}×{FittingConfig.MinPointsForSurfaceFit} grid required"));
 
     /// <summary>Rebuilds curve with new control point distribution.</summary>
