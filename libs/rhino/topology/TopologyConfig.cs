@@ -35,15 +35,13 @@ internal static class TopologyConfig {
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 
     /// <summary>Edge analysis thresholds for continuity classification.</summary>
-    /// <remarks>Ratio applied to angle threshold to determine curvature continuity (G2 vs G1). Conservative 0.1 ratio ensures tight curvature requirements.</remarks>
     internal const double CurvatureThresholdRatio = 0.1;
-    /// <remarks>Practical minimum loop length (1 micrometer) used as fallback when context tolerance is smaller. Approximately 1000× larger than RhinoMath.SqrtEpsilon for robust loop detection.</remarks>
+    /// <summary>Practical minimum loop length (1 micrometer) used as fallback when context tolerance is smaller. Approximately 1000× larger than RhinoMath.SqrtEpsilon for robust loop detection.</remarks>
     internal const double MinLoopLength = 1e-6;
 
     /// <summary>Diagnostic thresholds for topology problem detection.</summary>
-    /// <remarks>Multiplier for "near miss" edge detection: edges within 100× tolerance are candidates for joining. Balances detection sensitivity with performance.</remarks>
     internal const double NearMissMultiplier = 100.0;
-    /// <remarks>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
+    /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
     internal const int MaxEdgesForNearMissAnalysis = 100;
 
     /// <summary>Healing strategy identifiers for progressive topology repair.</summary>
