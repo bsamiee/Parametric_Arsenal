@@ -130,7 +130,7 @@ internal static class MorphologyCompute {
         Point3d[] newVerts = new Point3d[vertCount];
         for (int i = 0; i < vertCount; i++) {
             int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
-            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : Array.Empty<int>();
+            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
             int valence = neighbors.Length;
             double beta = valence is 3
                 ? MorphologyConfig.LoopBetaValence3
@@ -207,8 +207,8 @@ internal static class MorphologyCompute {
                     Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
                     int topologyV1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
                     int topologyV2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
-                    int[] v1Neighbors = topologyV1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV1) : Array.Empty<int>();
-                    int[] v2Neighbors = topologyV2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV2) : Array.Empty<int>();
+                    int[] v1Neighbors = topologyV1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV1) : [];
+                    int[] v2Neighbors = topologyV2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV2) : [];
                     (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4
                         ? FindButterflyOpposites(mesh, v1, v2)
                         : (-1, -1);
