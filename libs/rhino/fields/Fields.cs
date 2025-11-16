@@ -19,8 +19,12 @@ public static class Fields {
         BoundingBox? bounds = null,
         double? stepSize = null) {
         /// <summary>Grid resolution (cube root of sample count).</summary>
+        private static int NormalizeResolution(int resolution) =>
+            resolution >= FieldsConfig.MinResolution
+                ? resolution
+                : FieldsConfig.DefaultResolution;
         public readonly int Resolution = RhinoMath.Clamp(
-            resolution >= FieldsConfig.MinResolution ? resolution : FieldsConfig.DefaultResolution,
+            NormalizeResolution(resolution),
             FieldsConfig.MinResolution,
             FieldsConfig.MaxResolution);
         /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
