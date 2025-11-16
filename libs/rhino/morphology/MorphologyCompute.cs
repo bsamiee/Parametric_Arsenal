@@ -110,11 +110,13 @@ internal static class MorphologyCompute {
                         if (level > 0) {
                             current.Dispose();
                         }
-                        return !valid
-                            ? (level is 0
-                                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")))
-                                : result)
-                            : ResultFactory.Create(value: next);
+                        if (!valid) {
+                            next?.Dispose();
+                            return ResultFactory.Create<Mesh>(
+                                error: E.Geometry.Morphology.SubdivisionFailed.WithContext(
+                                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")));
+                        }
+                        return ResultFactory.Create(value: next);
                     }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
