@@ -294,29 +294,28 @@ internal static class FieldsCompute {
         ((Func<Result<Curve[]>>)(() => {
             Curve[] streamlines = new Curve[seeds.Length];
             Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
-            using RTree? tree = gridPoints.Length > FieldsConfig.StreamlineRTreeThreshold ? RTree.CreateFromPointArray(gridPoints) : null;
             try {
                 for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
                     Point3d current = seeds[seedIdx];
                     int stepCount = 0;
                     pathBuffer[stepCount++] = current;
                     for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
-                        Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, tree: tree, resolution: resolution, bounds: bounds);
+                        Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
                         double k1Magnitude = k1.Length;
                         Vector3d k2 = integrationMethod switch {
                             0 => k1,
-                            1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), tree: tree, resolution: resolution, bounds: bounds),
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), tree: tree, resolution: resolution, bounds: bounds),
+                            1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), resolution: resolution, bounds: bounds),
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), resolution: resolution, bounds: bounds),
                             _ => k1,
                         };
                         Vector3d k3 = integrationMethod switch {
                             0 or 1 => k1,
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), tree: tree, resolution: resolution, bounds: bounds),
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), resolution: resolution, bounds: bounds),
                             _ => k1,
                         };
                         Vector3d k4 = integrationMethod switch {
                             0 or 1 => k1,
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), tree: tree, resolution: resolution, bounds: bounds),
+                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), resolution: resolution, bounds: bounds),
                             _ => k1,
                         };
                         Vector3d delta = integrationMethod switch {
@@ -342,10 +341,12 @@ internal static class FieldsCompute {
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, RTree? tree, int resolution, BoundingBox bounds) =>
-        tree is not null
-            ? InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero)
-            : InterpolateNearest(query, vectorField, gridPoints).Match(onSuccess: v => v, onFailure: _ => Vector3d.Zero);
+    private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) {
+        Result<Vector3d> trilinear = InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds);
+        return trilinear.Match(
+            onSuccess: value => value,
+            onFailure: _ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints).Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(

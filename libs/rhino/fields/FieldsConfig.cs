@@ -26,7 +26,6 @@ internal static class FieldsConfig {
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
     internal const double RK2HalfStep = 0.5;
 
-    internal const int StreamlineRTreeThreshold = 1000;
     internal const int FieldRTreeThreshold = 100;
 
     internal const byte CriticalPointMinimum = 0;
