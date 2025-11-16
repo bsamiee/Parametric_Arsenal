@@ -1,3 +1,4 @@
+using System;
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
@@ -22,6 +23,22 @@ internal static class FieldsCore {
             [(FieldsConfig.OperationDistance, typeof(Curve))] = (ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
             [(FieldsConfig.OperationDistance, typeof(Surface))] = (ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
         }.ToFrozenDictionary();
+
+    [Pure]
+    internal static bool TryGetOperationConfig(
+        byte operation,
+        Type geometryType,
+        out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod) config) {
+        Type? current = geometryType;
+        while (current is not null) {
+            if (OperationRegistry.TryGetValue((operation, current), out config)) {
+                return true;
+            }
+            current = current.BaseType;
+        }
+        config = default;
+        return false;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
