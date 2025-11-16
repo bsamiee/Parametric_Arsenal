@@ -63,7 +63,7 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta,
-        Func<TIn[], int, int, int, int, int, (double, double, double, double, double, double), TOut> stencilOp,
+        Func<TIn[], int, int, int, int, int, int, (double, double, double, double, double, double), TOut> stencilOp,
         SystemError lengthError,
         SystemError resolutionError) where TIn : struct where TOut : struct =>
         (inputField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
@@ -79,7 +79,7 @@ internal static class FieldsCompute {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = (i * resSquared) + (j * resolution) + k;
-                                output[idx] = stencilOp(inputField, idx, i, j, k, resolution, (dx, dy, dz, twoDx, twoDy, twoDz));
+                                output[idx] = stencilOp(inputField, idx, i, j, k, resolution, resSquared, (dx, dy, dz, twoDx, twoDy, twoDz));
                             }
                         }
                     }
@@ -102,8 +102,7 @@ internal static class FieldsCompute {
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, deltas) => {
-                int resSquared = res * res;
+            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
                 double dFz_dy = (j < res - 1 && j > 0) ? (field[idx + res].Z - field[idx - res].Z) / deltas.Item5 : 0.0;
                 double dFy_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Y - field[idx - 1].Y) / deltas.Item6 : 0.0;
                 double dFx_dz = (k < res - 1 && k > 0) ? (field[idx + 1].X - field[idx - 1].X) / deltas.Item6 : 0.0;
@@ -126,8 +125,7 @@ internal static class FieldsCompute {
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, deltas) => {
-                int resSquared = res * res;
+            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
                 double dFx_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].X - field[idx - resSquared].X) / deltas.Item4 : 0.0;
                 double dFy_dy = (j < res - 1 && j > 0) ? (field[idx + res].Y - field[idx - res].Y) / deltas.Item5 : 0.0;
                 double dFz_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Z - field[idx - 1].Z) / deltas.Item6 : 0.0;
@@ -141,17 +139,14 @@ internal static class FieldsCompute {
         double[] scalarField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) =>
-        ComputeDerivativeField(
+        Vector3d gridDelta) {
+        (double dx2, double dy2, double dz2) = (gridDelta.X * gridDelta.X, gridDelta.Y * gridDelta.Y, gridDelta.Z * gridDelta.Z);
+        return ComputeDerivativeField(
             inputField: scalarField,
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, deltas) => {
-                int resSquared = res * res;
-                double dx2 = deltas.Item1 * deltas.Item1;
-                double dy2 = deltas.Item2 * deltas.Item2;
-                double dz2 = deltas.Item3 * deltas.Item3;
+            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
                 double d2f_dx2 = (i > 0 && i < res - 1) ? (field[idx + resSquared] - (2.0 * field[idx]) + field[idx - resSquared]) / dx2 : 0.0;
                 double d2f_dy2 = (j > 0 && j < res - 1) ? (field[idx + res] - (2.0 * field[idx]) + field[idx - res]) / dy2 : 0.0;
                 double d2f_dz2 = (k > 0 && k < res - 1) ? (field[idx + 1] - (2.0 * field[idx]) + field[idx - 1]) / dz2 : 0.0;
@@ -159,6 +154,7 @@ internal static class FieldsCompute {
             },
             lengthError: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"),
             resolutionError: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Potential)> ComputeVectorPotential(
@@ -561,11 +557,14 @@ internal static class FieldsCompute {
         Vector3d direction) =>
         (direction.IsValid && direction.Length > RhinoMath.ZeroTolerance) switch {
             false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
-            true => ApplyFieldOperation(
-                inputField: gradientField,
-                grid: grid,
-                operation: (gradient, _) => Vector3d.Multiply(gradient, direction / direction.Length),
-                error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points")),
+            true => ((Func<Result<(Point3d[], double[])>>)(() => {
+                Vector3d unitDirection = direction / direction.Length;
+                return ApplyFieldOperation(
+                    inputField: gradientField,
+                    grid: grid,
+                    operation: (gradient, _) => Vector3d.Multiply(gradient, unitDirection),
+                    error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"));
+            }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
