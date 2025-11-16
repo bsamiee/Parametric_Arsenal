@@ -32,6 +32,34 @@ public static class E {
             [2005] = "Parameters array must not be empty",
             [2006] = "Angle threshold must be positive",
 
+            // Transform Operations (2100-2199)
+            [2100] = "Transform matrix is invalid or singular",
+            [2101] = "Scale factor must be non-zero and within valid range",
+            [2102] = "Rotation axis vector is zero-length or invalid",
+            [2103] = "Mirror plane is invalid or degenerate",
+            [2104] = "Array count must be positive and within limits",
+            [2105] = "Array spacing must be greater than tolerance",
+            [2106] = "Polar array angle must be in range (0, 2π]",
+            [2107] = "Morph operation failed or geometry not morphable",
+            [2108] = "Flow curves must be valid for flow operation",
+            [2109] = "Twist parameters invalid: axis or angle out of range",
+            [2110] = "Bend parameters invalid: spine or angle out of range",
+            [2111] = "Taper parameters produce degenerate geometry",
+            [2112] = "Stretch parameters are invalid",
+            [2113] = "Shear plane and direction are collinear or invalid",
+            [2114] = "Projection plane is invalid",
+            [2115] = "Transform composition failed",
+            [2116] = "Invalid transform specification discriminated union state",
+            [2117] = "Transform application to geometry failed",
+            [2118] = "Array parameters invalid for specified mode",
+            [2119] = "Morph operation code invalid",
+            [2120] = "Array mode invalid",
+            [2121] = "Geometry type not morphable for specified operation",
+            [2122] = "Basis planes invalid for coordinate system transform",
+            [2123] = "Splop parameters invalid: plane, surface, or point",
+            [2124] = "Sporph parameters invalid: source or target surface",
+            [2125] = "Maelstrom parameters invalid: center, axis, or radius",
+
             // Intersection Operations (2200-2207)
             [2200] = "Intersection method not supported for geometry types",
             [2201] = "Intersection computation failed",
@@ -222,6 +250,38 @@ public static class E {
         public static readonly SystemError InvalidDirection = Get(2004);
         public static readonly SystemError InvalidParameters = Get(2005);
         public static readonly SystemError InvalidAngle = Get(2006);
+
+        // Transform Operations (2100-2199)
+        /// <summary>Transform operation errors (2100-2199).</summary>
+        public static class Transform {
+            public static readonly SystemError InvalidTransformMatrix = Get(2100);
+            public static readonly SystemError InvalidScaleFactor = Get(2101);
+            public static readonly SystemError InvalidRotationAxis = Get(2102);
+            public static readonly SystemError InvalidMirrorPlane = Get(2103);
+            public static readonly SystemError InvalidArrayCount = Get(2104);
+            public static readonly SystemError InvalidArraySpacing = Get(2105);
+            public static readonly SystemError InvalidPolarAngle = Get(2106);
+            public static readonly SystemError MorphFailed = Get(2107);
+            public static readonly SystemError InvalidFlowCurves = Get(2108);
+            public static readonly SystemError InvalidTwistParameters = Get(2109);
+            public static readonly SystemError InvalidBendParameters = Get(2110);
+            public static readonly SystemError InvalidTaperParameters = Get(2111);
+            public static readonly SystemError InvalidStretchParameters = Get(2112);
+            public static readonly SystemError InvalidShearParameters = Get(2113);
+            public static readonly SystemError InvalidProjectionPlane = Get(2114);
+            public static readonly SystemError CompositionFailed = Get(2115);
+            public static readonly SystemError InvalidTransformSpec = Get(2116);
+            public static readonly SystemError TransformApplicationFailed = Get(2117);
+            public static readonly SystemError InvalidArrayParameters = Get(2118);
+            public static readonly SystemError InvalidMorphOperation = Get(2119);
+            public static readonly SystemError InvalidArrayMode = Get(2120);
+            public static readonly SystemError GeometryNotMorphable = Get(2121);
+            public static readonly SystemError InvalidBasisPlanes = Get(2122);
+            public static readonly SystemError InvalidSplopParameters = Get(2123);
+            public static readonly SystemError InvalidSporphParameters = Get(2124);
+            public static readonly SystemError InvalidMaelstromParameters = Get(2125);
+            public static readonly SystemError MorphApplicationFailed = Get(2107);
+        }
 
         // Intersection Operations (2200-2207)
         public static readonly SystemError UnsupportedIntersection = Get(2200);

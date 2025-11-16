@@ -205,29 +205,29 @@ public static class Orient {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
+    public static Result<(global::Rhino.Geometry.Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
         IGeometryContext context) =>
         UnifiedOperation.Apply(
             input: brep,
-            operation: (Func<Brep, Result<IReadOnlyList<(Transform, double, byte[])>>>)(item =>
+            operation: (Func<Brep, Result<IReadOnlyList<(global::Rhino.Geometry.Transform, double, byte[])>>>)(item =>
                 OrientCompute.OptimizeOrientation(item, criteria, context.AbsoluteTolerance, context)
-                    .Map(r => (IReadOnlyList<(Transform, double, byte[])>)[r,])),
-            config: new OperationConfig<Brep, (Transform, double, byte[])> {
+                    .Map(r => (IReadOnlyList<(global::Rhino.Geometry.Transform, double, byte[])>)[r,])),
+            config: new OperationConfig<Brep, (global::Rhino.Geometry.Transform, double, byte[])> {
                 Context = context,
                 ValidationMode = V.Standard | V.Topology,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelativeOrientation(
+    public static Result<(global::Rhino.Geometry.Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelativeOrientation(
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
         OrientCompute.ComputeRelative(geometryA, geometryB, context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
+    public static Result<(byte PatternType, global::Rhino.Geometry.Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
         GeometryBase[] geometries,
         IGeometryContext context) =>
         OrientCompute.DetectPattern(geometries, context);

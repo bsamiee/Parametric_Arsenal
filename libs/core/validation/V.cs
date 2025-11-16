@@ -28,15 +28,16 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public static readonly V UVDomain = new(4096);
     public static readonly V SelfIntersection = new(8192);
     public static readonly V BrepGranular = new(16384);
+    public static readonly V TransformValidity = new(32768);
     public static readonly V All = new((ushort)(
         Standard._flags | AreaCentroid._flags | BoundingBox._flags | MassProperties._flags |
         Topology._flags | Degeneracy._flags | Tolerance._flags |
         MeshSpecific._flags | SurfaceContinuity._flags | PolycurveStructure._flags |
         NurbsGeometry._flags | ExtrusionGeometry._flags | UVDomain._flags |
-        SelfIntersection._flags | BrepGranular._flags
+        SelfIntersection._flags | BrepGranular._flags | TransformValidity._flags
     ));
 
-    internal static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular,];
+    internal static readonly V[] AllFlags = [Standard, AreaCentroid, BoundingBox, MassProperties, Topology, Degeneracy, Tolerance, MeshSpecific, SurfaceContinuity, PolycurveStructure, NurbsGeometry, ExtrusionGeometry, UVDomain, SelfIntersection, BrepGranular, TransformValidity,];
 
     private static readonly FrozenDictionary<ushort, string> _names =
         new Dictionary<ushort, string> {
@@ -56,6 +57,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
             [4096] = nameof(UVDomain),
             [8192] = nameof(SelfIntersection),
             [16384] = nameof(BrepGranular),
+            [32768] = nameof(TransformValidity),
         }.ToFrozenDictionary();
 
     [Pure] private string DebuggerDisplay => this.ToString();

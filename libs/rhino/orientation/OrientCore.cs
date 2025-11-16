@@ -60,7 +60,7 @@ internal static class OrientCore {
 
     /// <summary>Transform application with duplication and errors.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, global::Rhino.Geometry.Transform xform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
             T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
