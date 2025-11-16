@@ -129,10 +129,8 @@ public static class Morphology {
                 operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
                 config: new OperationConfig<T, IMorphologyResult> {
                     Context = context,
-                    ValidationMode = MorphologyConfig.ValidationModes.GetValueOrDefault((spec.Operation, typeof(T)), defaultValue: V.Standard),
-                    OperationName = MorphologyConfig.OperationNames.TryGetValue(spec.Operation, out string? opName)
-                        ? string.Create(CultureInfo.InvariantCulture, $"Morphology.{opName}")
-                        : string.Create(CultureInfo.InvariantCulture, $"Morphology.Op{spec.Operation}"),
+                    ValidationMode = MorphologyConfig.ValidationMode(spec.Operation, typeof(T)),
+                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(spec.Operation)}"),
                     EnableDiagnostics = false,
                 })
             : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(

@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
@@ -7,36 +8,24 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology operation configuration constants and dispatch tables.</summary>
 internal static class MorphologyConfig {
-    /// <summary>Validation mode dispatch: (operation ID, input type) → validation flags.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type InputType), V> ValidationModes =
-        new Dictionary<(byte, Type), V> {
-            [(1, typeof(Mesh))] = V.Standard | V.Topology,
-            [(1, typeof(Brep))] = V.Standard | V.Topology,
-            [(2, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(3, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(4, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(10, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(11, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(12, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(13, typeof(Mesh))] = V.Standard | V.MeshSpecific | V.Topology,
-            [(14, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(20, typeof(Mesh))] = V.Standard | V.MeshSpecific,
+    /// <summary>Operation metadata: validation, name, parameter type.</summary>
+    internal static readonly FrozenDictionary<(byte Op, Type Type), (V Validation, string Name)> Operations =
+        new Dictionary<(byte, Type), (V, string)> {
+            [(1, typeof(Mesh))] = (V.Standard | V.Topology, "CageDeform"),
+            [(1, typeof(Brep))] = (V.Standard | V.Topology, "CageDeform"),
+            [(2, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideCatmullClark"),
+            [(3, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideLoop"),
+            [(4, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideButterfly"),
+            [(10, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "SmoothLaplacian"),
+            [(11, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "SmoothTaubin"),
+            [(12, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshOffset"),
+            [(13, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "MeshReduce"),
+            [(14, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshRemesh"),
+            [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
         }.ToFrozenDictionary();
 
-    /// <summary>Operation names for diagnostics.</summary>
-    internal static readonly FrozenDictionary<byte, string> OperationNames =
-        new Dictionary<byte, string> {
-            [1] = "CageDeform",
-            [2] = "SubdivideCatmullClark",
-            [3] = "SubdivideLoop",
-            [4] = "SubdivideButterfly",
-            [10] = "SmoothLaplacian",
-            [11] = "SmoothTaubin",
-            [12] = "MeshOffset",
-            [13] = "MeshReduce",
-            [14] = "MeshRemesh",
-            [20] = "EvolveMeanCurvature",
-        }.ToFrozenDictionary();
+    [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
+    [Pure] internal static string OperationName(byte op) => Operations.FirstOrDefault(kv => kv.Key.Op == op).Value.Name ?? $"Op{op}";
 
     /// <summary>Operation ID constants.</summary>
     internal const byte OpCageDeform = 1;
@@ -49,6 +38,9 @@ internal static class MorphologyConfig {
     internal const byte OpReduce = 13;
     internal const byte OpRemesh = 14;
     internal const byte OpEvolveMeanCurvature = 20;
+
+    /// <summary>Subdivision algorithms requiring triangulated meshes.</summary>
+    internal static readonly FrozenSet<byte> TriangulatedSubdivisionOps = new HashSet<byte> { OpSubdivideLoop, OpSubdivideButterfly, }.ToFrozenSet();
 
     /// <summary>Cage deformation configuration.</summary>
     internal const int MinCageControlPoints = 8;
