@@ -157,8 +157,9 @@ internal static class MorphologyCore {
                     (weightedSum: Vector3d.Zero, weightSum: 0.0),
                     (acc, neighborIdx) => {
                         Point3d neighborPos = positions[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]];
+                        double distance = positions[i].DistanceTo(neighborPos);
                         double weight = useCotangent
-                            ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
+                            ? MorphologyConfig.UniformLaplacianWeight / (distance > RhinoMath.ZeroTolerance ? distance : RhinoMath.ZeroTolerance)
                             : MorphologyConfig.UniformLaplacianWeight;
                         return (acc.weightedSum + (weight * (Vector3d)neighborPos), acc.weightSum + weight);
                     }) is var (wSum, wTotal) && wTotal > RhinoMath.ZeroTolerance
@@ -275,7 +276,8 @@ internal static class MorphologyCore {
         double actualDist = minCount > 0
             ? Enumerable.Range(0, minCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]))
             : 0.0;
-        bool hasDegen = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
+        Result<Mesh> qualityResult = MorphologyCompute.ValidateMeshQuality(offset, context);
+        bool hasDegen = !qualityResult.IsSuccess;
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.OffsetResult(offset, actualDist, hasDegen, original.Vertices.Count, offset.Vertices.Count, original.Faces.Count, offset.Faces.Count),]);

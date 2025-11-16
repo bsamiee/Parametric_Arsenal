@@ -67,12 +67,8 @@ internal static class MorphologyConfig {
     internal const double ConvergenceMultiplier = 100.0;
     internal const double UniformLaplacianWeight = 1.0;
 
-    /// <summary>Taubin smoothing parameters.</summary>
-    internal const double TaubinLambda = 0.6307;
-    internal const double TaubinMu = -0.6732;
-
     /// <summary>Mesh quality validation thresholds.</summary>
-    internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
+    internal const double MinAngleRadiansThreshold = 5.0 * (Math.PI / 180.0);
     internal const double AspectRatioThreshold = 10.0;
 
     /// <summary>Mesh offset configuration.</summary>

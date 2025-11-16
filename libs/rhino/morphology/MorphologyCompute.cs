@@ -24,7 +24,7 @@ internal static class MorphologyCompute {
                 ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))
                 : ((Func<Result<GeometryBase>>)(() => {
                     BoundingBox cageBounds = new(originalControlPoints);
-                    return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
+                    return !double.IsFinite(cageBounds.Volume) || cageBounds.Volume <= __.AbsoluteTolerance
                         ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
                         : geometry switch {
                             Mesh m => (GeometryBase?)m.DuplicateMesh(),
@@ -45,11 +45,12 @@ internal static class MorphologyCompute {
             _ => [],
         };
         Vector3d span = cageBounds.Max - cageBounds.Min;
+        const double tolerance = RhinoMath.ZeroTolerance;
         Point3d[] deformedVerts = [.. vertices.Select(vertex => {
             Vector3d local = vertex - cageBounds.Min;
-            double u = RhinoMath.Clamp(span.X > RhinoMath.ZeroTolerance ? local.X / span.X : 0.0, 0.0, 1.0);
-            double v = RhinoMath.Clamp(span.Y > RhinoMath.ZeroTolerance ? local.Y / span.Y : 0.0, 0.0, 1.0);
-            double w = RhinoMath.Clamp(span.Z > RhinoMath.ZeroTolerance ? local.Z / span.Z : 0.0, 0.0, 1.0);
+            double u = span.X > tolerance ? (local.X / span.X < 0.0 ? 0.0 : local.X / span.X > 1.0 ? 1.0 : local.X / span.X) : 0.0;
+            double v = span.Y > tolerance ? (local.Y / span.Y < 0.0 ? 0.0 : local.Y / span.Y > 1.0 ? 1.0 : local.Y / span.Y) : 0.0;
+            double w = span.Z > tolerance ? (local.Z / span.Z < 0.0 ? 0.0 : local.Z / span.Z > 1.0 ? 1.0 : local.Z / span.Z) : 0.0;
             return Point3d.Origin + TrilinearInterpolate(deformedControlPoints, u, v, w);
         }),
         ];
@@ -136,7 +137,7 @@ internal static class MorphologyCompute {
                 : valence is 6
                     ? MorphologyConfig.LoopBetaValence6
                     : valence > 2
-                        ? (1.0 / valence) * (MorphologyConfig.LoopCenterWeight - Math.Pow(MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(RhinoMath.TwoPI / valence)), 2.0))
+                        ? (1.0 / valence) * (MorphologyConfig.LoopCenterWeight - Math.Pow(MorphologyConfig.LoopNeighborBase + (MorphologyConfig.LoopCosineMultiplier * Math.Cos(2.0 * Math.PI / valence)), 2.0))
                         : 0.0;
             Point3d sum = Point3d.Origin;
             for (int j = 0; j < neighbors.Length; j++) {
@@ -270,9 +271,10 @@ internal static class MorphologyCompute {
         bool lockBoundary,
         Func<Mesh, Point3d[], IGeometryContext, Point3d[]> updateFunc,
         IGeometryContext context) =>
-        maxIterations is <= 0 or > MorphologyConfig.MaxSmoothingIterations
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Iterations: {maxIterations}")))
-            : ((Func<Result<Mesh>>)(() => {
+        maxIterations switch {
+            <= 0 => ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Iterations: {maxIterations}"))),
+            > MorphologyConfig.MaxSmoothingIterations => ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Iterations: {maxIterations}"))),
+            _ => ((Func<Result<Mesh>>)(() => {
                 Mesh smoothed = mesh.DuplicateMesh();
                 Point3d[] positions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
                 Point3d[] prevPositions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
@@ -325,7 +327,8 @@ internal static class MorphologyCompute {
                     ArrayPool<Point3d>.Shared.Return(positions, clearArray: true);
                     ArrayPool<Point3d>.Shared.Return(prevPositions, clearArray: true);
                 }
-            }))();
+            }))(),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> OffsetMesh(
@@ -334,7 +337,7 @@ internal static class MorphologyCompute {
         bool _,
         IGeometryContext __) =>
         Math.Abs(distance) switch {
-            double abs when !RhinoMath.IsValidDouble(distance) || abs < MorphologyConfig.MinOffsetDistance =>
+            double abs when !double.IsFinite(distance) || abs < MorphologyConfig.MinOffsetDistance =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}"))),
             double abs when abs > MorphologyConfig.MaxOffsetDistance =>
@@ -362,15 +365,20 @@ internal static class MorphologyCompute {
             (int target, _) when target >= mesh.Faces.Count =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {target} >= Current: {mesh.Faces.Count}"))),
-            (_, double acc) when !RhinoMath.IsValidDouble(acc) || acc < MorphologyConfig.MinReductionAccuracy || acc > MorphologyConfig.MaxReductionAccuracy =>
+            (_, double acc) when !double.IsFinite(acc) || acc < MorphologyConfig.MinReductionAccuracy || acc > MorphologyConfig.MaxReductionAccuracy =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Accuracy: {acc:F3}"))),
             _ => ((Func<Result<Mesh>>)(() => {
                 Mesh reduced = mesh.DuplicateMesh();
+                double clampedAccuracy = accuracy < MorphologyConfig.MinReductionAccuracy
+                    ? MorphologyConfig.MinReductionAccuracy
+                    : accuracy > MorphologyConfig.MaxReductionAccuracy
+                        ? MorphologyConfig.MaxReductionAccuracy
+                        : accuracy;
                 bool success = reduced.Reduce(
                     desiredPolygonCount: targetFaceCount,
                     allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
-                    accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * MorphologyConfig.ReductionAccuracyScale),
+                    accuracy: (int)(clampedAccuracy * MorphologyConfig.ReductionAccuracyScale),
                     normalizeSize: false,
                     cancelToken: CancellationToken.None,
                     progress: null,
@@ -394,19 +402,19 @@ internal static class MorphologyCompute {
             double diagLength = bounds.Diagonal.Length;
             double minEdge = context.AbsoluteTolerance * MorphologyConfig.RemeshMinEdgeLengthFactor;
             double maxEdge = diagLength * MorphologyConfig.RemeshMaxEdgeLengthFactor;
-            if (!RhinoMath.IsValidDouble(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge) {
-                return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")));
-            }
-            if (maxIterations is <= 0 or > MorphologyConfig.MaxRemeshIterations) {
-                return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}")));
-            }
-            Mesh remeshed = mesh.DuplicateMesh();
+            return !double.IsFinite(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")))
+                : maxIterations switch {
+                <= 0 => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}"))),
+                > MorphologyConfig.MaxRemeshIterations => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}"))),
+                _ => ((Func<Result<Mesh>>)(() => {
+                    Mesh remeshed = mesh.DuplicateMesh();
             double splitThreshold = targetEdgeLength * MorphologyConfig.RemeshSplitThresholdFactor;
             for (int iter = 0; iter < maxIterations; iter++) {
                 int edgeCount = remeshed.TopologyEdges.Count;
                 for (int i = edgeCount - 1; i >= 0; i--) {
                     Line edge = remeshed.TopologyEdges.EdgeLine(i);
-                    _ = edge.Length > splitThreshold && remeshed.Vertices.Add(edge.PointAt(MorphologyConfig.EdgeMidpointParameter)) >= 0;
+                    _ = (edge.Length > splitThreshold ? remeshed.Vertices.Add(edge.PointAt(MorphologyConfig.EdgeMidpointParameter)) : -1) >= 0;
                 }
                 int vertCount = remeshed.Vertices.Count;
                 Point3d[] positions = new Point3d[vertCount];
@@ -420,9 +428,11 @@ internal static class MorphologyCompute {
                 _ = remeshed.Normals.ComputeNormals();
                 _ = remeshed.Compact();
             }
-            return remeshed.IsValid
-                ? ResultFactory.Create(value: remeshed)
-                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshingFailed);
+                    return remeshed.IsValid
+                        ? ResultFactory.Create(value: remeshed)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshingFailed);
+                }))(),
+                };
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -432,7 +442,7 @@ internal static class MorphologyCompute {
         return maxAspect > MorphologyConfig.AspectRatioThreshold
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
             : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {minAngle * (180.0 / Math.PI):F1}°")))
                 : ResultFactory.Create(value: mesh);
     }
 }
