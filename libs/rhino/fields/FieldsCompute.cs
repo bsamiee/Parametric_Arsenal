@@ -247,13 +247,13 @@ internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
         int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? (() => {
+            ? ((Func<int>)(() => {
                 using RTree tree = RTree.CreateFromPointArray(grid);
                 int idx = -1;
                 _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => idx = args.Id);
                 return idx;
-            })()
-            : (() => {
+            }))()
+            : ((Func<int>)(() => {
                 double minDist = double.MaxValue;
                 int idx = 0;
                 for (int i = 0; i < grid.Length; i++) {
@@ -261,7 +261,7 @@ internal static class FieldsCompute {
                     (idx, minDist) = dist < minDist ? (i, dist) : (idx, minDist);
                 }
                 return idx;
-            })();
+            }))();
         return nearestIdx >= 0
             ? ResultFactory.Create(value: field[nearestIdx])
             : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
