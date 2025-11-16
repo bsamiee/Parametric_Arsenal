@@ -278,10 +278,6 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateTrilinearScalar(Point3d query, double[] scalarField, int resolution, BoundingBox bounds) =>
-        InterpolateTrilinear(query: query, field: scalarField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)));
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Vector3d> InterpolateTrilinearVector(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds) =>
         InterpolateTrilinear(query: query, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)));
 
