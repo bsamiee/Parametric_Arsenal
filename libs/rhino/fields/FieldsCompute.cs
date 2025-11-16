@@ -22,8 +22,7 @@ internal static class FieldsCompute {
             int totalSamples = distances.Length;
             Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
             try {
-                (double dx, double dy, double dz) = (gridDelta.X, gridDelta.Y, gridDelta.Z);
-                (double twoDx, double twoDy, double twoDz) = (2.0 * dx, 2.0 * dy, 2.0 * dz);
+                (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
                 int resSquared = resolution * resolution;
                 for (int i = 0; i < resolution; i++) {
                     for (int j = 0; j < resolution; j++) {
@@ -71,13 +70,7 @@ internal static class FieldsCompute {
                 int totalSamples = vectorField.Length;
                 Vector3d[] curl = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                 try {
-                    double dx = gridDelta.X;
-                    double dy = gridDelta.Y;
-                    double dz = gridDelta.Z;
-                    double twoDx = 2.0 * dx;
-                    double twoDy = 2.0 * dy;
-                    double twoDz = 2.0 * dz;
-
+                    (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
                     int resolutionSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         int baseI = i * resolutionSquared;
@@ -122,13 +115,7 @@ internal static class FieldsCompute {
                 int totalSamples = vectorField.Length;
                 double[] divergence = ArrayPool<double>.Shared.Rent(totalSamples);
                 try {
-                    double dx = gridDelta.X;
-                    double dy = gridDelta.Y;
-                    double dz = gridDelta.Z;
-                    double twoDx = 2.0 * dx;
-                    double twoDy = 2.0 * dy;
-                    double twoDz = 2.0 * dz;
-
+                    (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
                     int resSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
@@ -260,13 +247,13 @@ internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
         int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
-            ? ((Func<int>)(() => {
+            ? (() => {
                 using RTree tree = RTree.CreateFromPointArray(grid);
                 int idx = -1;
                 _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => idx = args.Id);
                 return idx;
-            }))()
-            : ((Func<int>)(() => {
+            })()
+            : (() => {
                 double minDist = double.MaxValue;
                 int idx = 0;
                 for (int i = 0; i < grid.Length; i++) {
@@ -274,7 +261,7 @@ internal static class FieldsCompute {
                     (idx, minDist) = dist < minDist ? (i, dist) : (idx, minDist);
                 }
                 return idx;
-            }))();
+            })();
         return nearestIdx >= 0
             ? ResultFactory.Create(value: field[nearestIdx])
             : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
@@ -827,24 +814,15 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate")]
-    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) =>
-        ((Func<Vector3d>)(() => {
-            (double a, double b, double c, double d, double e, double f) = (
-                matrix[0, 0] - eigenvalue,
-                matrix[0, 1],
-                matrix[0, 2],
-                matrix[1, 1] - eigenvalue,
-                matrix[1, 2],
-                matrix[2, 2] - eigenvalue);
-            (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
-                new Vector3d((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b)),
-                new Vector3d((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c)),
-                new Vector3d((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d)));
-            Vector3d result = cross1.Length > cross2.Length
-                ? (cross1.Length > cross3.Length ? cross1 : cross3)
-                : (cross2.Length > cross3.Length ? cross2 : cross3);
-            return result.Length > RhinoMath.ZeroTolerance ? result / result.Length : new Vector3d(1, 0, 0);
-        }))();
+    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) {
+        (double a, double b, double c, double d, double e, double f) = (matrix[0, 0] - eigenvalue, matrix[0, 1], matrix[0, 2], matrix[1, 1] - eigenvalue, matrix[1, 2], matrix[2, 2] - eigenvalue);
+        (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
+            new Vector3d((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b)),
+            new Vector3d((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c)),
+            new Vector3d((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d)));
+        Vector3d result = cross1.Length > cross2.Length ? (cross1.Length > cross3.Length ? cross1 : cross3) : (cross2.Length > cross3.Length ? cross2 : cross3);
+        return result.Length > RhinoMath.ZeroTolerance ? result / result.Length : new Vector3d(1, 0, 0);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Fields.FieldStatistics> ComputeFieldStatistics(
