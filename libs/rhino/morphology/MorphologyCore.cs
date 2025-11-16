@@ -298,7 +298,8 @@ internal static class MorphologyCore {
                 quality,
                 aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
                 edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
-                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),]);
+                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),
+            ]);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
