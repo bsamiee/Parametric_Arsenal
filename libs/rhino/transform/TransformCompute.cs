@@ -1,3 +1,5 @@
+#pragma warning disable IDISP001, IDISP007 // SpaceMorph objects are disposed by ApplyMorph helper
+
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -24,16 +26,17 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         baseCurve.IsValid && targetCurve.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                FlowSpaceMorph morph = new() {
-                    BaseCurve = baseCurve,
-                    TargetCurve = targetCurve,
+                FlowSpaceMorph morph = new(
+                    curve0: baseCurve,
+                    curve1: targetCurve,
+                    preventStretching: !preserveStructure) {
                     PreserveStructure = preserveStructure,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidFlowCurves.WithContext($"Base: {baseCurve.IsValid}, Target: {targetCurve.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidFlowCurves.WithContext($"Base: {baseCurve.IsValid}, Target: {targetCurve.IsValid}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Twist geometry around axis by angle using TwistSpaceMorph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -55,7 +58,7 @@ internal static class TransformCompute {
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Bend geometry along spine using BendSpaceMorph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -66,17 +69,20 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         spine.IsValid && Math.Abs(angle) <= TransformConfig.MaxBendAngle && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                BendSpaceMorph morph = new() {
+                BendSpaceMorph morph = new(
+                    start: spine.From,
+                    end: spine.To,
+                    point: spine.From + (spine.Direction * 0.5 * spine.Length),
+                    angle: angle,
+                    straight: false,
+                    symmetric: false) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
-                morph.SetBendLine(spine.From, spine.To);
-                morph.BendAngleRadians = angle;
-                morph.Symmetric = false;
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -91,17 +97,20 @@ internal static class TransformCompute {
         && endWidth >= TransformConfig.MinScaleFactor
         && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                TaperSpaceMorph morph = new() {
+                TaperSpaceMorph morph = new(
+                    start: axis.From,
+                    end: axis.To,
+                    startRadius: startWidth,
+                    endRadius: endWidth,
+                    bFlat: false,
+                    infiniteTaper: false) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
-                    InfiniteTaper = false,
-                    Flat = false,
                 };
-                morph.SetTaperLine(axis.From, axis.To);
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth:F6}, End: {endWidth:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Stretch geometry along axis using StretchSpaceMorph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -111,14 +120,17 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         axis.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                StretchSpaceMorph morph = new() {
+                StretchSpaceMorph morph = new(
+                    start: axis.From,
+                    end: axis.To,
+                    length: axis.Length * 2.0) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidStretchParameters.WithContext($"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidStretchParameters.WithContext($"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Splop geometry from base plane to point on target surface.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -130,22 +142,23 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         basePlane.IsValid && targetSurface.IsValid && targetPoint.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                SplopSpaceMorph morph = new() {
-                    PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
-                    QuickPreview = false,
-                };
-                morph.SetBasePlane(basePlane);
                 double u = 0.0;
                 double v = 0.0;
                 return targetSurface.ClosestPoint(targetPoint, out u, out v)
                     ? ((Func<Result<T>>)(() => {
-                        morph.SetSurfacePoint(targetSurface, u, v);
+                        SplopSpaceMorph morph = new(
+                            plane: basePlane,
+                            surface: targetSurface,
+                            surfaceParam: new Point2d(u, v)) {
+                            PreserveStructure = false,
+                            Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                            QuickPreview = false,
+                        };
                         return ApplyMorph(morph: morph, geometry: geometry);
                     }))()
-                    : ResultFactory.Create<T>(error: E.Transform.InvalidSplopParameters.WithContext("Surface closest point failed"));
+                    : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidSplopParameters.WithContext("Surface closest point failed"));
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidSplopParameters.WithContext($"Plane: {basePlane.IsValid}, Surface: {targetSurface.IsValid}, Point: {targetPoint.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidSplopParameters.WithContext($"Plane: {basePlane.IsValid}, Surface: {targetSurface.IsValid}, Point: {targetPoint.IsValid}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Sporph geometry from source surface to target surface.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -157,15 +170,16 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         sourceSurface.IsValid && targetSurface.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                SporphSpaceMorph morph = new() {
+                SporphSpaceMorph morph = new(
+                    surface0: sourceSurface,
+                    surface1: targetSurface) {
                     PreserveStructure = preserveStructure,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
-                morph.SetSourceAndTarget(sourceSurface, targetSurface);
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidSporphParameters.WithContext($"Source: {sourceSurface.IsValid}, Target: {targetSurface.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidSporphParameters.WithContext($"Source: {sourceSurface.IsValid}, Target: {targetSurface.IsValid}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Maelstrom vortex deformation around axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -176,16 +190,21 @@ internal static class TransformCompute {
         double radius,
         double angle,
         IGeometryContext context) where T : GeometryBase =>
-        center.IsValid && axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid
+        center.IsValid && axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid && Math.Abs(angle) <= RhinoMath.TwoPI
             ? ((Func<Result<T>>)(() => {
-                MaelstromSpaceMorph morph = new() {
+                Plane plane = new(origin: center, normal: axis.Direction);
+                MaelstromSpaceMorph morph = new(
+                    plane: plane,
+                    radius0: 0.0,
+                    radius1: radius,
+                    angle: angle) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional frame orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -214,7 +233,7 @@ internal static class TransformCompute {
                 return UnifiedOperation.Apply(
                     input: transforms,
                     operation: (Func<RhinoTransform, Result<IReadOnlyList<T>>>)(xform =>
-                        TransformCore.ApplyTransform(item: geometry, transform: xform, context: context)),
+                        TransformCore.ApplyTransform(item: geometry, transform: xform)),
                     config: new OperationConfig<RhinoTransform, T> {
                         Context = context,
                         ValidationMode = V.None,
@@ -224,19 +243,24 @@ internal static class TransformCompute {
                     }).Map(results => (IReadOnlyList<T>)[.. results.SelectMany(static r => r),]);
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
+                error: global::Arsenal.Core.Errors.E.Transform.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Apply SpaceMorph to geometry with duplication and validation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ApplyMorph<TMorph, T>(
         TMorph morph,
-        T geometry) where TMorph : SpaceMorph where T : GeometryBase =>
-        morph.IsMorphable(geometry)
-            ? ((Func<Result<T>>)(() => {
-                T duplicate = (T)geometry.Duplicate();
-                return morph.Morph(duplicate)
-                    ? ResultFactory.Create(value: duplicate)
-                    : ResultFactory.Create<T>(error: E.Transform.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
-            }))()
-            : ResultFactory.Create<T>(error: E.Transform.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
+        T geometry) where TMorph : SpaceMorph where T : GeometryBase {
+        try {
+            return SpaceMorph.IsMorphable(geometry)
+                ? ((Func<Result<T>>)(() => {
+                    T duplicate = (T)geometry.Duplicate();
+                    return morph.Morph(duplicate)
+                        ? ResultFactory.Create(value: duplicate)
+                        : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
+                }))()
+                : ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
+        } finally {
+            (morph as IDisposable)?.Dispose();
+        }
+    }
 }

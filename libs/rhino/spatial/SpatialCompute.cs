@@ -249,8 +249,8 @@ internal static class SpatialCompute {
                     double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
                     int sampleCount = (int)RhinoMath.Clamp(length / effectiveTolerance, SpatialConfig.MedialAxisMinSampleCount, SpatialConfig.MedialAxisMaxSampleCount);
-                    Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
-                    Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
+                    global::Rhino.Geometry.Transform toPlane = global::Rhino.Geometry.Transform.PlaneToPlane(plane, Plane.WorldXY);
+                    global::Rhino.Geometry.Transform fromPlane = global::Rhino.Geometry.Transform.PlaneToPlane(Plane.WorldXY, plane);
                     Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
                     Point3d[] samples3D = [.. Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)),];
                     Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; pt.Transform(toPlane); return pt; }),];

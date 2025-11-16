@@ -13,6 +13,7 @@ namespace Arsenal.Rhino.Transform;
 
 /// <summary>Affine transforms, arrays, and deformations with unified polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Transform is the primary API entry point for the Transform namespace")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0104:Type name should not match namespace name", Justification = "Transform is the primary API entry point for the Transform namespace")]
 public static class Transform {
     /// <summary>Transform specification discriminated union for pattern matching dispatch.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -82,7 +83,7 @@ public static class Transform {
         public byte Mode { get; init; }
         /// <summary>Total count for polar/linear/path arrays.</summary>
         public int Count { get; init; }
-        
+
         /// <summary>Rectangular: X count.</summary>
         public int XCount { get; init; }
         /// <summary>Rectangular: Y count.</summary>
@@ -95,19 +96,19 @@ public static class Transform {
         public double YSpacing { get; init; }
         /// <summary>Rectangular: Z spacing (optional).</summary>
         public double? ZSpacing { get; init; }
-        
+
         /// <summary>Polar: center point.</summary>
         public Point3d? Center { get; init; }
         /// <summary>Polar: rotation axis.</summary>
         public Vector3d? Axis { get; init; }
         /// <summary>Polar: total angle in radians (default 2π).</summary>
         public double? TotalAngle { get; init; }
-        
+
         /// <summary>Linear: direction vector.</summary>
         public Vector3d? Direction { get; init; }
         /// <summary>Linear/Path: spacing between instances.</summary>
         public double Spacing { get; init; }
-        
+
         /// <summary>Path: curve to follow.</summary>
         public Curve? PathCurve { get; init; }
         /// <summary>Path: orient geometry to curve frames.</summary>
@@ -210,11 +211,11 @@ public static class Transform {
             .Bind(xform => UnifiedOperation.Apply(
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                    TransformCore.ApplyTransform(item: item, transform: xform, context: context)),
+                    TransformCore.ApplyTransform(item: item, transform: xform)),
                 config: new OperationConfig<T, T> {
                     Context = context,
                     ValidationMode = TransformConfig.GetValidationMode(typeof(T)),
-                    OperationName = $"Transform.Apply",
+                    OperationName = "Transform.Apply",
                     EnableDiagnostics = enableDiagnostics,
                 }))
             .Map(r => r[0]);
@@ -259,7 +260,7 @@ public static class Transform {
                 orientToPath: spec.OrientToPath,
                 context: context,
                 enableDiagnostics: enableDiagnostics),
-            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Transform.InvalidArrayMode),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: global::Arsenal.Core.Errors.E.Transform.InvalidArrayMode),
         };
 
     /// <summary>Apply SpaceMorph deformation via operation-based dispatch.</summary>
@@ -267,8 +268,7 @@ public static class Transform {
     public static Result<T> Morph<T>(
         T geometry,
         MorphSpec spec,
-        IGeometryContext context,
-        bool enableDiagnostics = false) where T : GeometryBase =>
+        IGeometryContext context) where T : GeometryBase =>
         spec.Operation switch {
             1 => TransformCompute.Flow(
                 geometry: geometry,
@@ -316,7 +316,7 @@ public static class Transform {
                 radius: spec.Radius!.Value,
                 angle: spec.Angle,
                 context: context),
-            _ => ResultFactory.Create<T>(error: E.Transform.InvalidMorphOperation),
+            _ => ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidMorphOperation),
         };
 
     /// <summary>Scale geometry uniformly about anchor point.</summary>

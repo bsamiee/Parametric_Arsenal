@@ -369,13 +369,13 @@ internal static class ExtractionCompute {
             && deltas[0].Length > context.AbsoluteTolerance
             && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeLinear, SymmetryTransform: global::Rhino.Geometry.Transform.Translation(deltas[0]), Confidence: 1.0))
-            : TryDetectRadialPattern(centers: centers, context: context) is Result<(byte, Transform, double)> radialResult && radialResult.IsSuccess
+            : TryDetectRadialPattern(centers: centers, context: context) is Result<(byte, global::Rhino.Geometry.Transform, double)> radialResult && radialResult.IsSuccess
                 ? radialResult
-                : TryDetectGridPattern(centers: centers, context: context) is Result<(byte, Transform, double)> gridResult && gridResult.IsSuccess
+                : TryDetectGridPattern(centers: centers, context: context) is Result<(byte, global::Rhino.Geometry.Transform, double)> gridResult && gridResult.IsSuccess
                     ? gridResult
-                    : TryDetectScalingPattern(centers: centers, context: context) is Result<(byte, Transform, double)> scaleResult && scaleResult.IsSuccess
+                    : TryDetectScalingPattern(centers: centers, context: context) is Result<(byte, global::Rhino.Geometry.Transform, double)> scaleResult && scaleResult.IsSuccess
                         ? scaleResult
-                        : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
+                        : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform, double)>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
 
     private static Result<(byte Type, global::Rhino.Geometry.Transform SymmetryTransform, double Confidence)> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
         Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
@@ -387,7 +387,7 @@ internal static class ExtractionCompute {
             && angles.Average() is double meanAngle
             && angles.All(a => RhinoMath.EpsilonEquals(a, meanAngle, ExtractionConfig.RadialAngleVariationThreshold))
                 ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeRadial, SymmetryTransform: global::Rhino.Geometry.Transform.Rotation(meanAngle, normal, centroid), Confidence: 0.9))
-                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
+                : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform, double)>(error: E.Geometry.NoPatternDetected);
     }
 
     [Pure]
@@ -416,7 +416,7 @@ internal static class ExtractionCompute {
             && FindGridBasis(candidates: candidates, context: context) is (Vector3d u, Vector3d v, bool success) && success
             && relativeVectors.All(vec => IsGridPoint(vector: vec, u: u, v: v, context: context))
                 ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeGrid, SymmetryTransform: global::Rhino.Geometry.Transform.PlaneToPlane(Plane.WorldXY, new Plane(origin, u, v)), Confidence: 0.9))
-                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
+                : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) {
         Vector3d u = candidates.Length > 0 ? candidates[0] : Vector3d.Zero;
@@ -463,7 +463,7 @@ internal static class ExtractionCompute {
             && Enumerable.Range(0, distances.Length - 1).Select(i => distances[i] > context.AbsoluteTolerance ? distances[i + 1] / distances[i] : 0.0).Where(r => r > context.AbsoluteTolerance).ToArray() is double[] validRatios
             && validRatios.Length >= 2 && ComputeVariance(values: validRatios) is double variance && variance < ExtractionConfig.ScalingVarianceThreshold
                 ? ResultFactory.Create(value: (Type: ExtractionConfig.PatternTypeScaling, SymmetryTransform: global::Rhino.Geometry.Transform.Scale(anchor: centroid, scaleFactor: validRatios.Average()), Confidence: 0.7))
-                : ResultFactory.Create<(byte, Transform, double)>(error: E.Geometry.NoPatternDetected);
+                : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform, double)>(error: E.Geometry.NoPatternDetected);
 
     [Pure]
     private static double ComputeVariance(double[] values) =>

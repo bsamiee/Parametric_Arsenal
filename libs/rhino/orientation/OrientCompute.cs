@@ -45,7 +45,7 @@ internal static class OrientCompute {
                                     ];
 
                                     (global::Rhino.Geometry.Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
-                                        Transform xf = global::Rhino.Geometry.Transform.PlaneToPlane(plane, Plane.WorldXY);
+                                        global::Rhino.Geometry.Transform xf = global::Rhino.Geometry.Transform.PlaneToPlane(plane, Plane.WorldXY);
                                         using Brep test = (Brep)validBrep.Duplicate();
                                         return !test.Transform(xf) ? (global::Rhino.Geometry.Transform.Identity, 0.0, Array.Empty<byte>())
                                             : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
@@ -93,7 +93,7 @@ internal static class OrientCompute {
                 switch {
                     (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
                         (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
-                            ? global::Rhino.Geometry.Transform.PlaneToPlane(pa, pb) is Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
+                            ? global::Rhino.Geometry.Transform.PlaneToPlane(pa, pb) is global::Rhino.Geometry.Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                                 ? ((geometryA, geometryB) switch {
                                     (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
                                         ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
@@ -133,7 +133,7 @@ internal static class OrientCompute {
                                         return candidateAngles.Length == 0
                                             ? (byte)0
                                             : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < context.AngleToleranceRadians)
-                                                && global::Rhino.Geometry.Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
+                                                && global::Rhino.Geometry.Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is global::Rhino.Geometry.Transform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;
                                                     rotated.Transform(rotation);
