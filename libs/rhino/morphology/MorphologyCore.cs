@@ -144,7 +144,7 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh(object input, object parameters, IGeometryContext context) =>
         Execute<Mesh, (double, int, bool)>(input, parameters, context, (mesh, p, ctx) => {
             (double targetEdge, int maxIters, bool preserveFeats) = p;
-            return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, ctx).Bind(remeshed => ComputeRemeshMetrics(remeshed, targetEdge, maxIters, ctx));
+            return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, ctx).Bind(remeshed => ComputeRemeshMetrics(mesh, remeshed, targetEdge, maxIters, ctx));
         });
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -306,6 +306,7 @@ internal static class MorphologyCore {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRemeshMetrics(
+        Mesh original,
         Mesh remeshed,
         double targetEdge,
         int maxIters,
@@ -325,6 +326,6 @@ internal static class MorphologyCore {
             Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * MorphologyConfig.RemeshConvergenceThreshold));
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, maxIters, converged, 0, remeshed.Faces.Count),]);
+            value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, maxIters, converged, original.Faces.Count, remeshed.Faces.Count),]);
     }
 }
