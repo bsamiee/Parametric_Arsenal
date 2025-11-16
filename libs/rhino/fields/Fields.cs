@@ -156,23 +156,23 @@ public static class Fields {
             RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
-            (false, _) => ResultFactory.Create<double>(
-                error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points")),
-            (true, true) => FieldsCompute.InterpolateScalar(
-                query: query,
-                scalarField: scalarField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                bounds: bounds,
-                interpolationMethod: FieldsConfig.InterpolationNearest),
-            (true, false) => FieldsCompute.InterpolateScalar(
-                query: query,
-                scalarField: scalarField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                bounds: bounds,
-                interpolationMethod: interpolationMethod),
-        };
+                (false, _) => ResultFactory.Create<double>(
+                    error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points")),
+                (true, true) => FieldsCompute.InterpolateScalar(
+                    query: query,
+                    scalarField: scalarField,
+                    grid: gridPoints,
+                    resolution: spec.Resolution,
+                    bounds: bounds,
+                    interpolationMethod: FieldsConfig.InterpolationNearest),
+                (true, false) => FieldsCompute.InterpolateScalar(
+                    query: query,
+                    scalarField: scalarField,
+                    grid: gridPoints,
+                    resolution: spec.Resolution,
+                    bounds: bounds,
+                    interpolationMethod: interpolationMethod),
+            };
     }
 
     /// <summary>Interpolate vector field at query point: (field, grid, query) → vector value.</summary>
@@ -188,23 +188,23 @@ public static class Fields {
             RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
-            (false, _) => ResultFactory.Create<Vector3d>(
-                error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points")),
-            (true, true) => FieldsCompute.InterpolateVector(
-                query: query,
-                vectorField: vectorField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                bounds: bounds,
-                interpolationMethod: FieldsConfig.InterpolationNearest),
-            (true, false) => FieldsCompute.InterpolateVector(
-                query: query,
-                vectorField: vectorField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                bounds: bounds,
-                interpolationMethod: interpolationMethod),
-        };
+                (false, _) => ResultFactory.Create<Vector3d>(
+                    error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points")),
+                (true, true) => FieldsCompute.InterpolateVector(
+                    query: query,
+                    vectorField: vectorField,
+                    grid: gridPoints,
+                    resolution: spec.Resolution,
+                    bounds: bounds,
+                    interpolationMethod: FieldsConfig.InterpolationNearest),
+                (true, false) => FieldsCompute.InterpolateVector(
+                    query: query,
+                    vectorField: vectorField,
+                    grid: gridPoints,
+                    resolution: spec.Resolution,
+                    bounds: bounds,
+                    interpolationMethod: interpolationMethod),
+            };
     }
 
     /// <summary>Trace streamlines along vector field: (field, seeds) → curves[].</summary>

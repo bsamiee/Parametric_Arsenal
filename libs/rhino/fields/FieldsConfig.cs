@@ -154,7 +154,8 @@ internal static class FieldsConfig {
             int[] baseCase = table[complement];
             table[i] = baseCase.Length > 0
                 ? [.. Enumerable.Range(0, baseCase.Length / 3)
-                    .SelectMany(t => new[] { baseCase[(t * 3) + 2], baseCase[(t * 3) + 1], baseCase[t * 3], })]
+                    .SelectMany(t => new[] { baseCase[(t * 3) + 2], baseCase[(t * 3) + 1], baseCase[t * 3], }),
+                ]
                 : [];
         }
 

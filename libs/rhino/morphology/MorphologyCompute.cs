@@ -22,61 +22,54 @@ internal static class MorphologyCompute {
             (int orig, int def) when orig != def => ResultFactory.Create<GeometryBase>(
                 error: E.Geometry.Morphology.CageControlPointMismatch.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Original: {orig}, Deformed: {def}"))),
-            (< MorphologyConfig.MinCageControlPoints, _) => ResultFactory.Create<GeometryBase>(
+            ( < MorphologyConfig.MinCageControlPoints, _) => ResultFactory.Create<GeometryBase>(
                 error: E.Geometry.Morphology.InsufficientCagePoints.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))),
             _ => ((Func<Result<GeometryBase>>)(() => {
-                    BoundingBox cageBounds = new(originalControlPoints);
-                    if (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance) {
-                        return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"));
-                    }
-                    GeometryBase? deformed = geometry switch {
-                        Mesh m => m.DuplicateMesh(),
-                        Brep b => b.DuplicateBrep(),
-                        _ => null,
-                    };
-                    if (deformed is null) {
-                        return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
-                    }
-                    Point3d[] vertices = deformed switch {
-                        Mesh m => (
-                            int count = m.Vertices.Count;
-                            Point3d[] arr = new Point3d[count];
-                            for (int i = 0; i < count; i++) {
-                                arr[i] = (Point3d)m.Vertices[i];
-                            }
-                            arr
-                        ),
-                        Brep b => b.Vertices.Select(static v => v.Location).ToArray(),
-                        _ => [],
-                    };
-                    Vector3d spanVec = cageBounds.Max - cageBounds.Min;
-                    Point3d[] deformedVerts = new Point3d[vertices.Length];
-                    for (int i = 0; i < vertices.Length; i++) {
-                        Vector3d localVec = vertices[i] - cageBounds.Min;
-                        (double u, double v, double w) = (
-                            RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
-                            RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
-                            RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
-                        (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
-                        deformedVerts[i] = Point3d.Origin + (Vector3d)(
-                            (u1 * v1 * w1 * deformedControlPoints[0]) +
-                            (u * v1 * w1 * deformedControlPoints[1]) +
-                            (u1 * v * w1 * deformedControlPoints[2]) +
-                            (u * v * w1 * deformedControlPoints[3]) +
-                            (u1 * v1 * w * deformedControlPoints[4]) +
-                            (u * v1 * w * deformedControlPoints[5]) +
-                            (u1 * v * w * deformedControlPoints[6]) +
-                            (u * v * w * deformedControlPoints[7]));
-                    }
-                    return (deformed switch {
-                        Mesh meshDeformed => ApplyMeshDeformation(meshDeformed, deformedVerts),
-                        Brep brepDeformed => ApplyBrepDeformation(brepDeformed, deformedVerts),
-                        _ => false,
-                    })
-                        ? ResultFactory.Create(value: deformed)
-                        : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
-                }))(),
+                BoundingBox cageBounds = new(originalControlPoints);
+                if (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance) {
+                    return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"));
+                }
+                GeometryBase? deformed = geometry switch {
+                    Mesh m => m.DuplicateMesh(),
+                    Brep b => b.DuplicateBrep(),
+                    _ => null,
+                };
+                if (deformed is null) {
+                    return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
+                }
+                Point3d[] vertices = deformed switch {
+                    Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
+                    Brep b => [.. b.Vertices.Select(static v => v.Location),],
+                    _ => [],
+                };
+                Vector3d spanVec = cageBounds.Max - cageBounds.Min;
+                Point3d[] deformedVerts = new Point3d[vertices.Length];
+                for (int i = 0; i < vertices.Length; i++) {
+                    Vector3d localVec = vertices[i] - cageBounds.Min;
+                    (double u, double v, double w) = (
+                        RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
+                        RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
+                        RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
+                    (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
+                    deformedVerts[i] = Point3d.Origin + (
+                        (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
+                        (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
+                        (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
+                        (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
+                        (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
+                        (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
+                        (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
+                        (u * v * w * (deformedControlPoints[7] - Point3d.Origin)));
+                }
+                return (deformed switch {
+                    Mesh meshDeformed => ApplyMeshDeformation(meshDeformed, deformedVerts),
+                    Brep brepDeformed => ApplyBrepDeformation(brepDeformed, deformedVerts),
+                    _ => false,
+                })
+                    ? ResultFactory.Create(value: deformed)
+                    : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
+            }))(),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -122,7 +115,7 @@ internal static class MorphologyCompute {
                             ? (level is 0
                                 ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")))
                                 : result)
-                            : ResultFactory.Create(value: next!);
+                            : ResultFactory.Create(value: next);
                     }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -320,7 +313,7 @@ internal static class MorphologyCompute {
                         iterPerformed++;
 
                         double rmsDisp = iter > 0
-                            ? (() => {
+                            ? ((Func<double>)(() => {
                                 double sumSq = 0.0;
                                 int count = smoothed.Vertices.Count;
                                 for (int i = 0; i < count; i++) {
@@ -328,7 +321,7 @@ internal static class MorphologyCompute {
                                     sumSq += dist * dist;
                                 }
                                 return Math.Sqrt(sumSq / count);
-                            })()
+                            }))()
                             : double.MaxValue;
                         converged = rmsDisp < threshold;
 
@@ -361,11 +354,11 @@ internal static class MorphologyCompute {
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}"))),
             _ => ((Func<Result<Mesh>>)(() => {
-                    Mesh? offset = mesh.Offset(distance);
-                    return offset?.IsValid is true
-                        ? ResultFactory.Create(value: offset)
-                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
-                }))(),
+                Mesh? offset = mesh.Offset(distance);
+                return offset?.IsValid is true
+                    ? ResultFactory.Create(value: offset)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
+            }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -376,7 +369,7 @@ internal static class MorphologyCompute {
         double accuracy,
         IGeometryContext __) =>
         (targetFaceCount, accuracy) switch {
-            (< MorphologyConfig.MinReductionFaceCount, _) =>
+            ( < MorphologyConfig.MinReductionFaceCount, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}"))),
             (int target, _) when target >= mesh.Faces.Count =>
@@ -386,20 +379,20 @@ internal static class MorphologyCompute {
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Accuracy: {acc:F3}"))),
             _ => ((Func<Result<Mesh>>)(() => {
-                        Mesh reduced = mesh.DuplicateMesh();
-                        bool success = reduced.Reduce(
-                            desiredPolygonCount: targetFaceCount,
-                            allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
-                            accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * MorphologyConfig.ReductionAccuracyScale),
-                            normalizeSize: false,
-                            cancelToken: CancellationToken.None,
-                            progress: null,
-                            problemDescription: out string _,
-                            threaded: false);
-                        return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * MorphologyConfig.ReductionTargetTolerance
-                            ? ResultFactory.Create(value: reduced)
-                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
-                    }))(),
+                Mesh reduced = mesh.DuplicateMesh();
+                bool success = reduced.Reduce(
+                    desiredPolygonCount: targetFaceCount,
+                    allowDistortion: accuracy < MorphologyConfig.DefaultReductionAccuracy,
+                    accuracy: (int)(RhinoMath.Clamp(accuracy, MorphologyConfig.MinReductionAccuracy, MorphologyConfig.MaxReductionAccuracy) * MorphologyConfig.ReductionAccuracyScale),
+                    normalizeSize: false,
+                    cancelToken: CancellationToken.None,
+                    progress: null,
+                    problemDescription: out string _,
+                    threaded: false);
+                return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * MorphologyConfig.ReductionTargetTolerance
+                    ? ResultFactory.Create(value: reduced)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
+            }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
