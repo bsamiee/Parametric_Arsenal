@@ -117,21 +117,15 @@ internal static class MorphologyCompute {
                             : ResultFactory.Create(value: next);
                     }));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SubdivideTriangleFaces(Mesh subdivided, int a, int b, int c, int[] midIndices) {
-        _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
-        _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
-        _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
-        _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
-    }
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideLoop(Mesh mesh) {
         if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
 
-        Mesh subdivided = new();
-        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
-        Point3d[] newVerts = new Point3d[originalVerts.Length];
+        int vertCount = mesh.Vertices.Count;
+        Point3d[] originalVerts = new Point3d[vertCount];
+        for (int i = 0; i < vertCount; i++) {
+            originalVerts[i] = mesh.Vertices[i];
+        }
 
         Point3d[] newVerts = new Point3d[vertCount];
         for (int i = 0; i < vertCount; i++) {
@@ -173,7 +167,10 @@ internal static class MorphologyCompute {
                     midIndices[e] = newMidIdx;
                 }
             }
-            SubdivideTriangleFaces(subdivided, a, b, c, midIndices);
+            _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
+            _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
+            _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
+            _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
         }
 
         _ = subdivided.Normals.ComputeNormals();
@@ -185,9 +182,14 @@ internal static class MorphologyCompute {
     private static Mesh? SubdivideButterfly(Mesh mesh) {
         if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
 
+        int vertCount = mesh.Vertices.Count;
+        Point3d[] originalVerts = new Point3d[vertCount];
+        for (int i = 0; i < vertCount; i++) {
+            originalVerts[i] = mesh.Vertices[i];
+        }
+
         Mesh subdivided = new();
-        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
-        for (int i = 0; i < originalVerts.Length; i++) {
+        for (int i = 0; i < vertCount; i++) {
             _ = subdivided.Vertices.Add(originalVerts[i]);
         }
 
@@ -211,10 +213,21 @@ internal static class MorphologyCompute {
                     Point3d midpoint = opposite1 < 0 || opposite2 < 0
                         ? mid
                         : ((Func<Point3d>)(() => {
-                            int[] wings = [.. v1Neighbors.Where(n => n != default && n != v2 && n != opposite1 && n != opposite2).Take(2), .. v2Neighbors.Where(n => n != default && n != v1 && n != opposite1 && n != opposite2).Take(2),];
+                            int[] wings = new int[4];
+                            int wingCount = 0;
+                            for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
+                                if (v1Neighbors[i] != default && v1Neighbors[i] != v2 && v1Neighbors[i] != opposite1 && v1Neighbors[i] != opposite2) {
+                                    wings[wingCount++] = v1Neighbors[i];
+                                }
+                            }
+                            for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
+                                if (v2Neighbors[i] != default && v2Neighbors[i] != v1 && v2Neighbors[i] != opposite1 && v2Neighbors[i] != opposite2) {
+                                    wings[wingCount++] = v2Neighbors[i];
+                                }
+                            }
                             Vector3d adjusted = (mid - Point3d.Origin) + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
                             Vector3d wingAdj = Vector3d.Zero;
-                            for (int w = 0; w < wings.Length; w++) {
+                            for (int w = 0; w < wingCount; w++) {
                                 wingAdj -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
                             }
                             return Point3d.Origin + adjusted + wingAdj;
@@ -225,7 +238,10 @@ internal static class MorphologyCompute {
                     midIndices[e] = newMidIdx;
                 }
             }
-            SubdivideTriangleFaces(subdivided, a, b, c, midIndices);
+            _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
+            _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
+            _ = subdivided.Faces.AddFace(midIndices[2], midIndices[1], c);
+            _ = subdivided.Faces.AddFace(midIndices[0], midIndices[1], midIndices[2]);
         }
 
         _ = subdivided.Normals.ComputeNormals();

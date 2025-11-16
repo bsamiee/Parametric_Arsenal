@@ -25,15 +25,7 @@ internal static class MorphologyConfig {
         }.ToFrozenDictionary();
 
     [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
-    [Pure] internal static string OperationName(byte op) => Operations.TryGetValue((op, typeof(Mesh)), out (V _, string n) meta) ? meta.n : Operations.TryGetValue((op, typeof(Brep)), out meta) ? meta.n : $"Op{op}";
-
-    /// <summary>Smoothing update strategies: (op) → (lockBoundary, lambda, mu, useCotangent).</summary>
-    internal static readonly FrozenDictionary<byte, (bool Lock, double Lambda, double Mu, bool Cotangent)> SmoothingStrategy =
-        new Dictionary<byte, (bool, double, double, bool)> {
-            [10] = (true, 1.0, 0.0, true),
-            [11] = (false, TaubinLambda, TaubinMu, false),
-            [20] = (false, 0.0, 0.0, false),
-        }.ToFrozenDictionary();
+    [Pure] internal static string OperationName(byte op) => Operations.FirstOrDefault(kv => kv.Key.Op == op).Value.Name ?? $"Op{op}";
 
     /// <summary>Operation ID constants.</summary>
     internal const byte OpCageDeform = 1;
