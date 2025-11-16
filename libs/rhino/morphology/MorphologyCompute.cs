@@ -434,24 +434,13 @@ internal static class MorphologyCompute {
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
-        ((Func<Result<Mesh>>)(() => {
-            double[] aspectRatios = new double[mesh.Faces.Count];
-            double[] minAngles = new double[mesh.Faces.Count];
-            for (int i = 0; i < mesh.Faces.Count; i++) {
-                (Point3d a, Point3d b, Point3d c) = (mesh.Vertices[mesh.Faces[i].A], mesh.Vertices[mesh.Faces[i].B], mesh.Vertices[mesh.Faces[i].C]);
-                (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
-                (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
-                aspectRatios[i] = minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
-                (Vector3d vAB, Vector3d vCA, Vector3d vBC) = (b - a, a - c, c - b);
-                (double angleA, double angleB, double angleC) = (Vector3d.VectorAngle(vAB, -vCA), Vector3d.VectorAngle(vBC, -vAB), Vector3d.VectorAngle(vCA, -vBC));
-                minAngles[i] = Math.Min(Math.Min(angleA, angleB), angleC);
-            }
-            (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
-            return maxAspect > MorphologyConfig.AspectRatioThreshold
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
-                : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
-                    : ResultFactory.Create(value: mesh);
-        }))();
+    internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
+        (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
+        (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
+        return maxAspect > MorphologyConfig.AspectRatioThreshold
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
+            : minAngle < MorphologyConfig.MinAngleRadiansThreshold
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
+                : ResultFactory.Create(value: mesh);
+    }
 }

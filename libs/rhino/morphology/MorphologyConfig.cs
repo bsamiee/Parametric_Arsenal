@@ -50,6 +50,20 @@ internal static class MorphologyConfig {
     internal const byte OpRemesh = 14;
     internal const byte OpEvolveMeanCurvature = 20;
 
+    /// <summary>Subdivision algorithms requiring triangulated meshes.</summary>
+    internal static readonly FrozenSet<byte> TriangulatedSubdivisionOps = new HashSet<byte> {
+        OpSubdivideLoop,
+        OpSubdivideButterfly,
+    }.ToFrozenSet();
+
+    /// <summary>Smoothing operations default parameters: (lockBoundary).</summary>
+    internal static readonly FrozenDictionary<byte, bool> SmoothingDefaults =
+        new Dictionary<byte, bool> {
+            [OpSmoothLaplacian] = true,
+            [OpSmoothTaubin] = false,
+            [OpEvolveMeanCurvature] = false,
+        }.ToFrozenDictionary();
+
     /// <summary>Cage deformation configuration.</summary>
     internal const int MinCageControlPoints = 8;
 

@@ -60,39 +60,37 @@ internal static class MorphologyCore {
         object input,
         object parameters,
         IGeometryContext context) =>
-        input is not Mesh mesh
-            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
-            : parameters is not int levels
-                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: int levels"))
-                : MorphologyCompute.SubdivideIterative(mesh, MorphologyConfig.OpSubdivideCatmullClark, levels, context)
-                    .Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, context));
+        ExecuteSubdivision(input, parameters, MorphologyConfig.OpSubdivideCatmullClark, context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideLoop(
         object input,
         object parameters,
         IGeometryContext context) =>
-        input is not Mesh mesh
-            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
-            : parameters is not int levels
-                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: int levels"))
-                : !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
-                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.LoopRequiresTriangles.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
-                    : MorphologyCompute.SubdivideIterative(mesh, MorphologyConfig.OpSubdivideLoop, levels, context)
-                        .Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, context));
+        ExecuteSubdivision(input, parameters, MorphologyConfig.OpSubdivideLoop, context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideButterfly(
         object input,
         object parameters,
         IGeometryContext context) =>
+        ExecuteSubdivision(input, parameters, MorphologyConfig.OpSubdivideButterfly, context);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision(
+        object input,
+        object parameters,
+        byte algorithm,
+        IGeometryContext context) =>
         input is not Mesh mesh
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext("Expected: Mesh"))
             : parameters is not int levels
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Expected: int levels"))
-                : !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
-                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
-                    : MorphologyCompute.SubdivideIterative(mesh, MorphologyConfig.OpSubdivideButterfly, levels, context)
+                : MorphologyConfig.TriangulatedSubdivisionOps.Contains(algorithm) && !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
+                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                        error: (algorithm == MorphologyConfig.OpSubdivideLoop ? E.Geometry.Morphology.LoopRequiresTriangles : E.Geometry.Morphology.ButterflyRequiresTriangles)
+                            .WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
+                    : MorphologyCompute.SubdivideIterative(mesh, algorithm, levels, context)
                         .Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, context));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -128,12 +126,7 @@ internal static class MorphologyCore {
                         mesh,
                         iterations,
                         lockBoundary: false,
-                        (m, pos, _) => {
-                            Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
-                            Point3d[] blended1 = [.. Enumerable.Range(0, pos.Length).Select(i => pos[i] + (lambda * (step1[i] - pos[i]))),];
-                            Point3d[] step2 = LaplacianUpdate(m, blended1, useCotangent: false);
-                            return [.. Enumerable.Range(0, pos.Length).Select(i => blended1[i] + (mu * (step2[i] - blended1[i]))),];
-                        },
+                        (m, pos, _) => TaubinUpdate(m, pos, lambda, mu),
                         context)
                         .Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, iterations, context));
 
@@ -191,6 +184,21 @@ internal static class MorphologyCore {
                     .Bind(remeshed => ComputeRemeshMetrics(remeshed, targetEdge, maxIters, context));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Point3d[] TaubinUpdate(Mesh mesh, Point3d[] positions, double lambda, double mu) {
+        Point3d[] step1 = LaplacianUpdate(mesh, positions, useCotangent: false);
+        Point3d[] blended1 = new Point3d[positions.Length];
+        for (int i = 0; i < positions.Length; i++) {
+            blended1[i] = positions[i] + (lambda * (step1[i] - positions[i]));
+        }
+        Point3d[] step2 = LaplacianUpdate(mesh, blended1, useCotangent: false);
+        Point3d[] result = new Point3d[positions.Length];
+        for (int i = 0; i < positions.Length; i++) {
+            result[i] = blended1[i] + (mu * (step2[i] - blended1[i]));
+        }
+        return result;
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
 
@@ -241,41 +249,38 @@ internal static class MorphologyCore {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static (double[] EdgeLengths, double[] AspectRatios, double[] MinAngles) ComputeMeshMetrics(Mesh mesh, IGeometryContext context) {
+        int faceCount = mesh.Faces.Count;
+        int edgeCount = mesh.TopologyEdges.Count;
+        double[] edges = new double[edgeCount];
+        double[] aspects = new double[faceCount];
+        double[] angles = new double[faceCount];
+
+        for (int i = 0; i < edgeCount; i++) {
+            edges[i] = mesh.TopologyEdges.EdgeLine(i).Length;
+        }
+
+        for (int i = 0; i < faceCount; i++) {
+            (Point3d a, Point3d b, Point3d c) = (mesh.Vertices[mesh.Faces[i].A], mesh.Vertices[mesh.Faces[i].B], mesh.Vertices[mesh.Faces[i].C]);
+            (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
+            (double maxE, double minE) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
+            aspects[i] = minE > context.AbsoluteTolerance ? maxE / minE : double.MaxValue;
+            (Vector3d vAB, Vector3d vBC, Vector3d vCA) = (b - a, c - b, a - c);
+            angles[i] = Math.Min(Math.Min(
+                Vector3d.VectorAngle(vAB, -vCA),
+                Vector3d.VectorAngle(vBC, -vAB)),
+                Vector3d.VectorAngle(vCA, -vBC));
+        }
+
+        return (edges, aspects, angles);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSubdivisionMetrics(
         Mesh original,
         Mesh subdivided,
         IGeometryContext context) {
-        double[] edgeLengths = [.. Enumerable.Range(0, subdivided.TopologyEdges.Count)
-            .Select(i => subdivided.TopologyEdges.EdgeLine(i).Length),
-        ];
-
-        double[] aspectRatios = [.. Enumerable.Range(0, subdivided.Faces.Count)
-            .Select(i => {
-                Point3d a = subdivided.Vertices[subdivided.Faces[i].A];
-                Point3d b = subdivided.Vertices[subdivided.Faces[i].B];
-                Point3d c = subdivided.Vertices[subdivided.Faces[i].C];
-                double ab = a.DistanceTo(b);
-                double bc = b.DistanceTo(c);
-                double ca = c.DistanceTo(a);
-                double maxEdge = Math.Max(Math.Max(ab, bc), ca);
-                double minEdge = Math.Min(Math.Min(ab, bc), ca);
-                return minEdge > context.AbsoluteTolerance ? (maxEdge / minEdge) : double.MaxValue;
-            }),
-        ];
-
-        double[] triangleAngles = [.. Enumerable.Range(0, subdivided.Faces.Count)
-            .SelectMany(i => {
-                Point3d a = subdivided.Vertices[subdivided.Faces[i].A];
-                Point3d b = subdivided.Vertices[subdivided.Faces[i].B];
-                Point3d c = subdivided.Vertices[subdivided.Faces[i].C];
-                return new[] {
-                    Vector3d.VectorAngle(b - a, c - a),
-                    Vector3d.VectorAngle(a - b, c - b),
-                    Vector3d.VectorAngle(a - c, b - c),
-                };
-            }),
-        ];
-
+        (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [
                 new Morphology.SubdivisionResult(
@@ -286,7 +291,7 @@ internal static class MorphologyCore {
                     edgeLengths.Max(),
                     edgeLengths.Average(),
                     aspectRatios.Average(),
-                    triangleAngles.Min()),
+                    minAngles.Min()),
             ]);
     }
 
@@ -332,24 +337,19 @@ internal static class MorphologyCore {
         Mesh original,
         Mesh reduced,
         IGeometryContext context) {
+        (double[] edgeLengths, double[] aspectRatios, double[] _) = ComputeMeshMetrics(reduced, context);
         double reductionRatio = original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0;
-        double[] aspectRatios = [.. Enumerable.Range(0, reduced.Faces.Count)
-            .Select(i => {
-                (Point3d a, Point3d b, Point3d c) = (reduced.Vertices[reduced.Faces[i].A], reduced.Vertices[reduced.Faces[i].B], reduced.Vertices[reduced.Faces[i].C]);
-                (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
-                (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
-                return minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue;
-            }),
-        ];
-        double[] edgeLengths = [.. Enumerable.Range(0, reduced.TopologyEdges.Count).Select(i => reduced.TopologyEdges.EdgeLine(i).Length),];
         double quality = MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0;
-        double meanAspect = aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0;
-        (double minEdge, double maxEdge) = edgeLengths.Length > 0
-            ? (edgeLengths.Min(), edgeLengths.Max())
-            : (0.0, 0.0);
-
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.ReductionResult(reduced, original.Faces.Count, reduced.Faces.Count, reductionRatio, quality, meanAspect, minEdge, maxEdge),]);
+            value: [new Morphology.ReductionResult(
+                reduced,
+                original.Faces.Count,
+                reduced.Faces.Count,
+                reductionRatio,
+                quality,
+                aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),]);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
