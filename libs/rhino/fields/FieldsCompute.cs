@@ -341,12 +341,12 @@ internal static class FieldsCompute {
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) {
-        Result<Vector3d> trilinear = InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds);
-        return trilinear.Match(
+    private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) =>
+    InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds)
+        .OnError(_ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints))
+        .Match(
             onSuccess: value => value,
-            onFailure: _ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints).Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero));
-    }
+            onFailure: _ => Vector3d.Zero);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
