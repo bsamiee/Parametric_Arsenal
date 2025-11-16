@@ -18,73 +18,72 @@ internal static class MorphologyCompute {
         Point3d[] originalControlPoints,
         Point3d[] deformedControlPoints,
         IGeometryContext __) =>
-        (originalControlPoints.Length, deformedControlPoints.Length) switch {
-            (int orig, int def) when orig != def => ResultFactory.Create<GeometryBase>(
-                error: E.Geometry.Morphology.CageControlPointMismatch.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Original: {orig}, Deformed: {def}"))),
-            ( < MorphologyConfig.MinCageControlPoints, _) => ResultFactory.Create<GeometryBase>(
-                error: E.Geometry.Morphology.InsufficientCagePoints.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))),
-            _ => ((Func<Result<GeometryBase>>)(() => {
-                BoundingBox cageBounds = new(originalControlPoints);
-                if (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance) {
-                    return ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"));
-                }
-                GeometryBase? deformed = geometry switch {
-                    Mesh m => m.DuplicateMesh(),
-                    Brep b => b.DuplicateBrep(),
-                    _ => null,
-                };
-                if (deformed is null) {
-                    return ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geometry.GetType().Name}")));
-                }
-                Point3d[] vertices = deformed switch {
-                    Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
-                    Brep b => [.. b.Vertices.Select(static v => v.Location),],
-                    _ => [],
-                };
-                Vector3d spanVec = cageBounds.Max - cageBounds.Min;
-                Point3d[] deformedVerts = new Point3d[vertices.Length];
-                for (int i = 0; i < vertices.Length; i++) {
-                    Vector3d localVec = vertices[i] - cageBounds.Min;
-                    (double u, double v, double w) = (
-                        RhinoMath.Clamp(spanVec.X > RhinoMath.ZeroTolerance ? localVec.X / spanVec.X : 0.0, 0.0, 1.0),
-                        RhinoMath.Clamp(spanVec.Y > RhinoMath.ZeroTolerance ? localVec.Y / spanVec.Y : 0.0, 0.0, 1.0),
-                        RhinoMath.Clamp(spanVec.Z > RhinoMath.ZeroTolerance ? localVec.Z / spanVec.Z : 0.0, 0.0, 1.0));
-                    (double u1, double v1, double w1) = (1.0 - u, 1.0 - v, 1.0 - w);
-                    deformedVerts[i] = Point3d.Origin + (
-                        (u1 * v1 * w1 * (deformedControlPoints[0] - Point3d.Origin)) +
-                        (u * v1 * w1 * (deformedControlPoints[1] - Point3d.Origin)) +
-                        (u1 * v * w1 * (deformedControlPoints[2] - Point3d.Origin)) +
-                        (u * v * w1 * (deformedControlPoints[3] - Point3d.Origin)) +
-                        (u1 * v1 * w * (deformedControlPoints[4] - Point3d.Origin)) +
-                        (u * v1 * w * (deformedControlPoints[5] - Point3d.Origin)) +
-                        (u1 * v * w * (deformedControlPoints[6] - Point3d.Origin)) +
-                        (u * v * w * (deformedControlPoints[7] - Point3d.Origin)));
-                }
-                return (deformed switch {
-                    Mesh meshDeformed => ApplyMeshDeformation(meshDeformed, deformedVerts),
-                    Brep brepDeformed => ApplyBrepDeformation(brepDeformed, deformedVerts),
-                    _ => false,
-                })
-                    ? ResultFactory.Create(value: deformed)
-                    : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
-            }))(),
-        };
+        originalControlPoints.Length != deformedControlPoints.Length
+            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}"))
+            : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
+                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))
+                : ((Func<Result<GeometryBase>>)(() => {
+                    BoundingBox cageBounds = new(originalControlPoints);
+                    return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
+                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
+                        : geometry switch {
+                            Mesh m => (GeometryBase?)m.DuplicateMesh(),
+                            Brep b => (GeometryBase?)b.DuplicateBrep(),
+                            _ => null,
+                        } is not GeometryBase deformed
+                            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext($"Type: {geometry.GetType().Name}"))
+                            : ApplyCageDeformation(deformed, cageBounds, deformedControlPoints)
+                                ? ResultFactory.Create(value: deformed)
+                                : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
+                }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ApplyMeshDeformation(Mesh mesh, Point3d[] deformedVerts) {
-        for (int i = 0; i < deformedVerts.Length; i++) {
-            mesh.Vertices[i] = new Point3f((float)deformedVerts[i].X, (float)deformedVerts[i].Y, (float)deformedVerts[i].Z);
+    private static bool ApplyCageDeformation(GeometryBase geometry, BoundingBox cageBounds, Point3d[] deformedControlPoints) {
+        Point3d[] vertices = geometry switch {
+            Mesh m => [.. Enumerable.Range(0, m.Vertices.Count).Select(i => (Point3d)m.Vertices[i]),],
+            Brep b => [.. b.Vertices.Select(static v => v.Location),],
+            _ => [],
+        };
+        Vector3d span = cageBounds.Max - cageBounds.Min;
+        Point3d[] deformedVerts = [.. vertices.Select(vertex => {
+            Vector3d local = vertex - cageBounds.Min;
+            double u = RhinoMath.Clamp(span.X > RhinoMath.ZeroTolerance ? local.X / span.X : 0.0, 0.0, 1.0);
+            double v = RhinoMath.Clamp(span.Y > RhinoMath.ZeroTolerance ? local.Y / span.Y : 0.0, 0.0, 1.0);
+            double w = RhinoMath.Clamp(span.Z > RhinoMath.ZeroTolerance ? local.Z / span.Z : 0.0, 0.0, 1.0);
+            return Point3d.Origin + TrilinearInterpolate(deformedControlPoints, u, v, w);
+        }),
+        ];
+        return geometry switch {
+            Mesh mesh => ApplyVertsToMesh(mesh, deformedVerts),
+            Brep brep => ApplyVertsToBrep(brep, deformedVerts),
+            _ => false,
+        };
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d TrilinearInterpolate(Point3d[] pts, double u, double v, double w) =>
+        ((1 - u) * (1 - v) * (1 - w) * (pts[0] - Point3d.Origin)) +
+        (u * (1 - v) * (1 - w) * (pts[1] - Point3d.Origin)) +
+        ((1 - u) * v * (1 - w) * (pts[2] - Point3d.Origin)) +
+        (u * v * (1 - w) * (pts[3] - Point3d.Origin)) +
+        ((1 - u) * (1 - v) * w * (pts[4] - Point3d.Origin)) +
+        (u * (1 - v) * w * (pts[5] - Point3d.Origin)) +
+        ((1 - u) * v * w * (pts[6] - Point3d.Origin)) +
+        (u * v * w * (pts[7] - Point3d.Origin));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ApplyVertsToMesh(Mesh mesh, Point3d[] verts) {
+        for (int i = 0; i < verts.Length; i++) {
+            mesh.Vertices[i] = new Point3f((float)verts[i].X, (float)verts[i].Y, (float)verts[i].Z);
         }
         return mesh.Normals.ComputeNormals() && mesh.Compact();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ApplyBrepDeformation(Brep brep, Point3d[] deformedVerts) {
-        for (int i = 0; i < Math.Min(deformedVerts.Length, brep.Vertices.Count); i++) {
-            brep.Vertices[i].Location = deformedVerts[i];
-        }
+    private static bool ApplyVertsToBrep(Brep brep, Point3d[] verts) {
+        int count = Math.Min(verts.Length, brep.Vertices.Count);
+        for (int i = 0; i < count; i++) { brep.Vertices[i].Location = verts[i]; }
+
         return brep.IsValid;
     }
 
@@ -120,17 +119,11 @@ internal static class MorphologyCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideLoop(Mesh mesh) {
-        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) {
-            return null;
-        }
+        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
 
         Mesh subdivided = new();
-        int vertCount = mesh.Vertices.Count;
-        Point3d[] originalVerts = new Point3d[vertCount];
-        for (int i = 0; i < vertCount; i++) {
-            originalVerts[i] = mesh.Vertices[i];
-        }
-        Point3d[] newVerts = new Point3d[vertCount];
+        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
+        Point3d[] newVerts = new Point3d[originalVerts.Length];
 
         for (int i = 0; i < originalVerts.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
@@ -195,18 +188,11 @@ internal static class MorphologyCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideButterfly(Mesh mesh) {
-        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) {
-            return null;
-        }
+        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
 
         Mesh subdivided = new();
-        int vertCount = mesh.Vertices.Count;
-        Point3d[] originalVerts = new Point3d[vertCount];
-        for (int i = 0; i < vertCount; i++) {
-            originalVerts[i] = mesh.Vertices[i];
-        }
-
-        for (int i = 0; i < vertCount; i++) {
+        Point3d[] originalVerts = [.. Enumerable.Range(0, mesh.Vertices.Count).Select(i => (Point3d)mesh.Vertices[i]),];
+        for (int i = 0; i < originalVerts.Length; i++) {
             _ = subdivided.Vertices.Add(originalVerts[i]);
         }
 
@@ -269,11 +255,12 @@ internal static class MorphologyCompute {
             (-1, -1),
             (state, fi) => {
                 int[] faceVerts = [mesh.Faces[fi].A, mesh.Faces[fi].B, mesh.Faces[fi].C,];
-                (bool hasV1, bool hasV2) = (Array.IndexOf(faceVerts, v1) >= 0, Array.IndexOf(faceVerts, v2) >= 0);
-                int opp = hasV1 && hasV2 ? faceVerts.First(v => v != v1 && v != v2) : -1;
-                return (
-                    opp >= 0 && state.Item1 < 0 ? opp : state.Item1,
-                    opp >= 0 && state.Item1 >= 0 && opp != state.Item1 ? opp : state.Item2);
+                return Array.IndexOf(faceVerts, v1) >= 0 && Array.IndexOf(faceVerts, v2) >= 0
+                    ? (faceVerts.First(v => v != v1 && v != v2) is int opp
+                        ? (state.Item1 < 0 ? opp : state.Item1,
+                           state.Item1 >= 0 && opp != state.Item1 ? opp : state.Item2)
+                        : state)
+                    : state;
             });
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
