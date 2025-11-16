@@ -23,7 +23,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         baseCurve.IsValid && targetCurve.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                FlowSpaceMorph morph = new() {
+                using FlowSpaceMorph morph = new() {
                     BaseCurve = baseCurve,
                     TargetCurve = targetCurve,
                     PreserveStructure = preserveStructure,
@@ -44,7 +44,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         axis.IsValid && Math.Abs(angleRadians) <= TransformConfig.MaxTwistAngle && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                TwistSpaceMorph morph = new() {
+                using TwistSpaceMorph morph = new() {
                     TwistAxis = axis,
                     TwistAngleRadians = angleRadians,
                     InfiniteTwist = infinite,
@@ -54,7 +54,7 @@ internal static class TransformCompute {
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Transform.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Bend geometry along spine using BendSpaceMorph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -65,7 +65,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         spine.IsValid && Math.Abs(angle) <= TransformConfig.MaxBendAngle && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                BendSpaceMorph morph = new() {
+                using BendSpaceMorph morph = new() {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
@@ -75,7 +75,7 @@ internal static class TransformCompute {
                 morph.Symmetric = false;
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Transform.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -90,7 +90,7 @@ internal static class TransformCompute {
         && endWidth >= TransformConfig.MinScaleFactor
         && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                TaperSpaceMorph morph = new() {
+                using TaperSpaceMorph morph = new() {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
@@ -100,7 +100,7 @@ internal static class TransformCompute {
                 morph.SetTaperLine(axis.From, axis.To);
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth:F6}, End: {endWidth:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Transform.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Stretch geometry along axis using StretchSpaceMorph.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -110,7 +110,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         axis.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                StretchSpaceMorph morph = new() {
+                using StretchSpaceMorph morph = new() {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
@@ -129,7 +129,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         basePlane.IsValid && targetSurface.IsValid && targetPoint.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                SplopSpaceMorph morph = new() {
+                using SplopSpaceMorph morph = new() {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
@@ -156,7 +156,7 @@ internal static class TransformCompute {
         IGeometryContext context) where T : GeometryBase =>
         sourceSurface.IsValid && targetSurface.IsValid && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                SporphSpaceMorph morph = new() {
+                using SporphSpaceMorph morph = new() {
                     PreserveStructure = preserveStructure,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
@@ -173,18 +173,17 @@ internal static class TransformCompute {
         Point3d center,
         Line axis,
         double radius,
-        double angle,
         IGeometryContext context) where T : GeometryBase =>
         center.IsValid && axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                MaelstromSpaceMorph morph = new() {
+                using MaelstromSpaceMorph morph = new() {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius:F6}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional frame orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -223,7 +222,7 @@ internal static class TransformCompute {
                     }).Map(results => (IReadOnlyList<T>)[.. results.SelectMany(static r => r),]);
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
+                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Apply SpaceMorph to geometry with duplication and validation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
