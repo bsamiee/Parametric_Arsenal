@@ -7,6 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Transform;
 
@@ -18,7 +19,7 @@ public static class Transform {
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct TransformSpec {
         /// <summary>Direct transform matrix application.</summary>
-        public global::Rhino.Geometry.Transform? Matrix { get; init; }
+        public RhinoTransform? Matrix { get; init; }
         /// <summary>Uniform scale: (anchor, factor).</summary>
         public (Point3d Anchor, double Factor)? UniformScale { get; init; }
         /// <summary>Non-uniform scale: (plane, xScale, yScale, zScale).</summary>
@@ -42,7 +43,7 @@ public static class Transform {
 
         /// <summary>Create matrix transform specification.</summary>
         [Pure]
-        public static TransformSpec FromMatrix(global::Rhino.Geometry.Transform xform) => new() { Matrix = xform };
+        public static TransformSpec FromMatrix(RhinoTransform xform) => new() { Matrix = xform };
         /// <summary>Create uniform scale specification.</summary>
         [Pure]
         public static TransformSpec FromScale(Point3d anchor, double factor) => new() { UniformScale = (anchor, factor) };
@@ -311,7 +312,7 @@ public static class Transform {
             8 => TransformCompute.Maelstrom(
                 geometry: geometry,
                 center: spec.Center!.Value,
-                axis: spec.Axis!.Value,
+                axis: spec.Axis!.Value.Direction,
                 radius: spec.Radius!.Value,
                 angle: spec.Angle,
                 context: context),

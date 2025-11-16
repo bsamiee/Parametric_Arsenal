@@ -7,6 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Transform;
 
@@ -14,83 +15,83 @@ namespace Arsenal.Rhino.Transform;
 internal static class TransformCore {
     /// <summary>Build transform matrix from specification via pattern matching dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<global::Rhino.Geometry.Transform> BuildTransform(
+    internal static Result<RhinoTransform> BuildTransform(
         Transform.TransformSpec spec,
         IGeometryContext context) =>
         spec switch {
-            { Matrix: global::Rhino.Geometry.Transform m } =>
+            { Matrix: RhinoTransform m } =>
                 ValidateTransform(transform: m, context: context),
 
             { UniformScale: (Point3d anchor, double factor) } =>
                 factor is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Scale(anchor, factor))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Factor: {factor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
+                    ? ResultFactory.Create(value: RhinoTransform.Scale(anchor, factor))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidScaleFactor.WithContext($"Factor: {factor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { NonUniformScale: (Plane plane, double x, double y, double z) } =>
                 plane.IsValid
                 && x >= TransformConfig.MinScaleFactor && x <= TransformConfig.MaxScaleFactor
                 && y >= TransformConfig.MinScaleFactor && y <= TransformConfig.MaxScaleFactor
                 && z >= TransformConfig.MinScaleFactor && z <= TransformConfig.MaxScaleFactor
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Scale(plane, x, y, z))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Plane valid: {plane.IsValid}, X: {x.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {y.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {z.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
+                    ? ResultFactory.Create(value: RhinoTransform.Scale(plane, x, y, z))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidScaleFactor.WithContext($"Plane valid: {plane.IsValid}, X: {x.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {y.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {z.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { Rotation: (double angle, Vector3d axis, Point3d center) } =>
                 axis.Length > context.AbsoluteTolerance
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(angle, axis, center))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Axis length: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
+                    ? ResultFactory.Create(value: RhinoTransform.Rotation(angle, axis, center))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidRotationAxis.WithContext($"Axis length: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { RotationVectors: (Vector3d start, Vector3d end, Point3d center) } =>
                 start.Length > context.AbsoluteTolerance && end.Length > context.AbsoluteTolerance
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(start, end, center))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Start: {start.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {end.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
+                    ? ResultFactory.Create(value: RhinoTransform.Rotation(start, end, center))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidRotationAxis.WithContext($"Start: {start.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {end.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { MirrorPlane: Plane plane } =>
                 plane.IsValid
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Mirror(plane))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidMirrorPlane),
+                    ? ResultFactory.Create(value: RhinoTransform.Mirror(plane))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidMirrorPlane),
 
             { Translation: Vector3d motion } =>
-                ResultFactory.Create(value: global::Rhino.Geometry.Transform.Translation(motion)),
+                ResultFactory.Create(value: RhinoTransform.Translation(motion)),
 
             { Shear: (Plane plane, Vector3d direction, double angle) } =>
                 plane.IsValid && direction.Length > context.AbsoluteTolerance
                 && !plane.ZAxis.IsParallelTo(direction, context.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier)
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Shear(plane, direction, angle))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidShearParameters.WithContext($"Plane: {plane.IsValid}, Direction: {direction.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
+                    ? ResultFactory.Create(value: RhinoTransform.Shear(plane, direction, angle))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidShearParameters.WithContext($"Plane: {plane.IsValid}, Direction: {direction.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { ProjectionPlane: Plane plane } =>
                 plane.IsValid
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.PlanarProjection(plane))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidProjectionPlane),
+                    ? ResultFactory.Create(value: RhinoTransform.PlanarProjection(plane))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidProjectionPlane),
 
             { ChangeBasis: (Plane from, Plane to) } =>
                 from.IsValid && to.IsValid
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.ChangeBasis(from, to))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidBasisPlanes.WithContext($"From: {from.IsValid}, To: {to.IsValid}")),
+                    ? ResultFactory.Create(value: RhinoTransform.ChangeBasis(from, to))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidBasisPlanes.WithContext($"From: {from.IsValid}, To: {to.IsValid}")),
 
             { PlaneToPlane: (Plane from, Plane to) } =>
                 from.IsValid && to.IsValid
-                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.PlaneToPlane(from, to))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidBasisPlanes.WithContext($"From: {from.IsValid}, To: {to.IsValid}")),
+                    ? ResultFactory.Create(value: RhinoTransform.PlaneToPlane(from, to))
+                    : ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidBasisPlanes.WithContext($"From: {from.IsValid}, To: {to.IsValid}")),
 
-            _ => ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidTransformSpec),
+            _ => ResultFactory.Create<RhinoTransform>(error: E.Transform.InvalidTransformSpec),
         };
 
     /// <summary>Validate transform matrix for validity and non-singularity.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<global::Rhino.Geometry.Transform> ValidateTransform(
-        global::Rhino.Geometry.Transform transform,
+    private static Result<RhinoTransform> ValidateTransform(
+        RhinoTransform transform,
         IGeometryContext context) =>
         transform.IsValid && Math.Abs(transform.Determinant) > context.AbsoluteTolerance
             ? ResultFactory.Create(value: transform)
-            : ResultFactory.Create<global::Rhino.Geometry.Transform>(
+            : ResultFactory.Create<RhinoTransform>(
                 error: E.Transform.InvalidTransformMatrix.WithContext($"Valid: {transform.IsValid}, Det: {transform.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
 
     /// <summary>Apply transform to geometry with Extrusion conversion and disposal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
-        global::Rhino.Geometry.Transform transform,
+        RhinoTransform transform,
         IGeometryContext _) where T : GeometryBase {
         (GeometryBase normalized, bool shouldDispose) = item switch {
             Extrusion ext => (ext.ToBrep(splitKinkyFaces: true), true),
@@ -126,7 +127,7 @@ internal static class TransformCore {
         && (zCount is 1 || Math.Abs(zSpacing) > context.AbsoluteTolerance)
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
                 int totalCount = xCount * yCount * zCount;
-                global::Rhino.Geometry.Transform[] transforms = new global::Rhino.Geometry.Transform[totalCount];
+                RhinoTransform[] transforms = new RhinoTransform[totalCount];
                 int index = 0;
 
                 for (int i = 0; i < xCount; i++) {
@@ -135,16 +136,16 @@ internal static class TransformCore {
                         double dy = j * ySpacing;
                         for (int k = 0; k < zCount; k++) {
                             double dz = k * zSpacing;
-                            transforms[index++] = global::Rhino.Geometry.Transform.Translation(dx: dx, dy: dy, dz: dz);
+                            transforms[index++] = RhinoTransform.Translation(dx: dx, dy: dy, dz: dz);
                         }
                     }
                 }
 
                 return UnifiedOperation.Apply(
                     input: transforms,
-                    operation: (Func<global::Rhino.Geometry.Transform, Result<IReadOnlyList<T>>>)(xform =>
+                    operation: (Func<RhinoTransform, Result<IReadOnlyList<T>>>)(xform =>
                         ApplyTransform(item: geometry, transform: xform, context: context)),
-                    config: new OperationConfig<global::Rhino.Geometry.Transform, T> {
+                    config: new OperationConfig<RhinoTransform, T> {
                         Context = context,
                         ValidationMode = V.None,
                         AccumulateErrors = false,
@@ -169,12 +170,12 @@ internal static class TransformCore {
         && axis.Length > context.AbsoluteTolerance
         && totalAngle > 0.0 && totalAngle <= RhinoMath.TwoPI
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
-                global::Rhino.Geometry.Transform[] transforms = new global::Rhino.Geometry.Transform[count];
+                RhinoTransform[] transforms = new RhinoTransform[count];
                 double angleStep = totalAngle / count;
 
                 for (int i = 0; i < count; i++) {
                     double angle = angleStep * i;
-                    transforms[i] = global::Rhino.Geometry.Transform.Rotation(
+                    transforms[i] = RhinoTransform.Rotation(
                         angleRadians: angle,
                         rotationAxis: axis,
                         rotationCenter: center);
@@ -182,9 +183,9 @@ internal static class TransformCore {
 
                 return UnifiedOperation.Apply(
                     input: transforms,
-                    operation: (Func<global::Rhino.Geometry.Transform, Result<IReadOnlyList<T>>>)(xform =>
+                    operation: (Func<RhinoTransform, Result<IReadOnlyList<T>>>)(xform =>
                         ApplyTransform(item: geometry, transform: xform, context: context)),
-                    config: new OperationConfig<global::Rhino.Geometry.Transform, T> {
+                    config: new OperationConfig<RhinoTransform, T> {
                         Context = context,
                         ValidationMode = V.None,
                         AccumulateErrors = false,
@@ -208,19 +209,19 @@ internal static class TransformCore {
         && direction.Length > context.AbsoluteTolerance
         && Math.Abs(spacing) > context.AbsoluteTolerance
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
-                global::Rhino.Geometry.Transform[] transforms = new global::Rhino.Geometry.Transform[count];
+                RhinoTransform[] transforms = new RhinoTransform[count];
                 Vector3d unitDirection = direction / direction.Length;
 
                 for (int i = 0; i < count; i++) {
                     Vector3d motion = unitDirection * (spacing * i);
-                    transforms[i] = global::Rhino.Geometry.Transform.Translation(motion);
+                    transforms[i] = RhinoTransform.Translation(motion);
                 }
 
                 return UnifiedOperation.Apply(
                     input: transforms,
-                    operation: (Func<global::Rhino.Geometry.Transform, Result<IReadOnlyList<T>>>)(xform =>
+                    operation: (Func<RhinoTransform, Result<IReadOnlyList<T>>>)(xform =>
                         ApplyTransform(item: geometry, transform: xform, context: context)),
-                    config: new OperationConfig<global::Rhino.Geometry.Transform, T> {
+                    config: new OperationConfig<RhinoTransform, T> {
                         Context = context,
                         ValidationMode = V.None,
                         AccumulateErrors = false,

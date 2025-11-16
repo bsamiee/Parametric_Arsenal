@@ -7,6 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Orientation;
 
@@ -68,7 +69,7 @@ public static class Orient {
                     ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
                 .Bind(src => !target.IsValid
                     ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
-                    : OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target)))),
+                    : OrientCore.ApplyTransform(item, RhinoTransform.PlaneToPlane(src, target)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
@@ -80,13 +81,13 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
-                    (1, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox box) => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
+                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<RhinoTransform>(error: E.Validation.BoundingBoxInvalid),
+                    (1, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.Translation(Point3d.Origin - box.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => RhinoTransform.Translation(Point3d.Origin - c)),
+                    _ => ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationMode),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -99,7 +100,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractCentroid(item, useMassProperties: useMass)
-                    .Map(c => Transform.Translation(target - c))
+                    .Map(c => RhinoTransform.Translation(target - c))
                     .Bind(x => OrientCore.ApplyTransform(item, x))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -113,7 +114,7 @@ public static class Orient {
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
-                        ((Func<Result<Transform>>)(() => {
+                        ((Func<Result<RhinoTransform>>)(() => {
                             Vector3d su = new(s);
                             Vector3d tu = new(t);
                             // The outer 'when' clause guarantees Unitize will succeed.
@@ -123,19 +124,19 @@ public static class Orient {
 
                             return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
                                 ? Math.Abs((su * tu) - 1.0) < RhinoMath.SqrtEpsilon
-                                    ? ResultFactory.Create(value: Transform.Identity)
+                                    ? ResultFactory.Create(value: RhinoTransform.Identity)
                                     : Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
-                                        ? ((Func<Result<Transform>>)(() => {
+                                        ? ((Func<Result<RhinoTransform>>)(() => {
                                             Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(su, Vector3d.XAxis) : Vector3d.CrossProduct(su, Vector3d.YAxis);
                                             bool normalized = axisCandidate.Unitize();
                                             return normalized
-                                                ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axisCandidate, pt))
-                                                : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
+                                                ? ResultFactory.Create(value: RhinoTransform.Rotation(Math.PI, axisCandidate, pt))
+                                                : ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors);
                                         }))()
-                                        : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
-                                : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
+                                        : ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors)
+                                : ResultFactory.Create(value: RhinoTransform.Rotation(su, tu, pt));
                         }))(),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
+                    _ => ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -148,7 +149,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractBestFitPlane(item)
-                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
+                    .Bind(plane => OrientCore.ApplyTransform(item, RhinoTransform.PlaneToPlane(plane, Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -160,7 +161,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 plane.IsValid
-                    ? OrientCore.ApplyTransform(item, Transform.Mirror(plane))
+                    ? OrientCore.ApplyTransform(item, RhinoTransform.Mirror(plane))
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,

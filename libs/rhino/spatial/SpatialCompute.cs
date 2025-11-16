@@ -7,6 +7,7 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Spatial;
 
@@ -249,8 +250,8 @@ internal static class SpatialCompute {
                     double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
                     int sampleCount = (int)RhinoMath.Clamp(length / effectiveTolerance, SpatialConfig.MedialAxisMinSampleCount, SpatialConfig.MedialAxisMaxSampleCount);
-                    Transform toPlane = Transform.PlaneToPlane(plane, Plane.WorldXY);
-                    Transform fromPlane = Transform.PlaneToPlane(Plane.WorldXY, plane);
+                    RhinoTransform toPlane = RhinoTransform.PlaneToPlane(plane, Plane.WorldXY);
+                    RhinoTransform fromPlane = RhinoTransform.PlaneToPlane(Plane.WorldXY, plane);
                     Point3d To3D(Point3d p2d) { Point3d pt = p2d; pt.Transform(fromPlane); return pt; }
                     Point3d[] samples3D = [.. Enumerable.Range(0, sampleCount).Select(i => boundary.PointAtNormalizedLength((double)i / sampleCount)),];
                     Point3d[] samples2D = [.. samples3D.Select(p => { Point3d pt = p; pt.Transform(toPlane); return pt; }),];

@@ -8,6 +8,7 @@ using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Morphs;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Transform;
 
@@ -97,7 +98,7 @@ internal static class TransformCompute {
                     InfiniteTaper = false,
                     Flat = false,
                 };
-                morph.SetTaperLine(axis.From, axis.To);
+                morph.SetTaperLine(axis.From, axis.To, startWidth, endWidth);
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
             : ResultFactory.Create<T>(error: E.Transform.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
@@ -115,6 +116,7 @@ internal static class TransformCompute {
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
+                morph.SetStretchPlane(new Plane(axis.From, axis.Direction));
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
             : ResultFactory.Create<T>(error: E.Transform.InvalidStretchParameters.WithContext($"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}"));
@@ -171,19 +173,20 @@ internal static class TransformCompute {
     internal static Result<T> Maelstrom<T>(
         T geometry,
         Point3d center,
-        Line axis,
+        Vector3d axis,
         double radius,
+        double angle,
         IGeometryContext context) where T : GeometryBase =>
-        center.IsValid && axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid
+        center.IsValid && axis.Length > context.AbsoluteTolerance && radius > context.AbsoluteTolerance && geometry.IsValid
             ? ((Func<Result<T>>)(() => {
-                using MaelstromSpaceMorph morph = new() {
+                using MaelstromSpaceMorph morph = new(plane: new Plane(center, axis), radius0: radius, radius1: radius, angle: angle) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 };
                 return ApplyMorph(morph: morph, geometry: geometry);
             }))()
-            : ResultFactory.Create<T>(error: E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Transform.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional frame orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -196,7 +199,7 @@ internal static class TransformCompute {
         bool enableDiagnostics) where T : GeometryBase =>
         count > 0 && count <= TransformConfig.MaxArrayCount && path.IsValid && geometry.IsValid
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
-                global::Rhino.Geometry.Transform[] transforms = new global::Rhino.Geometry.Transform[count];
+                RhinoTransform[] transforms = new RhinoTransform[count];
                 Interval domain = path.Domain;
                 double step = count > 1 ? (domain.Max - domain.Min) / (count - 1) : 0.0;
 
@@ -205,15 +208,15 @@ internal static class TransformCompute {
                     Point3d pt = path.PointAt(t);
 
                     transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
-                        ? global::Rhino.Geometry.Transform.PlaneToPlane(Plane.WorldXY, frame)
-                        : global::Rhino.Geometry.Transform.Translation(pt - Point3d.Origin);
+                        ? RhinoTransform.PlaneToPlane(Plane.WorldXY, frame)
+                        : RhinoTransform.Translation(pt - Point3d.Origin);
                 }
 
                 return UnifiedOperation.Apply(
                     input: transforms,
-                    operation: (Func<global::Rhino.Geometry.Transform, Result<IReadOnlyList<T>>>)(xform =>
+                    operation: (Func<RhinoTransform, Result<IReadOnlyList<T>>>)(xform =>
                         TransformCore.ApplyTransform(item: geometry, transform: xform, context: context)),
-                    config: new OperationConfig<global::Rhino.Geometry.Transform, T> {
+                    config: new OperationConfig<RhinoTransform, T> {
                         Context = context,
                         ValidationMode = V.None,
                         AccumulateErrors = false,
