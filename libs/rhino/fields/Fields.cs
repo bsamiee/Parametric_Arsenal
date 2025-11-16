@@ -82,15 +82,9 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds) =>
-        (vectorField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], Vector3d[])>(
-                error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points")),
-            true => FieldsCompute.ComputeCurl(
-                vectorField: vectorField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
-        };
+        ResultFactory.Create(value: (vectorField, gridPoints))
+            .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeCurl(vectorField: vectorField, grid: gridPoints, resolution: spec.Resolution, gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
     /// <summary>Compute divergence field: vector field → (grid points[], divergence scalars[]) where divergence = ∇·F, row-major grid order, zero derivatives at boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -99,15 +93,9 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds) =>
-        (vectorField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points")),
-            true => FieldsCompute.ComputeDivergence(
-                vectorField: vectorField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
-        };
+        ResultFactory.Create(value: (vectorField, gridPoints))
+            .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeDivergence(vectorField: vectorField, grid: gridPoints, resolution: spec.Resolution, gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
     /// <summary>Compute Laplacian field: scalar field → (grid points[], Laplacian scalars[]) where Laplacian = ∇²f, row-major grid order, zero second derivatives at boundaries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -116,15 +104,9 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds) =>
-        (scalarField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points")),
-            true => FieldsCompute.ComputeLaplacian(
-                scalarField: scalarField,
-                grid: gridPoints,
-                resolution: spec.Resolution,
-                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
-        };
+        ResultFactory.Create(value: (scalarField, gridPoints))
+            .Ensure(v => v.scalarField.Length == v.gridPoints.Length, error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeLaplacian(scalarField: scalarField, grid: gridPoints, resolution: spec.Resolution, gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
     /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A. Uses Coulomb gauge approximation via x-axis line integral (accurate only for fields with simple structure aligned with x-axis; general 3D magnetic fields require full volume integral).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -277,40 +259,27 @@ public static class Fields {
         Vector3d[] gradientField,
         Point3d[] gridPoints,
         Vector3d direction) =>
-        (gradientField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points")),
-            true => FieldsCompute.ComputeDirectionalDerivative(
-                gradientField: gradientField,
-                grid: gridPoints,
-                direction: direction),
-        };
+        ResultFactory.Create(value: (gradientField, gridPoints))
+            .Ensure(v => v.gradientField.Length == v.gridPoints.Length, error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeDirectionalDerivative(gradientField: gradientField, grid: gridPoints, direction: direction));
 
     /// <summary>Compute vector field magnitude: vector field → (grid points[], magnitudes[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Magnitudes)> FieldMagnitude(
         Vector3d[] vectorField,
         Point3d[] gridPoints) =>
-        (vectorField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points")),
-            true => FieldsCompute.ComputeFieldMagnitude(
-                vectorField: vectorField,
-                grid: gridPoints),
-        };
+        ResultFactory.Create(value: (vectorField, gridPoints))
+            .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeFieldMagnitude(vectorField: vectorField, grid: gridPoints));
 
     /// <summary>Normalize vector field: vector field → (grid points[], normalized vectors[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeField(
         Vector3d[] vectorField,
         Point3d[] gridPoints) =>
-        (vectorField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], Vector3d[])>(
-                error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points")),
-            true => FieldsCompute.NormalizeVectorField(
-                vectorField: vectorField,
-                grid: gridPoints),
-        };
+        ResultFactory.Create(value: (vectorField, gridPoints))
+            .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.NormalizeVectorField(vectorField: vectorField, grid: gridPoints));
 
     /// <summary>Scalar-vector field product: (scalar field, vector field, component) → (grid points[], product[]) where component 0=X, 1=Y, 2=Z.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -319,17 +288,10 @@ public static class Fields {
         Vector3d[] vectorField,
         Point3d[] gridPoints,
         int component) =>
-        (scalarField.Length == gridPoints.Length, vectorField.Length == gridPoints.Length) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
-            (true, true) => FieldsCompute.ScalarVectorProduct(
-                scalarField: scalarField,
-                vectorField: vectorField,
-                grid: gridPoints,
-                component: component),
-        };
+        ResultFactory.Create(value: (scalarField, vectorField, gridPoints))
+            .Ensure(v => v.scalarField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"))
+            .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ScalarVectorProduct(scalarField: scalarField, vectorField: vectorField, grid: gridPoints, component: component));
 
     /// <summary>Vector-vector dot product field: (vector field 1, vector field 2) → (grid points[], dot products[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -337,16 +299,10 @@ public static class Fields {
         Vector3d[] vectorField1,
         Vector3d[] vectorField2,
         Point3d[] gridPoints) =>
-        (vectorField1.Length == gridPoints.Length, vectorField2.Length == gridPoints.Length) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points")),
-            (true, true) => FieldsCompute.VectorDotProduct(
-                vectorField1: vectorField1,
-                vectorField2: vectorField2,
-                grid: gridPoints),
-        };
+        ResultFactory.Create(value: (vectorField1, vectorField2, gridPoints))
+            .Ensure(v => v.vectorField1.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"))
+            .Ensure(v => v.vectorField2.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.VectorDotProduct(vectorField1: vectorField1, vectorField2: vectorField2, grid: gridPoints));
 
     /// <summary>Detect and classify critical points in scalar field: (field, gradient, hessian) → critical points[] with type classification (minimum, maximum, saddle).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

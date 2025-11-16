@@ -165,25 +165,23 @@ internal static class FieldsCompute {
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
+        Vector3d gridDelta) =>
+        (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
             (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
             (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
                 int totalSamples = vectorField.Length;
                 Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                 try {
+                    int resSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
-                                potential[idx] = i > 0
-                                    ? potential[((i - 1) * resolution * resolution) + (j * resolution) + k] + (gridDelta.X * vectorField[idx])
-                                    : Vector3d.Zero;
+                                int idx = (i * resSquared) + (j * resolution) + k;
+                                potential[idx] = i > 0 ? potential[((i - 1) * resSquared) + (j * resolution) + k] + (gridDelta.X * vectorField[idx]) : Vector3d.Zero;
                             }
                         }
                     }
-
                     Vector3d[] finalPotential = [.. potential[..totalSamples]];
                     return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
                 } finally {
@@ -191,7 +189,21 @@ internal static class FieldsCompute {
                 }
             }))(),
         };
-    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<T> InterpolateField<T>(
+        Point3d query,
+        T[] field,
+        Point3d[] grid,
+        int resolution,
+        BoundingBox bounds,
+        byte interpolationMethod,
+        Func<T, T, double, T> lerp) where T : struct =>
+        interpolationMethod switch {
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, field, grid),
+            FieldsConfig.InterpolationTrilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<double> InterpolateScalar(
@@ -200,13 +212,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) {
-        return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, scalarField, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinearScalar(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds),
-            _ => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-        };
-    }
+        byte interpolationMethod) =>
+        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Vector3d> InterpolateVector(
@@ -215,13 +222,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) {
-        return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, vectorField, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds),
-            _ => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-        };
-    }
+        byte interpolationMethod) =>
+        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
