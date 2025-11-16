@@ -22,29 +22,46 @@ internal static class FieldsCompute {
             int totalSamples = distances.Length;
             Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
             try {
-                (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
+                bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+                bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+                bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+                double invDx = hasDx ? 1.0 / gridDelta.X : 0.0;
+                double invDy = hasDy ? 1.0 / gridDelta.Y : 0.0;
+                double invDz = hasDz ? 1.0 / gridDelta.Z : 0.0;
+                double invTwoDx = hasDx ? 0.5 * invDx : 0.0;
+                double invTwoDy = hasDy ? 0.5 * invDy : 0.0;
+                double invTwoDz = hasDz ? 0.5 * invDz : 0.0;
                 int resSquared = resolution * resolution;
                 for (int i = 0; i < resolution; i++) {
                     for (int j = 0; j < resolution; j++) {
                         for (int k = 0; k < resolution; k++) {
                             int idx = (i * resSquared) + (j * resolution) + k;
-                            double dfdx = (i, resolution) switch {
-                                (var x, var r) when x > 0 && x < r - 1 => (distances[idx + resSquared] - distances[idx - resSquared]) / twoDx,
-                                (0, > 1) => (distances[idx + resSquared] - distances[idx]) / dx,
-                                (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[idx - resSquared]) / dx,
-                                _ => 0.0,
+                            double dfdx = hasDx switch {
+                                false => 0.0,
+                                true => (i, resolution) switch {
+                                    (var x, var r) when x > 0 && x < r - 1 => (distances[idx + resSquared] - distances[idx - resSquared]) * invTwoDx,
+                                    (0, > 1) => (distances[idx + resSquared] - distances[idx]) * invDx,
+                                    (var x, var r) when x == r - 1 && r > 1 => (distances[idx] - distances[idx - resSquared]) * invDx,
+                                    _ => 0.0,
+                                },
                             };
-                            double dfdy = (j, resolution) switch {
-                                (var y, var r) when y > 0 && y < r - 1 => (distances[idx + resolution] - distances[idx - resolution]) / twoDy,
-                                (0, > 1) => (distances[idx + resolution] - distances[idx]) / dy,
-                                (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[idx - resolution]) / dy,
-                                _ => 0.0,
+                            double dfdy = hasDy switch {
+                                false => 0.0,
+                                true => (j, resolution) switch {
+                                    (var y, var r) when y > 0 && y < r - 1 => (distances[idx + resolution] - distances[idx - resolution]) * invTwoDy,
+                                    (0, > 1) => (distances[idx + resolution] - distances[idx]) * invDy,
+                                    (var y, var r) when y == r - 1 && r > 1 => (distances[idx] - distances[idx - resolution]) * invDy,
+                                    _ => 0.0,
+                                },
                             };
-                            double dfdz = (k, resolution) switch {
-                                (var z, var r) when z > 0 && z < r - 1 => (distances[idx + 1] - distances[idx - 1]) / twoDz,
-                                (0, > 1) => (distances[idx + 1] - distances[idx]) / dz,
-                                (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[idx - 1]) / dz,
-                                _ => 0.0,
+                            double dfdz = hasDz switch {
+                                false => 0.0,
+                                true => (k, resolution) switch {
+                                    (var z, var r) when z > 0 && z < r - 1 => (distances[idx + 1] - distances[idx - 1]) * invTwoDz,
+                                    (0, > 1) => (distances[idx + 1] - distances[idx]) * invDz,
+                                    (var z, var r) when z == r - 1 && r > 1 => (distances[idx] - distances[idx - 1]) * invDz,
+                                    _ => 0.0,
+                                },
                             };
                             gradients[idx] = new Vector3d(dfdx, dfdy, dfdz);
                         }
@@ -96,43 +113,57 @@ internal static class FieldsCompute {
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) =>
-        ComputeDerivativeField(
+        Vector3d gridDelta) {
+        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+        double invTwoDx = hasDx ? 0.5 / gridDelta.X : 0.0;
+        double invTwoDy = hasDy ? 0.5 / gridDelta.Y : 0.0;
+        double invTwoDz = hasDz ? 0.5 / gridDelta.Z : 0.0;
+        return ComputeDerivativeField(
             inputField: vectorField,
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
-                double dFz_dy = (j < res - 1 && j > 0) ? (field[idx + res].Z - field[idx - res].Z) / deltas.Item5 : 0.0;
-                double dFy_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Y - field[idx - 1].Y) / deltas.Item6 : 0.0;
-                double dFx_dz = (k < res - 1 && k > 0) ? (field[idx + 1].X - field[idx - 1].X) / deltas.Item6 : 0.0;
-                double dFz_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].Z - field[idx - resSquared].Z) / deltas.Item4 : 0.0;
-                double dFy_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].Y - field[idx - resSquared].Y) / deltas.Item4 : 0.0;
-                double dFx_dy = (j < res - 1 && j > 0) ? (field[idx + res].X - field[idx - res].X) / deltas.Item5 : 0.0;
+            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
+                double dFz_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].Z - field[idx - res].Z) * invTwoDy : 0.0;
+                double dFy_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].Y - field[idx - 1].Y) * invTwoDz : 0.0;
+                double dFx_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].X - field[idx - 1].X) * invTwoDz : 0.0;
+                double dFz_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].Z - field[idx - resSquared].Z) * invTwoDx : 0.0;
+                double dFy_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].Y - field[idx - resSquared].Y) * invTwoDx : 0.0;
+                double dFx_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].X - field[idx - res].X) * invTwoDy : 0.0;
                 return new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
             },
             lengthError: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"),
             resolutionError: E.Geometry.InvalidCurlComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) =>
-        ComputeDerivativeField(
+        Vector3d gridDelta) {
+        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+        double invTwoDx = hasDx ? 0.5 / gridDelta.X : 0.0;
+        double invTwoDy = hasDy ? 0.5 / gridDelta.Y : 0.0;
+        double invTwoDz = hasDz ? 0.5 / gridDelta.Z : 0.0;
+        return ComputeDerivativeField(
             inputField: vectorField,
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
-                double dFx_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].X - field[idx - resSquared].X) / deltas.Item4 : 0.0;
-                double dFy_dy = (j < res - 1 && j > 0) ? (field[idx + res].Y - field[idx - res].Y) / deltas.Item5 : 0.0;
-                double dFz_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Z - field[idx - 1].Z) / deltas.Item6 : 0.0;
+            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
+                double dFx_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].X - field[idx - resSquared].X) * invTwoDx : 0.0;
+                double dFy_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].Y - field[idx - res].Y) * invTwoDy : 0.0;
+                double dFz_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].Z - field[idx - 1].Z) * invTwoDz : 0.0;
                 return dFx_dx + dFy_dy + dFz_dz;
             },
             lengthError: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"),
             resolutionError: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
@@ -140,16 +171,21 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        (double dx2, double dy2, double dz2) = (gridDelta.X * gridDelta.X, gridDelta.Y * gridDelta.Y, gridDelta.Z * gridDelta.Z);
+        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+        double invDx2 = hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0;
+        double invDy2 = hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0;
+        double invDz2 = hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0;
         return ComputeDerivativeField(
             inputField: scalarField,
             grid: grid,
             resolution: resolution,
             gridDelta: gridDelta,
             stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
-                double d2f_dx2 = (i > 0 && i < res - 1) ? (field[idx + resSquared] - (2.0 * field[idx]) + field[idx - resSquared]) / dx2 : 0.0;
-                double d2f_dy2 = (j > 0 && j < res - 1) ? (field[idx + res] - (2.0 * field[idx]) + field[idx - res]) / dy2 : 0.0;
-                double d2f_dz2 = (k > 0 && k < res - 1) ? (field[idx + 1] - (2.0 * field[idx]) + field[idx - 1]) / dz2 : 0.0;
+                double d2f_dx2 = hasDx && i > 0 && i < res - 1 ? (field[idx + resSquared] - (2.0 * field[idx]) + field[idx - resSquared]) * invDx2 : 0.0;
+                double d2f_dy2 = hasDy && j > 0 && j < res - 1 ? (field[idx + res] - (2.0 * field[idx]) + field[idx - res]) * invDy2 : 0.0;
+                double d2f_dz2 = hasDz && k > 0 && k < res - 1 ? (field[idx + 1] - (2.0 * field[idx]) + field[idx - 1]) * invDz2 : 0.0;
                 return d2f_dx2 + d2f_dy2 + d2f_dz2;
             },
             lengthError: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"),
@@ -325,7 +361,7 @@ internal static class FieldsCompute {
                         };
                         Vector3d delta = integrationMethod switch {
                             0 => stepSize * k1,
-                            1 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2)),
+                            1 => stepSize * k2,
                             2 or 3 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4)),
                             _ => Vector3d.Zero,
                         };
@@ -434,12 +470,18 @@ internal static class FieldsCompute {
                 }
 
                 try {
-                    double dx2 = gridDelta.X * gridDelta.X;
-                    double dy2 = gridDelta.Y * gridDelta.Y;
-                    double dz2 = gridDelta.Z * gridDelta.Z;
-                    double dxdy = gridDelta.X * gridDelta.Y;
-                    double dxdz = gridDelta.X * gridDelta.Z;
-                    double dydz = gridDelta.Y * gridDelta.Z;
+                    bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+                    bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+                    bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+                    bool hasDxDy = hasDx && hasDy;
+                    bool hasDxDz = hasDx && hasDz;
+                    bool hasDyDz = hasDy && hasDz;
+                    double invDx2 = hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0;
+                    double invDy2 = hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0;
+                    double invDz2 = hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0;
+                    double invFourDxDy = hasDxDy ? 0.25 / (gridDelta.X * gridDelta.Y) : 0.0;
+                    double invFourDxDz = hasDxDz ? 0.25 / (gridDelta.X * gridDelta.Z) : 0.0;
+                    double invFourDyDz = hasDyDz ? 0.25 / (gridDelta.Y * gridDelta.Z) : 0.0;
                     int resSquared = resolution * resolution;
 
                     for (int i = 0; i < resolution; i++) {
@@ -448,28 +490,28 @@ internal static class FieldsCompute {
                                 int idx = (i * resSquared) + (j * resolution) + k;
                                 double center = scalarField[idx];
 
-                                double d2f_dx2 = (i > 0 && i < resolution - 1)
-                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + k] - (2.0 * center) + scalarField[((i - 1) * resSquared) + (j * resolution) + k]) / dx2
+                                double d2f_dx2 = hasDx && i > 0 && i < resolution - 1
+                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + k] - (2.0 * center) + scalarField[((i - 1) * resSquared) + (j * resolution) + k]) * invDx2
                                     : 0.0;
 
-                                double d2f_dy2 = (j > 0 && j < resolution - 1)
-                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + k] - (2.0 * center) + scalarField[(i * resSquared) + ((j - 1) * resolution) + k]) / dy2
+                                double d2f_dy2 = hasDy && j > 0 && j < resolution - 1
+                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + k] - (2.0 * center) + scalarField[(i * resSquared) + ((j - 1) * resolution) + k]) * invDy2
                                     : 0.0;
 
-                                double d2f_dz2 = (k > 0 && k < resolution - 1)
-                                    ? (scalarField[(i * resSquared) + (j * resolution) + (k + 1)] - (2.0 * center) + scalarField[(i * resSquared) + (j * resolution) + (k - 1)]) / dz2
+                                double d2f_dz2 = hasDz && k > 0 && k < resolution - 1
+                                    ? (scalarField[(i * resSquared) + (j * resolution) + (k + 1)] - (2.0 * center) + scalarField[(i * resSquared) + (j * resolution) + (k - 1)]) * invDz2
                                     : 0.0;
 
-                                double d2f_dxdy = (i > 0 && i < resolution - 1 && j > 0 && j < resolution - 1)
-                                    ? (scalarField[((i + 1) * resSquared) + ((j + 1) * resolution) + k] - scalarField[((i + 1) * resSquared) + ((j - 1) * resolution) + k] - scalarField[((i - 1) * resSquared) + ((j + 1) * resolution) + k] + scalarField[((i - 1) * resSquared) + ((j - 1) * resolution) + k]) / (4.0 * dxdy)
+                                double d2f_dxdy = hasDxDy && i > 0 && i < resolution - 1 && j > 0 && j < resolution - 1
+                                    ? (scalarField[((i + 1) * resSquared) + ((j + 1) * resolution) + k] - scalarField[((i + 1) * resSquared) + ((j - 1) * resolution) + k] - scalarField[((i - 1) * resSquared) + ((j + 1) * resolution) + k] + scalarField[((i - 1) * resSquared) + ((j - 1) * resolution) + k]) * invFourDxDy
                                     : 0.0;
 
-                                double d2f_dxdz = (i > 0 && i < resolution - 1 && k > 0 && k < resolution - 1)
-                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + (k + 1)] - scalarField[((i + 1) * resSquared) + (j * resolution) + (k - 1)] - scalarField[((i - 1) * resSquared) + (j * resolution) + (k + 1)] + scalarField[((i - 1) * resSquared) + (j * resolution) + (k - 1)]) / (4.0 * dxdz)
+                                double d2f_dxdz = hasDxDz && i > 0 && i < resolution - 1 && k > 0 && k < resolution - 1
+                                    ? (scalarField[((i + 1) * resSquared) + (j * resolution) + (k + 1)] - scalarField[((i + 1) * resSquared) + (j * resolution) + (k - 1)] - scalarField[((i - 1) * resSquared) + (j * resolution) + (k + 1)] + scalarField[((i - 1) * resSquared) + (j * resolution) + (k - 1)]) * invFourDxDz
                                     : 0.0;
 
-                                double d2f_dydz = (j > 0 && j < resolution - 1 && k > 0 && k < resolution - 1)
-                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + (k + 1)] - scalarField[(i * resSquared) + ((j + 1) * resolution) + (k - 1)] - scalarField[(i * resSquared) + ((j - 1) * resolution) + (k + 1)] + scalarField[(i * resSquared) + ((j - 1) * resolution) + (k - 1)]) / (4.0 * dydz)
+                                double d2f_dydz = hasDyDz && j > 0 && j < resolution - 1 && k > 0 && k < resolution - 1
+                                    ? (scalarField[(i * resSquared) + ((j + 1) * resolution) + (k + 1)] - scalarField[(i * resSquared) + ((j + 1) * resolution) + (k - 1)] - scalarField[(i * resSquared) + ((j - 1) * resolution) + (k + 1)] + scalarField[(i * resSquared) + ((j - 1) * resolution) + (k - 1)]) * invFourDyDz
                                     : 0.0;
 
                                 hessian[0, 0][idx] = d2f_dx2;
