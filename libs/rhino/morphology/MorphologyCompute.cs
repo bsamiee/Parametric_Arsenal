@@ -129,7 +129,8 @@ internal static class MorphologyCompute {
 
         Point3d[] newVerts = new Point3d[vertCount];
         for (int i = 0; i < vertCount; i++) {
-            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
+            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : Array.Empty<int>();
             int valence = neighbors.Length;
             double beta = valence is 3
                 ? MorphologyConfig.LoopBetaValence3
@@ -204,8 +205,10 @@ internal static class MorphologyCompute {
                 } else {
                     (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
                     Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
-                    int[] v1Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v1);
-                    int[] v2Neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(v2);
+                    int topologyV1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
+                    int topologyV2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
+                    int[] v1Neighbors = topologyV1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV1) : Array.Empty<int>();
+                    int[] v2Neighbors = topologyV2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV2) : Array.Empty<int>();
                     (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4
                         ? FindButterflyOpposites(mesh, v1, v2)
                         : (-1, -1);
@@ -291,7 +294,8 @@ internal static class MorphologyCompute {
                         Point3d[] updated = updateFunc(smoothed, positions, context);
 
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
-                            bool isBoundary = lockBoundary && (mesh.TopologyVertices.ConnectedFaces(i).Length < 2);
+                            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
+                            bool isBoundary = lockBoundary && (topologyIndex < 0 || mesh.TopologyVertices.ConnectedFaces(topologyIndex).Length < 2);
                             positions[i] = isBoundary ? positions[i] : updated[i];
                             _ = smoothed.Vertices.SetVertex(i, positions[i]);
                         }
