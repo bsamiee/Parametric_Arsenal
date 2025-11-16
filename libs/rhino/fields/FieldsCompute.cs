@@ -227,7 +227,12 @@ internal static class FieldsCompute {
             ? ((Func<int>)(() => {
                 using RTree tree = RTree.CreateFromPointArray(grid);
                 int idx = -1;
-                _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => idx = args.Id);
+                double bestDistance = double.MaxValue;
+                _ = tree.Search(new Sphere(query, radius: double.MaxValue), (sender, args) => {
+                    int candidateIdx = args.Id;
+                    double distance = query.DistanceTo(grid[candidateIdx]);
+                    (idx, bestDistance) = distance < bestDistance ? (candidateIdx, distance) : (idx, bestDistance);
+                });
                 return idx;
             }))()
             : ((Func<int>)(() => {
