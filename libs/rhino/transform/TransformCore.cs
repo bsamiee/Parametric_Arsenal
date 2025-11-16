@@ -22,9 +22,9 @@ internal static class TransformCore {
                 ValidateTransform(transform: m, context: context),
 
             { UniformScale: (Point3d anchor, double factor) } =>
-                factor >= TransformConfig.MinScaleFactor && factor <= TransformConfig.MaxScaleFactor
+                factor is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor
                     ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Scale(anchor, factor))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Factor: {factor:F6}")),
+                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Factor: {factor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { NonUniformScale: (Plane plane, double x, double y, double z) } =>
                 plane.IsValid
@@ -32,17 +32,17 @@ internal static class TransformCore {
                 && y >= TransformConfig.MinScaleFactor && y <= TransformConfig.MaxScaleFactor
                 && z >= TransformConfig.MinScaleFactor && z <= TransformConfig.MaxScaleFactor
                     ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Scale(plane, x, y, z))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Plane valid: {plane.IsValid}, X: {x:F6}, Y: {y:F6}, Z: {z:F6}")),
+                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidScaleFactor.WithContext($"Plane valid: {plane.IsValid}, X: {x.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {y.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {z.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { Rotation: (double angle, Vector3d axis, Point3d center) } =>
                 axis.Length > context.AbsoluteTolerance
                     ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(angle, axis, center))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Axis length: {axis.Length:F6}")),
+                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Axis length: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { RotationVectors: (Vector3d start, Vector3d end, Point3d center) } =>
                 start.Length > context.AbsoluteTolerance && end.Length > context.AbsoluteTolerance
                     ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(start, end, center))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Start: {start.Length:F6}, End: {end.Length:F6}")),
+                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidRotationAxis.WithContext($"Start: {start.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {end.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { MirrorPlane: Plane plane } =>
                 plane.IsValid
@@ -54,9 +54,9 @@ internal static class TransformCore {
 
             { Shear: (Plane plane, Vector3d direction, double angle) } =>
                 plane.IsValid && direction.Length > context.AbsoluteTolerance
-                && !plane.ZAxis.IsParallelTo(direction, context.AngleTolerance * TransformConfig.AngleToleranceMultiplier)
+                && !plane.ZAxis.IsParallelTo(direction, context.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier)
                     ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Shear(plane, direction, angle))
-                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidShearParameters.WithContext($"Plane: {plane.IsValid}, Direction: {direction.Length:F6}")),
+                    : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Transform.InvalidShearParameters.WithContext($"Plane: {plane.IsValid}, Direction: {direction.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")),
 
             { ProjectionPlane: Plane plane } =>
                 plane.IsValid
@@ -84,14 +84,14 @@ internal static class TransformCore {
         transform.IsValid && Math.Abs(transform.Determinant) > context.AbsoluteTolerance
             ? ResultFactory.Create(value: transform)
             : ResultFactory.Create<global::Rhino.Geometry.Transform>(
-                error: E.Transform.InvalidTransformMatrix.WithContext($"Valid: {transform.IsValid}, Det: {transform.Determinant:F6}"));
+                error: E.Transform.InvalidTransformMatrix.WithContext($"Valid: {transform.IsValid}, Det: {transform.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
 
     /// <summary>Apply transform to geometry with Extrusion conversion and disposal.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
         global::Rhino.Geometry.Transform transform,
-        IGeometryContext context) where T : GeometryBase {
+        IGeometryContext _) where T : GeometryBase {
         (GeometryBase normalized, bool shouldDispose) = item switch {
             Extrusion ext => (ext.ToBrep(splitKinkyFaces: true), true),
             GeometryBase g => (g, false),
@@ -128,7 +128,7 @@ internal static class TransformCore {
                 int totalCount = xCount * yCount * zCount;
                 global::Rhino.Geometry.Transform[] transforms = new global::Rhino.Geometry.Transform[totalCount];
                 int index = 0;
-                
+
                 for (int i = 0; i < xCount; i++) {
                     double dx = i * xSpacing;
                     for (int j = 0; j < yCount; j++) {
@@ -153,7 +153,7 @@ internal static class TransformCore {
                     }).Map(results => (IReadOnlyList<T>)[.. results.SelectMany(static r => r),]);
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Transform.InvalidArrayParameters.WithContext($"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {xCount * yCount * zCount}"));
+                error: E.Transform.InvalidArrayParameters.WithContext($"XCount: {xCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, YCount: {yCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ZCount: {zCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Total: {(xCount * yCount * zCount).ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
 
     /// <summary>Generate polar array transforms via angular stepping.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -193,7 +193,7 @@ internal static class TransformCore {
                     }).Map(results => (IReadOnlyList<T>)[.. results.SelectMany(static r => r),]);
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count}, Axis: {axis.Length:F6}, Angle: {totalAngle:F6}"));
+                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
 
     /// <summary>Generate linear array transforms via directional stepping.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -229,5 +229,5 @@ internal static class TransformCore {
                     }).Map(results => (IReadOnlyList<T>)[.. results.SelectMany(static r => r),]);
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count}, Direction: {direction.Length:F6}, Spacing: {spacing:F6}"));
+                error: E.Transform.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Direction: {direction.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Spacing: {spacing.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
 }

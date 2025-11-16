@@ -43,9 +43,9 @@ internal static class TransformConfig {
     internal const double AngleToleranceMultiplier = 10.0;
 
     /// <summary>Maximum twist angle in radians (10 full rotations).</summary>
-    internal static readonly double MaxTwistAngle = RhinoMath.TwoPI * 10.0;
+    internal const double MaxTwistAngle = RhinoMath.TwoPI * 10.0;
     /// <summary>Maximum bend angle in radians (full circle).</summary>
-    internal static readonly double MaxBendAngle = RhinoMath.TwoPI;
+    internal const double MaxBendAngle = RhinoMath.TwoPI;
 
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;

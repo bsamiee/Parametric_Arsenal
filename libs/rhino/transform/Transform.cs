@@ -12,6 +12,7 @@ namespace Arsenal.Rhino.Transform;
 
 /// <summary>Affine transforms, arrays, and deformations with unified polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Transform is the primary API entry point for the Transform namespace")]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0104:Type name exists in another namespace", Justification = "Our Transform class is intentionally named to match its purpose despite System.Security.Cryptography.Xml.Transform")]
 public static class Transform {
     /// <summary>Transform specification discriminated union for pattern matching dispatch.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -81,7 +82,7 @@ public static class Transform {
         public byte Mode { get; init; }
         /// <summary>Total count for polar/linear/path arrays.</summary>
         public int Count { get; init; }
-        
+
         /// <summary>Rectangular: X count.</summary>
         public int XCount { get; init; }
         /// <summary>Rectangular: Y count.</summary>
@@ -94,19 +95,19 @@ public static class Transform {
         public double YSpacing { get; init; }
         /// <summary>Rectangular: Z spacing (optional).</summary>
         public double? ZSpacing { get; init; }
-        
+
         /// <summary>Polar: center point.</summary>
         public Point3d? Center { get; init; }
         /// <summary>Polar: rotation axis.</summary>
         public Vector3d? Axis { get; init; }
         /// <summary>Polar: total angle in radians (default 2π).</summary>
         public double? TotalAngle { get; init; }
-        
+
         /// <summary>Linear: direction vector.</summary>
         public Vector3d? Direction { get; init; }
         /// <summary>Linear/Path: spacing between instances.</summary>
         public double Spacing { get; init; }
-        
+
         /// <summary>Path: curve to follow.</summary>
         public Curve? PathCurve { get; init; }
         /// <summary>Path: orient geometry to curve frames.</summary>
@@ -266,8 +267,7 @@ public static class Transform {
     public static Result<T> Morph<T>(
         T geometry,
         MorphSpec spec,
-        IGeometryContext context,
-        bool enableDiagnostics = false) where T : GeometryBase =>
+        IGeometryContext context) where T : GeometryBase =>
         spec.Operation switch {
             1 => TransformCompute.Flow(
                 geometry: geometry,
