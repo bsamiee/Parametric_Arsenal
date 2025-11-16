@@ -295,8 +295,8 @@ public static class E {
         public static readonly SystemError OrientationFailed = Get(2510);
         public static readonly SystemError PatternDetectionFailed = Get(2511);
 
-        /// <summary>Transform operation errors (2550-2573).</summary>
-        public static class Transform {
+        /// <summary>Transformation operation errors (2550-2573).</summary>
+        public static class Transformation {
             public static readonly SystemError InvalidTransformMatrix = Get(2550);
             public static readonly SystemError InvalidScaleFactor = Get(2551);
             public static readonly SystemError InvalidRotationAxis = Get(2552);

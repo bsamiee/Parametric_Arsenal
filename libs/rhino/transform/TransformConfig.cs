@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Transform;
 

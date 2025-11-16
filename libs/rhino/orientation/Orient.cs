@@ -7,6 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Orientation;
 
@@ -68,7 +69,7 @@ public static class Orient {
                     ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
                 .Bind(src => !target.IsValid
                     ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
-                    : OrientCore.ApplyTransform(item, global::Rhino.Geometry.Transform.PlaneToPlane(src, target)))),
+                    : OrientCore.ApplyTransform(item, RhinoTransform.PlaneToPlane(src, target)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
@@ -80,13 +81,13 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Validation.BoundingBoxInvalid),
-                    (1, BoundingBox box) => ResultFactory.Create(value: global::Rhino.Geometry.Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox box) => ResultFactory.Create(value: global::Rhino.Geometry.Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox box) => ResultFactory.Create(value: global::Rhino.Geometry.Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox box) => ResultFactory.Create(value: global::Rhino.Geometry.Transform.Translation(Point3d.Origin - box.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => global::Rhino.Geometry.Transform.Translation(Point3d.Origin - c)),
-                    _ => ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Geometry.InvalidOrientationMode),
+                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<RhinoTransform>(error: E.Validation.BoundingBoxInvalid),
+                    (1, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
+                    (2, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
+                    (3, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
+                    (4, BoundingBox box) => ResultFactory.Create(value: RhinoTransform.Translation(Point3d.Origin - box.Center)),
+                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => RhinoTransform.Translation(Point3d.Origin - c)),
+                    _ => ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationMode),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -99,7 +100,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractCentroid(item, useMassProperties: useMass)
-                    .Map(c => global::Rhino.Geometry.Transform.Translation(target - c))
+                    .Map(c => RhinoTransform.Translation(target - c))
                     .Bind(x => OrientCore.ApplyTransform(item, x))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -113,7 +114,7 @@ public static class Orient {
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
                     (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
-                        ((Func<Result<global::Rhino.Geometry.Transform>>)(() => {
+                        ((Func<Result<RhinoTransform>>)(() => {
                             Vector3d su = new(s);
                             Vector3d tu = new(t);
                             // The outer 'when' clause guarantees Unitize will succeed.
@@ -123,19 +124,19 @@ public static class Orient {
 
                             return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
                                 ? Math.Abs((su * tu) - 1.0) < RhinoMath.SqrtEpsilon
-                                    ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Identity)
+                                    ? ResultFactory.Create(value: RhinoTransform.Identity)
                                     : Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
-                                        ? ((Func<Result<global::Rhino.Geometry.Transform>>)(() => {
+                                        ? ((Func<Result<RhinoTransform>>)(() => {
                                             Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(su, Vector3d.XAxis) : Vector3d.CrossProduct(su, Vector3d.YAxis);
                                             bool normalized = axisCandidate.Unitize();
                                             return normalized
-                                                ? ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(Math.PI, axisCandidate, pt))
-                                                : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Geometry.InvalidOrientationVectors);
+                                                ? ResultFactory.Create(value: RhinoTransform.Rotation(Math.PI, axisCandidate, pt))
+                                                : ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors);
                                         }))()
-                                        : ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Geometry.InvalidOrientationVectors)
-                                : ResultFactory.Create(value: global::Rhino.Geometry.Transform.Rotation(su, tu, pt));
+                                        : ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors)
+                                : ResultFactory.Create(value: RhinoTransform.Rotation(su, tu, pt));
                         }))(),
-                    _ => ResultFactory.Create<global::Rhino.Geometry.Transform>(error: E.Geometry.InvalidOrientationVectors),
+                    _ => ResultFactory.Create<RhinoTransform>(error: E.Geometry.InvalidOrientationVectors),
                 }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -148,7 +149,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 OrientCore.ExtractBestFitPlane(item)
-                    .Bind(plane => OrientCore.ApplyTransform(item, global::Rhino.Geometry.Transform.PlaneToPlane(plane, Plane.WorldXY)))),
+                    .Bind(plane => OrientCore.ApplyTransform(item, RhinoTransform.PlaneToPlane(plane, Plane.WorldXY)))),
             config: new OperationConfig<T, T> {
                 Context = context,
                 ValidationMode = V.Standard,
@@ -160,7 +161,7 @@ public static class Orient {
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 plane.IsValid
-                    ? OrientCore.ApplyTransform(item, global::Rhino.Geometry.Transform.Mirror(plane))
+                    ? OrientCore.ApplyTransform(item, RhinoTransform.Mirror(plane))
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,
@@ -205,29 +206,29 @@ public static class Orient {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(global::Rhino.Geometry.Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
+    public static Result<(RhinoTransform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
         IGeometryContext context) =>
         UnifiedOperation.Apply(
             input: brep,
-            operation: (Func<Brep, Result<IReadOnlyList<(global::Rhino.Geometry.Transform, double, byte[])>>>)(item =>
+            operation: (Func<Brep, Result<IReadOnlyList<(RhinoTransform, double, byte[])>>>)(item =>
                 OrientCompute.OptimizeOrientation(item, criteria, context.AbsoluteTolerance, context)
-                    .Map(r => (IReadOnlyList<(global::Rhino.Geometry.Transform, double, byte[])>)[r,])),
-            config: new OperationConfig<Brep, (global::Rhino.Geometry.Transform, double, byte[])> {
+                    .Map(r => (IReadOnlyList<(RhinoTransform, double, byte[])>)[r,])),
+            config: new OperationConfig<Brep, (RhinoTransform, double, byte[])> {
                 Context = context,
                 ValidationMode = V.Standard | V.Topology,
             }).Map(r => r[0]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(global::Rhino.Geometry.Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelativeOrientation(
+    public static Result<(RhinoTransform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelativeOrientation(
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
         OrientCompute.ComputeRelative(geometryA, geometryB, context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte PatternType, global::Rhino.Geometry.Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
+    public static Result<(byte PatternType, RhinoTransform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
         GeometryBase[] geometries,
         IGeometryContext context) =>
         OrientCompute.DetectPattern(geometries, context);

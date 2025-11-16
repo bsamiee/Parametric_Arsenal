@@ -5,6 +5,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Orientation;
 
@@ -12,7 +13,7 @@ namespace Arsenal.Rhino.Orientation;
 [Pure]
 internal static class OrientCompute {
     /// <summary>Optimize orientation via criteria: 1=compact, 2=centroid, 3=flatness, 4=canonical.</summary>
-    internal static Result<(global::Rhino.Geometry.Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
+    internal static Result<(RhinoTransform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
         Brep brep,
         byte criteria,
         double tolerance,
@@ -20,15 +21,15 @@ internal static class OrientCompute {
         ResultFactory.Create(value: brep)
             .Validate(args: [context, V.Standard | V.Topology | V.BoundingBox | V.MassProperties,])
             .Bind(validBrep => criteria is < 1 or > 4
-                ? ResultFactory.Create<(global::Rhino.Geometry.Transform, double, byte[])>(error: E.Geometry.InvalidOrientationMode.WithContext($"Criteria must be 1-4, got {criteria}"))
+                ? ResultFactory.Create<(RhinoTransform, double, byte[])>(error: E.Geometry.InvalidOrientationMode.WithContext($"Criteria must be 1-4, got {criteria}"))
                 : tolerance <= 0.0
-                    ? ResultFactory.Create<(global::Rhino.Geometry.Transform, double, byte[])>(error: E.Validation.ToleranceAbsoluteInvalid)
+                    ? ResultFactory.Create<(RhinoTransform, double, byte[])>(error: E.Validation.ToleranceAbsoluteInvalid)
                     : validBrep.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
-                        ? ((Func<Result<(global::Rhino.Geometry.Transform, double, byte[])>>)(() => {
+                        ? ((Func<Result<(RhinoTransform, double, byte[])>>)(() => {
                             Result<Point3d> centroidResult = OrientCore.ExtractCentroid(validBrep, useMassProperties: true);
                             return (criteria, centroidResult.IsSuccess) switch {
-                                (2, false) => ResultFactory.Create<(global::Rhino.Geometry.Transform, double, byte[])>(error: E.Geometry.CentroidExtractionFailed),
-                                _ => ((Func<Result<(global::Rhino.Geometry.Transform, double, byte[])>>)(() => {
+                                (2, false) => ResultFactory.Create<(RhinoTransform, double, byte[])>(error: E.Geometry.CentroidExtractionFailed),
+                                _ => ((Func<Result<(RhinoTransform, double, byte[])>>)(() => {
                                     Vector3d diag1 = new(1, 1, 0);
                                     Vector3d diag2 = new(1, 0, 1);
                                     Vector3d diag3 = new(0, 1, 1);
@@ -44,10 +45,10 @@ internal static class OrientCompute {
                                         new Plane(box.Center, diag3, Vector3d.XAxis),
                                     ];
 
-                                    (global::Rhino.Geometry.Transform, double, byte[])[] results = [.. testPlanes.Select(plane => {
-                                        global::Rhino.Geometry.Transform xf = global::Rhino.Geometry.Transform.PlaneToPlane(plane, Plane.WorldXY);
+                                    (RhinoTransform, double, byte[])[] results = [.. testPlanes.Select(plane => {
+                                        RhinoTransform xf = RhinoTransform.PlaneToPlane(plane, Plane.WorldXY);
                                         using Brep test = (Brep)validBrep.Duplicate();
-                                        return !test.Transform(xf) ? (global::Rhino.Geometry.Transform.Identity, 0.0, Array.Empty<byte>())
+                                        return !test.Transform(xf) ? (RhinoTransform.Identity, 0.0, Array.Empty<byte>())
                                             : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
                                                 ? (xf, criteria switch {
                                                     1 => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
@@ -68,20 +69,20 @@ internal static class OrientCompute {
                                                     4 => (testBox.Min.Z >= -tolerance ? OrientConfig.OrientationScoreWeight1 : 0.0) + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientConfig.OrientationScoreWeight2 : 0.0) + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientConfig.LowProfileAspectRatio) ? OrientConfig.OrientationScoreWeight3 : 0.0),
                                                     _ => 0.0,
                                                 }, criteria is >= 1 and <= 4 ? [criteria,] : Array.Empty<byte>())
-                                                : (global::Rhino.Geometry.Transform.Identity, 0.0, Array.Empty<byte>());
+                                                : (RhinoTransform.Identity, 0.0, Array.Empty<byte>());
                                     }),
                                     ];
 
-                                    return results.MaxBy(r => r.Item2) is (global::Rhino.Geometry.Transform best, double bestScore, byte[] met) && bestScore > 0
+                                    return results.MaxBy(r => r.Item2) is (RhinoTransform best, double bestScore, byte[] met) && bestScore > 0
                                         ? ResultFactory.Create(value: (best, bestScore, met))
-                                        : ResultFactory.Create<(global::Rhino.Geometry.Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
+                                        : ResultFactory.Create<(RhinoTransform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
                                 }))(),
                             };
                         }))()
-                        : ResultFactory.Create<(global::Rhino.Geometry.Transform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));
+                        : ResultFactory.Create<(RhinoTransform, double, byte[])>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")));
 
     /// <summary>Compute relative orientation with symmetry and relationship classification.</summary>
-    internal static Result<(global::Rhino.Geometry.Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelative(
+    internal static Result<(RhinoTransform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelative(
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) {
@@ -93,13 +94,13 @@ internal static class OrientCompute {
                 switch {
                     (true, true) when extA!(geometryA) is Result<Plane> ra && extB!(geometryB) is Result<Plane> rb => (ra, rb) switch {
                         (Result<Plane> { IsSuccess: true }, Result<Plane> { IsSuccess: true }) => (ra.Value, rb.Value) is (Plane pa, Plane pb)
-                            ? global::Rhino.Geometry.Transform.PlaneToPlane(pa, pb) is global::Rhino.Geometry.Transform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
+                            ? RhinoTransform.PlaneToPlane(pa, pb) is RhinoTransform xform && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
                                 ? ((geometryA, geometryB) switch {
                                     (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count => (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
                                         ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin) is Plane mirror && mirror.IsValid
                                             && ba.Vertices.Select(va => {
                                                 Point3d reflected = va.Location;
-                                                reflected.Transform(global::Rhino.Geometry.Transform.Mirror(mirrorPlane: mirror));
+                                                reflected.Transform(RhinoTransform.Mirror(mirrorPlane: mirror));
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA
                                             && reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < symmetryTolerance))
@@ -108,7 +109,7 @@ internal static class OrientCompute {
                                         : new Plane(pa.Origin, pa.ZAxis) is Plane mirror2 && mirror2.IsValid
                                             && ba.Vertices.Select(va => {
                                                 Point3d reflected = va.Location;
-                                                reflected.Transform(global::Rhino.Geometry.Transform.Mirror(mirrorPlane: mirror2));
+                                                reflected.Transform(RhinoTransform.Mirror(mirrorPlane: mirror2));
                                                 return reflected;
                                             }).ToArray() is Point3d[] reflectedA2
                                             && reflectedA2.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < symmetryTolerance))
@@ -133,7 +134,7 @@ internal static class OrientCompute {
                                         return candidateAngles.Length == 0
                                             ? (byte)0
                                             : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < context.AngleToleranceRadians)
-                                                && global::Rhino.Geometry.Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is global::Rhino.Geometry.Transform rotation
+                                                && RhinoTransform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is RhinoTransform rotation
                                                 && samplesA.Zip(samplesB, (ptA, ptB) => {
                                                     Point3d rotated = ptA;
                                                     rotated.Transform(rotation);
@@ -148,35 +149,35 @@ internal static class OrientCompute {
                                     _ => (byte)3,
                                 }) is (byte symmetry, byte relationship)
                                     ? ResultFactory.Create(value: (xform, twist, tilt, symmetry, relationship))
-                                    : ResultFactory.Create<(global::Rhino.Geometry.Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
-                                : ResultFactory.Create<(global::Rhino.Geometry.Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
-                            : ResultFactory.Create<(global::Rhino.Geometry.Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
-                        _ => ResultFactory.Create<(global::Rhino.Geometry.Transform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
+                                    : ResultFactory.Create<(RhinoTransform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
+                                : ResultFactory.Create<(RhinoTransform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed)
+                            : ResultFactory.Create<(RhinoTransform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
+                        _ => ResultFactory.Create<(RhinoTransform, double, double, byte, byte)>(error: E.Geometry.OrientationFailed),
                     },
-                    _ => ResultFactory.Create<(global::Rhino.Geometry.Transform, double, double, byte, byte)>(error: E.Geometry.UnsupportedOrientationType),
+                    _ => ResultFactory.Create<(RhinoTransform, double, double, byte, byte)>(error: E.Geometry.UnsupportedOrientationType),
                 };
     }
 
     /// <summary>Detect linear or radial patterns with anomaly identification.</summary>
-    internal static Result<(byte PatternType, global::Rhino.Geometry.Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectPattern(
+    internal static Result<(byte PatternType, RhinoTransform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectPattern(
         GeometryBase[] geometries,
         IGeometryContext context) =>
         ResultFactory.Create(value: geometries)
             .Ensure(g => g.All(item => item?.IsValid == true), error: E.Validation.GeometryInvalid)
                 .Bind(validGeometries => validGeometries.Length >= OrientConfig.PatternMinInstances
-                    ? ((Func<Result<(byte, global::Rhino.Geometry.Transform[], int[], double)>>)(() => {
+                    ? ((Func<Result<(byte, RhinoTransform[], int[], double)>>)(() => {
                         Result<Point3d>[] centroidResults = [.. validGeometries.Select(g => OrientCore.ExtractCentroid(g, useMassProperties: false)),];
                         return centroidResults.All(r => r.IsSuccess)
                             ? centroidResults.Select(r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3 && centroids.Skip(1).Zip(centroids, (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas && deltas.Average(v => v.Length) is double avgLen && avgLen > context.AbsoluteTolerance
                                 ? (deltas[0].Length >= context.AbsoluteTolerance
                                     && deltas.Skip(1).All(v => Math.Abs(v.Length - avgLen) / avgLen < context.AbsoluteTolerance
                                         && Vector3d.VectorAngle(deltas[0], v) <= context.AngleToleranceRadians))
-                                    ? ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(value: (0, [.. Enumerable.Range(0, centroids.Length).Select(i => global::Rhino.Geometry.Transform.Translation(deltas[0] * i)),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
+                                    ? ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(value: (0, [.. Enumerable.Range(0, centroids.Length).Select(i => RhinoTransform.Translation(deltas[0] * i)),], [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
                                     : new Point3d(centroids.Average(p => p.X), centroids.Average(p => p.Y), centroids.Average(p => p.Z)) is Point3d center && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii && radii.Average() is double avgRadius && avgRadius > context.AbsoluteTolerance && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < context.AbsoluteTolerance)
-                                        ? ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => global::Rhino.Geometry.Transform.Rotation(RhinoMath.TwoPI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
-                                        : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
-                                : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
-                            : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(r => !r.IsSuccess)} geometries"));
+                                        ? ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(value: (1, [.. Enumerable.Range(0, centroids.Length).Select(i => RhinoTransform.Rotation(RhinoMath.TwoPI * i / centroids.Length, Vector3d.ZAxis, center)),], [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (context.AbsoluteTolerance * OrientConfig.PatternAnomalyThreshold)).Select(pair => pair.i),], radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
+                                        : ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
+                                : ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext("Insufficient valid centroids"))
+                            : ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(r => !r.IsSuccess)} geometries"));
                     }))()
-                    : ResultFactory.Create<(byte, global::Rhino.Geometry.Transform[], int[], double)>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientConfig.PatternMinInstances} geometries, got {validGeometries.Length}")));
+                    : ResultFactory.Create<(byte, RhinoTransform[], int[], double)>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientConfig.PatternMinInstances} geometries, got {validGeometries.Length}")));
 }

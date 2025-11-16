@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Orientation;
 

@@ -7,7 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
-using RhinoTransform = global::Rhino.Geometry.Transform;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Transform;
 
@@ -226,7 +226,9 @@ public static class Transform {
         T geometry,
         ArraySpec spec,
         IGeometryContext context,
+#pragma warning disable IDE0060, RCS1163 // Remove unused parameter - part of public API
         bool enableDiagnostics = false) where T : GeometryBase =>
+#pragma warning restore IDE0060, RCS1163
         spec.Mode switch {
             1 => TransformCore.RectangularArray(
                 geometry: geometry,
@@ -236,31 +238,26 @@ public static class Transform {
                 xSpacing: spec.XSpacing,
                 ySpacing: spec.YSpacing,
                 zSpacing: spec.ZSpacing ?? 0.0,
-                context: context,
-                enableDiagnostics: enableDiagnostics),
+                context: context),
             2 => TransformCore.PolarArray(
                 geometry: geometry,
                 center: spec.Center!.Value,
                 axis: spec.Axis!.Value,
                 count: spec.Count,
                 totalAngle: spec.TotalAngle ?? RhinoMath.TwoPI,
-                context: context,
-                enableDiagnostics: enableDiagnostics),
+                context: context),
             3 => TransformCore.LinearArray(
                 geometry: geometry,
                 direction: spec.Direction!.Value,
                 count: spec.Count,
                 spacing: spec.Spacing,
-                context: context,
-                enableDiagnostics: enableDiagnostics),
+                context: context),
             4 => TransformCompute.PathArray(
                 geometry: geometry,
                 path: spec.PathCurve!,
                 count: spec.Count,
-                orientToPath: spec.OrientToPath,
-                context: context,
-                enableDiagnostics: enableDiagnostics),
-            _ => ResultFactory.Create<IReadOnlyList<T>>(error: global::Arsenal.Core.Errors.E.Transform.InvalidArrayMode),
+                orientToPath: spec.OrientToPath),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode),
         };
 
     /// <summary>Apply SpaceMorph deformation via operation-based dispatch.</summary>
@@ -316,7 +313,7 @@ public static class Transform {
                 radius: spec.Radius!.Value,
                 angle: spec.Angle,
                 context: context),
-            _ => ResultFactory.Create<T>(error: global::Arsenal.Core.Errors.E.Transform.InvalidMorphOperation),
+            _ => ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMorphOperation),
         };
 
     /// <summary>Scale geometry uniformly about anchor point.</summary>

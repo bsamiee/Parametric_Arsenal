@@ -6,6 +6,7 @@ using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
+using RhinoTransform = Rhino.Geometry.Transform;
 
 namespace Arsenal.Rhino.Extraction;
 
@@ -151,6 +152,6 @@ public static class Extract {
 
     /// <summary>Extracts geometric patterns (linear, radial, grid, scaling) with symmetry transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte Type, global::Rhino.Geometry.Transform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
+    public static Result<(byte Type, RhinoTransform SymmetryTransform, double Confidence)> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
         ExtractionCompute.ExtractPatterns(geometries, context: context);
 }
