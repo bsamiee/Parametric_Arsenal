@@ -58,62 +58,20 @@ internal static class FieldsCompute {
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
-        Vector3d[] vectorField,
+    private static Result<(Point3d[] Grid, TOut[] Output)> ComputeDerivativeField<TIn, TOut>(
+        TIn[] inputField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidCurlComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] curl = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-                try {
-                    (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
-                    int resolutionSquared = resolution * resolution;
-                    for (int i = 0; i < resolution; i++) {
-                        int baseI = i * resolutionSquared;
-                        for (int j = 0; j < resolution; j++) {
-                            int baseJ = baseI + (j * resolution);
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = baseJ + k;
-
-                                double dFz_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].Z - vectorField[idx - resolution].Z) / twoDy : 0.0;
-                                double dFy_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].Y - vectorField[idx - 1].Y) / twoDz : 0.0;
-
-                                double dFx_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].X - vectorField[idx - 1].X) / twoDz : 0.0;
-                                double dFz_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resolutionSquared].Z - vectorField[idx - resolutionSquared].Z) / twoDx : 0.0;
-
-                                double dFy_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resolutionSquared].Y - vectorField[idx - resolutionSquared].Y) / twoDx : 0.0;
-                                double dFx_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].X - vectorField[idx - resolution].X) / twoDy : 0.0;
-
-                                curl[idx] = new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
-                            }
-                        }
-                    }
-
-                    Vector3d[] finalCurl = [.. curl[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Curl: finalCurl));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(curl, clearArray: true);
-                }
-            }))(),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
-        Vector3d[] vectorField,
-        Point3d[] grid,
-        int resolution,
-        Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                double[] divergence = ArrayPool<double>.Shared.Rent(totalSamples);
+        Vector3d gridDelta,
+        Func<TIn[], int, int, int, int, int, int, (double, double, double, double, double, double), TOut> stencilOp,
+        SystemError lengthError,
+        SystemError resolutionError) where TIn : struct where TOut : struct =>
+        (inputField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], TOut[])>(error: lengthError),
+            (_, false) => ResultFactory.Create<(Point3d[], TOut[])>(error: resolutionError),
+            (true, true) => ((Func<Result<(Point3d[], TOut[])>>)(() => {
+                int totalSamples = inputField.Length;
+                TOut[] output = ArrayPool<TOut>.Shared.Rent(totalSamples);
                 try {
                     (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
                     int resSquared = resolution * resolution;
@@ -121,24 +79,60 @@ internal static class FieldsCompute {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = (i * resSquared) + (j * resolution) + k;
-
-                                double dFx_dx = (i < resolution - 1 && i > 0) ? (vectorField[idx + resSquared].X - vectorField[idx - resSquared].X) / twoDx : 0.0;
-                                double dFy_dy = (j < resolution - 1 && j > 0) ? (vectorField[idx + resolution].Y - vectorField[idx - resolution].Y) / twoDy : 0.0;
-                                double dFz_dz = (k < resolution - 1 && k > 0) ? (vectorField[idx + 1].Z - vectorField[idx - 1].Z) / twoDz : 0.0;
-
-                                divergence[idx] = dFx_dx + dFy_dy + dFz_dz;
+                                output[idx] = stencilOp(inputField, idx, i, j, k, resolution, resSquared, (dx, dy, dz, twoDx, twoDy, twoDz));
                             }
                         }
                     }
-
-                    double[] finalDivergence = [.. divergence[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Divergence: finalDivergence));
+                    TOut[] finalOutput = [.. output[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Output: finalOutput));
                 } finally {
-                    ArrayPool<double>.Shared.Return(divergence, clearArray: true);
+                    ArrayPool<TOut>.Shared.Return(output, clearArray: true);
                 }
             }))(),
         };
-    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
+        Vector3d[] vectorField,
+        Point3d[] grid,
+        int resolution,
+        Vector3d gridDelta) =>
+        ComputeDerivativeField(
+            inputField: vectorField,
+            grid: grid,
+            resolution: resolution,
+            gridDelta: gridDelta,
+            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
+                double dFz_dy = (j < res - 1 && j > 0) ? (field[idx + res].Z - field[idx - res].Z) / deltas.Item5 : 0.0;
+                double dFy_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Y - field[idx - 1].Y) / deltas.Item6 : 0.0;
+                double dFx_dz = (k < res - 1 && k > 0) ? (field[idx + 1].X - field[idx - 1].X) / deltas.Item6 : 0.0;
+                double dFz_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].Z - field[idx - resSquared].Z) / deltas.Item4 : 0.0;
+                double dFy_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].Y - field[idx - resSquared].Y) / deltas.Item4 : 0.0;
+                double dFx_dy = (j < res - 1 && j > 0) ? (field[idx + res].X - field[idx - res].X) / deltas.Item5 : 0.0;
+                return new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
+            },
+            lengthError: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"),
+            resolutionError: E.Geometry.InvalidCurlComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
+        Vector3d[] vectorField,
+        Point3d[] grid,
+        int resolution,
+        Vector3d gridDelta) =>
+        ComputeDerivativeField(
+            inputField: vectorField,
+            grid: grid,
+            resolution: resolution,
+            gridDelta: gridDelta,
+            stencilOp: (field, idx, i, j, k, res, resSquared, deltas) => {
+                double dFx_dx = (i < res - 1 && i > 0) ? (field[idx + resSquared].X - field[idx - resSquared].X) / deltas.Item4 : 0.0;
+                double dFy_dy = (j < res - 1 && j > 0) ? (field[idx + res].Y - field[idx - res].Y) / deltas.Item5 : 0.0;
+                double dFz_dz = (k < res - 1 && k > 0) ? (field[idx + 1].Z - field[idx - 1].Z) / deltas.Item6 : 0.0;
+                return dFx_dx + dFy_dy + dFz_dz;
+            },
+            lengthError: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"),
+            resolutionError: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
@@ -146,39 +140,20 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        return (scalarField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = scalarField.Length;
-                double[] laplacian = ArrayPool<double>.Shared.Rent(totalSamples);
-                try {
-                    double dx2 = gridDelta.X * gridDelta.X;
-                    double dy2 = gridDelta.Y * gridDelta.Y;
-                    double dz2 = gridDelta.Z * gridDelta.Z;
-                    int resSquared = resolution * resolution;
-
-                    for (int i = 0; i < resolution; i++) {
-                        for (int j = 0; j < resolution; j++) {
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resSquared) + (j * resolution) + k;
-
-                                double d2f_dx2 = (i > 0 && i < resolution - 1) ? (scalarField[idx + resSquared] - (2.0 * scalarField[idx]) + scalarField[idx - resSquared]) / dx2 : 0.0;
-                                double d2f_dy2 = (j > 0 && j < resolution - 1) ? (scalarField[idx + resolution] - (2.0 * scalarField[idx]) + scalarField[idx - resolution]) / dy2 : 0.0;
-                                double d2f_dz2 = (k > 0 && k < resolution - 1) ? (scalarField[idx + 1] - (2.0 * scalarField[idx]) + scalarField[idx - 1]) / dz2 : 0.0;
-
-                                laplacian[idx] = d2f_dx2 + d2f_dy2 + d2f_dz2;
-                            }
-                        }
-                    }
-
-                    double[] finalLaplacian = [.. laplacian[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Laplacian: finalLaplacian));
-                } finally {
-                    ArrayPool<double>.Shared.Return(laplacian, clearArray: true);
-                }
-            }))(),
-        };
+        (double dx2, double dy2, double dz2) = (gridDelta.X * gridDelta.X, gridDelta.Y * gridDelta.Y, gridDelta.Z * gridDelta.Z);
+        return ComputeDerivativeField(
+            inputField: scalarField,
+            grid: grid,
+            resolution: resolution,
+            gridDelta: gridDelta,
+            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
+                double d2f_dx2 = (i > 0 && i < res - 1) ? (field[idx + resSquared] - (2.0 * field[idx]) + field[idx - resSquared]) / dx2 : 0.0;
+                double d2f_dy2 = (j > 0 && j < res - 1) ? (field[idx + res] - (2.0 * field[idx]) + field[idx - res]) / dy2 : 0.0;
+                double d2f_dz2 = (k > 0 && k < res - 1) ? (field[idx + 1] - (2.0 * field[idx]) + field[idx - 1]) / dz2 : 0.0;
+                return d2f_dx2 + d2f_dy2 + d2f_dz2;
+            },
+            lengthError: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"),
+            resolutionError: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -186,25 +161,23 @@ internal static class FieldsCompute {
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta) {
-        return (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
+        Vector3d gridDelta) =>
+        (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
             (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
             (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
                 int totalSamples = vectorField.Length;
                 Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                 try {
+                    int resSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resolution * resolution) + (j * resolution) + k;
-                                potential[idx] = i > 0
-                                    ? potential[((i - 1) * resolution * resolution) + (j * resolution) + k] + (gridDelta.X * vectorField[idx])
-                                    : Vector3d.Zero;
+                                int idx = (i * resSquared) + (j * resolution) + k;
+                                potential[idx] = i > 0 ? potential[((i - 1) * resSquared) + (j * resolution) + k] + (gridDelta.X * vectorField[idx]) : Vector3d.Zero;
                             }
                         }
                     }
-
                     Vector3d[] finalPotential = [.. potential[..totalSamples]];
                     return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
                 } finally {
@@ -212,7 +185,21 @@ internal static class FieldsCompute {
                 }
             }))(),
         };
-    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<T> InterpolateField<T>(
+        Point3d query,
+        T[] field,
+        Point3d[] grid,
+        int resolution,
+        BoundingBox bounds,
+        byte interpolationMethod,
+        Func<T, T, double, T> lerp) where T : struct =>
+        interpolationMethod switch {
+            FieldsConfig.InterpolationNearest => InterpolateNearest(query, field, grid),
+            FieldsConfig.InterpolationTrilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<double> InterpolateScalar(
@@ -221,13 +208,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) {
-        return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, scalarField, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinearScalar(query: query, scalarField: scalarField, resolution: resolution, bounds: bounds),
-            _ => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-        };
-    }
+        byte interpolationMethod) =>
+        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Vector3d> InterpolateVector(
@@ -236,13 +218,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) {
-        return interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, vectorField, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds),
-            _ => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-        };
-    }
+        byte interpolationMethod) =>
+        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
@@ -268,102 +245,45 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<double> InterpolateTrilinearScalar(Point3d query, double[] scalarField, int resolution, BoundingBox bounds) {
-        double dx = bounds.Max.X - bounds.Min.X;
-        double dy = bounds.Max.Y - bounds.Min.Y;
-        double dz = bounds.Max.Z - bounds.Min.Z;
+    private static Result<T> InterpolateTrilinear<T>(
+        Point3d query,
+        T[] field,
+        int resolution,
+        BoundingBox bounds,
+        Func<T, T, double, T> lerp) where T : struct {
+        (double dx, double dy, double dz) = (bounds.Max.X - bounds.Min.X, bounds.Max.Y - bounds.Min.Y, bounds.Max.Z - bounds.Min.Z);
         return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
-            true => ResultFactory.Create<double>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => ((Func<Result<double>>)(() => {
+            true => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
+            false => ((Func<Result<T>>)(() => {
                 int resSquared = resolution * resolution;
-                double normX = (query.X - bounds.Min.X) / dx;
-                double normY = (query.Y - bounds.Min.Y) / dy;
-                double normZ = (query.Z - bounds.Min.Z) / dz;
-                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
-
-                int i0 = (int)fi;
-                int j0 = (int)fj;
-                int k0 = (int)fk;
-                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
-
-                double tx = fi - i0;
-                double ty = fj - j0;
-                double tz = fk - k0;
-
-                double c000 = scalarField[(i0 * resSquared) + (j0 * resolution) + k0];
-                double c001 = scalarField[(i0 * resSquared) + (j0 * resolution) + k1];
-                double c010 = scalarField[(i0 * resSquared) + (j1 * resolution) + k0];
-                double c011 = scalarField[(i0 * resSquared) + (j1 * resolution) + k1];
-                double c100 = scalarField[(i1 * resSquared) + (j0 * resolution) + k0];
-                double c101 = scalarField[(i1 * resSquared) + (j0 * resolution) + k1];
-                double c110 = scalarField[(i1 * resSquared) + (j1 * resolution) + k0];
-                double c111 = scalarField[(i1 * resSquared) + (j1 * resolution) + k1];
-
-                double c00 = c000 + (tx * (c100 - c000));
-                double c01 = c001 + (tx * (c101 - c001));
-                double c10 = c010 + (tx * (c110 - c010));
-                double c11 = c011 + (tx * (c111 - c011));
-
-                double c0 = c00 + (ty * (c10 - c00));
-                double c1 = c01 + (ty * (c11 - c01));
-
-                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
+                (double normX, double normY, double normZ) = ((query.X - bounds.Min.X) / dx, (query.Y - bounds.Min.Y) / dy, (query.Z - bounds.Min.Z) / dz);
+                (double fi, double fj, double fk) = (RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1), RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1), RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1));
+                (int i0, int j0, int k0) = ((int)fi, (int)fj, (int)fk);
+                (int i1, int j1, int k1) = (i0 < resolution - 1 ? i0 + 1 : i0, j0 < resolution - 1 ? j0 + 1 : j0, k0 < resolution - 1 ? k0 + 1 : k0);
+                (double tx, double ty, double tz) = (fi - i0, fj - j0, fk - k0);
+                (T c000, T c001, T c010, T c011, T c100, T c101, T c110, T c111) = (
+                    field[(i0 * resSquared) + (j0 * resolution) + k0],
+                    field[(i0 * resSquared) + (j0 * resolution) + k1],
+                    field[(i0 * resSquared) + (j1 * resolution) + k0],
+                    field[(i0 * resSquared) + (j1 * resolution) + k1],
+                    field[(i1 * resSquared) + (j0 * resolution) + k0],
+                    field[(i1 * resSquared) + (j0 * resolution) + k1],
+                    field[(i1 * resSquared) + (j1 * resolution) + k0],
+                    field[(i1 * resSquared) + (j1 * resolution) + k1]);
+                (T c00, T c01, T c10, T c11) = (lerp(c000, c100, tx), lerp(c001, c101, tx), lerp(c010, c110, tx), lerp(c011, c111, tx));
+                (T c0, T c1) = (lerp(c00, c10, ty), lerp(c01, c11, ty));
+                return ResultFactory.Create(value: lerp(c0, c1, tz));
             }))(),
         };
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateTrilinearVector(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds) {
-        double dx = bounds.Max.X - bounds.Min.X;
-        double dy = bounds.Max.Y - bounds.Min.Y;
-        double dz = bounds.Max.Z - bounds.Min.Z;
-        return (RhinoMath.EpsilonEquals(dx, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dy, 0.0, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(dz, 0.0, epsilon: RhinoMath.SqrtEpsilon)) switch {
-            true => ResultFactory.Create<Vector3d>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Bounds have zero extent in one or more dimensions")),
-            false => ((Func<Result<Vector3d>>)(() => {
-                int resSquared = resolution * resolution;
-                double normX = (query.X - bounds.Min.X) / dx;
-                double normY = (query.Y - bounds.Min.Y) / dy;
-                double normZ = (query.Z - bounds.Min.Z) / dz;
-                double fi = RhinoMath.Clamp(normX * (resolution - 1), 0.0, resolution - 1);
-                double fj = RhinoMath.Clamp(normY * (resolution - 1), 0.0, resolution - 1);
-                double fk = RhinoMath.Clamp(normZ * (resolution - 1), 0.0, resolution - 1);
+    private static Result<double> InterpolateTrilinearScalar(Point3d query, double[] scalarField, int resolution, BoundingBox bounds) =>
+        InterpolateTrilinear(query: query, field: scalarField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)));
 
-                int i0 = (int)fi;
-                int j0 = (int)fj;
-                int k0 = (int)fk;
-                int i1 = i0 < resolution - 1 ? i0 + 1 : i0;
-                int j1 = j0 < resolution - 1 ? j0 + 1 : j0;
-                int k1 = k0 < resolution - 1 ? k0 + 1 : k0;
-
-                double tx = fi - i0;
-                double ty = fj - j0;
-                double tz = fk - k0;
-
-                Vector3d c000 = vectorField[(i0 * resSquared) + (j0 * resolution) + k0];
-                Vector3d c001 = vectorField[(i0 * resSquared) + (j0 * resolution) + k1];
-                Vector3d c010 = vectorField[(i0 * resSquared) + (j1 * resolution) + k0];
-                Vector3d c011 = vectorField[(i0 * resSquared) + (j1 * resolution) + k1];
-                Vector3d c100 = vectorField[(i1 * resSquared) + (j0 * resolution) + k0];
-                Vector3d c101 = vectorField[(i1 * resSquared) + (j0 * resolution) + k1];
-                Vector3d c110 = vectorField[(i1 * resSquared) + (j1 * resolution) + k0];
-                Vector3d c111 = vectorField[(i1 * resSquared) + (j1 * resolution) + k1];
-
-                Vector3d c00 = c000 + (tx * (c100 - c000));
-                Vector3d c01 = c001 + (tx * (c101 - c001));
-                Vector3d c10 = c010 + (tx * (c110 - c010));
-                Vector3d c11 = c011 + (tx * (c111 - c011));
-
-                Vector3d c0 = c00 + (ty * (c10 - c00));
-                Vector3d c1 = c01 + (ty * (c11 - c01));
-
-                return ResultFactory.Create(value: c0 + (tz * (c1 - c0)));
-            }))(),
-        };
-    }
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d> InterpolateTrilinearVector(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds) =>
+        InterpolateTrilinear(query: query, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Curve[]> IntegrateStreamlines(
@@ -582,141 +502,128 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> ComputeDirectionalDerivative(
-        Vector3d[] gradientField,
+    private static Result<(Point3d[] Grid, TOut[] Output)> ApplyFieldOperation<TIn, TOut>(
+        TIn[] inputField,
         Point3d[] grid,
-        Vector3d direction) {
-        return (gradientField.Length == grid.Length, direction.IsValid && direction.Length > RhinoMath.ZeroTolerance) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = gradientField.Length;
-                double[] directionalDerivatives = ArrayPool<double>.Shared.Rent(totalSamples);
-                Vector3d unitDirection = direction / direction.Length;
-
+        Func<TIn, int, TOut> operation,
+        SystemError error) where TIn : struct where TOut : struct =>
+        (inputField.Length == grid.Length) switch {
+            false => ResultFactory.Create<(Point3d[], TOut[])>(error: error),
+            true => ((Func<Result<(Point3d[], TOut[])>>)(() => {
+                int totalSamples = inputField.Length;
+                TOut[] output = ArrayPool<TOut>.Shared.Rent(totalSamples);
                 try {
                     for (int i = 0; i < totalSamples; i++) {
-                        directionalDerivatives[i] = Vector3d.Multiply(gradientField[i], unitDirection);
+                        output[i] = operation(inputField[i], i);
                     }
-
-                    double[] finalDerivatives = [.. directionalDerivatives[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, DirectionalDerivatives: finalDerivatives));
+                    TOut[] finalOutput = [.. output[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Output: finalOutput));
                 } finally {
-                    ArrayPool<double>.Shared.Return(directionalDerivatives, clearArray: true);
+                    ArrayPool<TOut>.Shared.Return(output, clearArray: true);
                 }
             }))(),
         };
-    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<(Point3d[] Grid, TOut[] Output)> ApplyBinaryFieldOperation<T1, T2, TOut>(
+        T1[] inputField1,
+        T2[] inputField2,
+        Point3d[] grid,
+        Func<T1, T2, int, TOut> operation,
+        SystemError error1,
+        SystemError error2) where T1 : struct where T2 : struct where TOut : struct =>
+        (inputField1.Length == grid.Length, inputField2.Length == grid.Length) switch {
+            (false, _) => ResultFactory.Create<(Point3d[], TOut[])>(error: error1),
+            (_, false) => ResultFactory.Create<(Point3d[], TOut[])>(error: error2),
+            (true, true) => ((Func<Result<(Point3d[], TOut[])>>)(() => {
+                int totalSamples = inputField1.Length;
+                TOut[] output = ArrayPool<TOut>.Shared.Rent(totalSamples);
+                try {
+                    for (int i = 0; i < totalSamples; i++) {
+                        output[i] = operation(inputField1[i], inputField2[i], i);
+                    }
+                    TOut[] finalOutput = [.. output[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: grid, Output: finalOutput));
+                } finally {
+                    ArrayPool<TOut>.Shared.Return(output, clearArray: true);
+                }
+            }))(),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> ComputeDirectionalDerivative(
+        Vector3d[] gradientField,
+        Point3d[] grid,
+        Vector3d direction) =>
+        (direction.IsValid && direction.Length > RhinoMath.ZeroTolerance) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
+            true => ((Func<Result<(Point3d[], double[])>>)(() => {
+                Vector3d unitDirection = direction / direction.Length;
+                return ApplyFieldOperation(
+                    inputField: gradientField,
+                    grid: grid,
+                    operation: (gradient, _) => Vector3d.Multiply(gradient, unitDirection),
+                    error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"));
+            }))(),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Magnitudes)> ComputeFieldMagnitude(
         Vector3d[] vectorField,
-        Point3d[] grid) {
-        return (vectorField.Length == grid.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points")),
-            true => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                double[] magnitudes = ArrayPool<double>.Shared.Rent(totalSamples);
-
-                try {
-                    for (int i = 0; i < totalSamples; i++) {
-                        magnitudes[i] = vectorField[i].Length;
-                    }
-
-                    double[] finalMagnitudes = [.. magnitudes[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Magnitudes: finalMagnitudes));
-                } finally {
-                    ArrayPool<double>.Shared.Return(magnitudes, clearArray: true);
-                }
-            }))(),
-        };
-    }
+        Point3d[] grid) =>
+        ApplyFieldOperation(
+            inputField: vectorField,
+            grid: grid,
+            operation: (vector, _) => vector.Length,
+            error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeVectorField(
         Vector3d[] vectorField,
-        Point3d[] grid) {
-        return (vectorField.Length == grid.Length) switch {
-            false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points")),
-            true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] normalized = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-
-                try {
-                    for (int i = 0; i < totalSamples; i++) {
-                        double magnitude = vectorField[i].Length;
-                        normalized[i] = magnitude > FieldsConfig.MinFieldMagnitude
-                            ? vectorField[i] / magnitude
-                            : Vector3d.Zero;
-                    }
-
-                    Vector3d[] finalNormalized = [.. normalized[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Normalized: finalNormalized));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(normalized, clearArray: true);
-                }
-            }))(),
-        };
-    }
+        Point3d[] grid) =>
+        ApplyFieldOperation(
+            inputField: vectorField,
+            grid: grid,
+            operation: (vector, _) => (vector.Length > FieldsConfig.MinFieldMagnitude) switch {
+                true => vector / vector.Length,
+                false => Vector3d.Zero,
+            },
+            error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
         double[] scalarField,
         Vector3d[] vectorField,
         Point3d[] grid,
-        int component) {
-        return (scalarField.Length == grid.Length, vectorField.Length == grid.Length, component is >= 0 and <= 2) switch {
-            (false, _, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points")),
-            (_, false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
-            (_, _, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Component must be 0 (X), 1 (Y), or 2 (Z)")),
-            (true, true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = scalarField.Length;
-                double[] product = ArrayPool<double>.Shared.Rent(totalSamples);
-
-                try {
-                    for (int i = 0; i < totalSamples; i++) {
-                        product[i] = component switch {
-                            0 => scalarField[i] * vectorField[i].X,
-                            1 => scalarField[i] * vectorField[i].Y,
-                            2 => scalarField[i] * vectorField[i].Z,
-                            _ => 0.0,
-                        };
-                    }
-
-                    double[] finalProduct = [.. product[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Product: finalProduct));
-                } finally {
-                    ArrayPool<double>.Shared.Return(product, clearArray: true);
-                }
-            }))(),
+        int component) =>
+        (component is >= 0 and <= 2) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Component must be 0 (X), 1 (Y), or 2 (Z)")),
+            true => ApplyBinaryFieldOperation(
+                inputField1: scalarField,
+                inputField2: vectorField,
+                grid: grid,
+                operation: (scalar, vector, _) => component switch {
+                    0 => scalar * vector.X,
+                    1 => scalar * vector.Y,
+                    2 => scalar * vector.Z,
+                    _ => 0.0,
+                },
+                error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
+                error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
         };
-    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
         Vector3d[] vectorField1,
         Vector3d[] vectorField2,
-        Point3d[] grid) {
-        return (vectorField1.Length == grid.Length, vectorField2.Length == grid.Length) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points")),
-            (true, true) => ((Func<Result<(Point3d[], double[])>>)(() => {
-                int totalSamples = vectorField1.Length;
-                double[] dotProduct = ArrayPool<double>.Shared.Rent(totalSamples);
-
-                try {
-                    for (int i = 0; i < totalSamples; i++) {
-                        dotProduct[i] = Vector3d.Multiply(vectorField1[i], vectorField2[i]);
-                    }
-
-                    double[] finalDotProduct = [.. dotProduct[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, DotProduct: finalDotProduct));
-                } finally {
-                    ArrayPool<double>.Shared.Return(dotProduct, clearArray: true);
-                }
-            }))(),
-        };
-    }
+        Point3d[] grid) =>
+        ApplyBinaryFieldOperation(
+            inputField1: vectorField1,
+            inputField2: vectorField2,
+            grid: grid,
+            operation: (v1, v2, _) => Vector3d.Multiply(v1, v2),
+            error1: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"),
+            error2: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
