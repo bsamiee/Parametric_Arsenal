@@ -22,31 +22,31 @@ namespace Arsenal.Rhino.Boolean;
 [Pure]
 internal static class BooleanCompute {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> BrepUnion(
+    internal static Result<Boolean.BooleanOutput> BrepUnion(
         Brep[] breps,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Brep.CreateBooleanUnion(breps, tolerance) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Union returned null - verify input Breps are closed, valid, and have compatible tolerances")),
-                    { Length: 0 } => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    { Length: 0 } => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Union produced empty result - Breps may not overlap or touch")),
                     Brep[] results => options.ValidateResult
                         ? results.All(static b => b.IsValid)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: results,
                                 Meshes: [],
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid Breps in result: {results.Count(static b => !b.IsValid)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: results,
                             Meshes: [],
                             Curves: [],
@@ -55,35 +55,35 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> BrepIntersection(
+    internal static Result<Boolean.BooleanOutput> BrepIntersection(
         Brep[] firstSet,
         Brep[] secondSet,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Brep.CreateBooleanIntersection(firstSet, secondSet, tolerance) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Intersection returned null - verify Breps are closed and overlap")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Brep[] results => options.ValidateResult
                         ? results.All(static b => b.IsValid)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: results,
                                 Meshes: [],
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid Breps: {results.Count(static b => !b.IsValid)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: results,
                             Meshes: [],
                             Curves: [],
@@ -92,39 +92,39 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> BrepDifference(
+    internal static Result<Boolean.BooleanOutput> BrepDifference(
         Brep[] firstSet,
         Brep[] secondSet,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Brep.CreateBooleanDifference(
                     firstSet: firstSet,
                     secondSet: secondSet,
                     tolerance: tolerance,
                     manifoldOnly: options.ManifoldOnly) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Difference returned null - verify Breps are closed and overlap")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Brep[] results => options.ValidateResult
                         ? results.All(static b => b.IsValid)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: results,
                                 Meshes: [],
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid Breps: {results.Count(static b => !b.IsValid)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: results,
                             Meshes: [],
                             Curves: [],
@@ -133,35 +133,35 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> BrepSplit(
+    internal static Result<Boolean.BooleanOutput> BrepSplit(
         Brep brep,
         Brep splitter,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : brep.Split(splitter, tolerance) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Split returned null - verify Breps intersect")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [brep,],
                         Meshes: [],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Brep[] results => options.ValidateResult
                         ? results.All(static b => b.IsValid)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: results,
                                 Meshes: [],
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid Breps: {results.Count(static b => !b.IsValid)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: results,
                             Meshes: [],
                             Curves: [],
@@ -170,34 +170,34 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> MeshUnion(
+    internal static Result<Boolean.BooleanOutput> MeshUnion(
         Mesh[] meshes,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             MeshBooleanOptions meshOptions = new() {
                 CombineCoplanarFaces = options.CombineCoplanarFaces,
             };
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Mesh.CreateBooleanUnion(meshes, tolerance, meshOptions) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Mesh union returned null - ensure meshes are closed and manifold")),
-                    { Length: 0 } => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    { Length: 0 } => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Mesh union produced empty result")),
                     Mesh[] results => options.ValidateResult
                         ? results.All(static m => m.IsValid && m.IsClosed)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: [],
                                 Meshes: results,
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid meshes: {results.Count(static m => !m.IsValid || !m.IsClosed)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: [],
                             Meshes: results,
                             Curves: [],
@@ -206,38 +206,38 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> MeshIntersection(
+    internal static Result<Boolean.BooleanOutput> MeshIntersection(
         Mesh[] firstSet,
         Mesh[] secondSet,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             MeshBooleanOptions meshOptions = new() {
                 CombineCoplanarFaces = options.CombineCoplanarFaces,
             };
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Mesh.CreateBooleanIntersection(firstSet, secondSet, tolerance, meshOptions) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Mesh intersection returned null")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Mesh[] results => options.ValidateResult
                         ? results.All(static m => m.IsValid && m.IsClosed)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: [],
                                 Meshes: results,
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid meshes: {results.Count(static m => !m.IsValid || !m.IsClosed)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: [],
                             Meshes: results,
                             Curves: [],
@@ -246,38 +246,38 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> MeshDifference(
+    internal static Result<Boolean.BooleanOutput> MeshDifference(
         Mesh[] firstSet,
         Mesh[] secondSet,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             MeshBooleanOptions meshOptions = new() {
                 CombineCoplanarFaces = options.CombineCoplanarFaces,
             };
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Mesh.CreateBooleanDifference(firstSet, secondSet, tolerance, meshOptions) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Mesh difference returned null")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Mesh[] results => options.ValidateResult
                         ? results.All(static m => m.IsValid && m.IsClosed)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: [],
                                 Meshes: results,
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid meshes: {results.Count(static m => !m.IsValid || !m.IsClosed)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: [],
                             Meshes: results,
                             Curves: [],
@@ -286,38 +286,38 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> MeshSplit(
+    internal static Result<Boolean.BooleanOutput> MeshSplit(
         Mesh[] meshes,
         Mesh[] cutters,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             MeshBooleanOptions meshOptions = new() {
                 CombineCoplanarFaces = options.CombineCoplanarFaces,
             };
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Mesh.CreateBooleanSplit(meshes, cutters, tolerance, meshOptions) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Mesh split returned null")),
-                    { Length: 0 } => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [.. meshes,],
                         Curves: [],
                         ToleranceUsed: tolerance)),
                     Mesh[] results => options.ValidateResult
                         ? results.All(static m => m.IsValid && m.IsClosed)
-                            ? ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                                 Breps: [],
                                 Meshes: results,
                                 Curves: [],
                                 ToleranceUsed: tolerance))
-                            : ResultFactory.Create<BooleanCore.BooleanOutput>(
+                            : ResultFactory.Create<Boolean.BooleanOutput>(
                                 error: E.Validation.GeometryInvalid.WithContext(
                                     $"Invalid meshes: {results.Count(static m => !m.IsValid || !m.IsClosed)} of {results.Length}"))
-                        : ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                        : ResultFactory.Create(value: new Boolean.BooleanOutput(
                             Breps: [],
                             Meshes: results,
                             Curves: [],
@@ -326,21 +326,21 @@ internal static class BooleanCompute {
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<BooleanCore.BooleanOutput> CurveRegions(
+    internal static Result<Boolean.BooleanOutput> CurveRegions(
         Curve[] curves,
         Plane plane,
         bool combineRegions,
         Boolean.BooleanOptions options,
         IGeometryContext context) =>
-        ((Func<Result<BooleanCore.BooleanOutput>>)(() => {
+        ((Func<Result<Boolean.BooleanOutput>>)(() => {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanCore.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Curve.CreateBooleanRegions(curves, plane, combineRegions, tolerance) switch {
-                    null => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.InvalidGeometryType.WithContext("Curve region extraction returned null - verify curves are planar and coplanar")),
-                    CurveBooleanRegions regions when regions.RegionCount > 0 => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    CurveBooleanRegions regions when regions.RegionCount > 0 => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [.. Enumerable.Range(0, regions.RegionCount)
@@ -348,7 +348,7 @@ internal static class BooleanCompute {
                             .Where(static c => c is not null),
                         ],
                         ToleranceUsed: tolerance)),
-                    _ => ResultFactory.Create(value: new BooleanCore.BooleanOutput(
+                    _ => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
                         Curves: [],
@@ -359,6 +359,12 @@ internal static class BooleanCompute {
 ```
 
 ## Key Design Notes
+
+### CRITICAL: Type References
+- **All methods return** `Result<Boolean.BooleanOutput>`
+- **BooleanOutput is nested in Boolean class**, not BooleanCore
+- **Matches pattern**: IntersectionCompute returns `Intersect.IntersectionOutput`
+- **Single type per file**: Only BooleanCompute class at namespace level
 
 ### SDK Wrapping Pattern
 Each method follows identical structure:

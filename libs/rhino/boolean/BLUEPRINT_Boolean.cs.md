@@ -2,8 +2,8 @@
 
 **File**: `libs/rhino/boolean/Boolean.cs`  
 **Purpose**: Public API surface with unified `Execute<T1, T2>` entry point  
-**Types**: 3 (Boolean class + 2 nested types)  
-**Estimated LOC**: 120-160
+**Types**: 1 (Boolean class with 3 nested types)  
+**Estimated LOC**: 140-180
 
 ## File Structure
 
@@ -38,9 +38,20 @@ public static class Boolean {
         bool CombineCoplanarFaces = true,
         bool ValidateResult = true);
 
+    /// <summary>Boolean operation result containing geometry arrays and metadata.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct BooleanOutput(
+        IReadOnlyList<Brep> Breps,
+        IReadOnlyList<Mesh> Meshes,
+        IReadOnlyList<Curve> Curves,
+        double ToleranceUsed) {
+        /// <summary>Empty result for non-intersecting or failed operations.</summary>
+        public static readonly BooleanOutput Empty = new([], [], [], 0.0);
+    }
+
     /// <summary>Executes type-detected boolean operation with automatic validation and dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<BooleanCore.BooleanOutput> Execute<T1, T2>(
+    public static Result<BooleanOutput> Execute<T1, T2>(
         T1 geometryA,
         T2 geometryB,
         OperationType operation,
@@ -48,24 +59,24 @@ public static class Boolean {
         BooleanOptions? options = null) where T1 : notnull where T2 : notnull =>
         BooleanCore.OperationRegistry.TryGetValue(
             key: (typeof(T1), typeof(T2), operation),
-            value: out (V ValidationMode, Func<object, object, OperationType, BooleanOptions, IGeometryContext, Result<BooleanCore.BooleanOutput>> Executor) config) switch {
+            value: out (V ValidationMode, Func<object, object, OperationType, BooleanOptions, IGeometryContext, Result<BooleanOutput>> Executor) config) switch {
             true => UnifiedOperation.Apply(
                 input: geometryA,
-                operation: (Func<T1, Result<IReadOnlyList<BooleanCore.BooleanOutput>>>)(itemA => config.Executor(
+                operation: (Func<T1, Result<IReadOnlyList<BooleanOutput>>>)(itemA => config.Executor(
                     itemA,
                     geometryB,
                     operation,
                     options ?? new BooleanOptions(),
                     context)
-                    .Map(output => (IReadOnlyList<BooleanCore.BooleanOutput>)[output])),
-                config: new OperationConfig<T1, BooleanCore.BooleanOutput> {
+                    .Map(output => (IReadOnlyList<BooleanOutput>)[output])),
+                config: new OperationConfig<T1, BooleanOutput> {
                     Context = context,
                     ValidationMode = config.ValidationMode,
                     OperationName = $"Boolean.{operation}.{typeof(T1).Name}.{typeof(T2).Name}",
                     EnableDiagnostics = false,
                 })
-                .Map(outputs => outputs.Count > 0 ? outputs[0] : BooleanCore.BooleanOutput.Empty),
-            false => ResultFactory.Create<BooleanCore.BooleanOutput>(
+                .Map(outputs => outputs.Count > 0 ? outputs[0] : BooleanOutput.Empty),
+            false => ResultFactory.Create<BooleanOutput>(
                 error: E.Geometry.UnsupportedConfiguration.WithContext(
                     $"Operation: {operation}, Types: {typeof(T1).Name}, {typeof(T2).Name}")),
         };
@@ -74,10 +85,11 @@ public static class Boolean {
 
 ## Key Design Notes
 
-### Type Nesting
-- **Boolean** static class: Main API container
+### Type Nesting (CRITICAL)
+- **Boolean** static class: Main API container - ONLY type at namespace level
 - **OperationType** enum: Nested in Boolean class (byte enum for memory efficiency)
 - **BooleanOptions** record struct: Nested in Boolean class with StructLayout.Auto
+- **BooleanOutput** record struct: Nested in Boolean class (NOT in BooleanCore - matches Intersect.IntersectionOutput pattern)
 
 ### Namespace Suppression
 - **REQUIRED**: `[SuppressMessage("MA0049")]` attribute on Boolean class
@@ -109,8 +121,15 @@ public static class Boolean {
 - Namespace + class declaration: 3
 - OperationType enum: 6
 - BooleanOptions record: 7
+- BooleanOutput record: 10
 - Execute<T1, T2> method: 30
-- Total: ~56 LOC base + XML comments
+- Total: ~66 LOC base + XML comments
+
+### Why BooleanOutput is Here (Not in BooleanCore)
+- **Pattern match**: Intersect.IntersectionOutput is nested in Intersect (public API class)
+- **Rule**: Only ONE type per file at namespace level (no mixed types in bracket)
+- **BooleanCore.cs must have ONLY BooleanCore class** at namespace level
+- **Public output types belong with public API**, not internal implementation
 
 ## XML Documentation Standards
 ```csharp

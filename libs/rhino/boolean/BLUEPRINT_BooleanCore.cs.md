@@ -2,8 +2,8 @@
 
 **File**: `libs/rhino/boolean/BooleanCore.cs`  
 **Purpose**: FrozenDictionary dispatch registry and execution routing  
-**Types**: 2 (BooleanCore class + BooleanOutput record)  
-**Estimated LOC**: 150-200
+**Types**: 1 (BooleanCore class ONLY - no mixed types)  
+**Estimated LOC**: 140-180
 
 ## File Structure
 
@@ -19,23 +19,12 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Boolean;
 
-/// <summary>Boolean operation result containing geometry arrays and metadata.</summary>
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-public readonly record struct BooleanOutput(
-    IReadOnlyList<Brep> Breps,
-    IReadOnlyList<Mesh> Meshes,
-    IReadOnlyList<Curve> Curves,
-    double ToleranceUsed) {
-    /// <summary>Empty result for non-intersecting or failed operations.</summary>
-    public static readonly BooleanOutput Empty = new([], [], [], 0.0);
-}
-
 /// <summary>FrozenDictionary dispatch with type-based operation routing.</summary>
 [Pure]
 internal static class BooleanCore {
     /// <summary>Type-operation-specific dispatch registry mapping to executors and validation modes.</summary>
-    internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> Executor)> OperationRegistry =
-        new Dictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> Executor)> {
+    internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> Executor)> OperationRegistry =
+        new Dictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> Executor)> {
             [(typeof(Brep), typeof(Brep), Boolean.OperationType.Union)] = (V.Standard | V.Topology, MakeBrepExecutor()),
             [(typeof(Brep), typeof(Brep), Boolean.OperationType.Intersection)] = (V.Standard | V.Topology, MakeBrepExecutor()),
             [(typeof(Brep), typeof(Brep), Boolean.OperationType.Difference)] = (V.Standard | V.Topology, MakeBrepExecutor()),
@@ -55,27 +44,27 @@ internal static class BooleanCore {
         }.ToFrozenDictionary();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeBrepExecutor() =>
+    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeBrepExecutor() =>
         (a, b, op, opts, ctx) => ExecuteBrepBoolean((Brep)a, (Brep)b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeBrepArrayExecutor() =>
+    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeBrepArrayExecutor() =>
         (a, b, op, opts, ctx) => ExecuteBrepArrayBoolean((Brep[])a, (Brep[])b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeMeshExecutor() =>
+    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeMeshExecutor() =>
         (a, b, op, opts, ctx) => ExecuteMeshBoolean((Mesh)a, (Mesh)b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeMeshArrayExecutor() =>
+    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeMeshArrayExecutor() =>
         (a, b, op, opts, ctx) => ExecuteMeshArrayBoolean((Mesh[])a, (Mesh[])b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeCurveExecutor() =>
+    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeCurveExecutor() =>
         (a, b, op, opts, ctx) => ExecuteCurveBoolean((Curve[])a, (Plane)b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ExecuteBrepBoolean(
+    private static Result<Boolean.BooleanOutput> ExecuteBrepBoolean(
         Brep brepA,
         Brep brepB,
         Boolean.OperationType operation,
@@ -154,12 +143,11 @@ internal static class BooleanCore {
 
 ## Key Design Notes
 
-### BooleanOutput Record
-- **Public**: Accessible from Boolean.Execute return type
-- **StructLayout.Auto**: Let runtime optimize struct layout
-- **IReadOnlyList<T>**: Immutable collections for Breps, Meshes, Curves
-- **ToleranceUsed**: Track actual tolerance applied (may differ from input)
-- **Empty**: Static readonly for zero-allocation default
+### CRITICAL: Single Type Per File
+- **ONLY BooleanCore class at namespace level** - no mixed types
+- **BooleanOutput moved to Boolean.cs** - matches Intersect.IntersectionOutput pattern
+- **No suppression needed** - only one type in the main bracket
+- **Pattern**: All Config/Core files have exactly ONE type at namespace level
 
 ### Registry Structure
 - **FrozenDictionary**: O(1) lookup, compiled at startup
@@ -193,12 +181,16 @@ internal static class BooleanCore {
 
 ### LOC Breakdown
 - Using statements: 10
-- BooleanOutput record: 10
 - BooleanCore class declaration: 2
 - OperationRegistry: 20 (16 entries + ToFrozenDictionary)
 - Executor factories (5): 15
 - Routing methods (5): 60
-- Total: ~117 LOC + XML comments
+- Total: ~107 LOC + XML comments
+
+### Type References
+- All `BooleanOutput` references qualified as `Boolean.BooleanOutput`
+- Matches IntersectionCore referencing `Intersect.IntersectionOutput`
+- Executor functions return `Result<Boolean.BooleanOutput>`
 
 ## XML Documentation Standards
 ```csharp
