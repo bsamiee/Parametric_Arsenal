@@ -129,7 +129,6 @@ internal static class MorphologyCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) {
         Point3d[] updated = new Point3d[positions.Length];
-
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
             if (neighbors.Length is 0) {
@@ -141,38 +140,34 @@ internal static class MorphologyCore {
             for (int j = 0; j < neighbors.Length; j++) {
                 int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0];
                 Point3d neighborPos = positions[meshVertIdx];
-                double weight = useCotangent
-                    ? MorphologyConfig.UniformLaplacianWeight / Math.Max(currentPos.DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                    : MorphologyConfig.UniformLaplacianWeight;
+                double weight = useCotangent ? MorphologyConfig.UniformLaplacianWeight / Math.Max(currentPos.DistanceTo(neighborPos), RhinoMath.ZeroTolerance) : MorphologyConfig.UniformLaplacianWeight;
                 weightedSum += weight * (Vector3d)neighborPos;
                 weightSum += weight;
             }
             updated[i] = weightSum > RhinoMath.ZeroTolerance ? (Point3d)(weightedSum / weightSum) : currentPos;
         }
-
         return updated;
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep, IGeometryContext _) {
         Point3d[] updated = new Point3d[positions.Length];
-
         for (int i = 0; i < positions.Length; i++) {
             int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            if (neighbors.Length is 0) {
+                updated[i] = positions[i];
+                continue;
+            }
             Point3d currentPos = positions[i];
-            Point3d laplacian = neighbors.Length is 0
-                ? Point3d.Origin
-                : neighbors.Aggregate(
-                    Point3d.Origin,
-                    (acc, neighborIdx) => {
-                        int meshVertIdx = mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0];
-                        return acc + (positions[meshVertIdx] - currentPos);
-                    }) / neighbors.Length;
+            Point3d laplacian = Point3d.Origin;
+            for (int j = 0; j < neighbors.Length; j++) {
+                laplacian += positions[mesh.TopologyVertices.MeshVertexIndices(neighbors[j])[0]] - currentPos;
+            }
+            laplacian /= neighbors.Length;
             Vector3d normal = mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis;
             double curvature = normal * (laplacian - Point3d.Origin);
-            updated[i] = neighbors.Length is 0 ? currentPos : currentPos + ((timeStep * curvature) * normal);
+            updated[i] = currentPos + ((timeStep * curvature) * normal);
         }
-
         return updated;
     }
 
