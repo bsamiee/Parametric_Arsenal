@@ -4,9 +4,8 @@ using System.Runtime.CompilerServices;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
-using RhinoTransform = Rhino.Geometry.Transform;
 
-namespace Arsenal.Rhino.Transform;
+namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform configuration: validation modes, algorithmic constants, and tolerance thresholds.</summary>
 internal static class TransformConfig {

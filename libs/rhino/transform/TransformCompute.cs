@@ -9,10 +9,9 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
-using RhinoTransform = Rhino.Geometry.Transform;
 using Rhino.Geometry.Morphs;
 
-namespace Arsenal.Rhino.Transform;
+namespace Arsenal.Rhino.Transformation;
 
 /// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
 internal static class TransformCompute {
@@ -215,7 +214,7 @@ internal static class TransformCompute {
         bool orientToPath) where T : GeometryBase =>
         count > 0 && count <= TransformConfig.MaxArrayCount && path.IsValid && geometry.IsValid
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
-                RhinoTransform[] transforms = new RhinoTransform[count];
+                Transform[] transforms = new Transform[count];
                 Interval domain = path.Domain;
                 double step = count > 1 ? (domain.Max - domain.Min) / (count - 1) : 0.0;
 
@@ -224,8 +223,8 @@ internal static class TransformCompute {
                     Point3d pt = path.PointAt(t);
 
                     transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
-                        ? RhinoTransform.PlaneToPlane(Plane.WorldXY, frame)
-                        : RhinoTransform.Translation(pt - Point3d.Origin);
+                        ? Transform.PlaneToPlane(Plane.WorldXY, frame)
+                        : Transform.Translation(pt - Point3d.Origin);
                 }
 
                 List<T> results = [];

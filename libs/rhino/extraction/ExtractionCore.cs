@@ -8,7 +8,6 @@ using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Collections;
 using Rhino.Geometry;
-using RhinoTransform = Rhino.Geometry.Transform;
 using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Extraction;

@@ -7,19 +7,16 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
-using RhinoTransform = Rhino.Geometry.Transform;
 
-namespace Arsenal.Rhino.Transform;
+namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Affine transforms, arrays, and deformations with unified polymorphic dispatch.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Transform is the primary API entry point for the Transform namespace")]
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0104:Type name should not match namespace name", Justification = "Transform is the primary API entry point for the Transform namespace")]
-public static class Transform {
+public static class Transforms {
     /// <summary>Transform specification discriminated union for pattern matching dispatch.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct TransformSpec {
         /// <summary>Direct transform matrix application.</summary>
-        public RhinoTransform? Matrix { get; init; }
+        public Transform? Matrix { get; init; }
         /// <summary>Uniform scale: (anchor, factor).</summary>
         public (Point3d Anchor, double Factor)? UniformScale { get; init; }
         /// <summary>Non-uniform scale: (plane, xScale, yScale, zScale).</summary>
@@ -43,7 +40,7 @@ public static class Transform {
 
         /// <summary>Create matrix transform specification.</summary>
         [Pure]
-        public static TransformSpec FromMatrix(RhinoTransform xform) => new() { Matrix = xform };
+        public static TransformSpec FromMatrix(Transform xform) => new() { Matrix = xform };
         /// <summary>Create uniform scale specification.</summary>
         [Pure]
         public static TransformSpec FromScale(Point3d anchor, double factor) => new() { UniformScale = (anchor, factor) };
