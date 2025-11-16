@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
@@ -150,7 +151,8 @@ internal static class MorphologyCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) =>
         [.. Enumerable.Range(0, positions.Length).Select(i => {
-            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
+            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : Array.Empty<int>();
             return neighbors.Length is 0
                 ? positions[i]
                 : neighbors.Aggregate(
@@ -170,7 +172,8 @@ internal static class MorphologyCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep, IGeometryContext _) =>
         [.. Enumerable.Range(0, positions.Length).Select(i => {
-            int[] neighbors = mesh.TopologyVertices.ConnectedTopologyVertices(i);
+            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
+            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : Array.Empty<int>();
             return neighbors.Length is 0
                 ? positions[i]
                 : positions[i] + ((timeStep * (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis) *
