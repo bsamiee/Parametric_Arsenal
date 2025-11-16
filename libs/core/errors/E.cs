@@ -95,6 +95,17 @@ public static class E {
             [2007] = "Invalid or unsupported geometry type",
             [2008] = "Unsupported configuration for operation and geometry type combination",
 
+            // Boolean Operations (2100-2108)
+            [2100] = "Boolean operation failed",
+            [2101] = "Input geometry not closed or solid",
+            [2102] = "Input curves not planar or not coplanar",
+            [2103] = "Mesh quality insufficient for boolean operation",
+            [2104] = "Operation produced degenerate or invalid result",
+            [2105] = "Trim operation failed",
+            [2106] = "Split operation failed",
+            [2107] = "Region extraction failed",
+            [2108] = "Boolean result validation failed",
+
             // Morphology Operations (2800-2817)
             [2800] = "Cage-based deformation failed",
             [2801] = "Cage control point count mismatch between original and deformed arrays",
@@ -285,6 +296,19 @@ public static class E {
         // General Geometry Type Errors (2007-2008)
         public static readonly SystemError InvalidGeometryType = Get(2007);
         public static readonly SystemError UnsupportedConfiguration = Get(2008);
+
+        /// <summary>Boolean operation errors (2100-2108).</summary>
+        public static class BooleanOps {
+            public static readonly SystemError OperationFailed = Get(2100);
+            public static readonly SystemError NotClosedOrSolid = Get(2101);
+            public static readonly SystemError NotPlanarOrCoplanar = Get(2102);
+            public static readonly SystemError InsufficientMeshQuality = Get(2103);
+            public static readonly SystemError DegenerateResult = Get(2104);
+            public static readonly SystemError TrimFailed = Get(2105);
+            public static readonly SystemError SplitFailed = Get(2106);
+            public static readonly SystemError RegionExtractionFailed = Get(2107);
+            public static readonly SystemError ResultValidationFailed = Get(2108);
+        }
 
         /// <summary>Morphology operation errors (2800-2817).</summary>
         public static class Morphology {
