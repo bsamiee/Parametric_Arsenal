@@ -297,12 +297,9 @@ internal static class MorphologyCore {
         int iterations,
         IGeometryContext context) {
         int vertCount = Math.Min(original.Vertices.Count, smoothed.Vertices.Count);
-        (double sumSq, double maxDisp) = (0.0, 0.0);
-        for (int i = 0; i < vertCount; i++) {
-            double dist = ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]);
-            sumSq += dist * dist;
-            maxDisp = Math.Max(maxDisp, dist);
-        }
+        (double sumSq, double maxDisp) = Enumerable.Range(0, vertCount)
+            .Select(i => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]))
+            .Aggregate((sumSq: 0.0, maxDisp: 0.0), (acc, dist) => (acc.sumSq + (dist * dist), Math.Max(acc.maxDisp, dist)));
         double rms = vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0;
         double quality = MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0;
         bool converged = rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
@@ -359,12 +356,9 @@ internal static class MorphologyCore {
         int maxIters,
         IGeometryContext context) {
         int edgeCount = remeshed.TopologyEdges.Count;
-        (double sum, double sumSq) = (0.0, 0.0);
-        for (int i = 0; i < edgeCount; i++) {
-            double len = remeshed.TopologyEdges.EdgeLine(i).Length;
-            sum += len;
-            sumSq += len * len;
-        }
+        (double sum, double sumSq) = Enumerable.Range(0, edgeCount)
+            .Select(i => remeshed.TopologyEdges.EdgeLine(i).Length)
+            .Aggregate((sum: 0.0, sumSq: 0.0), (acc, len) => (acc.sum + len, acc.sumSq + (len * len)));
         double mean = edgeCount > 0 ? sum / edgeCount : 0.0;
         double variance = edgeCount > 0 ? (sumSq / edgeCount) - (mean * mean) : 0.0;
         double stdDev = Math.Sqrt(Math.Max(variance, 0.0));
