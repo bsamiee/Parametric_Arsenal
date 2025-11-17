@@ -10,15 +10,17 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Transformation;
 
-/// <summary>Transform matrix construction, validation, and application with disposal patterns.</summary>
+/// <summary>Transform matrix construction, validation, and application.</summary>
 internal static class TransformCore {
-    /// <summary>Build transform matrix from specification via pattern matching dispatch.</summary>
+    /// <summary>Build transform matrix from specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> BuildTransform(
         Transforms.TransformSpec spec,
         IGeometryContext context) =>
         spec switch { { Matrix: Transform m } =>
-                          ValidateTransform(transform: m, context: context), { UniformScale: (Point3d anchor, double factor) } when factor is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor =>
+                          m.IsValid && Math.Abs(m.Determinant) > context.AbsoluteTolerance
+                              ? ResultFactory.Create(value: m)
+                              : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Valid: {m.IsValid}, Det: {m.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")), { UniformScale: (Point3d anchor, double factor) } when factor is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor =>
                                                                                  ResultFactory.Create(value: Transform.Scale(anchor, factor)), { UniformScale: (Point3d, double factor) } =>
                                                                                                                                                    ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidScaleFactor.WithContext($"Factor: {factor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")), { NonUniformScale: (Plane plane, double x, double y, double z) } =>
                                                                                                                                                                                                                                                                                                                                                 plane.IsValid
@@ -54,17 +56,7 @@ internal static class TransformCore {
             _ => ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec),
         };
 
-    /// <summary>Validate transform matrix for validity and non-singularity.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Transform> ValidateTransform(
-        Transform transform,
-        IGeometryContext context) =>
-        transform.IsValid && Math.Abs(transform.Determinant) > context.AbsoluteTolerance
-            ? ResultFactory.Create(value: transform)
-            : ResultFactory.Create<Transform>(
-                error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Valid: {transform.IsValid}, Det: {transform.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
-
-    /// <summary>Apply transform to geometry with Extrusion conversion and disposal.</summary>
+    /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
@@ -84,7 +76,7 @@ internal static class TransformCore {
         }
     }
 
-    /// <summary>Generate rectangular grid array transforms via nested loops.</summary>
+    /// <summary>Generate rectangular grid array transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> RectangularArray<T>(
         T geometry,
@@ -132,7 +124,7 @@ internal static class TransformCore {
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {xCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, YCount: {yCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ZCount: {zCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Total: {(xCount * yCount * zCount).ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
 
-    /// <summary>Generate polar array transforms via angular stepping.</summary>
+    /// <summary>Generate polar array transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> PolarArray<T>(
         T geometry,
@@ -172,7 +164,7 @@ internal static class TransformCore {
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
 
-    /// <summary>Generate linear array transforms via directional stepping.</summary>
+    /// <summary>Generate linear array transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> LinearArray<T>(
         T geometry,
