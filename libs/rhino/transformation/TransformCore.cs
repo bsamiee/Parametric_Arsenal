@@ -152,7 +152,7 @@ internal static class TransformCore {
             || axis.Length <= context.AbsoluteTolerance
             || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Axis: {Fmt(axis.Length)}, Angle: {Fmt(totalAngle)}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Axis: {Fmt(axis.Length)}, Angle: {Fmt(totalAngle)}"));
         }
 
         Transform[] transforms = new Transform[count];
