@@ -191,7 +191,7 @@ internal static class TransformCore {
             || direction.Length <= context.AbsoluteTolerance
             || Math.Abs(spacing) <= context.AbsoluteTolerance) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Direction: {Fmt(direction.Length)}, Spacing: {Fmt(spacing)}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Direction: {Fmt(direction.Length)}, Spacing: {Fmt(spacing)}"));
         }
 
         Transform[] transforms = new Transform[count];
