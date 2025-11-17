@@ -67,6 +67,32 @@ public static class E {
             [2510] = "Relative orientation computation failed",
             [2511] = "Pattern detection failed",
 
+            // Transform Operations (2550-2566)
+            [2550] = "Transform matrix is invalid or singular",
+            [2551] = "Scale factor must be non-zero and within valid range",
+            [2552] = "Rotation axis vector is zero-length or invalid",
+            [2553] = "Mirror plane is invalid or degenerate",
+            [2554] = "Array count must be positive and within limits",
+            [2555] = "Array parameters are invalid or produce invalid configuration",
+            [2556] = "Polar array angle must be in range (0, 2π]",
+            [2557] = "Morph operation failed or geometry not morphable",
+            [2558] = "Flow curves are invalid or incompatible",
+            [2559] = "Twist parameters invalid: axis or angle out of range",
+            [2560] = "Bend parameters invalid: spine or angle out of range",
+            [2561] = "Taper parameters produce degenerate geometry",
+            [2562] = "Stretch parameters are invalid",
+            [2563] = "Shear parameters invalid: plane and direction are incompatible",
+            [2564] = "Projection plane is invalid",
+            [2565] = "Basis planes are invalid for coordinate system change",
+            [2566] = "Transform specification is invalid or incomplete",
+            [2567] = "Transform application to geometry failed",
+            [2568] = "Geometry is not morphable with specified operation",
+            [2569] = "Invalid array mode specified",
+            [2570] = "Invalid morph operation specified",
+            [2571] = "Splop parameters invalid: plane, surface, or point",
+            [2572] = "Sporph parameters invalid: source or target surface",
+            [2573] = "Maelstrom parameters invalid: center, axis, or radius",
+
             // Feature Extraction Operations (2600-2603)
             [2600] = "Feature extraction failed",
             [2601] = "Primitive decomposition failed",
@@ -268,6 +294,34 @@ public static class E {
         public static readonly SystemError FrameExtractionFailed = Get(2509);
         public static readonly SystemError OrientationFailed = Get(2510);
         public static readonly SystemError PatternDetectionFailed = Get(2511);
+
+        /// <summary>Transformation operation errors (2550-2573).</summary>
+        public static class Transformation {
+            public static readonly SystemError InvalidTransformMatrix = Get(2550);
+            public static readonly SystemError InvalidScaleFactor = Get(2551);
+            public static readonly SystemError InvalidRotationAxis = Get(2552);
+            public static readonly SystemError InvalidMirrorPlane = Get(2553);
+            public static readonly SystemError InvalidArrayCount = Get(2554);
+            public static readonly SystemError InvalidArrayParameters = Get(2555);
+            public static readonly SystemError InvalidPolarAngle = Get(2556);
+            public static readonly SystemError MorphApplicationFailed = Get(2557);
+            public static readonly SystemError InvalidFlowCurves = Get(2558);
+            public static readonly SystemError InvalidTwistParameters = Get(2559);
+            public static readonly SystemError InvalidBendParameters = Get(2560);
+            public static readonly SystemError InvalidTaperParameters = Get(2561);
+            public static readonly SystemError InvalidStretchParameters = Get(2562);
+            public static readonly SystemError InvalidShearParameters = Get(2563);
+            public static readonly SystemError InvalidProjectionPlane = Get(2564);
+            public static readonly SystemError InvalidBasisPlanes = Get(2565);
+            public static readonly SystemError InvalidTransformSpec = Get(2566);
+            public static readonly SystemError TransformApplicationFailed = Get(2567);
+            public static readonly SystemError GeometryNotMorphable = Get(2568);
+            public static readonly SystemError InvalidArrayMode = Get(2569);
+            public static readonly SystemError InvalidMorphOperation = Get(2570);
+            public static readonly SystemError InvalidSplopParameters = Get(2571);
+            public static readonly SystemError InvalidSporphParameters = Get(2572);
+            public static readonly SystemError InvalidMaelstromParameters = Get(2573);
+        }
 
         // Feature Extraction Operations (2600-2603)
         public static readonly SystemError FeatureExtractionFailed = Get(2600);
