@@ -299,7 +299,7 @@ internal static class FieldsCompute {
                         (az, azNext) = (azNext, az);
                         if (maxChange < FieldsConfig.VectorPotentialTolerance) {
                             converged = true;
-                            iteration = FieldsConfig.VectorPotentialMaxIterations;
+                            break;
                         }
                     }
                     return converged switch {
