@@ -327,8 +327,7 @@ internal static class MorphologyCore {
         double allowed = targetEdge * MorphologyConfig.RemeshConvergenceThreshold;
         bool lengthConverged = delta <= allowed;
         bool uniformityConverged = mean > RhinoMath.ZeroTolerance
-            ? (stdDev / mean) <= MorphologyConfig.RemeshUniformityWeight
-            : false;
+            && (stdDev / mean) <= MorphologyConfig.RemeshUniformityWeight;
         bool converged = lengthConverged && uniformityConverged;
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
