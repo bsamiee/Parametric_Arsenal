@@ -252,9 +252,7 @@ internal static class FieldsCompute {
                                                         double deltaX = Math.Abs(newAx - ax[idx]);
                                                         double deltaY = Math.Abs(newAy - ay[idx]);
                                                         double deltaZ = Math.Abs(newAz - az[idx]);
-                                                        maxDelta = deltaX > maxDelta ? deltaX : maxDelta;
-                                                        maxDelta = deltaY > maxDelta ? deltaY : maxDelta;
-                                                        maxDelta = deltaZ > maxDelta ? deltaZ : maxDelta;
+                                                        maxDelta = Math.Max(maxDelta, Math.Max(deltaX, Math.Max(deltaY, deltaZ)));
                                                         ax[idx] = newAx;
                                                         ay[idx] = newAy;
                                                         az[idx] = newAz;
