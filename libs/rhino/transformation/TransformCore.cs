@@ -110,7 +110,7 @@ internal static class TransformCore {
             || Math.Abs(ySpacing) <= context.AbsoluteTolerance
             || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {xCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, YCount: {yCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ZCount: {zCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Total: {totalCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}"));
         }
 
         Transform[] transforms = new Transform[totalCount];
