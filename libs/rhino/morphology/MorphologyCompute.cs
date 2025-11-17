@@ -6,6 +6,7 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
+using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Morphology;
 
@@ -389,46 +390,93 @@ internal static class MorphologyCompute {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Mesh> RemeshIsotropic(
+    internal static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropic(
         Mesh mesh,
         double targetEdgeLength,
         int maxIterations,
-        bool _,
+        bool preserveFeatures,
         IGeometryContext context) =>
-        ((Func<Result<Mesh>>)(() => {
+        ((Func<Result<(Mesh, int)>>)(() => {
             BoundingBox bounds = mesh.GetBoundingBox(accurate: false);
             double diagLength = bounds.Diagonal.Length;
             double minEdge = context.AbsoluteTolerance * MorphologyConfig.RemeshMinEdgeLengthFactor;
             double maxEdge = diagLength * MorphologyConfig.RemeshMaxEdgeLengthFactor;
             if (!RhinoMath.IsValidDouble(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge) {
-                return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")));
+                return ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")));
             }
             if (maxIterations is <= 0 or > MorphologyConfig.MaxRemeshIterations) {
-                return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}")));
+                return ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}")));
             }
             Mesh remeshed = mesh.DuplicateMesh();
             double splitThreshold = targetEdgeLength * MorphologyConfig.RemeshSplitThresholdFactor;
-            for (int iter = 0; iter < maxIterations; iter++) {
-                int edgeCount = remeshed.TopologyEdges.Count;
-                for (int i = edgeCount - 1; i >= 0; i--) {
-                    Line edge = remeshed.TopologyEdges.EdgeLine(i);
-                    _ = edge.Length > splitThreshold && remeshed.Vertices.Add(edge.PointAt(MorphologyConfig.EdgeMidpointParameter)) >= 0;
+            double collapseThreshold = targetEdgeLength / MorphologyConfig.RemeshSplitThresholdFactor;
+            int iterationsPerformed = 0;
+            bool converged = false;
+
+            while (iterationsPerformed < maxIterations && !converged) {
+                iterationsPerformed++;
+                bool modified = false;
+                MeshTopologyEdgeList edges = remeshed.TopologyEdges;
+                int edgeCount = edges.Count;
+                for (int edgeIndex = edgeCount - 1; edgeIndex >= 0; edgeIndex--) {
+                    Line edge = edges.EdgeLine(edgeIndex);
+                    double length = edge.Length;
+                    if (!RhinoMath.IsValidDouble(length) || length <= RhinoMath.ZeroTolerance) {
+                        continue;
+                    }
+                    bool boundaryEdge = preserveFeatures && edges.GetConnectedFaces(edgeIndex).Length < 2;
+                    if (boundaryEdge) {
+                        continue;
+                    }
+                    if (length > splitThreshold && edges.SplitEdge(edgeIndex, MorphologyConfig.EdgeMidpointParameter)) {
+                        modified = true;
+                        continue;
+                    }
+                    if (length < collapseThreshold && edges.CollapseEdge(edgeIndex)) {
+                        modified = true;
+                    }
                 }
-                int vertCount = remeshed.Vertices.Count;
-                Point3d[] positions = new Point3d[vertCount];
-                for (int i = 0; i < vertCount; i++) {
+
+                _ = remeshed.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                _ = remeshed.Vertices.CullUnused();
+                _ = remeshed.Faces.CullDegenerateFaces();
+
+                bool[] boundaryMask = preserveFeatures ? remeshed.GetNakedEdgePointStatus() : [];
+                int vertexCount = remeshed.Vertices.Count;
+                Point3d[] positions = new Point3d[vertexCount];
+                for (int i = 0; i < vertexCount; i++) {
                     positions[i] = remeshed.Vertices[i];
                 }
-                Point3d[] smoothed = MorphologyCore.LaplacianUpdate(remeshed, positions, useCotangent: false);
-                for (int i = 0; i < vertCount; i++) {
-                    _ = remeshed.Vertices.SetVertex(i, smoothed[i]);
+                Point3d[] relaxed = MorphologyCore.LaplacianUpdate(remeshed, positions, useCotangent: false);
+                for (int i = 0; i < vertexCount; i++) {
+                    if (preserveFeatures && boundaryMask.Length > i && boundaryMask[i]) {
+                        continue;
+                    }
+                    _ = remeshed.Vertices.SetVertex(i, relaxed[i]);
                 }
+
                 _ = remeshed.Normals.ComputeNormals();
                 _ = remeshed.Compact();
+
+                (double[] edgeLengths, double[] _, double[] __) = MorphologyCore.ComputeMeshMetrics(remeshed, context);
+                double meanEdge = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
+                double stdDev = edgeLengths.Length > 0
+                    ? Math.Sqrt(edgeLengths.Average(length => Math.Pow(length - meanEdge, 2.0)))
+                    : 0.0;
+                double allowedDelta = targetEdgeLength * MorphologyConfig.RemeshConvergenceThreshold;
+                bool lengthConverged = Math.Abs(meanEdge - targetEdgeLength) <= allowedDelta;
+                bool uniformityConverged = meanEdge > RhinoMath.ZeroTolerance
+                    ? (stdDev / meanEdge) <= MorphologyConfig.RemeshUniformityWeight
+                    : false;
+                converged = lengthConverged && uniformityConverged;
+                if (!modified && !converged) {
+                    break;
+                }
             }
+
             return remeshed.IsValid
-                ? ResultFactory.Create(value: remeshed)
-                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.RemeshingFailed);
+                ? ResultFactory.Create(value: (remeshed, iterationsPerformed))
+                : ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshingFailed);
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

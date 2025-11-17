@@ -144,7 +144,8 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh(object input, object parameters, IGeometryContext context) =>
         Execute<Mesh, (double, int, bool)>(input, parameters, context, (mesh, p, ctx) => {
             (double targetEdge, int maxIters, bool preserveFeats) = p;
-            return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, ctx).Bind(remeshed => ComputeRemeshMetrics(mesh, remeshed, targetEdge, maxIters, ctx));
+            return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, ctx)
+                .Bind(remeshData => ComputeRemeshMetrics(mesh, remeshData.Remeshed, targetEdge, remeshData.IterationsPerformed, ctx));
         });
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -309,7 +310,7 @@ internal static class MorphologyCore {
         Mesh original,
         Mesh remeshed,
         double targetEdge,
-        int maxIters,
+        int iterationsPerformed,
         IGeometryContext context) {
         int edgeCount = remeshed.TopologyEdges.Count;
         (double sum, double sumSq) = (0.0, 0.0);
@@ -321,11 +322,16 @@ internal static class MorphologyCore {
         double mean = edgeCount > 0 ? sum / edgeCount : 0.0;
         double variance = edgeCount > 0 ? (sumSq / edgeCount) - (mean * mean) : 0.0;
         double stdDev = Math.Sqrt(Math.Max(variance, 0.0));
-        (double uniformity, bool converged) = (
-            mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / mean) : 0.0,
-            Math.Abs(mean - targetEdge) < (targetEdge * MorphologyConfig.RemeshUniformityWeight * MorphologyConfig.RemeshConvergenceThreshold));
+        double uniformity = mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / Math.Max(mean, RhinoMath.ZeroTolerance)) : 0.0;
+        double delta = Math.Abs(mean - targetEdge);
+        double allowed = targetEdge * MorphologyConfig.RemeshConvergenceThreshold;
+        bool lengthConverged = delta <= allowed;
+        bool uniformityConverged = mean > RhinoMath.ZeroTolerance
+            ? (stdDev / mean) <= MorphologyConfig.RemeshUniformityWeight
+            : false;
+        bool converged = lengthConverged && uniformityConverged;
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, maxIters, converged, original.Faces.Count, remeshed.Faces.Count),]);
+            value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, iterationsPerformed, converged, original.Faces.Count, remeshed.Faces.Count),]);
     }
 }
