@@ -21,6 +21,8 @@ internal static class FieldsConfig {
     internal const double MaxStepSize = 1.0;
     internal const int MaxStreamlineSteps = 10000;
     internal const double MinFieldMagnitude = 1e-10;
+    internal const int VectorPotentialMaxIterations = 256;
+    internal const double VectorPotentialTolerance = 1e-6;
 
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];

@@ -202,23 +202,23 @@ internal static class FieldsCompute {
             (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
             (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
             (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-                try {
-                    int resSquared = resolution * resolution;
-                    for (int i = 0; i < resolution; i++) {
-                        for (int j = 0; j < resolution; j++) {
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resSquared) + (j * resolution) + k;
-                                potential[idx] = i > 0 ? potential[((i - 1) * resSquared) + (j * resolution) + k] + (gridDelta.X * vectorField[idx]) : Vector3d.Zero;
-                            }
-                        }
-                    }
-                    Vector3d[] finalPotential = [.. potential[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(potential, clearArray: true);
-                }
+                bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+                bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+                bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+                return (hasDx || hasDy || hasDz) switch {
+                    false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Bounds must have non-zero extent in at least one dimension")),
+                    true => ComputeCurl(vectorField: vectorField, grid: grid, resolution: resolution, gridDelta: gridDelta)
+                        .Bind(curlResult => SolveVectorPotential(
+                                curlField: curlResult.Curl,
+                                resolution: resolution,
+                                hasDx: hasDx,
+                                hasDy: hasDy,
+                                hasDz: hasDz,
+                                invDx2: hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0,
+                                invDy2: hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0,
+                                invDz2: hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0)
+                            .Map(potential => (Grid: curlResult.Grid, Potential: potential))),
+                };
             }))(),
         };
 
@@ -236,6 +236,96 @@ internal static class FieldsCompute {
             FieldsConfig.InterpolationTrilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
         };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d[]> SolveVectorPotential(
+        Vector3d[] curlField,
+        int resolution,
+        bool hasDx,
+        bool hasDy,
+        bool hasDz,
+        double invDx2,
+        double invDy2,
+        double invDz2) {
+        int totalSamples = curlField.Length;
+        double[] ax = ArrayPool<double>.Shared.Rent(totalSamples);
+        double[] ay = ArrayPool<double>.Shared.Rent(totalSamples);
+        double[] az = ArrayPool<double>.Shared.Rent(totalSamples);
+        double[] axNext = ArrayPool<double>.Shared.Rent(totalSamples);
+        double[] ayNext = ArrayPool<double>.Shared.Rent(totalSamples);
+        double[] azNext = ArrayPool<double>.Shared.Rent(totalSamples);
+        try {
+            Array.Clear(ax, 0, totalSamples);
+            Array.Clear(ay, 0, totalSamples);
+            Array.Clear(az, 0, totalSamples);
+            Array.Clear(axNext, 0, totalSamples);
+            Array.Clear(ayNext, 0, totalSamples);
+            Array.Clear(azNext, 0, totalSamples);
+            double denominator = (hasDx ? 2.0 * invDx2 : 0.0) + (hasDy ? 2.0 * invDy2 : 0.0) + (hasDz ? 2.0 * invDz2 : 0.0);
+            return (denominator > RhinoMath.ZeroTolerance) switch {
+                false => ResultFactory.Create<Vector3d[]>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Bounds must have non-zero extent in at least one dimension")),
+                true => ((Func<Result<Vector3d[]>>)(() => {
+                    int resSquared = resolution * resolution;
+                    bool converged = false;
+                    for (int iteration = 0; iteration < FieldsConfig.VectorPotentialMaxIterations; iteration++) {
+                        double maxChange = 0.0;
+                        for (int i = 1; i < resolution - 1; i++) {
+                            for (int j = 1; j < resolution - 1; j++) {
+                                for (int k = 1; k < resolution - 1; k++) {
+                                    int idx = (i * resSquared) + (j * resolution) + k;
+                                    int idxXP = idx + resSquared;
+                                    int idxXM = idx - resSquared;
+                                    int idxYP = idx + resolution;
+                                    int idxYM = idx - resolution;
+                                    int idxZP = idx + 1;
+                                    int idxZM = idx - 1;
+                                    double sumAx = (hasDx ? (ax[idxXP] + ax[idxXM]) * invDx2 : 0.0) + (hasDy ? (ax[idxYP] + ax[idxYM]) * invDy2 : 0.0) + (hasDz ? (ax[idxZP] + ax[idxZM]) * invDz2 : 0.0);
+                                    double sumAy = (hasDx ? (ay[idxXP] + ay[idxXM]) * invDx2 : 0.0) + (hasDy ? (ay[idxYP] + ay[idxYM]) * invDy2 : 0.0) + (hasDz ? (ay[idxZP] + ay[idxZM]) * invDz2 : 0.0);
+                                    double sumAz = (hasDx ? (az[idxXP] + az[idxXM]) * invDx2 : 0.0) + (hasDy ? (az[idxYP] + az[idxYM]) * invDy2 : 0.0) + (hasDz ? (az[idxZP] + az[idxZM]) * invDz2 : 0.0);
+                                    Vector3d rhs = curlField[idx];
+                                    double nextAx = (sumAx + rhs.X) / denominator;
+                                    double nextAy = (sumAy + rhs.Y) / denominator;
+                                    double nextAz = (sumAz + rhs.Z) / denominator;
+                                    double localMax = Math.Max(Math.Abs(nextAx - ax[idx]), Math.Max(Math.Abs(nextAy - ay[idx]), Math.Abs(nextAz - az[idx])));
+                                    maxChange = localMax > maxChange ? localMax : maxChange;
+                                    axNext[idx] = nextAx;
+                                    ayNext[idx] = nextAy;
+                                    azNext[idx] = nextAz;
+                                }
+                            }
+                        }
+                        (ax, axNext) = (axNext, ax);
+                        (ay, ayNext) = (ayNext, ay);
+                        (az, azNext) = (azNext, az);
+                        Array.Clear(axNext, 0, totalSamples);
+                        Array.Clear(ayNext, 0, totalSamples);
+                        Array.Clear(azNext, 0, totalSamples);
+                        if (maxChange < FieldsConfig.VectorPotentialTolerance) {
+                            converged = true;
+                            iteration = FieldsConfig.VectorPotentialMaxIterations;
+                        }
+                    }
+                    return converged switch {
+                        false => ResultFactory.Create<Vector3d[]>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector potential solver failed to converge")),
+                        true => ((Func<Result<Vector3d[]>>)(() => {
+                            Vector3d[] potential = new Vector3d[totalSamples];
+                            for (int idx = 0; idx < totalSamples; idx++) {
+                                potential[idx] = new Vector3d(ax[idx], ay[idx], az[idx]);
+                            }
+                            return ResultFactory.Create(value: potential);
+                        }))(),
+                    };
+                }))(),
+            };
+        } finally {
+            ArrayPool<double>.Shared.Return(ax, clearArray: true);
+            ArrayPool<double>.Shared.Return(ay, clearArray: true);
+            ArrayPool<double>.Shared.Return(az, clearArray: true);
+            ArrayPool<double>.Shared.Return(axNext, clearArray: true);
+            ArrayPool<double>.Shared.Return(ayNext, clearArray: true);
+            ArrayPool<double>.Shared.Return(azNext, clearArray: true);
+        }
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<double> InterpolateScalar(

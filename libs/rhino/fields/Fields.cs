@@ -113,7 +113,7 @@ public static class Fields {
             .Ensure(v => v.scalarField.Length == v.gridPoints.Length, error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"))
             .Bind(_ => FieldsCompute.ComputeLaplacian(scalarField: scalarField, grid: gridPoints, resolution: spec.Resolution, gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
-    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A. Uses Coulomb gauge approximation via x-axis line integral (accurate only for fields with simple structure aligned with x-axis; general 3D magnetic fields require full volume integral).</summary>
+    /// <summary>Compute vector potential field: magnetic field B → (grid points[], vector potential A[]) where B = ∇×A. Solves the Coulomb-gauge Poisson system (∇²A = -∇×B) with zero boundary conditions for robust 3D fields.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, Vector3d[] Potential)> VectorPotentialField(
         Vector3d[] magneticField,
