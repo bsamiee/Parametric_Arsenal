@@ -11,7 +11,7 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Affine transforms, arrays, and deformations with unified polymorphic dispatch.</summary>
 public static class Transforms {
-    /// <summary>Transform specification discriminated union for pattern matching dispatch.</summary>
+    /// <summary>Transform specification discriminated union.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct TransformSpec {
         /// <summary>Direct transform matrix application.</summary>
@@ -72,7 +72,7 @@ public static class Transforms {
         public static TransformSpec FromPlaneToPlane(Plane from, Plane to) => new() { PlaneToPlane = (from, to) };
     }
 
-    /// <summary>Array transformation specification with mode-based dispatch.</summary>
+    /// <summary>Array transformation specification.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct ArraySpec {
         /// <summary>Array mode: 1=Rectangular, 2=Polar, 3=Linear, 4=Path.</summary>
@@ -128,7 +128,7 @@ public static class Transforms {
             new() { Mode = 4, PathCurve = path, Count = count, OrientToPath = orient };
     }
 
-    /// <summary>SpaceMorph operation specification with mode-based dispatch.</summary>
+    /// <summary>SpaceMorph operation specification.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct MorphSpec {
         /// <summary>Morph operation: 1=Flow, 2=Twist, 3=Bend, 4=Taper, 5=Stretch, 6=Splop, 7=Sporph, 8=Maelstrom.</summary>
@@ -196,7 +196,7 @@ public static class Transforms {
             new() { Operation = 8, Center = center, Axis = new Line(center, axis), Radius = radius, Angle = angle };
     }
 
-    /// <summary>Apply transform specification to geometry via unified dispatch.</summary>
+    /// <summary>Apply transform specification to geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Apply<T>(
         T geometry,
@@ -216,7 +216,7 @@ public static class Transforms {
                 }))
             .Map(r => r[0]);
 
-    /// <summary>Apply array transformation via mode-based dispatch.</summary>
+    /// <summary>Apply array transformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> ArrayTransform<T>(
         T geometry,
@@ -259,7 +259,7 @@ public static class Transforms {
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode),
         };
 
-    /// <summary>Apply SpaceMorph deformation via operation-based dispatch.</summary>
+    /// <summary>Apply SpaceMorph deformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Morph<T>(
         T geometry,

@@ -7,9 +7,9 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Transformation;
 
-/// <summary>Transform configuration: validation modes, algorithmic constants, and tolerance thresholds.</summary>
+/// <summary>Transform validation modes and algorithmic constants.</summary>
 internal static class TransformConfig {
-    /// <summary>Type-to-validation mode mapping for geometry transformation.</summary>
+    /// <summary>Geometry type validation mode mapping.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
@@ -36,8 +36,6 @@ internal static class TransformConfig {
 
     /// <summary>Maximum array count to prevent memory exhaustion.</summary>
     internal const int MaxArrayCount = 10000;
-    /// <summary>Default array count for operations.</summary>
-    internal const int DefaultArrayCount = 10;
 
     /// <summary>Angular tolerance multiplier for vector parallelism checks.</summary>
     internal const double AngleToleranceMultiplier = 10.0;
@@ -50,7 +48,7 @@ internal static class TransformConfig {
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;
 
-    /// <summary>Retrieve validation mode for geometry type with inheritance fallback.</summary>
+    /// <summary>Get validation mode for geometry type with inheritance fallback.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static V GetValidationMode(Type geometryType) =>
         ValidationModes.TryGetValue(geometryType, out V mode)

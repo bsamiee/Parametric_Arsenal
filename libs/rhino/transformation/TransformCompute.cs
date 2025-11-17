@@ -13,7 +13,7 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
 internal static class TransformCompute {
-    /// <summary>Flow geometry from base curve to target curve using FlowSpaceMorph.</summary>
+    /// <summary>Flow geometry along base curve to target curve.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Flow<T>(
         T geometry,
@@ -35,7 +35,7 @@ internal static class TransformCompute {
             }))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidFlowCurves.WithContext($"Base: {baseCurve.IsValid}, Target: {targetCurve.IsValid}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Twist geometry around axis by angle using TwistSpaceMorph.</summary>
+    /// <summary>Twist geometry around axis by angle.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Twist<T>(
         T geometry,
@@ -57,7 +57,7 @@ internal static class TransformCompute {
             }))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Bend geometry along spine using BendSpaceMorph.</summary>
+    /// <summary>Bend geometry along spine.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Bend<T>(
         T geometry,
@@ -109,7 +109,7 @@ internal static class TransformCompute {
             }))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Stretch geometry along axis using StretchSpaceMorph.</summary>
+    /// <summary>Stretch geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Stretch<T>(
         T geometry,
@@ -129,7 +129,7 @@ internal static class TransformCompute {
             }))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidStretchParameters.WithContext($"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Splop geometry from base plane to point on target surface.</summary>
+    /// <summary>Splop geometry from base plane to target surface point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Splop<T>(
         T geometry,
@@ -199,7 +199,7 @@ internal static class TransformCompute {
             }))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Array geometry along path curve with optional frame orientation.</summary>
+    /// <summary>Array geometry along path curve with optional orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> PathArray<T>(
         T geometry,
@@ -238,7 +238,7 @@ internal static class TransformCompute {
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Apply SpaceMorph to geometry with duplication and validation.</summary>
+    /// <summary>Apply SpaceMorph to geometry with duplication.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ApplyMorph<TMorph, T>(
         TMorph morph,
