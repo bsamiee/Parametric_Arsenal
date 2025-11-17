@@ -211,8 +211,10 @@ internal static class TransformCompute {
         T geometry,
         Curve path,
         int count,
-        bool orientToPath) where T : GeometryBase =>
-        count > 0 && count <= TransformConfig.MaxArrayCount && path.IsValid && geometry.IsValid
+        bool orientToPath,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        path is not null && count > 0 && count <= TransformConfig.MaxArrayCount && path.IsValid && geometry.IsValid
             ? ((Func<Result<IReadOnlyList<T>>>)(() => {
                 Transform[] transforms = new Transform[count];
                 Interval domain = path.Domain;
@@ -227,16 +229,17 @@ internal static class TransformCompute {
                         : Transform.Translation(pt - Point3d.Origin);
                 }
 
-                List<T> results = [];
-                for (int idx = 0; idx < transforms.Length; idx++) {
-                    Result<IReadOnlyList<T>> r = TransformCore.ApplyTransform(item: geometry, transform: transforms[idx]);
-                    if (r.IsSuccess) {
-                        results.AddRange(r.Value);
-                    } else {
-                        return r;
-                    }
-                }
-                return ResultFactory.Create(value: (IReadOnlyList<T>)results);
+                return UnifiedOperation.Apply<IReadOnlyList<Transform>, T>(
+                    input: transforms,
+                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                        TransformCore.ApplyTransform(item: geometry, transform: xform)),
+                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                        Context = context,
+                        ValidationMode = V.None,
+                        AccumulateErrors = false,
+                        OperationName = "Transforms.PathArray",
+                        EnableDiagnostics = enableDiagnostics,
+                    });
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
@@ -246,7 +249,7 @@ internal static class TransformCompute {
     private static Result<T> ApplyMorph<TMorph, T>(
         TMorph morph,
         T geometry) where TMorph : SpaceMorph where T : GeometryBase {
-        try {
+        using (morph as IDisposable) {
             return SpaceMorph.IsMorphable(geometry)
                 ? ((Func<Result<T>>)(() => {
                     T duplicate = (T)geometry.Duplicate();
@@ -255,8 +258,6 @@ internal static class TransformCompute {
                         : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
                 }))()
                 : ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
-        } finally {
-            (morph as IDisposable)?.Dispose();
         }
     }
 }

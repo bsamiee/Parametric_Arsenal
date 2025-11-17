@@ -223,9 +223,7 @@ public static class Transforms {
         T geometry,
         ArraySpec spec,
         IGeometryContext context,
-#pragma warning disable IDE0060, RCS1163 // Remove unused parameter - part of public API
         bool enableDiagnostics = false) where T : GeometryBase =>
-#pragma warning restore IDE0060, RCS1163
         spec.Mode switch {
             1 => TransformCore.RectangularArray(
                 geometry: geometry,
@@ -235,25 +233,30 @@ public static class Transforms {
                 xSpacing: spec.XSpacing,
                 ySpacing: spec.YSpacing,
                 zSpacing: spec.ZSpacing ?? 0.0,
-                context: context),
+                context: context,
+                enableDiagnostics: enableDiagnostics),
             2 => TransformCore.PolarArray(
                 geometry: geometry,
                 center: spec.Center!.Value,
                 axis: spec.Axis!.Value,
                 count: spec.Count,
                 totalAngle: spec.TotalAngle ?? RhinoMath.TwoPI,
-                context: context),
+                context: context,
+                enableDiagnostics: enableDiagnostics),
             3 => TransformCore.LinearArray(
                 geometry: geometry,
                 direction: spec.Direction!.Value,
                 count: spec.Count,
                 spacing: spec.Spacing,
-                context: context),
+                context: context,
+                enableDiagnostics: enableDiagnostics),
             4 => TransformCompute.PathArray(
                 geometry: geometry,
                 path: spec.PathCurve!,
                 count: spec.Count,
-                orientToPath: spec.OrientToPath),
+                orientToPath: spec.OrientToPath,
+                context: context,
+                enableDiagnostics: enableDiagnostics),
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode),
         };
 

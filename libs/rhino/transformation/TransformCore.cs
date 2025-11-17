@@ -117,7 +117,8 @@ internal static class TransformCore {
         double xSpacing,
         double ySpacing,
         double zSpacing,
-        IGeometryContext context) where T : GeometryBase =>
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
         xCount > 0 && yCount > 0 && zCount > 0
         && xCount * yCount * zCount <= TransformConfig.MaxArrayCount
         && Math.Abs(xSpacing) > context.AbsoluteTolerance
@@ -139,16 +140,17 @@ internal static class TransformCore {
                     }
                 }
 
-                List<T> results = [];
-                for (int idx = 0; idx < transforms.Length; idx++) {
-                    Result<IReadOnlyList<T>> r = ApplyTransform(item: geometry, transform: transforms[idx]);
-                    if (r.IsSuccess) {
-                        results.AddRange(r.Value);
-                    } else {
-                        return r;
-                    }
-                }
-                return ResultFactory.Create(value: (IReadOnlyList<T>)results);
+                return UnifiedOperation.Apply<IReadOnlyList<Transform>, T>(
+                    input: transforms,
+                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                        ApplyTransform(item: geometry, transform: xform)),
+                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                        Context = context,
+                        ValidationMode = V.None,
+                        AccumulateErrors = false,
+                        OperationName = "Transforms.RectangularArray",
+                        EnableDiagnostics = enableDiagnostics,
+                    });
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {xCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, YCount: {yCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ZCount: {zCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Total: {(xCount * yCount * zCount).ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
@@ -161,7 +163,8 @@ internal static class TransformCore {
         Vector3d axis,
         int count,
         double totalAngle,
-        IGeometryContext context) where T : GeometryBase =>
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
         count > 0 && count <= TransformConfig.MaxArrayCount
         && axis.Length > context.AbsoluteTolerance
         && totalAngle > 0.0 && totalAngle <= RhinoMath.TwoPI
@@ -177,16 +180,17 @@ internal static class TransformCore {
                         rotationCenter: center);
                 }
 
-                List<T> results = [];
-                for (int idx = 0; idx < transforms.Length; idx++) {
-                    Result<IReadOnlyList<T>> r = ApplyTransform(item: geometry, transform: transforms[idx]);
-                    if (r.IsSuccess) {
-                        results.AddRange(r.Value);
-                    } else {
-                        return r;
-                    }
-                }
-                return ResultFactory.Create(value: (IReadOnlyList<T>)results);
+                return UnifiedOperation.Apply<IReadOnlyList<Transform>, T>(
+                    input: transforms,
+                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                        ApplyTransform(item: geometry, transform: xform)),
+                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                        Context = context,
+                        ValidationMode = V.None,
+                        AccumulateErrors = false,
+                        OperationName = "Transforms.PolarArray",
+                        EnableDiagnostics = enableDiagnostics,
+                    });
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
@@ -198,7 +202,8 @@ internal static class TransformCore {
         Vector3d direction,
         int count,
         double spacing,
-        IGeometryContext context) where T : GeometryBase =>
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
         count > 0 && count <= TransformConfig.MaxArrayCount
         && direction.Length > context.AbsoluteTolerance
         && Math.Abs(spacing) > context.AbsoluteTolerance
@@ -211,16 +216,17 @@ internal static class TransformCore {
                     transforms[i] = Transform.Translation(motion);
                 }
 
-                List<T> results = [];
-                for (int idx = 0; idx < transforms.Length; idx++) {
-                    Result<IReadOnlyList<T>> r = ApplyTransform(item: geometry, transform: transforms[idx]);
-                    if (r.IsSuccess) {
-                        results.AddRange(r.Value);
-                    } else {
-                        return r;
-                    }
-                }
-                return ResultFactory.Create(value: (IReadOnlyList<T>)results);
+                return UnifiedOperation.Apply<IReadOnlyList<Transform>, T>(
+                    input: transforms,
+                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                        ApplyTransform(item: geometry, transform: xform)),
+                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                        Context = context,
+                        ValidationMode = V.None,
+                        AccumulateErrors = false,
+                        OperationName = "Transforms.LinearArray",
+                        EnableDiagnostics = enableDiagnostics,
+                    });
             }))()
             : ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Direction: {direction.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Spacing: {spacing.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
