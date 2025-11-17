@@ -283,25 +283,11 @@ public static class Boolean {
 
 **Code Style Example**:
 ```csharp
-internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> Executor)> OperationRegistry =
-    [
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Union), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Intersection), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Difference), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Split), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Union), (V.Standard | V.Topology, MakeBrepArrayExecutor())),
-        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Intersection), (V.Standard | V.Topology, MakeBrepArrayExecutor())),
-        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Difference), (V.Standard | V.Topology, MakeBrepArrayExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Union), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Intersection), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Difference), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Split), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Union), (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
-        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Intersection), (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
-        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Difference), (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
-    ].ToFrozenDictionary(
-        static entry => entry.Item1,
-        static entry => entry.Item2);
+internal static readonly FrozenDictionary<...> OperationRegistry =
+    new Dictionary<...> {
+        [(typeof(Brep), typeof(Brep), Boolean.OperationType.Union)] = (V.Standard | V.Topology, MakeBrepExecutor()),
+        ...
+    }.ToFrozenDictionary();
 
 private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeBrepExecutor() =>
     (a, b, op, opts, ctx) => ExecuteBrepBoolean((Brep)a, (Brep)b, op, opts, ctx);
