@@ -2,8 +2,8 @@
 
 **File**: `libs/rhino/boolean/BooleanCore.cs`  
 **Purpose**: FrozenDictionary dispatch registry and execution routing  
-**Types**: 1 (BooleanCore class ONLY - no mixed types)  
-**Estimated LOC**: 140-180
+**Types**: 1 (BooleanCore class ONLY - no nested types, no output types)  
+**Estimated LOC**: 140-170
 
 ## File Structure
 
@@ -39,8 +39,6 @@ internal static class BooleanCore {
             [(typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Union)] = (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor()),
             [(typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Intersection)] = (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor()),
             [(typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Difference)] = (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor()),
-            [(typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Split)] = (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor()),
-            [(typeof(Curve[]), typeof(Plane), Boolean.OperationType.Union)] = (V.AreaCentroid, MakeCurveExecutor()),
         }.ToFrozenDictionary();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -60,10 +58,6 @@ internal static class BooleanCore {
         (a, b, op, opts, ctx) => ExecuteMeshArrayBoolean((Mesh[])a, (Mesh[])b, op, opts, ctx);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeCurveExecutor() =>
-        (a, b, op, opts, ctx) => ExecuteCurveBoolean((Curve[])a, (Plane)b, op, opts, ctx);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Boolean.BooleanOutput> ExecuteBrepBoolean(
         Brep brepA,
         Brep brepB,
@@ -75,12 +69,12 @@ internal static class BooleanCore {
             Boolean.OperationType.Intersection => BooleanCompute.BrepIntersection([brepA,], [brepB,], options, context),
             Boolean.OperationType.Difference => BooleanCompute.BrepDifference([brepA,], [brepB,], options, context),
             Boolean.OperationType.Split => BooleanCompute.BrepSplit(brepA, brepB, options, context),
-            _ => ResultFactory.Create<BooleanOutput>(
-                error: E.Geometry.UnsupportedConfiguration.WithContext($"Brep operation: {operation}")),
+            _ => ResultFactory.Create<Boolean.BooleanOutput>(
+                error: E.Geometry.BooleanOps.UnsupportedConfiguration.WithContext($"Brep operation: {operation}")),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ExecuteBrepArrayBoolean(
+    private static Result<Boolean.BooleanOutput> ExecuteBrepArrayBoolean(
         Brep[] brepsA,
         Brep[] brepsB,
         Boolean.OperationType operation,
@@ -90,12 +84,12 @@ internal static class BooleanCore {
             Boolean.OperationType.Union => BooleanCompute.BrepUnion([.. brepsA, .. brepsB,], options, context),
             Boolean.OperationType.Intersection => BooleanCompute.BrepIntersection(brepsA, brepsB, options, context),
             Boolean.OperationType.Difference => BooleanCompute.BrepDifference(brepsA, brepsB, options, context),
-            _ => ResultFactory.Create<BooleanOutput>(
-                error: E.Geometry.UnsupportedConfiguration.WithContext($"Brep[] operation: {operation}")),
+            _ => ResultFactory.Create<Boolean.BooleanOutput>(
+                error: E.Geometry.BooleanOps.UnsupportedConfiguration.WithContext($"Brep[] operation: {operation}")),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ExecuteMeshBoolean(
+    private static Result<Boolean.BooleanOutput> ExecuteMeshBoolean(
         Mesh meshA,
         Mesh meshB,
         Boolean.OperationType operation,
@@ -106,12 +100,12 @@ internal static class BooleanCore {
             Boolean.OperationType.Intersection => BooleanCompute.MeshIntersection([meshA,], [meshB,], options, context),
             Boolean.OperationType.Difference => BooleanCompute.MeshDifference([meshA,], [meshB,], options, context),
             Boolean.OperationType.Split => BooleanCompute.MeshSplit([meshA,], [meshB,], options, context),
-            _ => ResultFactory.Create<BooleanOutput>(
-                error: E.Geometry.UnsupportedConfiguration.WithContext($"Mesh operation: {operation}")),
+            _ => ResultFactory.Create<Boolean.BooleanOutput>(
+                error: E.Geometry.BooleanOps.UnsupportedConfiguration.WithContext($"Mesh operation: {operation}")),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ExecuteMeshArrayBoolean(
+    private static Result<Boolean.BooleanOutput> ExecuteMeshArrayBoolean(
         Mesh[] meshesA,
         Mesh[] meshesB,
         Boolean.OperationType operation,
@@ -121,22 +115,8 @@ internal static class BooleanCore {
             Boolean.OperationType.Union => BooleanCompute.MeshUnion([.. meshesA, .. meshesB,], options, context),
             Boolean.OperationType.Intersection => BooleanCompute.MeshIntersection(meshesA, meshesB, options, context),
             Boolean.OperationType.Difference => BooleanCompute.MeshDifference(meshesA, meshesB, options, context),
-            Boolean.OperationType.Split => BooleanCompute.MeshSplit(meshesA, meshesB, options, context),
-            _ => ResultFactory.Create<BooleanOutput>(
-                error: E.Geometry.UnsupportedConfiguration.WithContext($"Mesh[] operation: {operation}")),
-        };
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ExecuteCurveBoolean(
-        Curve[] curves,
-        Plane plane,
-        Boolean.OperationType operation,
-        Boolean.BooleanOptions options,
-        IGeometryContext context) =>
-        operation switch {
-            Boolean.OperationType.Union => BooleanCompute.CurveRegions(curves, plane, combineRegions: true, options, context),
-            _ => ResultFactory.Create<BooleanOutput>(
-                error: E.Geometry.UnsupportedConfiguration.WithContext($"Curve[] operation: {operation}")),
+            _ => ResultFactory.Create<Boolean.BooleanOutput>(
+                error: E.Geometry.BooleanOps.UnsupportedConfiguration.WithContext($"Mesh[] operation: {operation}")),
         };
 }
 ```
@@ -144,60 +124,72 @@ internal static class BooleanCore {
 ## Key Design Notes
 
 ### CRITICAL: Single Type Per File
-- **ONLY BooleanCore class at namespace level** - no mixed types
-- **BooleanOutput moved to Boolean.cs** - matches Intersect.IntersectionOutput pattern
-- **No suppression needed** - only one type in the main bracket
-- **Pattern**: All Config/Core files have exactly ONE type at namespace level
+- **ONLY BooleanCore class at namespace level** - no nested types, no output types
+- **BooleanOutput is in Boolean.cs** - nested in Boolean class, not in BooleanCore
+- **Single responsibility**: BooleanCore ONLY handles dispatch and routing
+- **No suppression needed** - only one type in the file
+- **Pattern**: All Core files have exactly ONE type at namespace level
 
 ### Registry Structure
 - **FrozenDictionary**: O(1) lookup, compiled at startup
 - **Tuple key**: `(Type T1, Type T2, OperationType)` for precise dispatch
 - **Tuple value**: `(V ValidationMode, Executor func)`
-- **16 registry entries**: 
-  - 4 Brep-Brep (single)
-  - 3 Brep[]-Brep[] (arrays)
-  - 4 Mesh-Mesh (single)
-  - 4 Mesh[]-Mesh[] (arrays)
-  - 1 Curve[]-Plane
+- **14 registry entries**: 
+  - 4 Brep-Brep (Union, Intersection, Difference, Split)
+  - 3 Brep[]-Brep[] (Union, Intersection, Difference - no Split for arrays)
+  - 4 Mesh-Mesh (Union, Intersection, Difference, Split)
+  - 3 Mesh[]-Mesh[] (Union, Intersection, Difference - no Split for arrays)
 
 ### Executor Factories
 - **MakeBrepExecutor**: Creates closure with type cast to Brep
+- **MakeBrepArrayExecutor**: Creates closure with type cast to Brep[]
 - **MakeMeshExecutor**: Creates closure with type cast to Mesh
-- **MakeCurveExecutor**: Creates closure with type cast to Curve[] + Plane
+- **MakeMeshArrayExecutor**: Creates closure with type cast to Mesh[]
 - **Pattern**: Avoids dynamic dispatch overhead, provides type safety
+- **Count**: 4 executor factories total
 
 ### Routing Methods
-- **ExecuteBrepBoolean**: Single Brep operations
-- **ExecuteBrepArrayBoolean**: Array Brep operations (union combines all)
-- **ExecuteMeshBoolean**: Single Mesh operations
-- **ExecuteMeshArrayBoolean**: Array Mesh operations
-- **ExecuteCurveBoolean**: Curve region extraction
+- **ExecuteBrepBoolean**: Single Brep operations (4 operation types)
+- **ExecuteBrepArrayBoolean**: Array Brep operations (3 operation types - no Split)
+- **ExecuteMeshBoolean**: Single Mesh operations (4 operation types)
+- **ExecuteMeshArrayBoolean**: Array Mesh operations (3 operation types - no Split)
 - **All use switch expressions**: NO if/else statements
+- **Count**: 4 routing methods total
 
-### Pattern Matching
-- Switch expression for operation type routing
-- Named parameters in all calls
-- Trailing commas in array literals
+### Validation Modes
+- **Brep operations**: `V.Standard | V.Topology` - validate topology integrity
+- **Mesh operations**: `V.Standard | V.MeshSpecific` - validate mesh structure
+- **No curve validation** - no curve operations in this file
 
 ### LOC Breakdown
-- Using statements: 10
-- BooleanCore class declaration: 2
-- OperationRegistry: 20 (16 entries + ToFrozenDictionary)
-- Executor factories (5): 15
-- Routing methods (5): 60
-- Total: ~107 LOC + XML comments
+- Using statements: 10 lines
+- BooleanCore class declaration: 2 lines
+- OperationRegistry: 16 lines (14 entries + declaration + ToFrozenDictionary)
+- Executor factories (4): 12 lines (4 factories × 3 lines each)
+- Routing methods (4): 48 lines (4 methods × 12 lines average)
+- Total: ~88 LOC core + comments/spacing = 140-170 LOC
 
 ### Type References
-- All `BooleanOutput` references qualified as `Boolean.BooleanOutput`
-- Matches IntersectionCore referencing `Intersect.IntersectionOutput`
-- Executor functions return `Result<Boolean.BooleanOutput>`
+- **All `BooleanOutput` references MUST be qualified** as `Boolean.BooleanOutput`
+- **BooleanOutput defined in Boolean.cs** - nested in Boolean class, NOT in BooleanCore
+- **Pattern**: Matches IntersectionCore referencing `Intersect.IntersectionOutput`
+- **Executor functions return**: `Result<Boolean.BooleanOutput>`
+
+### Error References
+- **All error references** use `E.Geometry.BooleanOps.*` namespace
+- **Example**: `E.Geometry.BooleanOps.UnsupportedConfiguration`
+- **NOT** `E.Geometry.Boolean.*` - incorrect namespace
 
 ## XML Documentation Standards
 ```csharp
-/// <summary>Boolean operation result containing geometry arrays and metadata.</summary>
-/// <summary>Empty result for non-intersecting or failed operations.</summary>
 /// <summary>FrozenDictionary dispatch with type-based operation routing.</summary>
 /// <summary>Type-operation-specific dispatch registry mapping to executors and validation modes.</summary>
 ```
 
 **NO** parameter tags or verbose descriptions - single-line summaries only.
+
+## Adherence to Organizational Limits
+- **Files**: 1 file (BooleanCore.cs) - ✅ Well under 4-file limit
+- **Types**: 1 type (BooleanCore class) - ✅ Single type, no nested types
+- **LOC**: 140-170 LOC per file - ✅ Within 300 LOC limit, optimal density
+- **Single Responsibility**: Dispatch and routing ONLY - no output types, no configuration, no algorithms
