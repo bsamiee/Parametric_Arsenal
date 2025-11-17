@@ -75,8 +75,9 @@ internal static class TransformCore {
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
         Transform transform) where T : GeometryBase {
-        GeometryBase normalized = item is Extrusion ext ? ext.ToBrep(splitKinkyFaces: true) : item;
-        bool shouldDispose = item is Extrusion;
+        bool isExtrusion = item is Extrusion;
+        GeometryBase normalized = isExtrusion ? ((Extrusion)(object)item).ToBrep(splitKinkyFaces: true) : item;
+        bool shouldDispose = isExtrusion;
 
         try {
             T duplicate = (T)normalized.Duplicate();
