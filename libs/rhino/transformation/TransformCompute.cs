@@ -1,5 +1,3 @@
-#pragma warning disable IDISP001, IDISP007 // SpaceMorph objects are disposed by ApplyMorph helper
-
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -140,10 +138,7 @@ internal static class TransformCompute {
         Point3d targetPoint,
         IGeometryContext context) where T : GeometryBase =>
         basePlane.IsValid && targetSurface.IsValid && targetPoint.IsValid && geometry.IsValid
-            ? ((Func<Result<T>>)(() => {
-                double u = 0.0;
-                double v = 0.0;
-                return targetSurface.ClosestPoint(targetPoint, out u, out v)
+            ? ((Func<Result<T>>)(() => targetSurface.ClosestPoint(targetPoint, out double u, out double v)
                     ? ((Func<Result<T>>)(() => {
                         SplopSpaceMorph morph = new(
                             plane: basePlane,
@@ -155,8 +150,7 @@ internal static class TransformCompute {
                         };
                         return ApplyMorph(morph: morph, geometry: geometry);
                     }))()
-                    : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext("Surface closest point failed"));
-            }))()
+                    : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext("Surface closest point failed"))))()
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext($"Plane: {basePlane.IsValid}, Surface: {targetSurface.IsValid}, Point: {targetPoint.IsValid}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Sporph geometry from source surface to target surface.</summary>
@@ -229,7 +223,7 @@ internal static class TransformCompute {
                         : Transform.Translation(pt - Point3d.Origin);
                 }
 
-                return UnifiedOperation.Apply<IReadOnlyList<Transform>, T>(
+                return UnifiedOperation.Apply(
                     input: transforms,
                     operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
                         TransformCore.ApplyTransform(item: geometry, transform: xform)),
