@@ -201,25 +201,84 @@ internal static class FieldsCompute {
         (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
             (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
             (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                int totalSamples = vectorField.Length;
-                Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
-                try {
-                    int resSquared = resolution * resolution;
-                    for (int i = 0; i < resolution; i++) {
-                        for (int j = 0; j < resolution; j++) {
-                            for (int k = 0; k < resolution; k++) {
-                                int idx = (i * resSquared) + (j * resolution) + k;
-                                potential[idx] = i > 0 ? potential[((i - 1) * resSquared) + (j * resolution) + k] + (gridDelta.X * vectorField[idx]) : Vector3d.Zero;
-                            }
-                        }
-                    }
-                    Vector3d[] finalPotential = [.. potential[..totalSamples]];
-                    return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
-                } finally {
-                    ArrayPool<Vector3d>.Shared.Return(potential, clearArray: true);
-                }
-            }))(),
+            (true, true) => ComputeCurl(
+                vectorField: vectorField,
+                grid: grid,
+                resolution: resolution,
+                gridDelta: gridDelta).Bind(curl => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                    bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
+                    bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
+                    bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+                    return (hasDx && hasDy && hasDz) switch {
+                        false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Grid bounds must have non-zero extent across X, Y, and Z")),
+                        true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                            int totalSamples = vectorField.Length;
+                            double invDx2 = 1.0 / (gridDelta.X * gridDelta.X);
+                            double invDy2 = 1.0 / (gridDelta.Y * gridDelta.Y);
+                            double invDz2 = 1.0 / (gridDelta.Z * gridDelta.Z);
+                            double diagonal = (2.0 * invDx2) + (2.0 * invDy2) + (2.0 * invDz2);
+                            return (diagonal > RhinoMath.ZeroTolerance) switch {
+                                false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Degenerate Laplacian diagonal due to invalid spacing")),
+                                true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                                    double[] ax = ArrayPool<double>.Shared.Rent(totalSamples);
+                                    double[] ay = ArrayPool<double>.Shared.Rent(totalSamples);
+                                    double[] az = ArrayPool<double>.Shared.Rent(totalSamples);
+                                    Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
+                                    try {
+                                        Array.Clear(array: ax, index: 0, length: totalSamples);
+                                        Array.Clear(array: ay, index: 0, length: totalSamples);
+                                        Array.Clear(array: az, index: 0, length: totalSamples);
+                                        int resSquared = resolution * resolution;
+                                        Vector3d[] curlField = curl.Curl;
+                                        for (int iteration = 0; iteration < FieldsConfig.VectorPotentialIterations; iteration++) {
+                                            double maxDelta = 0.0;
+                                            for (int i = 1; i < resolution - 1; i++) {
+                                                for (int j = 1; j < resolution - 1; j++) {
+                                                    for (int k = 1; k < resolution - 1; k++) {
+                                                        int idx = (i * resSquared) + (j * resolution) + k;
+                                                        int idxXp = idx + resSquared;
+                                                        int idxXm = idx - resSquared;
+                                                        int idxYp = idx + resolution;
+                                                        int idxYm = idx - resolution;
+                                                        int idxZp = idx + 1;
+                                                        int idxZm = idx - 1;
+                                                        Vector3d curlValue = curlField[idx];
+                                                        double neighborAx = ((ax[idxXp] + ax[idxXm]) * invDx2) + ((ax[idxYp] + ax[idxYm]) * invDy2) + ((ax[idxZp] + ax[idxZm]) * invDz2);
+                                                        double neighborAy = ((ay[idxXp] + ay[idxXm]) * invDx2) + ((ay[idxYp] + ay[idxYm]) * invDy2) + ((ay[idxZp] + ay[idxZm]) * invDz2);
+                                                        double neighborAz = ((az[idxXp] + az[idxXm]) * invDx2) + ((az[idxYp] + az[idxYm]) * invDy2) + ((az[idxZp] + az[idxZm]) * invDz2);
+                                                        double newAx = (neighborAx - curlValue.X) / diagonal;
+                                                        double newAy = (neighborAy - curlValue.Y) / diagonal;
+                                                        double newAz = (neighborAz - curlValue.Z) / diagonal;
+                                                        double deltaX = Math.Abs(newAx - ax[idx]);
+                                                        double deltaY = Math.Abs(newAy - ay[idx]);
+                                                        double deltaZ = Math.Abs(newAz - az[idx]);
+                                                        maxDelta = Math.Max(maxDelta, Math.Max(deltaX, Math.Max(deltaY, deltaZ)));
+                                                        ax[idx] = newAx;
+                                                        ay[idx] = newAy;
+                                                        az[idx] = newAz;
+                                                    }
+                                                }
+                                            }
+                                            if (maxDelta < FieldsConfig.VectorPotentialTolerance) {
+                                                break;
+                                            }
+                                        }
+                                        for (int idx = 0; idx < totalSamples; idx++) {
+                                            potential[idx] = new(ax[idx], ay[idx], az[idx]);
+                                        }
+                                        Vector3d[] finalPotential = [.. potential[..totalSamples]];
+                                        return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
+                                    } finally {
+                                        ArrayPool<double>.Shared.Return(ax, clearArray: true);
+                                        ArrayPool<double>.Shared.Return(ay, clearArray: true);
+                                        ArrayPool<double>.Shared.Return(az, clearArray: true);
+                                        ArrayPool<Vector3d>.Shared.Return(potential, clearArray: true);
+                                    }
+                                }))(),
+                            };
+                        }))(),
+                    };
+                }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
