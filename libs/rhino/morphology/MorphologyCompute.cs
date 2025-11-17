@@ -458,17 +458,9 @@ internal static class MorphologyCompute {
                 _ = remeshed.Normals.ComputeNormals();
                 _ = remeshed.Compact();
 
-                (double[] edgeLengths, double[] _, double[] __) = MorphologyCore.ComputeMeshMetrics(remeshed, context);
-                double meanEdge = edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0;
-                double stdDev = edgeLengths.Length > 0
-                    ? Math.Sqrt(edgeLengths.Average(length => Math.Pow(length - meanEdge, 2.0)))
-                    : 0.0;
-                double allowedDelta = targetEdgeLength * MorphologyConfig.RemeshConvergenceThreshold;
-                bool lengthConverged = Math.Abs(meanEdge - targetEdgeLength) <= allowedDelta;
-                bool uniformityConverged = meanEdge > RhinoMath.ZeroTolerance
-                    ? (stdDev / meanEdge) <= MorphologyConfig.RemeshUniformityWeight
-                    : false;
-                converged = lengthConverged && uniformityConverged;
+                (double[] edgeLengths, double meanEdge, double stdDev, bool isConverged) =
+                    MorphologyCore.ComputeRemeshMetrics(remeshed, targetEdgeLength, context);
+                converged = isConverged;
                 if (!modified && !converged) {
                     break;
                 }
