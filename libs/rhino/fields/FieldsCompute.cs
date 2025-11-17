@@ -264,7 +264,7 @@ internal static class FieldsCompute {
                                             }
                                         }
                                         for (int idx = 0; idx < totalSamples; idx++) {
-                                            potential[idx] = new Vector3d(ax[idx], ay[idx], az[idx]);
+                                            potential[idx] = new(ax[idx], ay[idx], az[idx]);
                                         }
                                         Vector3d[] finalPotential = [.. potential[..totalSamples]];
                                         return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
