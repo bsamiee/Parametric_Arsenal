@@ -130,7 +130,7 @@ public static class Boolean {
 - **Rule**: Only ONE type per file at namespace level (no mixed types in bracket)
 - **BooleanCore.cs has ONLY BooleanCore class** at namespace level - no nested types
 - **Public output types belong with public API** - BooleanOutput is definitively in Boolean.cs
-- **Field usage**: Only ONE array populated per operation call (Breps for Brep ops, Meshes for Mesh ops, Curves for Curve ops)
+- **Field usage**: Only ONE array populated per operation call (Breps for Brep ops, Meshes for Mesh ops)
 
 ## Error References
 All error codes use `E.Geometry.BooleanOps.*` namespace (libs/core/errors/E.cs line 355):
