@@ -218,7 +218,7 @@ internal static class FieldsCompute {
                             double invDz2 = 1.0 / (gridDelta.Z * gridDelta.Z);
                             double diagonal = (2.0 * invDx2) + (2.0 * invDy2) + (2.0 * invDz2);
                             return (diagonal > RhinoMath.ZeroTolerance) switch {
-                                false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Laplacian diagonal degenerated due to invalid spacing")),
+                                false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Degenerate Laplacian diagonal due to invalid spacing")),
                                 true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
                                     double[] ax = ArrayPool<double>.Shared.Rent(totalSamples);
                                     double[] ay = ArrayPool<double>.Shared.Rent(totalSamples);
