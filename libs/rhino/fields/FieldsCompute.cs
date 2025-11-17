@@ -246,9 +246,9 @@ internal static class FieldsCompute {
                                                         double neighborAx = ((ax[idxXp] + ax[idxXm]) * invDx2) + ((ax[idxYp] + ax[idxYm]) * invDy2) + ((ax[idxZp] + ax[idxZm]) * invDz2);
                                                         double neighborAy = ((ay[idxXp] + ay[idxXm]) * invDx2) + ((ay[idxYp] + ay[idxYm]) * invDy2) + ((ay[idxZp] + ay[idxZm]) * invDz2);
                                                         double neighborAz = ((az[idxXp] + az[idxXm]) * invDx2) + ((az[idxYp] + az[idxYm]) * invDy2) + ((az[idxZp] + az[idxZm]) * invDz2);
-                                                        double newAx = (neighborAx + curlValue.X) / diagonal;
-                                                        double newAy = (neighborAy + curlValue.Y) / diagonal;
-                                                        double newAz = (neighborAz + curlValue.Z) / diagonal;
+                                                        double newAx = (neighborAx - curlValue.X) / diagonal;
+                                                        double newAy = (neighborAy - curlValue.Y) / diagonal;
+                                                        double newAz = (neighborAz - curlValue.Z) / diagonal;
                                                         double deltaX = Math.Abs(newAx - ax[idx]);
                                                         double deltaY = Math.Abs(newAy - ay[idx]);
                                                         double deltaZ = Math.Abs(newAz - az[idx]);
