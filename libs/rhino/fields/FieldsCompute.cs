@@ -859,24 +859,28 @@ internal static class FieldsCompute {
                     }
                 }
 
-                double mean = validCount > 0 ? sum / validCount : 0.0;
-                double sumSquaredDiff = 0.0;
-                for (int i = 0; i < scalarField.Length; i++) {
-                    double value = scalarField[i];
-                    if (RhinoMath.IsValidDouble(value)) {
-                        double diff = value - mean;
-                        sumSquaredDiff += diff * diff;
-                    }
-                }
-                double stdDev = validCount > 0 ? Math.Sqrt(sumSquaredDiff / validCount) : 0.0;
+                return validCount > 0
+                    ? ((Func<Result<Fields.FieldStatistics>>)(() => {
+                        double mean = sum / validCount;
+                        double sumSquaredDiff = 0.0;
+                        for (int i = 0; i < scalarField.Length; i++) {
+                            double value = scalarField[i];
+                            if (RhinoMath.IsValidDouble(value)) {
+                                double diff = value - mean;
+                                sumSquaredDiff += diff * diff;
+                            }
+                        }
+                        double stdDev = Math.Sqrt(sumSquaredDiff / validCount);
 
-                return ResultFactory.Create(value: new Fields.FieldStatistics(
-                    Min: min,
-                    Max: max,
-                    Mean: mean,
-                    StdDev: stdDev,
-                    MinLocation: grid[minIdx],
-                    MaxLocation: grid[maxIdx]));
+                        return ResultFactory.Create(value: new Fields.FieldStatistics(
+                            Min: min,
+                            Max: max,
+                            Mean: mean,
+                            StdDev: stdDev,
+                            MinLocation: grid[minIdx],
+                            MaxLocation: grid[maxIdx]));
+                    }))()
+                    : ResultFactory.Create<Fields.FieldStatistics>(error: E.Geometry.InvalidFieldStatistics.WithContext("Scalar field contains no valid samples"));
             }))(),
         };
     }
