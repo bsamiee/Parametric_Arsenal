@@ -204,27 +204,32 @@ internal static class IntersectionCompute {
                                     double perturbationDistance = validA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor;
                                     Result<(double Score, double Sensitivity, bool[] UnstableFlags)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
 
-                                    (double Delta, IDisposable? Resource) perturbAndIntersect(Vector3d direction, GeometryBase original) =>
-                                        original switch {
-                                            Curve curve when curve.DuplicateCurve() is Curve copy => translateAndExecute(copy),
-                                            Surface surface when surface.Duplicate() is Surface copy => translateAndExecute(copy),
-                                            Brep brep when brep.DuplicateBrep() is Brep copy => translateAndExecute(copy),
-                                            Extrusion extrusion when extrusion.Duplicate() is Extrusion copy => translateAndExecute(copy),
-                                            Mesh mesh when mesh.DuplicateMesh() is Mesh copy => translateAndExecute(copy),
-                                            _ => (RhinoMath.UnsetValue, null),
+                                    (double Delta, IDisposable? Resource) perturbAndIntersect(Vector3d direction, GeometryBase original) {
+                                        GeometryBase? copy = original switch {
+                                            Curve curve => curve.DuplicateCurve(),
+                                            Brep brep => brep.DuplicateBrep(),
+                                            Extrusion extrusion => extrusion.Duplicate(),
+                                            Surface surface => surface.Duplicate(),
+                                            Mesh mesh => mesh.DuplicateMesh(),
+                                            _ => null,
                                         };
 
-                                    (double Delta, IDisposable? Resource) translateAndExecute(GeometryBase copy) =>
-                                        copy.Translate(direction * perturbationDistance)
-                                            ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
-                                                .Map(result => {
-                                                    foreach (Curve intersection in result.Curves) {
-                                                        intersection?.Dispose();
-                                                    }
-                                                    return ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy);
-                                                })
-                                                .Match(onSuccess: tuple => tuple, onFailure: _ => invalidate(copy))
-                                            : invalidate(copy);
+                                        return copy is not null
+                                            ? translateAndExecute(copy)
+                                            : (RhinoMath.UnsetValue, null);
+
+                                        (double Delta, IDisposable? Resource) translateAndExecute(GeometryBase copy) =>
+                                            copy.Translate(direction * perturbationDistance)
+                                                ? IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
+                                                    .Map(result => {
+                                                        foreach (Curve intersection in result.Curves) {
+                                                            intersection?.Dispose();
+                                                        }
+                                                        return ((double)Math.Abs(result.Points.Count - count), (IDisposable?)copy);
+                                                    })
+                                                    .Match(onSuccess: tuple => tuple, onFailure: _ => invalidate(copy))
+                                                : invalidate(copy);
+                                    }
 
                                     static (double Delta, IDisposable? Resource) invalidate(GeometryBase geometry) {
                                         geometry.Dispose();
