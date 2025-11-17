@@ -121,7 +121,8 @@ internal static class TransformCore {
             for (int j = 0; j < yCount; j++) {
                 double dy = j * ySpacing;
                 for (int k = 0; k < zCount; k++) {
-                    transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: k * zSpacing);
+                    double dz = k * zSpacing;
+                    transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: dz);
                 }
             }
         }
