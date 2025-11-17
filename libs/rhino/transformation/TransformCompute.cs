@@ -75,7 +75,7 @@ internal static class TransformCompute {
                 morph: new BendSpaceMorph(
                     start: spine.From,
                     end: spine.To,
-                    point: spine.From + (spine.Direction * (0.5 * spine.Length)),
+                    point: spine.From + spine.Direction * (spine.Length * 0.5),
                     angle: angle,
                     straight: false,
                     symmetric: false) {
