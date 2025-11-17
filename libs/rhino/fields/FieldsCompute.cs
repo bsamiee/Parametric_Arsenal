@@ -297,9 +297,6 @@ internal static class FieldsCompute {
                         (ax, axNext) = (axNext, ax);
                         (ay, ayNext) = (ayNext, ay);
                         (az, azNext) = (azNext, az);
-                        Array.Clear(axNext, 0, totalSamples);
-                        Array.Clear(ayNext, 0, totalSamples);
-                        Array.Clear(azNext, 0, totalSamples);
                         if (maxChange < FieldsConfig.VectorPotentialTolerance) {
                             converged = true;
                             iteration = FieldsConfig.VectorPotentialMaxIterations;
