@@ -225,9 +225,9 @@ internal static class FieldsCompute {
                                     double[] az = ArrayPool<double>.Shared.Rent(totalSamples);
                                     Vector3d[] potential = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
                                     try {
-                                        Array.Clear(ax, 0, totalSamples);
-                                        Array.Clear(ay, 0, totalSamples);
-                                        Array.Clear(az, 0, totalSamples);
+                                        Array.Clear(array: ax, index: 0, length: totalSamples);
+                                        Array.Clear(array: ay, index: 0, length: totalSamples);
+                                        Array.Clear(array: az, index: 0, length: totalSamples);
                                         int resSquared = resolution * resolution;
                                         Vector3d[] curlField = curl.Curl;
                                         for (int iteration = 0; iteration < FieldsConfig.VectorPotentialIterations; iteration++) {
