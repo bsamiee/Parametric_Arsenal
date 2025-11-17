@@ -85,8 +85,8 @@ internal static class TransformCore {
                 ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
                 : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
         } finally {
-            if (shouldDispose) {
-                (normalized as IDisposable)?.Dispose();
+            } finally {
+                (shouldDispose ? normalized as IDisposable : null)?.Dispose();
             }
         }
     }
