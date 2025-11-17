@@ -209,7 +209,7 @@ internal static class TransformCompute {
         bool enableDiagnostics) where T : GeometryBase {
         if (path is null || count <= 0 || count > TransformConfig.MaxArrayCount || !path.IsValid || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
         }
 
         Transform[] transforms = new Transform[count];
