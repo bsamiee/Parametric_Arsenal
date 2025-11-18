@@ -225,8 +225,8 @@ internal static class MorphologyCore {
                 edgeLengths.Min(),
                 edgeLengths.Max(),
                 edgeLengths.Average(),
-                aspectRatios.Average(),
-                minAngles.Min()),
+                aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                minAngles.Length > 0 ? minAngles.Min() : 0.0),
         ]);
     }
 
