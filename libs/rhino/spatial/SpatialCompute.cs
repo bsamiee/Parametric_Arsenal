@@ -260,7 +260,7 @@ internal static class SpatialCompute {
                             .SelectMany((cell, _) => cell.Length > 0
                                 ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length]))
                                 : [])
-                            .Select(edge => (edge.P1, edge.P2, Mid: Point3d.Interpolate(edge.P1, edge.P2, 0.5)))
+                            .Select(edge => (edge.P1, edge.P2, Mid: Point3d.Interpolate(edge.P1, edge.P2, t: 0.5))) 
                             .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
                             .Where(edge => boundary.Contains(edge.Mid3D, plane, effectiveTolerance) is PointContainment.Inside)
                             .GroupBy(edge => (edge.P1, edge.P2) switch {
