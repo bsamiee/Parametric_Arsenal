@@ -227,9 +227,9 @@ public static class Fields {
         BoundingBox bounds) =>
         ResultFactory.Create(value: (ScalarField: scalarField, GridPoints: gridPoints))
             .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points"))
-            .Bind(_ => FieldsCompute.ComputeHessian(
-                scalarField: scalarField,
-                grid: gridPoints,
+            .Bind(state => FieldsCompute.ComputeHessian(
+                scalarField: state.ScalarField,
+                grid: state.GridPoints,
                 resolution: spec.Resolution,
                 gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
