@@ -114,7 +114,7 @@ internal static class TopologyCompute {
                                     }
                                     joinedAny = joinedAny || joinedThisPass;
                                     bool shouldContinue = joinedThisPass;
-                                    _ = shouldContinue || ((Func<bool>)(() => { iteration = maxIterations; return false; }))();
+                                    if (!shouldContinue) break;
                                 }
                                 copy.Compact();
                                 return joinedAny;
