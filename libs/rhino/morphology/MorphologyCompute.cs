@@ -445,7 +445,7 @@ internal static class MorphologyCompute {
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
                 foreach (byte flag in MorphologyConfig.RepairOperations.Keys) {
-                    bool applied = (flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string _, Func<Mesh, double, bool> action) entry) && entry.action(repaired, tol);
+                    (flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string _, Func<Mesh, double, bool> action) entry) && entry.action(repaired, tol);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
