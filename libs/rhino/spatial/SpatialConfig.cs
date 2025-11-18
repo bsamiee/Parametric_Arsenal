@@ -32,13 +32,6 @@ internal static class SpatialConfig {
         internal const string ProximityField = "Spatial.ProximityField";
     }
 
-    /// <summary>RTree factory functions for geometry types.</summary>
-    internal static readonly FrozenDictionary<Type, Func<object, RTree>> RTreeFactories =
-        new Dictionary<Type, Func<object, RTree>> {
-            [typeof(Point3d[])] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
-            [typeof(PointCloud)] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
-            [typeof(Mesh)] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-        }.ToFrozenDictionary();
 
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
     internal const int DefaultBufferSize = 2048;
