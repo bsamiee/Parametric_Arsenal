@@ -48,8 +48,9 @@ public static class Fields {
     public static Result<(Point3d[] Grid, double[] Distances)> DistanceField<T>(
         T geometry,
         FieldSpec spec,
-        IGeometryContext context) where T : GeometryBase =>
-        FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
+        IGeometryContext context) where T : GeometryBase {
+        Type geometryType = geometry is null ? typeof(T) : geometry.GetType();
+        return FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, geometryType), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
             true => UnifiedOperation.Apply(
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<(Point3d[], double[])>>>)(item =>
@@ -57,12 +58,13 @@ public static class Fields {
                 config: new OperationConfig<T, (Point3d[], double[])> {
                     Context = context,
                     ValidationMode = config.ValidationMode,
-                    OperationName = $"Fields.DistanceField.{typeof(T).Name}",
+                    OperationName = $"Fields.DistanceField.{geometryType.Name}",
                     EnableDiagnostics = false,
                 }).Map(results => results[0]),
             false => ResultFactory.Create<(Point3d[], double[])>(
-                error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {typeof(T).Name}")),
+                error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometryType.Name}")),
         };
+    }
 
     /// <summary>Compute gradient field: geometry → (grid points[], gradient vectors[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
