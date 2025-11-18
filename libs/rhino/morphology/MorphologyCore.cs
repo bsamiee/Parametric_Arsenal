@@ -493,21 +493,24 @@ internal static class MorphologyCore {
         Mesh unwrapped,
         IGeometryContext _) {
         bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
-        (double minU, double maxU, double minV, double maxV, double coverage) = hasUVs
-            ? ((Func<(double, double, double, double, double)>)(() => {
-                (double minU, double maxU, double minV, double maxV) = (double.MaxValue, double.MinValue, double.MaxValue, double.MinValue);
-                for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
-                    Point2f uv = unwrapped.TextureCoordinates[i];
-                    minU = Math.Min(minU, uv.X);
-                    maxU = Math.Max(maxU, uv.X);
-                    minV = Math.Min(minV, uv.Y);
-                    maxV = Math.Max(maxV, uv.Y);
-                }
-                double uvArea = (maxU - minU) * (maxV - minV);
-                double coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
-                return (minU, maxU, minV, maxV, coverage);
-            }))()
-            : (0.0, 0.0, 0.0, 0.0, 0.0);
+        double minU, maxU, minV, maxV, coverage;
+        if (hasUVs) {
+            minU = double.MaxValue;
+            maxU = double.MinValue;
+            minV = double.MaxValue;
+            maxV = double.MinValue;
+            for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
+                Point2f uv = unwrapped.TextureCoordinates[i];
+                minU = Math.Min(minU, uv.X);
+                maxU = Math.Max(maxU, uv.X);
+                minV = Math.Min(minV, uv.Y);
+                maxV = Math.Max(maxV, uv.Y);
+            }
+            double uvArea = (maxU - minU) * (maxV - minV);
+            coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
+        } else {
+            minU = maxU = minV = maxV = coverage = 0.0;
+        }
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.MeshUnwrapResult(
                 unwrapped,
