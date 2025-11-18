@@ -463,7 +463,7 @@ internal static class MorphologyCore {
         bool solidify,
         Vector3d direction,
         IGeometryContext _) {
-        Mesh? temp = original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
+        original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
         int wallCount = wallFaces?.Count ?? 0;
         BoundingBox originalBounds = original.GetBoundingBox(accurate: false);
         BoundingBox thickenedBounds = thickened.GetBoundingBox(accurate: false);
