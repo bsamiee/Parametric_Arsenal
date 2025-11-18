@@ -654,9 +654,9 @@ internal static class FieldsCompute {
         Point3d[] grid,
         Fields.VectorComponent component) {
         Func<Vector3d, double>? selector = component switch {
-            Fields.VectorComponent.XComponent => v => v.X,
-            Fields.VectorComponent.YComponent => v => v.Y,
-            Fields.VectorComponent.ZComponent => v => v.Z,
+            Fields.VectorComponent.XComponent _ => v => v.X,
+            Fields.VectorComponent.YComponent _ => v => v.Y,
+            Fields.VectorComponent.ZComponent _ => v => v.Z,
             _ => null,
         };
         return selector is null
