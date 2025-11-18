@@ -191,22 +191,23 @@ internal static class TopologyCore {
                     _ = mesh.FaceNormals.Count == mesh.Faces.Count || mesh.FaceNormals.ComputeFaceNormals();
                     int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(idx);
                     return connectedFaces switch {
-                        int[] { Length: 2 } af => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
-                            Vector3d normalA = mesh.FaceNormals.Count > af[0] ? mesh.FaceNormals[af[0]] : Vector3d.Unset;
-                            Vector3d normalB = mesh.FaceNormals.Count > af[1] ? mesh.FaceNormals[af[1]] : Vector3d.Unset;
-                            double dihedral = normalA.IsValid && normalB.IsValid
-                                ? Vector3d.VectorAngle(normalA, normalB)
-                                : 0.0;
-                            return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                                new Topology.AdjacencyData(
-                                    EdgeIndex: idx,
-                                    AdjacentFaceIndices: af,
-                                    FaceNormals: [normalA, normalB,],
-                                    DihedralAngle: dihedral,
-                                    IsManifold: true,
-                                    IsBoundary: false),
-                            ]);
-                        }))(),
+                        int[] { Length: 2 } af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                            new Topology.AdjacencyData(
+                                EdgeIndex: idx,
+                                AdjacentFaceIndices: af,
+                                FaceNormals: [
+                                    mesh.FaceNormals.Count > af[0] ? mesh.FaceNormals[af[0]] : Vector3d.Unset,
+                                    mesh.FaceNormals.Count > af[1] ? mesh.FaceNormals[af[1]] : Vector3d.Unset,
+                                ],
+                                DihedralAngle: (
+                                    mesh.FaceNormals.Count > af[0] && mesh.FaceNormals.Count > af[1] &&
+                                    mesh.FaceNormals[af[0]].IsValid && mesh.FaceNormals[af[1]].IsValid
+                                        ? Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]])
+                                        : 0.0
+                                ),
+                                IsManifold: true,
+                                IsBoundary: false),
+                        ]),
                         int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
                             new Topology.AdjacencyData(
                                 EdgeIndex: idx,
