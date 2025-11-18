@@ -139,27 +139,19 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
-        return (scalarField.Length == gridPoints.Length,
-            RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
+        bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
-                (false, _) => ResultFactory.Create<double>(
-                    error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points")),
-                (true, true) => FieldsCompute.InterpolateScalar(
-                    query: query,
-                    scalarField: scalarField,
-                    grid: gridPoints,
-                    resolution: spec.Resolution,
-                    bounds: bounds,
-                    interpolationMethod: FieldsConfig.InterpolationNearest),
-                (true, false) => FieldsCompute.InterpolateScalar(
-                    query: query,
-                    scalarField: scalarField,
-                    grid: gridPoints,
-                    resolution: spec.Resolution,
-                    bounds: bounds,
-                    interpolationMethod: interpolationMethod),
-            };
+            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
+        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        return ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints))
+            .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
+            .Bind(state => FieldsCompute.InterpolateScalar(
+                query: query,
+                scalarField: state.Field,
+                grid: state.Grid,
+                resolution: spec.Resolution,
+                bounds: bounds,
+                interpolationMethod: method));
     }
 
     /// <summary>Interpolate vector field at query point: (field, grid, query) → vector value.</summary>
@@ -171,27 +163,19 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
-        return (vectorField.Length == gridPoints.Length,
-            RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
+        bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) switch {
-                (false, _) => ResultFactory.Create<Vector3d>(
-                    error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points")),
-                (true, true) => FieldsCompute.InterpolateVector(
-                    query: query,
-                    vectorField: vectorField,
-                    grid: gridPoints,
-                    resolution: spec.Resolution,
-                    bounds: bounds,
-                    interpolationMethod: FieldsConfig.InterpolationNearest),
-                (true, false) => FieldsCompute.InterpolateVector(
-                    query: query,
-                    vectorField: vectorField,
-                    grid: gridPoints,
-                    resolution: spec.Resolution,
-                    bounds: bounds,
-                    interpolationMethod: interpolationMethod),
-            };
+            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
+        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        return ResultFactory.Create(value: (vectorField, gridPoints))
+            .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
+            .Bind(state => FieldsCompute.InterpolateVector(
+                query: query,
+                vectorField: state.Field,
+                grid: state.Grid,
+                resolution: spec.Resolution,
+                bounds: bounds,
+                interpolationMethod: method));
     }
 
     /// <summary>Trace streamlines along vector field: (field, seeds) → curves[].</summary>
@@ -203,21 +187,18 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         IGeometryContext context) =>
-        (vectorField.Length == gridPoints.Length, seeds.Length > 0) switch {
-            (false, _) => ResultFactory.Create<Curve[]>(
-                error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<Curve[]>(
-                error: E.Geometry.InvalidStreamlineSeeds),
-            (true, true) => FieldsCompute.IntegrateStreamlines(
-                vectorField: vectorField,
-                gridPoints: gridPoints,
-                seeds: seeds,
+        ResultFactory.Create(value: (vectorField, gridPoints, seeds))
+            .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
+            .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
+            .Bind(state => FieldsCompute.IntegrateStreamlines(
+                vectorField: state.vectorField,
+                gridPoints: state.gridPoints,
+                seeds: state.seeds,
                 stepSize: spec.StepSize,
                 integrationMethod: FieldsConfig.IntegrationRK4,
                 resolution: spec.Resolution,
                 bounds: bounds,
-                context: context),
-        };
+                context: context));
 
     /// <summary>Extract isosurfaces from scalar field: (field, isovalues) → meshes[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -226,19 +207,15 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         double[] isovalues) =>
-        (scalarField.Length == gridPoints.Length, isovalues.Length > 0, isovalues.All(v => RhinoMath.IsValidDouble(v))) switch {
-            (false, _, _) => ResultFactory.Create<Mesh[]>(
-                error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points")),
-            (_, false, _) => ResultFactory.Create<Mesh[]>(
-                error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required")),
-            (_, _, false) => ResultFactory.Create<Mesh[]>(
-                error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles")),
-            (true, true, true) => FieldsCompute.ExtractIsosurfaces(
-                scalarField: scalarField,
-                gridPoints: gridPoints,
+        ResultFactory.Create(value: (ScalarField: scalarField, GridPoints: gridPoints, Isovalues: isovalues))
+            .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points"))
+            .Ensure(state => state.Isovalues.Length > 0, error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required"))
+            .Ensure(v => v.Isovalues.All(value => RhinoMath.IsValidDouble(value)), error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles"))
+            .Bind(state => FieldsCompute.ExtractIsosurfaces(
+                scalarField: state.ScalarField,
+                gridPoints: state.GridPoints,
                 resolution: spec.Resolution,
-                isovalues: isovalues),
-        };
+                isovalues: state.Isovalues));
 
     /// <summary>Compute Hessian field (second derivative matrix): scalar field → (grid points[], hessian matrices[3,3][]). Assumes uniform grid spacing derived from bounds and resolution; non-uniform grids will produce incorrect second derivatives.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -248,15 +225,13 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds) =>
-        (scalarField.Length == gridPoints.Length) switch {
-            false => ResultFactory.Create<(Point3d[], double[,][])>(
-                error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points")),
-            true => FieldsCompute.ComputeHessian(
-                scalarField: scalarField,
-                grid: gridPoints,
+        ResultFactory.Create(value: (ScalarField: scalarField, GridPoints: gridPoints))
+            .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points"))
+            .Bind(state => FieldsCompute.ComputeHessian(
+                scalarField: state.ScalarField,
+                grid: state.GridPoints,
                 resolution: spec.Resolution,
-                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)),
-        };
+                gridDelta: (bounds.Max - bounds.Min) / (spec.Resolution - 1)));
 
     /// <summary>Compute directional derivative field: (gradient field, direction) → (grid points[], directional derivatives[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
