@@ -189,8 +189,7 @@ internal static class TopologyCore {
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
                     bool normalsValid = mesh.FaceNormals.Count == mesh.Faces.Count
-                        ? true
-                        : mesh.FaceNormals.ComputeFaceNormals();
+                        || mesh.FaceNormals.ComputeFaceNormals();
                     _ = mesh.FaceNormals.UnitizeFaceNormals();
                     return !normalsValid
                         ? ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
