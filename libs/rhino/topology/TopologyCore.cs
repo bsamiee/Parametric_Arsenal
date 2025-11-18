@@ -46,7 +46,7 @@ internal static class TopologyCore {
                             IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
                             Point3d p1 = mesh.TopologyVertices[verts.I];
                             Point3d p2 = mesh.TopologyVertices[verts.J];
-                            return (i, new PolylineCurve([p1, p2]), p1.DistanceTo(p2));
+                            return (i, new LineCurve(p1, p2), p1.DistanceTo(p2));
                         }),
                     ];
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
