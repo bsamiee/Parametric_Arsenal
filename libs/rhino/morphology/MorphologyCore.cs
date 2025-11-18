@@ -75,7 +75,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    /// <summary>Unified subdivision executor for CatmullClark, Loop, and Butterfly algorithms.</summary>
+    /// <summary>Execute subdivision with CatmullClark, Loop, or Butterfly algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision<T>(
         T input,
@@ -100,7 +100,20 @@ internal static class MorphologyCore {
                             m,
                             MorphologyConfig.GetSubdivisionAlgorithm(strategy),
                             strategy.Levels,
-                            context).Bind(subdivided => ComputeSubdivisionMetrics(m, subdivided, context))),
+                            context).Bind(subdivided => {
+                                (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
+                                return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                    new Morphology.SubdivisionResult(
+                                        subdivided,
+                                        m.Faces.Count,
+                                        subdivided.Faces.Count,
+                                        edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+                                        edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0,
+                                        edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0,
+                                        aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                                        minAngles.Length > 0 ? minAngles.Min() : 0.0),
+                                ]);
+                            })),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
                         ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
@@ -171,7 +184,16 @@ internal static class MorphologyCore {
                             m,
                             mcf.Iterations,
                             lockBoundary: false,
-                            (mesh, pos, _) => MeanCurvatureFlowUpdate(mesh, pos, mcf.TimeStep),
+                            (mesh, pos, _) => [.. Enumerable.Range(0, pos.Length).Select(i => {
+                                int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
+                                int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
+                                return neighbors.Length is 0
+                                    ? pos[i]
+                                    : pos[i] + ((mcf.TimeStep * (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis) *
+                                        ((neighbors.Aggregate(Point3d.Origin, (acc, neighborIdx) =>
+                                            acc + (pos[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]] - pos[i])) / neighbors.Length) - Point3d.Origin)) *
+                                        (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis));
+                            }),],
                             context).Bind(smoothed => ComputeSmoothingMetrics(m, smoothed, mcf.Iterations, context))),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
@@ -195,7 +217,19 @@ internal static class MorphologyCore {
                 input: mesh,
                 operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                     MorphologyCompute.OffsetMesh(m, operation.Distance, operation.BothSides, context)
-                        .Bind(offset => ComputeOffsetMetrics(m, offset, operation.Distance, context))),
+                        .Bind(offset => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                            new Morphology.OffsetResult(
+                                offset,
+                                Math.Min(m.Vertices.Count, offset.Vertices.Count) switch {
+                                    0 => 0.0,
+                                    int sampleCount => Enumerable.Range(0, sampleCount).Average(i => ((Point3d)m.Vertices[i]).DistanceTo(offset.Vertices[i])),
+                                },
+                                !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess,
+                                m.Vertices.Count,
+                                offset.Vertices.Count,
+                                m.Faces.Count,
+                                offset.Faces.Count),
+                        ]))),
                 config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                     Context = context,
                     ValidationMode = V.Standard | V.MeshSpecific,
@@ -215,7 +249,20 @@ internal static class MorphologyCore {
                 input: mesh,
                 operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                     MorphologyCompute.ReduceMesh(m, operation.TargetFaceCount, operation.PreserveBoundary, operation.Accuracy, context)
-                        .Bind(reduced => ComputeReductionMetrics(m, reduced, context))),
+                        .Bind(reduced => {
+                            (double[] edgeLengths, double[] aspectRatios, double[] _) = ComputeMeshMetrics(reduced, context);
+                            return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                                value: [new Morphology.ReductionResult(
+                                    reduced,
+                                    m.Faces.Count,
+                                    reduced.Faces.Count,
+                                    m.Faces.Count > 0 ? (double)reduced.Faces.Count / m.Faces.Count : 1.0,
+                                    MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0,
+                                    aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                                    edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+                                    edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),
+                                ]);
+                        })),
                 config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                     Context = context,
                     ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
@@ -264,21 +311,7 @@ internal static class MorphologyCore {
         }),
         ];
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep) =>
-        [.. Enumerable.Range(0, positions.Length).Select(i => {
-            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
-            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
-            return neighbors.Length is 0
-                ? positions[i]
-                : positions[i] + ((timeStep * (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis) *
-                    ((neighbors.Aggregate(Point3d.Origin, (acc, neighborIdx) =>
-                        acc + (positions[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]] - positions[i])) / neighbors.Length) - Point3d.Origin)) *
-                    (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis));
-        }),
-        ];
-
-    /// <summary>Computes mesh quality metrics. Assumes triangulated mesh - only processes first 3 vertices (.A, .B, .C) of each face. Quad faces (.D) are ignored.</summary>
+    /// <summary>Compute edge lengths, aspect ratios, and minimum angles for triangulated mesh.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static (double[] EdgeLengths, double[] AspectRatios, double[] MinAngles) ComputeMeshMetrics(Mesh mesh, IGeometryContext context) {
         int faceCount = mesh.Faces.Count;
@@ -307,25 +340,6 @@ internal static class MorphologyCore {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSubdivisionMetrics(
-        Mesh original,
-        Mesh subdivided,
-        IGeometryContext context) {
-        (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
-        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-            new Morphology.SubdivisionResult(
-                subdivided,
-                original.Faces.Count,
-                subdivided.Faces.Count,
-                edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
-                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0,
-                edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0,
-                aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
-                minAngles.Length > 0 ? minAngles.Min() : 0.0),
-        ]);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSmoothingMetrics(
         Mesh original,
         Mesh smoothed,
@@ -345,45 +359,6 @@ internal static class MorphologyCore {
                     rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier),
             ])
             : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount);
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeOffsetMetrics(
-        Mesh original,
-        Mesh offset,
-        double _,
-        IGeometryContext context) =>
-        ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-            new Morphology.OffsetResult(
-                offset,
-                Math.Min(original.Vertices.Count, offset.Vertices.Count) switch {
-                    0 => 0.0,
-                    int sampleCount => Enumerable.Range(0, sampleCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i])),
-                },
-                !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess,
-                original.Vertices.Count,
-                offset.Vertices.Count,
-                original.Faces.Count,
-                offset.Faces.Count),
-        ]);
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeReductionMetrics(
-        Mesh original,
-        Mesh reduced,
-        IGeometryContext context) {
-        (double[] edgeLengths, double[] aspectRatios, double[] _) = ComputeMeshMetrics(reduced, context);
-        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.ReductionResult(
-                reduced,
-                original.Faces.Count,
-                reduced.Faces.Count,
-                original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0,
-                MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0,
-                aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
-                edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
-                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),
-            ]);
-    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRemeshMetrics(
