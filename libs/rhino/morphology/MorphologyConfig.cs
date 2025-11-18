@@ -119,7 +119,7 @@ internal static class MorphologyConfig {
     /// <summary>Mesh unwrap method dispatch: strategy type → RhinoCommon method.</summary>
     internal static readonly FrozenDictionary<Type, MeshUnwrapMethod> UnwrapMethods =
         new Dictionary<Type, MeshUnwrapMethod> {
-            [typeof(Morphology.AngleBasedUnwrapStrategy)] = 0,
-            [typeof(Morphology.ConformalEnergyMinimizationUnwrapStrategy)] = (MeshUnwrapMethod)1,
+            [typeof(Morphology.AngleBasedUnwrapStrategy)] = MeshUnwrapMethod.AngleBased,
+            [typeof(Morphology.ConformalEnergyMinimizationUnwrapStrategy)] = MeshUnwrapMethod.ConformalEnergyMinimization,
         }.ToFrozenDictionary();
 }
