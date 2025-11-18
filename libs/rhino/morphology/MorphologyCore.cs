@@ -111,9 +111,16 @@ internal static class MorphologyCore {
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({p.Item3:F4}) must be < -λ ({(-p.Item2):F4})")))
                 : MorphologyCompute.SmoothWithConvergence(mesh, p.Item1, lockBoundary: false, (m, pos, _) => {
                     Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
-                    Point3d[] blended1 = [.. Enumerable.Range(0, pos.Length).Select(i => pos[i] + (p.Item2 * (step1[i] - pos[i]))),];
+                    Point3d[] blended1 = new Point3d[pos.Length];
+                    for (int i = 0; i < pos.Length; i++) {
+                        blended1[i] = pos[i] + (p.Item2 * (step1[i] - pos[i]));
+                    }
                     Point3d[] step2 = LaplacianUpdate(m, blended1, useCotangent: false);
-                    return [.. Enumerable.Range(0, pos.Length).Select(i => blended1[i] + (p.Item3 * (step2[i] - blended1[i]))),];
+                    Point3d[] result = new Point3d[pos.Length];
+                    for (int i = 0; i < pos.Length; i++) {
+                        result[i] = blended1[i] + (p.Item3 * (step2[i] - blended1[i]));
+                    }
+                    return result;
                 }, ctx).Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, p.Item1, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -463,7 +470,7 @@ internal static class MorphologyCore {
         bool solidify,
         Vector3d direction,
         IGeometryContext _) {
-        original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
+        Mesh? temp = original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
         int wallCount = wallFaces?.Count ?? 0;
         BoundingBox originalBounds = original.GetBoundingBox(accurate: false);
         BoundingBox thickenedBounds = thickened.GetBoundingBox(accurate: false);
@@ -493,12 +500,12 @@ internal static class MorphologyCore {
         Mesh unwrapped,
         IGeometryContext _) {
         bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
-        double minU, maxU, minV, maxV, coverage;
+        double minU = double.MaxValue;
+        double maxU = double.MinValue;
+        double minV = double.MaxValue;
+        double maxV = double.MinValue;
+        double coverage = 0.0;
         if (hasUVs) {
-            minU = double.MaxValue;
-            maxU = double.MinValue;
-            minV = double.MaxValue;
-            maxV = double.MinValue;
             for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
                 Point2f uv = unwrapped.TextureCoordinates[i];
                 minU = Math.Min(minU, uv.X);
@@ -508,8 +515,6 @@ internal static class MorphologyCore {
             }
             double uvArea = (maxU - minU) * (maxV - minV);
             coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
-        } else {
-            minU = maxU = minV = maxV = coverage = 0.0;
         }
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.MeshUnwrapResult(
