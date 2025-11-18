@@ -457,9 +457,12 @@ internal static class MorphologyCompute {
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
         mesh switch {
             { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
-            Mesh m when m.SplitDisjointPieces() is not Mesh[] components || components.Length == 0 =>
-                ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed")),
-            Mesh m => ResultFactory.Create(value: m.SplitDisjointPieces()),
+            Mesh m => ((Func<Result<Mesh[]>>)(() => {
+                Mesh[] components = m.SplitDisjointPieces();
+                return (components is not { Length: > 0 })
+                    ? ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed"))
+                    : ResultFactory.Create(value: components);
+            }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
