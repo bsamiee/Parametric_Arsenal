@@ -140,9 +140,10 @@ internal static class MorphologyCore {
                         ValidationMode = MorphologyConfig.GetValidationMode(typeof(Morphology.SubdiveButterflyRequest), typeof(Mesh)),
                         OperationName = "Morphology.SubdivideButterfly",
                     }),
-                _ => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                    error: E.Geometry.Morphology.UnsupportedConfiguration),
-            };
+                _ => throw new InvalidOperationException(
+                    string.Create(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        $"Unsupported subdivision request type: {request.GetType().Name}")),
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothLaplacian<T>(
