@@ -265,7 +265,7 @@ internal static class MorphologyCore {
                 offset,
                 Math.Min(original.Vertices.Count, offset.Vertices.Count) switch {
                     0 => 0.0,
-                    int sampleCount => Enumerable.Range(0, sampleCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i])),
+                    int sampleCount => Enumerable.Range(0, sampleCount).Average((int i) => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i])),
                 },
                 !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess,
                 original.Vertices.Count,
