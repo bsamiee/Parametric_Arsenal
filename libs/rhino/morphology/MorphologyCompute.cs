@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -489,7 +490,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
-        byte flags,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
         double weldTolerance,
         IGeometryContext _) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
@@ -499,11 +500,14 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < 5; i++) {
-                    byte flag = (byte)(1 << i);
-                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
-                        bool success = entry.action(repaired, tol);
+                IReadOnlyList<Morphology.MeshRepairOperation> ops = operations ?? Array.Empty<Morphology.MeshRepairOperation>();
+                for (int i = 0; i < ops.Count; i++) {
+                    Morphology.MeshRepairOperation op = ops[i];
+                    if (!MorphologyConfig.RepairOperations.TryGetValue(op.GetType(), out (string discard, Func<Mesh, double, bool> action) entry)) {
+                        return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext(
+                            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Unknown repair operation: {op.GetType().Name}")));
                     }
+                    _ = entry.action(repaired, tol);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -597,17 +601,17 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
-        byte unwrapMethod,
+        MeshUnwrapMethod unwrapMethod,
         IGeometryContext _) =>
         unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
+            MeshUnwrapMethod.AngleBased or MeshUnwrapMethod.ConformalEnergyMinimization => ((Func<Result<Mesh>>)(() => {
                 Mesh unwrapped = mesh.DuplicateMesh();
                 using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                bool success = unwrapper.Unwrap(method: unwrapMethod);
                 return success && unwrapped.TextureCoordinates.Count > 0
                     ? ResultFactory.Create(value: unwrapped)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {unwrapMethod}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
             }))(),
             _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),

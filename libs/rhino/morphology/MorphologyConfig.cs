@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
@@ -30,15 +31,9 @@ internal static class MorphologyConfig {
             [(21, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshWeld"),
         }.ToFrozenDictionary();
 
-    /// <summary>Operation names by ID for O(1) lookup, derived from Operations.</summary>
-    private static readonly FrozenDictionary<byte, string> OperationNames =
-        Operations
-            .GroupBy(static kv => kv.Key.Op)
-            .ToDictionary(static g => g.Key, static g => g.First().Value.Name)
-            .ToFrozenDictionary();
-
-    [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
-    [Pure] internal static string OperationName(byte op) => OperationNames.TryGetValue(op, out string? name) ? name : $"Op{op}";
+    [Pure]
+    internal static bool TryGetOperationMetadata(byte op, Type type, out (V Validation, string Name) metadata) =>
+        Operations.TryGetValue((op, type), out metadata);
 
     /// <summary>Operation ID constants.</summary>
     internal const byte OpCageDeform = 1;
@@ -124,22 +119,13 @@ internal static class MorphologyConfig {
     internal const double MinThickenDistance = 0.0001;
     internal const double MaxThickenDistance = 10000.0;
 
-    /// <summary>Mesh repair operation flags for bitwise composition.</summary>
-    internal const byte RepairNone = 0;
-    internal const byte RepairFillHoles = 1;
-    internal const byte RepairUnifyNormals = 2;
-    internal const byte RepairCullDegenerateFaces = 4;
-    internal const byte RepairCompact = 8;
-    internal const byte RepairWeld = 16;
-    internal const byte RepairAll = RepairFillHoles | RepairUnifyNormals | RepairCullDegenerateFaces | RepairCompact | RepairWeld;
-
-    /// <summary>Mesh repair operation dispatch: flag → (operation name, mesh action).</summary>
-    internal static readonly FrozenDictionary<byte, (string Name, Func<Mesh, double, bool> Action)> RepairOperations =
-        new Dictionary<byte, (string, Func<Mesh, double, bool>)> {
-            [RepairFillHoles] = ("FillHoles", static (m, _) => m.FillHoles()),
-            [RepairUnifyNormals] = ("UnifyNormals", static (m, _) => m.UnifyNormals() >= 0),
-            [RepairCullDegenerateFaces] = ("CullDegenerateFaces", static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
-            [RepairCompact] = ("Compact", static (m, _) => m.Compact()),
-            [RepairWeld] = ("Weld", static (m, _) => m.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true)),
+    /// <summary>Mesh repair operation dispatch: type → (operation name, mesh action).</summary>
+    internal static readonly FrozenDictionary<Type, (string Name, Func<Mesh, double, bool> Action)> RepairOperations =
+        new Dictionary<Type, (string, Func<Mesh, double, bool>)> {
+            [typeof(Morphology.FillHolesRepairOperation)] = ("FillHoles", static (m, _) => m.FillHoles()),
+            [typeof(Morphology.UnifyNormalsRepairOperation)] = ("UnifyNormals", static (m, _) => m.UnifyNormals() >= 0),
+            [typeof(Morphology.CullDegenerateFacesRepairOperation)] = ("CullDegenerateFaces", static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
+            [typeof(Morphology.CompactRepairOperation)] = ("Compact", static (m, _) => m.Compact()),
+            [typeof(Morphology.WeldRepairOperation)] = ("Weld", static (m, _) => m.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true)),
         }.ToFrozenDictionary();
 }
