@@ -392,22 +392,23 @@ internal static class TopologyCore {
                 Point3d endPoint = edges[current].Curve.PointAtEnd;
                 int nextIndex = -1;
                 bool reverseNext = false;
+                double minDistance = double.MaxValue;
                 for (int candidate = 0; candidate < edges.Length; candidate++) {
                     if (visited[candidate]) {
                         continue;
                     }
                     Curve candidateCurve = edges[candidate].Curve;
                     double startDistance = endPoint.DistanceTo(candidateCurve.PointAtStart);
-                    double endDistance = endPoint.DistanceTo(candidateCurve.PointAtEnd);
-                    if (startDistance <= tol) {
+                    if (startDistance <= tol && startDistance < minDistance) {
                         nextIndex = candidate;
                         reverseNext = false;
-                        break;
+                        minDistance = startDistance;
                     }
-                    if (endDistance <= tol) {
+                    double endDistance = endPoint.DistanceTo(candidateCurve.PointAtEnd);
+                    if (endDistance <= tol && endDistance < minDistance) {
                         nextIndex = candidate;
                         reverseNext = true;
-                        break;
+                        minDistance = endDistance;
                     }
                 }
                 if (nextIndex == -1) {
