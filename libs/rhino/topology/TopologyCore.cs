@@ -22,39 +22,52 @@ internal static class TopologyCore {
     internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NakedEdges,
             operation: g => g switch {
-                Brep { Edges.Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
-                Brep brep => brep.DuplicateNakedEdgeCurves(nakedOuter: true, nakedInner: true) switch {
-                    null => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
-                        new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: 0.0),
-                    ]),
-                    Curve[] nakedCurves => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
-                        new Topology.NakedEdgeData(
-                            EdgeCurves: nakedCurves,
-                            EdgeIndices: [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),],
-                            Valences: [.. nakedCurves.Select(static _ => 1),],
-                            IsOrdered: orderLoops,
-                            TotalEdgeCount: brep.Edges.Count,
-                            TotalLength: nakedCurves.Sum(static c => c.GetLength())),
-                    ]),
-                },
-                Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
-                    (int Index, Curve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
-                        .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1)
-                        .Select(i => {
-                            IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
-                            Point3d p1 = mesh.TopologyVertices[verts.I];
-                            Point3d p2 = mesh.TopologyVertices[verts.J];
-                            return (i, new LineCurve(p1, p2), p1.DistanceTo(p2));
-                        }),
-                    ];
+                Brep brep => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
+                    (int Index, Curve Curve, double Length, int Valence)[] nakedEdges = brep.Edges.Count == 0
+                        ? []
+                        : [.. Enumerable.Range(0, brep.Edges.Count)
+                            .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
+                            .Select(i => (Index: i, Curve: brep.Edges[i].DuplicateCurve(), Valence: (int)brep.Edges[i].Valence))
+                            .Where(t => t.Curve is Curve)
+                            .Select(t => {
+                                Curve dup = t.Curve!;
+                                return (t.Index, dup, dup.GetLength(), t.Valence);
+                            }),
+                        ];
+                    (int Index, Curve Curve, double Length, int Valence)[] ordered = orderLoops && nakedEdges.Length > 1
+                        ? OrderNakedEdgesByLoop(edges: nakedEdges, tolerance: Math.Max(context.AbsoluteTolerance, RhinoMath.ZeroTolerance))
+                        : nakedEdges;
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
                         new Topology.NakedEdgeData(
-                            EdgeCurves: [.. edges.Select(e => e.Curve),],
-                            EdgeIndices: [.. edges.Select(e => e.Index),],
-                            Valences: [.. edges.Select(_ => 1),],
-                            IsOrdered: orderLoops,
+                            EdgeCurves: [.. ordered.Select(e => e.Curve),],
+                            EdgeIndices: [.. ordered.Select(e => e.Index),],
+                            Valences: [.. ordered.Select(e => e.Valence),],
+                            IsOrdered: orderLoops && ordered.Length > 0,
+                            TotalEdgeCount: brep.Edges.Count,
+                            TotalLength: ordered.Sum(e => e.Length)),
+                    ]);
+                }))(),
+                Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
+                    (int Index, Curve Curve, double Length, int Valence)[] nakedEdges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
+                        .Select(i => (Index: i, Faces: mesh.TopologyEdges.GetConnectedFaces(i), Verts: mesh.TopologyEdges.GetTopologyVertices(i)))
+                        .Where(t => t.Faces.Length == 1)
+                        .Select(t => {
+                            Point3d start = mesh.TopologyVertices[t.Verts.I];
+                            Point3d end = mesh.TopologyVertices[t.Verts.J];
+                            return (t.Index, (Curve)new LineCurve(start, end), start.DistanceTo(end), t.Faces.Length);
+                        }),
+                    ];
+                    (int Index, Curve Curve, double Length, int Valence)[] ordered = orderLoops && nakedEdges.Length > 1
+                        ? OrderNakedEdgesByLoop(edges: nakedEdges, tolerance: Math.Max(context.AbsoluteTolerance, RhinoMath.ZeroTolerance))
+                        : nakedEdges;
+                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+                        new Topology.NakedEdgeData(
+                            EdgeCurves: [.. ordered.Select(e => e.Curve),],
+                            EdgeIndices: [.. ordered.Select(e => e.Index),],
+                            Valences: [.. ordered.Select(e => e.Valence),],
+                            IsOrdered: orderLoops && ordered.Length > 0,
                             TotalEdgeCount: mesh.TopologyEdges.Count,
-                            TotalLength: edges.Sum(e => e.Length)),
+                            TotalLength: ordered.Sum(e => e.Length)),
                     ]);
                 }))(),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
@@ -358,4 +371,55 @@ internal static class TopologyCore {
                 },
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
+
+    private static (int Index, Curve Curve, double Length, int Valence)[] OrderNakedEdgesByLoop((int Index, Curve Curve, double Length, int Valence)[] edges, double tolerance) {
+        if (edges.Length <= 1) {
+            return edges;
+        }
+        (int Index, Curve Curve, double Length, int Valence)[] ordered = new (int, Curve, double, int)[edges.Length];
+        bool[] visited = new bool[edges.Length];
+        double tol = Math.Max(tolerance, RhinoMath.ZeroTolerance);
+        int writeIndex = 0;
+        for (int seed = 0; seed < edges.Length; seed++) {
+            if (visited[seed]) {
+                continue;
+            }
+            int current = seed;
+            bool extend = true;
+            while (extend) {
+                visited[current] = true;
+                ordered[writeIndex++] = edges[current];
+                Point3d endPoint = edges[current].Curve.PointAtEnd;
+                int nextIndex = -1;
+                bool reverseNext = false;
+                for (int candidate = 0; candidate < edges.Length; candidate++) {
+                    if (visited[candidate]) {
+                        continue;
+                    }
+                    Curve candidateCurve = edges[candidate].Curve;
+                    double startDistance = endPoint.DistanceTo(candidateCurve.PointAtStart);
+                    double endDistance = endPoint.DistanceTo(candidateCurve.PointAtEnd);
+                    if (startDistance <= tol) {
+                        nextIndex = candidate;
+                        reverseNext = false;
+                        break;
+                    }
+                    if (endDistance <= tol) {
+                        nextIndex = candidate;
+                        reverseNext = true;
+                        break;
+                    }
+                }
+                if (nextIndex == -1) {
+                    extend = false;
+                } else {
+                    if (reverseNext) {
+                        edges[nextIndex].Curve.Reverse();
+                    }
+                    current = nextIndex;
+                }
+            }
+        }
+        return ordered;
+    }
 }
