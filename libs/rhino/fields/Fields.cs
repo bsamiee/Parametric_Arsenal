@@ -167,8 +167,8 @@ public static class Fields {
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
         byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
-        return ResultFactory.Create(value: (vectorField, gridPoints))
-            .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
+        return ResultFactory.Create(value: (Field: vectorField, Grid: gridPoints))
+            .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
             .Bind(state => FieldsCompute.InterpolateVector(
                 query: query,
                 vectorField: state.Field,
