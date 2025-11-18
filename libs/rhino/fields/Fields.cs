@@ -145,10 +145,10 @@ public static class Fields {
         byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
         return ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
-            .Bind(_ => FieldsCompute.InterpolateScalar(
+            .Bind(state => FieldsCompute.InterpolateScalar(
                 query: query,
-                scalarField: scalarField,
-                grid: gridPoints,
+                scalarField: state.Field,
+                grid: state.Grid,
                 resolution: spec.Resolution,
                 bounds: bounds,
                 interpolationMethod: method));
