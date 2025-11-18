@@ -82,7 +82,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
-        byte algorithm,
+        MorphologyCore.SubdivisionAlgorithm algorithm,
         int levels,
         IGeometryContext context) =>
         levels <= 0
@@ -93,9 +93,9 @@ internal static class MorphologyCompute {
                     ResultFactory.Create(value: mesh.DuplicateMesh()),
                     (result, level) => result.Bind(current => {
                         Mesh? next = algorithm switch {
-                            MorphologyConfig.OpSubdivideCatmullClark => current.DuplicateMesh(),
-                            MorphologyConfig.OpSubdivideLoop => SubdivideLoop(current),
-                            MorphologyConfig.OpSubdivideButterfly => SubdivideButterfly(current),
+                            MorphologyCore.SubdivisionAlgorithm.CatmullClark => current.DuplicateMesh(),
+                            MorphologyCore.SubdivisionAlgorithm.Loop => SubdivideLoop(current),
+                            MorphologyCore.SubdivisionAlgorithm.Butterfly => SubdivideButterfly(current),
                             _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
