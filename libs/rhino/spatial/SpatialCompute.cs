@@ -400,8 +400,10 @@ internal static class SpatialCompute {
         if (points.Length < 3) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"));
         (double z0, double minX, double minY, double maxX, double maxY) = (points[0].Z, points[0].X, points[0].Y, points[0].X, points[0].Y);
         for (int i = 1; i < points.Length; i++) {
+            double x = points[i].X;
+            double y = points[i].Y;
             if (Math.Abs(points[i].Z - z0) > context.AbsoluteTolerance) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate"));
-            (minX, minY, maxX, maxY) = (points[i].X < minX ? points[i].X : minX, points[i].Y < minY ? points[i].Y : minY, points[i].X > maxX ? points[i].X : maxX, points[i].Y > maxY ? points[i].Y : maxY);
+            (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
         }
         (double dx, double dy) = ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale, (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale);
         Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, z0), new Point3d(maxX + dx, minY - dy, z0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, z0),];
