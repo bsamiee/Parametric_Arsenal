@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
+using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
@@ -166,6 +168,76 @@ public static class Topology {
                 $"NgonTopology: {this.TotalNgons} ngons | {this.TotalFaces} faces | AvgValence={this.EdgeCountPerNgon.Average():F1}");
     }
 
+    /// <summary>Closest naked edge pair with minimum separation distance.</summary>
+    public sealed record NearEdgeMiss(int EdgeA, int EdgeB, double Distance);
+
+    /// <summary>Topology diagnosis with metrics and suggested repair strategies.</summary>
+    public sealed record TopologyDiagnosis(
+        IReadOnlyList<double> EdgeGaps,
+        IReadOnlyList<NearEdgeMiss> NearMisses,
+        IReadOnlyList<HealingStrategy> SuggestedStrategies) : IResult;
+
+    /// <summary>Loop metadata capturing hole classification.</summary>
+    public sealed record LoopClassification(int LoopIndex, bool IsHole);
+
+    /// <summary>Topological feature summary with genus and handle counts.</summary>
+    public sealed record TopologicalFeatures(
+        int Genus,
+        IReadOnlyList<LoopClassification> Loops,
+        bool IsSolid,
+        int HandleCount) : IResult;
+
+    /// <summary>Topology healing strategy variant.</summary>
+    public abstract record HealingStrategy;
+
+    /// <summary>Repair tolerance-limited healing to close minor gaps.</summary>
+    public sealed record ConservativeRepairStrategy() : HealingStrategy;
+
+    /// <summary>Moderate join attempts across naked edge pairs.</summary>
+    public sealed record ModerateJoinStrategy() : HealingStrategy;
+
+    /// <summary>High-tolerance join for challenging openings.</summary>
+    public sealed record AggressiveJoinStrategy() : HealingStrategy;
+
+    /// <summary>Combined repair and join strategy.</summary>
+    public sealed record CombinedRepairStrategy() : HealingStrategy;
+
+    /// <summary>Targeted near-miss join strategy.</summary>
+    public sealed record TargetedJoinStrategy() : HealingStrategy;
+
+    /// <summary>Component join strategy for disjoint pieces.</summary>
+    public sealed record ComponentJoinStrategy() : HealingStrategy;
+
+    /// <summary>Ordered healing strategy sequence.</summary>
+    public sealed record HealingPlan(IReadOnlyList<HealingStrategy> Strategies) {
+        /// <summary>Create a progressive plan truncated at a specific strategy index.</summary>
+        [Pure]
+        public static HealingPlan Progressive(int maxStrategyIndex) {
+            int maxIndex = System.Math.Min(System.Math.Max(maxStrategyIndex, 0), ProgressiveStrategyOrder.Length - 1);
+            int count = maxIndex + 1;
+            HealingStrategy[] strategies = new HealingStrategy[count];
+            for (int index = 0; index < count; index++) {
+                strategies[index] = ProgressiveStrategyOrder[index];
+            }
+            return new HealingPlan(strategies);
+        }
+    }
+
+    /// <summary>Healing result including the strategy applied.</summary>
+    public sealed record HealingResult(Brep Healed, HealingStrategy Strategy, bool Success) : IResult;
+
+    private static readonly HealingStrategy[] ProgressiveStrategyOrder = [
+        new ConservativeRepairStrategy(),
+        new ModerateJoinStrategy(),
+        new AggressiveJoinStrategy(),
+        new CombinedRepairStrategy(),
+        new TargetedJoinStrategy(),
+        new ComponentJoinStrategy(),
+    ];
+
+    /// <summary>Default progressive plan traversing all healing strategies.</summary>
+    public static readonly HealingPlan ProgressiveHealingPlan = new(ProgressiveStrategyOrder);
+
     /// <summary>Extract naked boundary edges with optional loop ordering.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<NakedEdgeData> GetNakedEdges<T>(
@@ -230,23 +302,27 @@ public static class Topology {
 
     /// <summary>Diagnose topology with edge gaps, near-misses, and repair strategy suggestions.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> DiagnoseTopology(
+    public static Result<TopologyDiagnosis> DiagnoseTopology(
         Brep brep,
         IGeometryContext context) =>
         TopologyCompute.Diagnose(brep: brep, context: context);
 
     /// <summary>Progressive healing with automatic rollback and strategy selection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Brep Healed, byte Strategy, bool Success)> HealTopology(
+    public static Result<HealingResult> HealTopology(
         Brep brep,
-        byte maxStrategy,
-        IGeometryContext context) =>
-        TopologyCompute.Heal(brep: brep, maxStrategy: maxStrategy, context: context);
+        IGeometryContext context,
+        HealingPlan? plan = null) {
+        HealingPlan selectedPlan = plan ?? ProgressiveHealingPlan;
+        return selectedPlan.Strategies.Count == 0
+            ? ResultFactory.Create<HealingResult>(error: E.Geometry.InvalidParameters.WithContext("Healing plan requires at least one strategy"))
+            : TopologyCompute.Heal(brep: brep, plan: selectedPlan, context: context);
+    }
 
     /// <summary>Extract genus, holes, handles, and solid classification via Euler.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractTopologicalFeatures(
+    public static Result<TopologicalFeatures> ExtractTopologicalFeatures(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.ExtractFeatures(brep: brep, context);
+        TopologyCompute.ExtractFeatures(brep: brep, context: context);
 }
