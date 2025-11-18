@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -11,53 +12,55 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology operation dispatch and executor implementations.</summary>
 internal static class MorphologyCore {
-    /// <summary>Operation dispatch: (operation ID, type) → executor function.</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type InputType), Func<object, object, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> OperationDispatch =
-        new Dictionary<(byte, Type), Func<object, object, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> {
-            [(MorphologyConfig.OpCageDeform, typeof(Mesh))] = ExecuteCageDeform,
-            [(MorphologyConfig.OpCageDeform, typeof(Brep))] = ExecuteCageDeform,
-            [(MorphologyConfig.OpSubdivideCatmullClark, typeof(Mesh))] = ExecuteSubdivideCatmullClark,
-            [(MorphologyConfig.OpSubdivideLoop, typeof(Mesh))] = ExecuteSubdivideLoop,
-            [(MorphologyConfig.OpSubdivideButterfly, typeof(Mesh))] = ExecuteSubdivideButterfly,
-            [(MorphologyConfig.OpSmoothLaplacian, typeof(Mesh))] = ExecuteSmoothLaplacian,
-            [(MorphologyConfig.OpSmoothTaubin, typeof(Mesh))] = ExecuteSmoothTaubin,
-            [(MorphologyConfig.OpEvolveMeanCurvature, typeof(Mesh))] = ExecuteEvolveMeanCurvature,
-            [(MorphologyConfig.OpOffset, typeof(Mesh))] = ExecuteOffset,
-            [(MorphologyConfig.OpReduce, typeof(Mesh))] = ExecuteReduce,
-            [(MorphologyConfig.OpRemesh, typeof(Mesh))] = ExecuteRemesh,
-            [(MorphologyConfig.OpBrepToMesh, typeof(Brep))] = ExecuteBrepToMesh,
-            [(MorphologyConfig.OpMeshRepair, typeof(Mesh))] = ExecuteMeshRepair,
-            [(MorphologyConfig.OpMeshThicken, typeof(Mesh))] = ExecuteMeshThicken,
-            [(MorphologyConfig.OpMeshUnwrap, typeof(Mesh))] = ExecuteMeshUnwrap,
-            [(MorphologyConfig.OpMeshSeparate, typeof(Mesh))] = ExecuteMeshSeparate,
-            [(MorphologyConfig.OpMeshWeld, typeof(Mesh))] = ExecuteMeshWeld,
+    /// <summary>Operation dispatch: (request type, geometry type) → executor function.</summary>
+    internal static readonly FrozenDictionary<(Type RequestType, Type InputType), Func<object, Morphology.Request, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> OperationDispatch =
+        new Dictionary<(Type, Type), Func<object, Morphology.Request, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>>> {
+            [(typeof(Morphology.CageDeformRequest), typeof(Mesh))] = ExecuteCageDeform,
+            [(typeof(Morphology.CageDeformRequest), typeof(Brep))] = ExecuteCageDeform,
+            [(typeof(Morphology.CatmullClarkSubdivisionRequest), typeof(Mesh))] = ExecuteSubdivideCatmullClark,
+            [(typeof(Morphology.LoopSubdivisionRequest), typeof(Mesh))] = ExecuteSubdivideLoop,
+            [(typeof(Morphology.ButterflySubdivisionRequest), typeof(Mesh))] = ExecuteSubdivideButterfly,
+            [(typeof(Morphology.LaplacianSmoothingRequest), typeof(Mesh))] = ExecuteSmoothLaplacian,
+            [(typeof(Morphology.TaubinSmoothingRequest), typeof(Mesh))] = ExecuteSmoothTaubin,
+            [(typeof(Morphology.MeanCurvatureFlowRequest), typeof(Mesh))] = ExecuteEvolveMeanCurvature,
+            [(typeof(Morphology.MeshOffsetRequest), typeof(Mesh))] = ExecuteOffset,
+            [(typeof(Morphology.MeshReductionRequest), typeof(Mesh))] = ExecuteReduce,
+            [(typeof(Morphology.RemeshRequest), typeof(Mesh))] = ExecuteRemesh,
+            [(typeof(Morphology.BrepToMeshRequest), typeof(Brep))] = ExecuteBrepToMesh,
+            [(typeof(Morphology.MeshRepairRequest), typeof(Mesh))] = ExecuteMeshRepair,
+            [(typeof(Morphology.MeshThickenRequest), typeof(Mesh))] = ExecuteMeshThicken,
+            [(typeof(Morphology.MeshUnwrapRequest), typeof(Mesh))] = ExecuteMeshUnwrap,
+            [(typeof(Morphology.MeshSeparationRequest), typeof(Mesh))] = ExecuteMeshSeparate,
+            [(typeof(Morphology.MeshWeldRequest), typeof(Mesh))] = ExecuteMeshWeld,
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> Execute<TGeom, TParam>(
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> Execute<TGeom, TRequest>(
         object input,
-        object parameters,
+        Morphology.Request request,
         IGeometryContext context,
-        Func<TGeom, TParam, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>> compute,
-        Func<object, bool>? geomCheck = null) where TGeom : GeometryBase =>
-        input is not TGeom geom || (geomCheck is not null && !geomCheck(input))
-            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext($"Expected: {typeof(TGeom).Name}"))
-            : parameters is not TParam param
-                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext($"Expected: {typeof(TParam).Name}"))
-                : compute(geom, param, context);
+        Func<TGeom, TRequest, IGeometryContext, Result<IReadOnlyList<Morphology.IMorphologyResult>>> compute,
+        Func<TGeom, bool>? geomCheck = null)
+        where TGeom : GeometryBase
+        where TRequest : Morphology.Request =>
+        (input, request) switch {
+            (not TGeom, _) => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext($"Expected: {typeof(TGeom).Name}")),
+            (_, not TRequest) => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext($"Expected: {typeof(TRequest).Name}")),
+            (TGeom geom, TRequest typed) when geomCheck is not null && !geomCheck(geom) => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Type: {geom.GetType().Name}"))),
+            (TGeom geom, TRequest typed) => compute(geom, typed, context),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteCageDeform(object input, object parameters, IGeometryContext context) =>
-        Execute<GeometryBase, (GeometryBase, Point3d[], Point3d[])>(
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteCageDeform(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<GeometryBase, Morphology.CageDeformRequest>(
             input,
-            parameters,
+            request,
             context,
-            (geom, p, ctx) => {
-                (GeometryBase cage, Point3d[] originalPts, Point3d[] deformedPts) = p;
-                return MorphologyCompute.CageDeform(geom, cage, originalPts, deformedPts, ctx).Bind(deformed => {
+            (geom, typedRequest, ctx) => {
+                return MorphologyCompute.CageDeform(geom, typedRequest.Cage, typedRequest.OriginalControlPoints, typedRequest.DeformedControlPoints, ctx).Bind(deformed => {
                     BoundingBox originalBounds = geom.GetBoundingBox(accurate: false);
                     BoundingBox deformedBounds = deformed.GetBoundingBox(accurate: false);
-                    double[] displacements = [.. originalPts.Zip(deformedPts, static (o, d) => o.DistanceTo(d)),];
+                    double[] displacements = [.. typedRequest.OriginalControlPoints.Zip(typedRequest.DeformedControlPoints, static (o, d) => o.DistanceTo(d)),];
                     return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                         value: [new Morphology.CageDeformResult(
                             deformed,
@@ -74,84 +77,75 @@ internal static class MorphologyCore {
             geomCheck: g => g is Mesh or Brep);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideCatmullClark(object input, object parameters, IGeometryContext context) =>
-        ExecuteSubdivision(input, parameters, context, MorphologyConfig.OpSubdivideCatmullClark);
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideCatmullClark(object input, Morphology.Request request, IGeometryContext context) =>
+        ExecuteSubdivision<Morphology.CatmullClarkSubdivisionRequest>(input, request, context, MorphologyConfig.SubdivisionAlgorithm.CatmullClark);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideLoop(object input, object parameters, IGeometryContext context) =>
-        ExecuteSubdivision(input, parameters, context, MorphologyConfig.OpSubdivideLoop);
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideLoop(object input, Morphology.Request request, IGeometryContext context) =>
+        ExecuteSubdivision<Morphology.LoopSubdivisionRequest>(input, request, context, MorphologyConfig.SubdivisionAlgorithm.Loop);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideButterfly(object input, object parameters, IGeometryContext context) =>
-        ExecuteSubdivision(input, parameters, context, MorphologyConfig.OpSubdivideButterfly);
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideButterfly(object input, Morphology.Request request, IGeometryContext context) =>
+        ExecuteSubdivision<Morphology.ButterflySubdivisionRequest>(input, request, context, MorphologyConfig.SubdivisionAlgorithm.Butterfly);
 
-    /// <summary>Unified subdivision executor for CatmullClark, Loop, and Butterfly algorithms. Validates triangulated mesh requirement for Loop/Butterfly (MorphologyConfig.OpSubdivideLoop/OpSubdivideButterfly).</summary>
+    /// <summary>Unified subdivision executor for CatmullClark, Loop, and Butterfly algorithms. Validates triangulated mesh requirement for Loop/Butterfly (MorphologyConfig.SubdivisionAlgorithm.Loop/Butterfly).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision(object input, object parameters, IGeometryContext context, byte algorithm) =>
-        Execute<Mesh, int>(input, parameters, context, (mesh, levels, ctx) =>
-            MorphologyConfig.TriangulatedSubdivisionOps.Contains(algorithm) && mesh.Faces.TriangleCount != mesh.Faces.Count
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision<TRequest>(object input, Morphology.Request request, IGeometryContext context, MorphologyConfig.SubdivisionAlgorithm algorithm)
+        where TRequest : Morphology.SubdivisionRequest =>
+        Execute<Mesh, TRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyConfig.TriangulatedSubdivisionAlgorithms.Contains(algorithm) && mesh.Faces.TriangleCount != mesh.Faces.Count
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                    error: (algorithm == MorphologyConfig.OpSubdivideLoop ? E.Geometry.Morphology.LoopRequiresTriangles : E.Geometry.Morphology.ButterflyRequiresTriangles)
+                    error: (algorithm == MorphologyConfig.SubdivisionAlgorithm.Loop ? E.Geometry.Morphology.LoopRequiresTriangles : E.Geometry.Morphology.ButterflyRequiresTriangles)
                         .WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
-                : MorphologyCompute.SubdivideIterative(mesh, algorithm, levels, ctx).Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, ctx)));
+                : MorphologyCompute.SubdivideIterative(mesh, algorithm, typedRequest.Levels, ctx).Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothLaplacian(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (int, bool)>(input, parameters, context, (mesh, p, ctx) => {
-            (int iters, bool lockBound) = p;
-            return MorphologyCompute.SmoothWithConvergence(mesh, iters, lockBound, (m, pos, _) => LaplacianUpdate(m, pos, useCotangent: true), ctx)
-                .Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, iters, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothLaplacian(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.LaplacianSmoothingRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.SmoothWithConvergence(mesh, typedRequest.Iterations, typedRequest.LockBoundary, (m, pos, _) => LaplacianUpdate(m, pos, useCotangent: true), ctx)
+                .Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, typedRequest.Iterations, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothTaubin(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (int, double, double)>(input, parameters, context, (mesh, p, ctx) =>
-            p.Item3 >= -p.Item2
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothTaubin(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.TaubinSmoothingRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            typedRequest.Mu >= -typedRequest.Lambda
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({p.Item3:F4}) must be < -λ ({(-p.Item2):F4})")))
-                : MorphologyCompute.SmoothWithConvergence(mesh, p.Item1, lockBoundary: false, (m, pos, _) => {
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({typedRequest.Mu:F4}) must be < -λ ({(-typedRequest.Lambda):F4})")))
+                : MorphologyCompute.SmoothWithConvergence(mesh, typedRequest.Iterations, lockBoundary: false, (m, pos, _) => {
                     Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
                     Point3d[] blended1 = new Point3d[pos.Length];
                     for (int i = 0; i < pos.Length; i++) {
-                        blended1[i] = pos[i] + (p.Item2 * (step1[i] - pos[i]));
+                        blended1[i] = pos[i] + (typedRequest.Lambda * (step1[i] - pos[i]));
                     }
                     Point3d[] step2 = LaplacianUpdate(m, blended1, useCotangent: false);
                     Point3d[] result = new Point3d[pos.Length];
                     for (int i = 0; i < pos.Length; i++) {
-                        result[i] = blended1[i] + (p.Item3 * (step2[i] - blended1[i]));
+                        result[i] = blended1[i] + (typedRequest.Mu * (step2[i] - blended1[i]));
                     }
                     return result;
-                }, ctx).Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, p.Item1, ctx)));
+                }, ctx).Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, typedRequest.Iterations, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteEvolveMeanCurvature(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (double, int)>(input, parameters, context, (mesh, p, ctx) => {
-            (double timeStep, int iters) = p;
-            return MorphologyCompute.SmoothWithConvergence(mesh, iters, lockBoundary: false, (m, pos, _) => MeanCurvatureFlowUpdate(m, pos, timeStep), ctx)
-                .Bind(evolved => ComputeSmoothingMetrics(mesh, evolved, iters, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteEvolveMeanCurvature(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeanCurvatureFlowRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.SmoothWithConvergence(mesh, typedRequest.Iterations, lockBoundary: false, (m, pos, _) => MeanCurvatureFlowUpdate(m, pos, typedRequest.TimeStep), ctx)
+                .Bind(evolved => ComputeSmoothingMetrics(mesh, evolved, typedRequest.Iterations, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteOffset(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (double, bool)>(input, parameters, context, (mesh, p, ctx) => {
-            (double distance, bool bothSides) = p;
-            return MorphologyCompute.OffsetMesh(mesh, distance, bothSides, ctx).Bind(offset => ComputeOffsetMetrics(mesh, offset, distance, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteOffset(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshOffsetRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.OffsetMesh(mesh, typedRequest.Distance, typedRequest.BothSides, ctx).Bind(offset => ComputeOffsetMetrics(mesh, offset, typedRequest.Distance, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteReduce(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (int, bool, double)>(input, parameters, context, (mesh, p, ctx) => {
-            (int targetFaces, bool preserveBoundary, double accuracy) = p;
-            return MorphologyCompute.ReduceMesh(mesh, targetFaces, preserveBoundary, accuracy, ctx).Bind(reduced => ComputeReductionMetrics(mesh, reduced, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteReduce(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshReductionRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.ReduceMesh(mesh, typedRequest.TargetFaceCount, typedRequest.PreserveBoundary, typedRequest.Accuracy, ctx).Bind(reduced => ComputeReductionMetrics(mesh, reduced, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (double, int, bool)>(input, parameters, context, (mesh, p, ctx) => {
-            (double targetEdge, int maxIters, bool preserveFeats) = p;
-            return MorphologyCompute.RemeshIsotropic(mesh, targetEdge, maxIters, preserveFeats, ctx)
-                .Bind(remeshData => ComputeRemeshMetrics(mesh, remeshData.Remeshed, targetEdge, remeshData.IterationsPerformed, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.RemeshRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.RemeshIsotropic(mesh, typedRequest.TargetEdgeLength, typedRequest.MaxIterations, typedRequest.PreserveFeatures, ctx)
+                .Bind(remeshData => ComputeRemeshMetrics(mesh, remeshData.Remeshed, typedRequest.TargetEdgeLength, remeshData.IterationsPerformed, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) =>
@@ -325,29 +319,25 @@ internal static class MorphologyCore {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshRepair(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (byte, double)>(input, parameters, context, (mesh, p, ctx) => {
-            (byte flags, double weldTol) = p;
-            return MorphologyCompute.RepairMesh(mesh, flags, weldTol, ctx).Bind(repaired => ComputeRepairMetrics(mesh, repaired, flags, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshRepair(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshRepairRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.RepairMesh(mesh, typedRequest.Operations, typedRequest.WeldTolerance, ctx).Bind(repaired => ComputeRepairMetrics(mesh, repaired, typedRequest.Operations, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshSeparate(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, ValueTuple>(input, parameters, context, (mesh, _, ctx) =>
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshSeparate(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshSeparationRequest>(input, request, context, (mesh, _, ctx) =>
             MorphologyCompute.SeparateMeshComponents(mesh, ctx).Bind(components => ComputeSeparationMetrics(components, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshWeld(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (double, bool)>(input, parameters, context, (mesh, p, ctx) => {
-            (double tolerance, bool weldNormals) = p;
-            return MorphologyCompute.WeldMeshVertices(mesh, tolerance, weldNormals, ctx).Bind(welded => ComputeWeldMetrics(mesh, welded, tolerance, weldNormals, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshWeld(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshWeldRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.WeldMeshVertices(mesh, typedRequest.Tolerance, typedRequest.RecomputeNormals, ctx).Bind(welded => ComputeWeldMetrics(mesh, welded, typedRequest.Tolerance, typedRequest.RecomputeNormals, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRepairMetrics(
         Mesh original,
         Mesh repaired,
-        byte operations,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
         IGeometryContext context) =>
         ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.MeshRepairResult(
@@ -356,7 +346,7 @@ internal static class MorphologyCore {
                 repaired.Vertices.Count,
                 original.Faces.Count,
                 repaired.Faces.Count,
-                operations,
+                [.. operations,],
                 MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
                 original.DisjointMeshCount > 1,
                 original.Normals.Count != original.Vertices.Count || original.Normals.Any(n => n.IsZero)),
@@ -409,11 +399,9 @@ internal static class MorphologyCore {
             : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteBrepToMesh(object input, object parameters, IGeometryContext context) =>
-        Execute<Brep, (MeshingParameters?, bool)>(input, parameters, context, (brep, p, ctx) => {
-            (MeshingParameters? meshParams, bool joinMeshes) = p;
-            return MorphologyCompute.BrepToMesh(brep, meshParams, joinMeshes, ctx).Bind(mesh => ComputeBrepToMeshMetrics(brep, mesh, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteBrepToMesh(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Brep, Morphology.BrepToMeshRequest>(input, request, context, (brep, typedRequest, ctx) =>
+            MorphologyCompute.BrepToMesh(brep, typedRequest.MeshingParameters, typedRequest.JoinMeshes, ctx).Bind(mesh => ComputeBrepToMeshMetrics(brep, mesh, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeBrepToMeshMetrics(
@@ -456,11 +444,9 @@ internal static class MorphologyCore {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshThicken(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, (double, bool, Vector3d)>(input, parameters, context, (mesh, p, ctx) => {
-            (double thickness, bool solidify, Vector3d direction) = p;
-            return MorphologyCompute.ThickenMesh(mesh, thickness, solidify, direction, ctx).Bind(thickened => ComputeThickenMetrics(mesh, thickened, thickness, solidify, direction, ctx));
-        });
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshThicken(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshThickenRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.ThickenMesh(mesh, typedRequest.Thickness, typedRequest.Solidify, typedRequest.Direction, ctx).Bind(thickened => ComputeThickenMetrics(mesh, thickened, typedRequest.Thickness, typedRequest.Solidify, typedRequest.Direction, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeThickenMetrics(
@@ -490,9 +476,9 @@ internal static class MorphologyCore {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshUnwrap(object input, object parameters, IGeometryContext context) =>
-        Execute<Mesh, byte>(input, parameters, context, (mesh, unwrapMethod, ctx) =>
-            MorphologyCompute.UnwrapMesh(mesh, unwrapMethod, ctx).Bind(unwrapped => ComputeUnwrapMetrics(mesh, unwrapped, ctx)));
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshUnwrap(object input, Morphology.Request request, IGeometryContext context) =>
+        Execute<Mesh, Morphology.MeshUnwrapRequest>(input, request, context, (mesh, typedRequest, ctx) =>
+            MorphologyCompute.UnwrapMesh(mesh, typedRequest.Method, ctx).Bind(unwrapped => ComputeUnwrapMetrics(mesh, unwrapped, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeUnwrapMetrics(

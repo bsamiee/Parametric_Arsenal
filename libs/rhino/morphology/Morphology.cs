@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -124,14 +126,14 @@ public static class Morphology {
         int RepairedVertexCount,
         int OriginalFaceCount,
         int RepairedFaceCount,
-        byte OperationsPerformed,
+        IReadOnlyList<MeshRepairOperation> OperationsPerformed,
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
-            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={string.Join(',', this.OperationsPerformed.Select(operation => MorphologyConfig.RepairOperationName(operation.GetType())))} | Quality={this.QualityScore:F3}");
     }
 
     /// <summary>Mesh separation result with per-component statistics.</summary>
@@ -226,22 +228,78 @@ public static class Morphology {
             $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
     }
 
+    /// <summary>Abstract morphology request marker.</summary>
+    public abstract record Request;
+
+    public sealed record CageDeformRequest(
+        GeometryBase Cage,
+        IReadOnlyList<Point3d> OriginalControlPoints,
+        IReadOnlyList<Point3d> DeformedControlPoints) : Request;
+
+    public abstract record SubdivisionRequest(int Levels) : Request;
+
+    public sealed record CatmullClarkSubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    public sealed record LoopSubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    public sealed record ButterflySubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    public abstract record SmoothingRequest : Request;
+
+    public sealed record LaplacianSmoothingRequest(int Iterations, bool LockBoundary) : SmoothingRequest;
+
+    public sealed record TaubinSmoothingRequest(int Iterations, double Lambda, double Mu) : SmoothingRequest;
+
+    public sealed record MeanCurvatureFlowRequest(double TimeStep, int Iterations) : SmoothingRequest;
+
+    public sealed record MeshOffsetRequest(double Distance, bool BothSides) : Request;
+
+    public sealed record MeshReductionRequest(int TargetFaceCount, bool PreserveBoundary, double Accuracy) : Request;
+
+    public sealed record RemeshRequest(double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : Request;
+
+    public sealed record BrepToMeshRequest(MeshingParameters MeshingParameters, bool JoinMeshes) : Request;
+
+    public sealed record MeshRepairRequest(IReadOnlyList<MeshRepairOperation> Operations, double WeldTolerance) : Request;
+
+    public abstract record MeshRepairOperation;
+
+    public sealed record FillHolesRepairOperation : MeshRepairOperation;
+
+    public sealed record UnifyNormalsRepairOperation : MeshRepairOperation;
+
+    public sealed record CullDegenerateFacesRepairOperation : MeshRepairOperation;
+
+    public sealed record CompactRepairOperation : MeshRepairOperation;
+
+    public sealed record WeldVerticesRepairOperation : MeshRepairOperation;
+
+    public sealed record MeshThickenRequest(double Thickness, bool Solidify, Vector3d Direction) : Request;
+
+    public sealed record MeshUnwrapRequest(MeshUnwrapMethod Method) : Request;
+
+    public sealed record MeshSeparationRequest : Request;
+
+    public sealed record MeshWeldRequest(double Tolerance, bool RecomputeNormals) : Request;
+
     /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,
-        (byte Operation, object Parameters) spec,
+        Request request,
         IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
-            ? UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
-                config: new OperationConfig<T, IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = MorphologyConfig.ValidationMode(spec.Operation, typeof(T)),
-                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(spec.Operation)}"),
-                    EnableDiagnostics = false,
-                })
-            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+        request is null
+            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Geometry.InsufficientParameters.WithContext("Request cannot be null"))
+            : MorphologyCore.OperationDispatch.TryGetValue((request.GetType(), typeof(T)), out Func<object, Request, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
+                ? UnifiedOperation.Apply(
+                    input: input,
+                    operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, request, context)),
+                    config: new OperationConfig<T, IMorphologyResult> {
+                        Context = context,
+                        ValidationMode = MorphologyConfig.ValidationMode(request.GetType(), typeof(T)),
+                        OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(request.GetType())}"),
+                        EnableDiagnostics = false,
+                    })
+                : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
+                    error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Request: {request.GetType().Name}, Type: {typeof(T).Name}"));
 }

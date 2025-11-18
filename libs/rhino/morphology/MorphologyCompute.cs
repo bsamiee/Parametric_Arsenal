@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -16,13 +17,13 @@ internal static class MorphologyCompute {
     internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
         GeometryBase _,
-        Point3d[] originalControlPoints,
-        Point3d[] deformedControlPoints,
+        IReadOnlyList<Point3d> originalControlPoints,
+        IReadOnlyList<Point3d> deformedControlPoints,
         IGeometryContext __) =>
-        originalControlPoints.Length != deformedControlPoints.Length
-            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}"))
-            : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
-                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))
+        originalControlPoints.Count != deformedControlPoints.Count
+            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Count}, Deformed: {deformedControlPoints.Count}"))
+            : originalControlPoints.Count < MorphologyConfig.MinCageControlPoints
+                ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Count}, Required: {MorphologyConfig.MinCageControlPoints}"))
                 : ((Func<Result<GeometryBase>>)(() => {
                     BoundingBox cageBounds = new(originalControlPoints);
                     return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
@@ -82,7 +83,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
-        byte algorithm,
+        MorphologyConfig.SubdivisionAlgorithm algorithm,
         int levels,
         IGeometryContext context) =>
         levels <= 0
@@ -93,9 +94,9 @@ internal static class MorphologyCompute {
                     ResultFactory.Create(value: mesh.DuplicateMesh()),
                     (result, level) => result.Bind(current => {
                         Mesh? next = algorithm switch {
-                            MorphologyConfig.OpSubdivideCatmullClark => current.DuplicateMesh(),
-                            MorphologyConfig.OpSubdivideLoop => SubdivideLoop(current),
-                            MorphologyConfig.OpSubdivideButterfly => SubdivideButterfly(current),
+                            MorphologyConfig.SubdivisionAlgorithm.CatmullClark => current.DuplicateMesh(),
+                            MorphologyConfig.SubdivisionAlgorithm.Loop => SubdivideLoop(current),
+                            MorphologyConfig.SubdivisionAlgorithm.Butterfly => SubdivideButterfly(current),
                             _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
@@ -489,27 +490,30 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
-        byte flags,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
         double weldTolerance,
         IGeometryContext _) =>
-        (weldTolerance, mesh.DuplicateMesh()) switch {
-            ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {weldTolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
-            (_, null) or (_, { IsValid: false }) =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
-            (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < 5; i++) {
-                    byte flag = (byte)(1 << i);
-                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
-                        bool success = entry.action(repaired, tol);
+        operations.Count == 0
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("No repair operations specified"))
+            : (weldTolerance, mesh.DuplicateMesh()) switch {
+                ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
+                    ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {weldTolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
+                (_, null) or (_, { IsValid: false }) =>
+                    ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
+                (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
+                    for (int i = 0; i < operations.Count; i++) {
+                        Morphology.MeshRepairOperation operation = operations[i];
+                        if (!MorphologyConfig.RepairOperations.TryGetValue(operation.GetType(), out (string discard, Func<Mesh, double, bool> action) entry)) {
+                            return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Unsupported operation: {operation.GetType().Name}")));
+                        }
+                        _ = entry.action(repaired, tol);
                     }
-                }
-                return repaired.Normals.ComputeNormals()
-                    ? ResultFactory.Create(value: repaired)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Normal recomputation failed"));
-            }))(),
-        };
+                    return repaired.Normals.ComputeNormals()
+                        ? ResultFactory.Create(value: repaired)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Normal recomputation failed"));
+                }))(),
+            };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
@@ -547,13 +551,13 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> BrepToMesh(
         Brep brep,
-        MeshingParameters? meshParams,
+        MeshingParameters meshingParameters,
         bool joinMeshes,
         IGeometryContext __) =>
-        meshParams is null
+        meshingParameters is null
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshingParametersInvalid.WithContext("Parameters cannot be null"))
             : ((Func<Result<Mesh>>)(() => {
-                Mesh[]? meshes = Mesh.CreateFromBrep(brep: brep, meshingParameters: meshParams);
+                Mesh[]? meshes = Mesh.CreateFromBrep(brep: brep, meshingParameters: meshingParameters);
                 return (meshes is null || meshes.Length == 0) switch {
                     true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext(
                         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Brep face count: {brep.Faces.Count}"))),
@@ -597,19 +601,19 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
-        byte unwrapMethod,
+        MeshUnwrapMethod method,
         IGeometryContext _) =>
-        unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
+        method switch {
+            MeshUnwrapMethod.AngleBased or MeshUnwrapMethod.ConformalEnergyMinimization => ((Func<Result<Mesh>>)(() => {
                 Mesh unwrapped = mesh.DuplicateMesh();
                 using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                bool success = unwrapper.Unwrap(method: method);
                 return success && unwrapped.TextureCoordinates.Count > 0
                     ? ResultFactory.Create(value: unwrapped)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {method}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
             }))(),
             _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {method}"))),
         };
 }
