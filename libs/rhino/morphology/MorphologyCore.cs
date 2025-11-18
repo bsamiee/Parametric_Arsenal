@@ -261,16 +261,20 @@ internal static class MorphologyCore {
         Mesh original,
         Mesh offset,
         double _,
-        IGeometryContext context) {
-        int minCount = Math.Min(original.Vertices.Count, offset.Vertices.Count);
-        double actualDist = minCount > 0
-            ? Enumerable.Range(0, minCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]))
-            : 0.0;
-        bool hasDegen = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
-
-        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-            value: [new Morphology.OffsetResult(offset, actualDist, hasDegen, original.Vertices.Count, offset.Vertices.Count, original.Faces.Count, offset.Faces.Count),]);
-    }
+        IGeometryContext context) =>
+        ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+            new Morphology.OffsetResult(
+                offset,
+                Math.Min(original.Vertices.Count, offset.Vertices.Count) switch {
+                    0 => 0.0,
+                    int sampleCount => Enumerable.Range(0, sampleCount).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i])),
+                },
+                !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess,
+                original.Vertices.Count,
+                offset.Vertices.Count,
+                original.Faces.Count,
+                offset.Faces.Count),
+        ]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeReductionMetrics(
@@ -278,15 +282,13 @@ internal static class MorphologyCore {
         Mesh reduced,
         IGeometryContext context) {
         (double[] edgeLengths, double[] aspectRatios, double[] _) = ComputeMeshMetrics(reduced, context);
-        double reductionRatio = original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0;
-        double quality = MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.ReductionResult(
                 reduced,
                 original.Faces.Count,
                 reduced.Faces.Count,
-                reductionRatio,
-                quality,
+                original.Faces.Count > 0 ? (double)reduced.Faces.Count / original.Faces.Count : 1.0,
+                MorphologyCompute.ValidateMeshQuality(reduced, context).IsSuccess ? 1.0 : 0.0,
                 aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
                 edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
                 edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0),
