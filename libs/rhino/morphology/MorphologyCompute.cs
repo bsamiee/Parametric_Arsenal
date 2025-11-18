@@ -159,16 +159,16 @@ internal static class MorphologyCompute {
             (int, int)[] edges = [(Math.Min(a, b), Math.Max(a, b)), (Math.Min(b, c), Math.Max(b, c)), (Math.Min(c, a), Math.Max(c, a)),];
             int[] midIndices = new int[3];
             for (int e = 0; e < 3; e++) {
-                if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
-                    midIndices[e] = existingMidIdx;
-                } else {
-                    (Vector3d v1, Vector3d v2) = (originalVerts[edges[e].Item1] - Point3d.Origin, originalVerts[edges[e].Item2] - Point3d.Origin);
-                    Vector3d faceSum = (originalVerts[a] - Point3d.Origin) + (originalVerts[b] - Point3d.Origin) + (originalVerts[c] - Point3d.Origin);
-                    Point3d midpoint = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (faceSum - v1 - v2));
-                    int newMidIdx = subdivided.Vertices.Add(midpoint);
-                    edgeMidpoints[edges[e]] = newMidIdx;
-                    midIndices[e] = newMidIdx;
-                }
+                midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
+                    ? existingMidIdx
+                    : ((Func<int>)(() => {
+                        (Vector3d v1, Vector3d v2) = (originalVerts[edges[e].Item1] - Point3d.Origin, originalVerts[edges[e].Item2] - Point3d.Origin);
+                        Vector3d faceSum = (originalVerts[a] - Point3d.Origin) + (originalVerts[b] - Point3d.Origin) + (originalVerts[c] - Point3d.Origin);
+                        Point3d midpoint = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * (v1 + v2)) + (MorphologyConfig.LoopEdgeOppositeWeight * (faceSum - v1 - v2));
+                        int newMidIdx = subdivided.Vertices.Add(midpoint);
+                        edgeMidpoints[edges[e]] = newMidIdx;
+                        return newMidIdx;
+                    }))();
             }
             _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
             _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
@@ -202,46 +202,46 @@ internal static class MorphologyCompute {
             (int, int)[] edges = [(Math.Min(a, b), Math.Max(a, b)), (Math.Min(b, c), Math.Max(b, c)), (Math.Min(c, a), Math.Max(c, a)),];
             int[] midIndices = new int[3];
             for (int e = 0; e < 3; e++) {
-                if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
-                    midIndices[e] = existingMidIdx;
-                } else {
-                    (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
-                    Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
-                    int topologyV1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
-                    int topologyV2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
-                    int[] v1Neighbors = topologyV1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV1) : [];
-                    int[] v2Neighbors = topologyV2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV2) : [];
-                    (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4
-                        ? FindButterflyOpposites(mesh, v1, v2)
-                        : (-1, -1);
+                midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
+                    ? existingMidIdx
+                    : ((Func<int>)(() => {
+                        (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
+                        Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
+                        int topologyV1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
+                        int topologyV2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
+                        int[] v1Neighbors = topologyV1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV1) : [];
+                        int[] v2Neighbors = topologyV2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyV2) : [];
+                        (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4
+                            ? FindButterflyOpposites(mesh, v1, v2)
+                            : (-1, -1);
 
-                    Point3d midpoint = opposite1 < 0 || opposite2 < 0
-                        ? mid
-                        : ((Func<Point3d>)(() => {
-                            int[] wings = new int[4];
-                            int wingCount = 0;
-                            for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
-                                if (v1Neighbors[i] != default && v1Neighbors[i] != v2 && v1Neighbors[i] != opposite1 && v1Neighbors[i] != opposite2) {
-                                    wings[wingCount++] = v1Neighbors[i];
+                        Point3d midpoint = opposite1 < 0 || opposite2 < 0
+                            ? mid
+                            : ((Func<Point3d>)(() => {
+                                int[] wings = new int[4];
+                                int wingCount = 0;
+                                for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
+                                    if (v1Neighbors[i] != default && v1Neighbors[i] != v2 && v1Neighbors[i] != opposite1 && v1Neighbors[i] != opposite2) {
+                                        wings[wingCount++] = v1Neighbors[i];
+                                    }
                                 }
-                            }
-                            for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
-                                if (v2Neighbors[i] != default && v2Neighbors[i] != v1 && v2Neighbors[i] != opposite1 && v2Neighbors[i] != opposite2) {
-                                    wings[wingCount++] = v2Neighbors[i];
+                                for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
+                                    if (v2Neighbors[i] != default && v2Neighbors[i] != v1 && v2Neighbors[i] != opposite1 && v2Neighbors[i] != opposite2) {
+                                        wings[wingCount++] = v2Neighbors[i];
+                                    }
                                 }
-                            }
-                            Vector3d adjusted = (mid - Point3d.Origin) + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
-                            Vector3d wingAdj = Vector3d.Zero;
-                            for (int w = 0; w < wingCount; w++) {
-                                wingAdj -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
-                            }
-                            return Point3d.Origin + adjusted + wingAdj;
-                        }))();
+                                Vector3d adjusted = (mid - Point3d.Origin) + (MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin)));
+                                Vector3d wingAdj = Vector3d.Zero;
+                                for (int w = 0; w < wingCount; w++) {
+                                    wingAdj -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(wings[w])[0]] - Point3d.Origin);
+                                }
+                                return Point3d.Origin + adjusted + wingAdj;
+                            }))();
 
-                    int newMidIdx = subdivided.Vertices.Add(midpoint);
-                    edgeMidpoints[edges[e]] = newMidIdx;
-                    midIndices[e] = newMidIdx;
-                }
+                        int newMidIdx = subdivided.Vertices.Add(midpoint);
+                        edgeMidpoints[edges[e]] = newMidIdx;
+                        return newMidIdx;
+                    }))();
             }
             _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
             _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);

@@ -22,15 +22,9 @@ internal static class FieldsCompute {
             int totalSamples = distances.Length;
             Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
             try {
-                bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-                bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-                bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
-                double invDx = hasDx ? 1.0 / gridDelta.X : 0.0;
-                double invDy = hasDy ? 1.0 / gridDelta.Y : 0.0;
-                double invDz = hasDz ? 1.0 / gridDelta.Z : 0.0;
-                double invTwoDx = hasDx ? 0.5 * invDx : 0.0;
-                double invTwoDy = hasDy ? 0.5 * invDy : 0.0;
-                double invTwoDz = hasDz ? 0.5 * invDz : 0.0;
+                (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
+                (double invDx, double invDy, double invDz) = (hasDx ? 1.0 / gridDelta.X : 0.0, hasDy ? 1.0 / gridDelta.Y : 0.0, hasDz ? 1.0 / gridDelta.Z : 0.0);
+                (double invTwoDx, double invTwoDy, double invTwoDz) = (hasDx ? 0.5 * invDx : 0.0, hasDy ? 0.5 * invDy : 0.0, hasDz ? 0.5 * invDz : 0.0);
                 int resSquared = resolution * resolution;
                 for (int i = 0; i < resolution; i++) {
                     for (int j = 0; j < resolution; j++) {
@@ -189,16 +183,12 @@ internal static class FieldsCompute {
                 grid: grid,
                 resolution: resolution,
                 gridDelta: gridDelta).Bind(curl => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
-                    bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-                    bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-                    bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
+                    (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
                     return (hasDx && hasDy && hasDz) switch {
                         false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Grid bounds must have non-zero extent across X, Y, and Z")),
                         true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
                             int totalSamples = vectorField.Length;
-                            double invDx2 = 1.0 / (gridDelta.X * gridDelta.X);
-                            double invDy2 = 1.0 / (gridDelta.Y * gridDelta.Y);
-                            double invDz2 = 1.0 / (gridDelta.Z * gridDelta.Z);
+                            (double invDx2, double invDy2, double invDz2) = (1.0 / (gridDelta.X * gridDelta.X), 1.0 / (gridDelta.Y * gridDelta.Y), 1.0 / (gridDelta.Z * gridDelta.Z));
                             double diagonal = (2.0 * invDx2) + (2.0 * invDy2) + (2.0 * invDz2);
                             return (diagonal > RhinoMath.ZeroTolerance) switch {
                                 false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Degenerate Laplacian diagonal due to invalid spacing")),
@@ -494,18 +484,10 @@ internal static class FieldsCompute {
                 }
 
                 try {
-                    bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-                    bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-                    bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
-                    bool hasDxDy = hasDx && hasDy;
-                    bool hasDxDz = hasDx && hasDz;
-                    bool hasDyDz = hasDy && hasDz;
-                    double invDx2 = hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0;
-                    double invDy2 = hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0;
-                    double invDz2 = hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0;
-                    double invFourDxDy = hasDxDy ? 0.25 / (gridDelta.X * gridDelta.Y) : 0.0;
-                    double invFourDxDz = hasDxDz ? 0.25 / (gridDelta.X * gridDelta.Z) : 0.0;
-                    double invFourDyDz = hasDyDz ? 0.25 / (gridDelta.Y * gridDelta.Z) : 0.0;
+                    (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
+                    (bool hasDxDy, bool hasDxDz, bool hasDyDz) = (hasDx && hasDy, hasDx && hasDz, hasDy && hasDz);
+                    (double invDx2, double invDy2, double invDz2) = (hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0, hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0, hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0);
+                    (double invFourDxDy, double invFourDxDz, double invFourDyDz) = (hasDxDy ? 0.25 / (gridDelta.X * gridDelta.Y) : 0.0, hasDxDz ? 0.25 / (gridDelta.X * gridDelta.Z) : 0.0, hasDyDz ? 0.25 / (gridDelta.Y * gridDelta.Z) : 0.0);
                     int resSquared = resolution * resolution;
 
                     for (int i = 0; i < resolution; i++) {
