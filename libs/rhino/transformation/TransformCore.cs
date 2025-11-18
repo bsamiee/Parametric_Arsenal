@@ -52,31 +52,27 @@ internal static class TransformCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> BuildTransform(
         Transforms.TransformSpec spec,
-        IGeometryContext context) =>
-        DetectMode(spec) is byte mode and > 0 && _builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)
-            ? entry.validate(spec, context) is (true, _)
-                ? ResultFactory.Create(value: entry.build(spec))
-                : ResultFactory.Create<Transform>(error: entry.error.WithContext(entry.validate(spec, context).Context))
-            : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec);
+        IGeometryContext context) {
+        byte mode = DetectMode(spec);
+        if (mode == 0 || !_builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)) {
+            return ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec);
+        }
 
-    /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
+        (bool Valid, string Context) validation = entry.validate(spec, context);
+        return validation.Valid
+            ? ResultFactory.Create(value: entry.build(spec))
+            : ResultFactory.Create<Transform>(error: entry.error.WithContext(validation.Context));
+    }
+
+    /// <summary>Apply transform to duplicated geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
         Transform transform) where T : GeometryBase {
-        bool isExtrusion = item is Extrusion;
-        GeometryBase normalized = isExtrusion ? ((Extrusion)(object)item).ToBrep(splitKinkyFaces: true) : item;
-        bool shouldDispose = isExtrusion;
-        T duplicate = (T)normalized.Duplicate();
-        Result<IReadOnlyList<T>> result = duplicate.Transform(transform)
+        T duplicate = (T)item.Duplicate();
+        return duplicate.Transform(transform)
             ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
             : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
-
-        if (shouldDispose && normalized is IDisposable disposable) {
-            disposable.Dispose();
-        }
-
-        return result;
     }
 
     /// <summary>Generate rectangular grid array transforms.</summary>
