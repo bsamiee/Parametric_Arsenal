@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
-using Arsenal.Core.Context;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -8,26 +7,31 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
 [Pure]
 internal static class SpatialConfig {
-    /// <summary>Polymorphic type extractors for centroids, RTree factories, and clustering dispatch.</summary>
-    internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
-        new Dictionary<(string, Type), Func<object, object>> {
-            [("Centroid", typeof(Curve))] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Surface))] = static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Brep))] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(Mesh))] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [("Centroid", typeof(GeometryBase))] = static g => g is GeometryBase gb ? gb.GetBoundingBox(accurate: false).Center : Point3d.Origin,
-            [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
-            [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
-            [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
-                ? alg switch {
-                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
-                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
-                    2 => SpatialCompute.HierarchicalAssign(pts, k),
-                    _ => [],
-                }
-                : [],
+    /// <summary>Polymorphic centroid extractors for clustering operations.</summary>
+    internal static readonly FrozenDictionary<Type, Func<GeometryBase, Point3d>> CentroidExtractors =
+        new Dictionary<Type, Func<GeometryBase, Point3d>> {
+            [typeof(Curve)] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [typeof(Surface)] = static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [typeof(Brep)] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [typeof(Mesh)] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
+            [typeof(GeometryBase)] = static g => g.GetBoundingBox(accurate: false).Center,
         }.ToFrozenDictionary();
+
+    /// <summary>Operation names for diagnostics and error reporting.</summary>
+    internal static class OperationNames {
+        internal const string PointArrayRange = "Spatial.PointArray.Range";
+        internal const string PointArrayProximity = "Spatial.PointArray.Proximity";
+        internal const string PointCloudRange = "Spatial.PointCloud.Range";
+        internal const string PointCloudProximity = "Spatial.PointCloud.Proximity";
+        internal const string MeshRange = "Spatial.Mesh.Range";
+        internal const string MeshOverlap = "Spatial.Mesh.Overlap";
+        internal const string CurveArrayRange = "Spatial.CurveArray.Range";
+        internal const string SurfaceArrayRange = "Spatial.SurfaceArray.Range";
+        internal const string BrepArrayRange = "Spatial.BrepArray.Range";
+        internal const string Clustering = "Spatial.Clustering";
+        internal const string ProximityField = "Spatial.ProximityField";
+    }
+
 
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
     internal const int DefaultBufferSize = 2048;
