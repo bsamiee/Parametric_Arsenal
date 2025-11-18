@@ -3,7 +3,7 @@ using Rhino;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
+/// <summary>Configuration constants for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
     internal const string DistanceOperationName = "Fields.DistanceField";
