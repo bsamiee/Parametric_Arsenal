@@ -46,7 +46,13 @@ internal static class SpatialCompute {
                                 return members.Length is 0
                                     ? (Point3d.Origin, Array.Empty<double>())
                                     : ((Func<(Point3d, double[])>)(() => {
-                                        Point3d centroid = members.Aggregate(Point3d.Origin, (sum, idx) => sum + pts[idx]) / members.Length;
+                                        Vector3d sum = Vector3d.Zero;
+                                        for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
+                                            Point3d point = pts[members[memberIndex]];
+                                            sum += new Vector3d(point);
+                                        }
+                                        double invCount = 1.0 / members.Length;
+                                        Point3d centroid = new(sum.X * invCount, sum.Y * invCount, sum.Z * invCount);
                                         return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
                                     }))();
                             }),
@@ -98,7 +104,7 @@ internal static class SpatialCompute {
             }
 
             // Lloyd's algorithm with hot-path optimization
-            (Point3d Sum, int Count)[] clusters = new (Point3d, int)[k];
+            (Vector3d Sum, int Count)[] clusters = new (Vector3d, int)[k];
             for (int iter = 0; iter < maxIter; iter++) {
                 // Assign to nearest centroid (hot path - use for loops)
                 for (int i = 0; i < pts.Length; i++) {
@@ -113,16 +119,21 @@ internal static class SpatialCompute {
 
                 // Recompute centroids and check convergence
                 for (int i = 0; i < k; i++) {
-                    clusters[i] = (Point3d.Origin, 0);
+                    clusters[i] = (Vector3d.Zero, 0);
                 }
                 for (int i = 0; i < pts.Length; i++) {
                     int cluster = assignments[i];
-                    clusters[cluster] = (clusters[cluster].Sum + pts[i], clusters[cluster].Count + 1);
+                    clusters[cluster] = (clusters[cluster].Sum + new Vector3d(pts[i]), clusters[cluster].Count + 1);
                 }
 
                 double maxShift = 0.0;
                 for (int i = 0; i < k; i++) {
-                    Point3d newCentroid = clusters[i].Count > 0 ? clusters[i].Sum / clusters[i].Count : centroids[i];
+                    Point3d newCentroid = clusters[i].Count > 0
+                        ? new Point3d(
+                            clusters[i].Sum.X / clusters[i].Count,
+                            clusters[i].Sum.Y / clusters[i].Count,
+                            clusters[i].Sum.Z / clusters[i].Count)
+                        : centroids[i];
                     maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
                     centroids[i] = newCentroid;
                 }
@@ -255,7 +266,7 @@ internal static class SpatialCompute {
                             .SelectMany((cell, _) => cell.Length > 0
                                 ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length]))
                                 : [])
-                            .Select(edge => (edge.P1, edge.P2, Mid: (edge.P1 + edge.P2) * 0.5))
+                            .Select(edge => (edge.P1, edge.P2, Mid: Point3d.Interpolate(edge.P1, edge.P2, 0.5)))
                             .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
                             .Where(edge => boundary.Contains(edge.Mid3D, plane, effectiveTolerance) is PointContainment.Inside)
                             .GroupBy(edge => (edge.P1, edge.P2) switch {
