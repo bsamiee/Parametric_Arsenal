@@ -401,32 +401,35 @@ internal static class SpatialCompute {
 
     /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
-        points.Length < 3
-            ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"))
-            : ((Func<Result<int[][]>>)(() => {
-                (double minX, double minY, double maxX, double maxY) = (points.Min(p => p.X), points.Min(p => p.Y), points.Max(p => p.X), points.Max(p => p.Y));
-                double dx = (maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale;
-                double dy = (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale;
-                Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, 0), new Point3d(maxX + dx, minY - dy, 0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, 0),];
-                HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
-                Point3d[] allPoints = [.. points, .. superTriangle,];
-                for (int i = 0; i < points.Length; i++) {
-                    (int, int, int)[] badTriangles = [.. triangles.Where(t => IsInCircumcircle(allPoints[t.Item1], allPoints[t.Item2], allPoints[t.Item3], points[i], context)),];
-                    HashSet<(int, int)> polygon = [];
-                    foreach ((int a, int b, int c) in badTriangles) {
-                        void Toggle((int, int) edge, (int, int) reverse) => _ = polygon.Remove(reverse) || polygon.Add(edge);
-                        Toggle((a, b), (b, a));
-                        Toggle((b, c), (c, b));
-                        Toggle((c, a), (a, c));
-                        _ = triangles.Remove((a, b, c));
-                    }
-                    foreach ((int a, int b) in polygon) {
-                        _ = triangles.Add((a, b, i));
-                    }
-                }
-                return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
-            }))();
+    internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) {
+        if (points.Length < 3) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"));
+        (double z0, double minX, double minY, double maxX, double maxY) = (points[0].Z, points[0].X, points[0].Y, points[0].X, points[0].Y);
+        for (int i = 1; i < points.Length; i++) {
+            double x = points[i].X;
+            double y = points[i].Y;
+            if (Math.Abs(points[i].Z - z0) > context.AbsoluteTolerance) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate"));
+            (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
+        }
+        (double dx, double dy) = ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale, (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale);
+        Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, z0), new Point3d(maxX + dx, minY - dy, z0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, z0),];
+        HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
+        Point3d[] allPoints = [.. points, .. superTriangle,];
+        for (int i = 0; i < points.Length; i++) {
+            (int, int, int)[] badTriangles = [.. triangles.Where(t => IsInCircumcircle(allPoints[t.Item1], allPoints[t.Item2], allPoints[t.Item3], points[i], context)),];
+            HashSet<(int, int)> polygon = [];
+            foreach ((int a, int b, int c) in badTriangles) {
+                void Toggle((int, int) edge, (int, int) reverse) => _ = polygon.Remove(reverse) || polygon.Add(edge);
+                Toggle((a, b), (b, a));
+                Toggle((b, c), (c, b));
+                Toggle((c, a), (a, c));
+                _ = triangles.Remove((a, b, c));
+            }
+            foreach ((int a, int b) in polygon) {
+                _ = triangles.Add((a, b, i));
+            }
+        }
+        return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
