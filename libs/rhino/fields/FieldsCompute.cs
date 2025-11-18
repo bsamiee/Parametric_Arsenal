@@ -646,18 +646,20 @@ internal static class FieldsCompute {
         Vector3d[] vectorField,
         Point3d[] grid,
         Fields.VectorComponent component) =>
-        ApplyBinaryFieldOperation(
-            inputField1: scalarField,
-            inputField2: vectorField,
-            grid: grid,
-            operation: (scalar, vector, _) => component switch {
-                Fields.XComponent => scalar * vector.X,
-                Fields.YComponent => scalar * vector.Y,
-                Fields.ZComponent => scalar * vector.Z,
-                _ => 0.0,
-            },
-            error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
-            error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"));
+        (component == Fields.XComponent || component == Fields.YComponent || component == Fields.ZComponent)
+            ? ApplyBinaryFieldOperation(
+                inputField1: scalarField,
+                inputField2: vectorField,
+                grid: grid,
+                operation: (scalar, vector, _) => component switch {
+                    Fields.XComponent => scalar * vector.X,
+                    Fields.YComponent => scalar * vector.Y,
+                    Fields.ZComponent => scalar * vector.Z,
+                },
+                error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
+                error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"))
+            : ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComponent.WithContext("Invalid vector component for scalar-vector product")),
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
