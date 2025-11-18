@@ -95,9 +95,9 @@ internal static class MorphologyCompute {
         int levels,
         IGeometryContext context) =>
         levels <= 0
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Levels: {levels}")))
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext($"Levels: {levels}"))
             : levels > MorphologyConfig.MaxSubdivisionLevels
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionLevelExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxSubdivisionLevels}")))
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionLevelExceeded.WithContext($"Max: {MorphologyConfig.MaxSubdivisionLevels}"))
                 : Enumerable.Range(0, levels).Aggregate(
                     ResultFactory.Create(value: mesh.DuplicateMesh()),
                     (result, level) => result.Bind(current => {
@@ -113,16 +113,14 @@ internal static class MorphologyCompute {
                         }
                         if (!valid) {
                             next?.Dispose();
-                            return ResultFactory.Create<Mesh>(
-                                error: E.Geometry.Morphology.SubdivisionFailed.WithContext(
-                                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")));
+                            return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext($"Level: {level}, Algorithm: {algorithm}"));
                         }
                         return ResultFactory.Create(value: next);
                     }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideLoop(Mesh mesh) {
-        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
+        if (mesh.Faces.TriangleCount != mesh.Faces.Count) { return null; }
 
         int vertCount = mesh.Vertices.Count;
         Point3d[] originalVerts = new Point3d[vertCount];
@@ -184,7 +182,7 @@ internal static class MorphologyCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Mesh? SubdivideButterfly(Mesh mesh) {
-        if (!mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)) { return null; }
+        if (mesh.Faces.TriangleCount != mesh.Faces.Count) { return null; }
 
         int vertCount = mesh.Vertices.Count;
         Point3d[] originalVerts = new Point3d[vertCount];
@@ -277,7 +275,7 @@ internal static class MorphologyCompute {
         Func<Mesh, Point3d[], IGeometryContext, Point3d[]> updateFunc,
         IGeometryContext context) =>
         maxIterations is <= 0 or > MorphologyConfig.MaxSmoothingIterations
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Iterations: {maxIterations}")))
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.InvalidCount.WithContext($"Iterations: {maxIterations}"))
             : ((Func<Result<Mesh>>)(() => {
                 Mesh smoothed = mesh.DuplicateMesh();
                 Point3d[] positions = ArrayPool<Point3d>.Shared.Rent(smoothed.Vertices.Count);
@@ -342,11 +340,9 @@ internal static class MorphologyCompute {
         IGeometryContext __) =>
         Math.Abs(distance) switch {
             double abs when !RhinoMath.IsValidDouble(distance) || abs < MorphologyConfig.MinOffsetDistance =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}"))),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext($"Distance: {distance:F6}")),
             double abs when abs > MorphologyConfig.MaxOffsetDistance =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}"))),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext($"Max: {MorphologyConfig.MaxOffsetDistance}")),
             _ => ((Func<Result<Mesh>>)(() => {
                 Mesh? offset = mesh.Offset(distance);
                 return offset?.IsValid is true
@@ -364,14 +360,11 @@ internal static class MorphologyCompute {
         IGeometryContext __) =>
         (targetFaceCount, accuracy) switch {
             ( < MorphologyConfig.MinReductionFaceCount, _) =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}"))),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext($"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}")),
             (int target, _) when target >= mesh.Faces.Count =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {target} >= Current: {mesh.Faces.Count}"))),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext($"Target: {target} >= Current: {mesh.Faces.Count}")),
             (_, double acc) when !RhinoMath.IsValidDouble(acc) || acc < MorphologyConfig.MinReductionAccuracy || acc > MorphologyConfig.MaxReductionAccuracy =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Accuracy: {acc:F3}"))),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext($"Accuracy: {acc:F3}")),
             _ => ((Func<Result<Mesh>>)(() => {
                 Mesh reduced = mesh.DuplicateMesh();
                 bool success = reduced.Reduce(
@@ -385,7 +378,7 @@ internal static class MorphologyCompute {
                     threaded: false);
                 return success && reduced.IsValid && reduced.Faces.Count <= targetFaceCount * MorphologyConfig.ReductionTargetTolerance
                     ? ResultFactory.Create(value: reduced)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}")));
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext($"Achieved: {reduced.Faces.Count}, Target: {targetFaceCount}"));
             }))(),
         };
 
@@ -399,14 +392,22 @@ internal static class MorphologyCompute {
         ((Func<Result<(Mesh, int)>>)(() => {
             BoundingBox bounds = mesh.GetBoundingBox(accurate: false);
             double diagLength = bounds.Diagonal.Length;
-            double minEdge = context.AbsoluteTolerance * MorphologyConfig.RemeshMinEdgeLengthFactor;
-            double maxEdge = diagLength * MorphologyConfig.RemeshMaxEdgeLengthFactor;
-            if (!RhinoMath.IsValidDouble(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge) {
-                return ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")));
-            }
-            if (maxIterations is <= 0 or > MorphologyConfig.MaxRemeshIterations) {
-                return ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxIters: {maxIterations}")));
-            }
+            (double minEdge, double maxEdge) = (context.AbsoluteTolerance * MorphologyConfig.RemeshMinEdgeLengthFactor, diagLength * MorphologyConfig.RemeshMaxEdgeLengthFactor);
+            return (!RhinoMath.IsValidDouble(targetEdgeLength) || targetEdgeLength < minEdge || targetEdgeLength > maxEdge, maxIterations) switch {
+                (true, _) => ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshTargetEdgeLengthInvalid.WithContext($"Target: {targetEdgeLength:F6}, Range: [{minEdge:F6}, {maxEdge:F6}]")),
+                (_, <= 0) or (_, > MorphologyConfig.MaxRemeshIterations) => ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.RemeshIterationLimitExceeded.WithContext($"MaxIters: {maxIterations}")),
+                _ => RemeshIsotropicCore(mesh, targetEdgeLength, maxIterations, preserveFeatures, context),
+            };
+        }))();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropicCore(
+        Mesh mesh,
+        double targetEdgeLength,
+        int maxIterations,
+        bool preserveFeatures,
+        IGeometryContext context) =>
+        ((Func<Result<(Mesh, int)>>)(() => {
             Mesh remeshed = mesh.DuplicateMesh();
             double splitThreshold = targetEdgeLength * MorphologyConfig.RemeshSplitThresholdFactor;
             double collapseThreshold = targetEdgeLength / MorphologyConfig.RemeshSplitThresholdFactor;
@@ -488,9 +489,9 @@ internal static class MorphologyCompute {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
         return maxAspect > MorphologyConfig.AspectRatioThreshold
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext($"MaxAspect: {maxAspect:F2}"))
             : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext($"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°"))
                 : ResultFactory.Create(value: mesh);
     }
 }

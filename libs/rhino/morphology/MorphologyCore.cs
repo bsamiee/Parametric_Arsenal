@@ -83,10 +83,10 @@ internal static class MorphologyCore {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision(object input, object parameters, IGeometryContext context, byte algorithm) =>
         Execute<Mesh, int>(input, parameters, context, (mesh, levels, ctx) =>
-            MorphologyConfig.TriangulatedSubdivisionOps.Contains(algorithm) && !mesh.Faces.TriangleCount.Equals(mesh.Faces.Count)
+            MorphologyConfig.TriangulatedSubdivisionOps.Contains(algorithm) && mesh.Faces.TriangleCount != mesh.Faces.Count
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                     error: (algorithm == MorphologyConfig.OpSubdivideLoop ? E.Geometry.Morphology.LoopRequiresTriangles : E.Geometry.Morphology.ButterflyRequiresTriangles)
-                        .WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}")))
+                        .WithContext($"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}"))
                 : MorphologyCompute.SubdivideIterative(mesh, algorithm, levels, ctx).Bind(subdivided => ComputeSubdivisionMetrics(mesh, subdivided, ctx)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -102,7 +102,7 @@ internal static class MorphologyCore {
         Execute<Mesh, (int, double, double)>(input, parameters, context, (mesh, p, ctx) => {
             (int iterations, double lambda, double mu) = p;
             return mu >= -lambda
-                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({mu:F4}) must be < -λ ({(-lambda):F4})")))
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext($"μ ({mu:F4}) must be < -λ ({(-lambda):F4})"))
                 : MorphologyCompute.SmoothWithConvergence(mesh, iterations, lockBoundary: false, (m, pos, _) => {
                     Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
                     Point3d[] blended1 = new Point3d[pos.Length];
