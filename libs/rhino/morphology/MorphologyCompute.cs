@@ -339,7 +339,7 @@ internal static class MorphologyCompute {
     internal static Result<Mesh> OffsetMesh(
         Mesh mesh,
         double distance,
-        bool _,
+        bool bothSides,
         IGeometryContext __) =>
         Math.Abs(distance) switch {
             double abs when !RhinoMath.IsValidDouble(distance) || abs < MorphologyConfig.MinOffsetDistance =>
@@ -349,7 +349,7 @@ internal static class MorphologyCompute {
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}"))),
             _ => ((Func<Result<Mesh>>)(() => {
-                Mesh? offset = mesh.Offset(distance);
+                Mesh? offset = mesh.Offset(distance: distance, solidify: bothSides);
                 return offset?.IsValid is true
                     ? ResultFactory.Create(value: offset)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
