@@ -501,7 +501,7 @@ internal static class MorphologyCompute {
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
                 for (int i = 0; i < 5; i++) {
                     byte flag = (byte)(1 << i);
-                    bool applied = (flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string _, Func<Mesh, double, bool> action) entry) && entry.action(repaired, tol);
+                    (flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string _, Func<Mesh, double, bool> action) entry) && entry.action(repaired, tol);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
