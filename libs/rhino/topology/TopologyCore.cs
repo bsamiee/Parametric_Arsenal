@@ -54,7 +54,7 @@ internal static class TopologyCore {
                         .Select(t => {
                             Point3d start = mesh.TopologyVertices[t.Verts.I];
                             Point3d end = mesh.TopologyVertices[t.Verts.J];
-                            return (t.Index, (Curve)new LineCurve(start, end), start.DistanceTo(end), t.Faces.Length);
+                            return (t.Index, (Curve)new LineCurve(start, end), start.DistanceTo(end), (int)EdgeAdjacency.Naked);
                         }),
                     ];
                     (int Index, Curve Curve, double Length, int Valence)[] ordered = orderLoops && nakedEdges.Length > 1
