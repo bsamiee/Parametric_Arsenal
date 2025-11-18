@@ -28,10 +28,8 @@ internal static class TopologyCore {
                         : [.. Enumerable.Range(0, brep.Edges.Count)
                             .Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked)
                             .Select(i => (Index: i, Curve: brep.Edges[i].DuplicateCurve(), Valence: (int)brep.Edges[i].Valence))
-                            .Where(t => t.Curve is Curve)
-                            .Select(t => {
-                                Curve dup = t.Curve!;
-                                return (t.Index, dup, dup.GetLength(), t.Valence);
+                            .Where(t => t.Curve is not null)
+                            .Select(t => (t.Index, t.Curve!, t.Curve!.GetLength(), t.Valence))
                             }),
                         ];
                     (int Index, Curve Curve, double Length, int Valence)[] ordered = orderLoops && nakedEdges.Length > 1
