@@ -211,11 +211,11 @@ public static class Fields {
             .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points"))
             .Ensure(state => state.Isovalues.Length > 0, error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required"))
             .Ensure(v => v.Isovalues.All(value => RhinoMath.IsValidDouble(value)), error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles"))
-            .Bind(_ => FieldsCompute.ExtractIsosurfaces(
-                scalarField: scalarField,
-                gridPoints: gridPoints,
+            .Bind(state => FieldsCompute.ExtractIsosurfaces(
+                scalarField: state.ScalarField,
+                gridPoints: state.GridPoints,
                 resolution: spec.Resolution,
-                isovalues: isovalues));
+                isovalues: state.Isovalues));
 
     /// <summary>Compute Hessian field (second derivative matrix): scalar field → (grid points[], hessian matrices[3,3][]). Assumes uniform grid spacing derived from bounds and resolution; non-uniform grids will produce incorrect second derivatives.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
