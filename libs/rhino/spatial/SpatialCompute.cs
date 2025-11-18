@@ -23,43 +23,79 @@ internal static class SpatialCompute {
         ];
 
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
-    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        (geometry.Length, algorithm, k, epsilon) switch {
-            (0, _, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
-            (_, > 2, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}")),
-            (_, 0 or 2, <= 0, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
-            (_, 1, _, <= 0) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon),
-            _ => ((Func<Result<(Point3d, double[])[]>>)(() => {
-                Point3d[] pts = new Point3d[geometry.Length];
-                for (int i = 0; i < geometry.Length; i++) {
-                    GeometryBase current = geometry[i];
-                    Type geometryType = current.GetType();
-                    Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
-                    pts[i] = (Point3d)extractor(current);
-                }
-                return (algorithm is 0 or 2) && k > pts.Length
+
+    /// <summary>K-means clustering: partition geometries into exactly k clusters minimizing within-cluster variance.</summary>
+    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterKMeans<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase =>
+        geometry.Length is 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("ClusterKMeans requires at least one geometry"))
+            : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                Point3d[] pts = ExtractCentroids(geometry);
+                return k > pts.Length
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
-                        ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
-                            ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
-                                int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
-                                return members.Length is 0
-                                    ? (Point3d.Origin, Array.Empty<double>())
-                                    : ((Func<(Point3d, double[])>)(() => {
-                                        Vector3d sum = Vector3d.Zero;
-                                        for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
-                                            Point3d point = pts[members[memberIndex]];
-                                            sum += new Vector3d(point);
-                                        }
-                                        Point3d centroid = Point3d.Origin + (sum / members.Length);
-                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
-                                    }))();
-                            }),
-                            ])
-                            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
-                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
-            }))(),
-        };
+                    : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                        int[] assigns = KMeansAssign(pts, k, context.AbsoluteTolerance, SpatialConfig.KMeansMaxIterations);
+                        return BuildClusterResults(pts: pts, assigns: assigns, clusterCount: k);
+                    }))();
+            }))();
+
+    /// <summary>DBSCAN clustering: density-based spatial clustering with epsilon neighborhood radius.</summary>
+    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterDBSCAN<T>(T[] geometry, double epsilon, IGeometryContext context) where T : GeometryBase =>
+        geometry.Length is 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("ClusterDBSCAN requires at least one geometry"))
+            : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                Point3d[] pts = ExtractCentroids(geometry);
+                int[] assigns = DBSCANAssign(pts, epsilon, SpatialConfig.DBSCANMinPoints);
+                int clusterCount = assigns.Length > 0 ? assigns.Where(static a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : 0;
+                return clusterCount > 0
+                    ? BuildClusterResults(pts: pts, assigns: assigns, clusterCount: clusterCount)
+                    : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("DBSCAN found no clusters"));
+            }))();
+
+    /// <summary>Hierarchical clustering: agglomerative clustering producing exactly k clusters.</summary>
+    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterHierarchical<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase =>
+        geometry.Length is 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("ClusterHierarchical requires at least one geometry"))
+            : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                Point3d[] pts = ExtractCentroids(geometry);
+                return k > pts.Length
+                    ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
+                    : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                        int[] assigns = HierarchicalAssign(pts, k);
+                        return BuildClusterResults(pts: pts, assigns: assigns, clusterCount: k);
+                    }))();
+            }))();
+
+    /// <summary>Extract centroids from geometry array using cached type-specific extractors.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Point3d[] ExtractCentroids<T>(T[] geometry) where T : GeometryBase {
+        Point3d[] pts = new Point3d[geometry.Length];
+        for (int i = 0; i < geometry.Length; i++) {
+            GeometryBase current = geometry[i];
+            Type geometryType = current.GetType();
+            Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
+            pts[i] = (Point3d)extractor(current);
+        }
+        return pts;
+    }
+
+    /// <summary>Build cluster result tuples from assignments.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<(Point3d Centroid, double[] Radii)[]> BuildClusterResults(Point3d[] pts, int[] assigns, int clusterCount) =>
+        ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
+            int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
+            return members.Length is 0
+                ? (Point3d.Origin, Array.Empty<double>())
+                : ((Func<(Point3d, double[])>)(() => {
+                    Vector3d sum = Vector3d.Zero;
+                    for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
+                        Point3d point = pts[members[memberIndex]];
+                        sum += new Vector3d(point);
+                    }
+                    Point3d centroid = Point3d.Origin + (sum / members.Length);
+                    return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
+                }))();
+        }),
+        ]);
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
@@ -289,7 +325,7 @@ internal static class SpatialCompute {
                 _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary is not closed, planar, or degenerate")),
             };
 
-    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
+    internal static Result<(int Index, double Distance, double Angle)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
         (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
             (0, _, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
             (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection),

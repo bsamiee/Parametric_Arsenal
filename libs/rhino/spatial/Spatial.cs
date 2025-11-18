@@ -12,6 +12,31 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
+    #region Algebraic Domain Types
+
+    /// <summary>Base type for clustering algorithm requests.</summary>
+    public abstract record ClusteringRequest;
+
+    /// <summary>K-means clustering: partition points into exactly K clusters minimizing within-cluster variance.</summary>
+    public sealed record KMeansClusteringRequest(int K) : ClusteringRequest;
+
+    /// <summary>DBSCAN clustering: density-based spatial clustering with epsilon neighborhood radius.</summary>
+    public sealed record DBSCANClusteringRequest(double Epsilon) : ClusteringRequest;
+
+    /// <summary>Hierarchical clustering: agglomerative clustering producing exactly K clusters.</summary>
+    public sealed record HierarchicalClusteringRequest(int K) : ClusteringRequest;
+
+    /// <summary>Directional proximity field request with weighted angular scoring.</summary>
+    public sealed record DirectionalProximityRequest(Vector3d Direction, double MaxDistance, double AngleWeight);
+
+    /// <summary>Result of clustering operation: centroid position and radii to each cluster member.</summary>
+    public sealed record ClusteringResult(Point3d Centroid, double[] Radii);
+
+    /// <summary>Result of proximity field query: geometry index, distance, and angle from direction.</summary>
+    public sealed record ProximityFieldResult(int Index, double Distance, double Angle);
+
+    #endregion
+
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
@@ -34,13 +59,13 @@ public static class Spatial {
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
-    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
+    /// <summary>Cluster geometry by proximity using algebraic request types.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
+    public static Result<ClusteringResult[]> Cluster<T>(
         T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
+        ClusteringRequest request,
         IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+        SpatialCore.Cluster(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,13 +75,13 @@ public static class Spatial {
         IGeometryContext context) =>
         SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
 
-    /// <summary>Compute directional proximity field: (direction, maxDistance, angleWeight) → (index, distance, angle)[].</summary>
+    /// <summary>Compute directional proximity field using algebraic request type.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
+    public static Result<ProximityFieldResult[]> ProximityField(
         GeometryBase[] geometry,
-        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
+        DirectionalProximityRequest request,
         IGeometryContext context) =>
-        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
+        SpatialCore.ProximityField(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

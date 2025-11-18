@@ -42,6 +42,28 @@ internal static class SpatialCore {
             (typeof(Brep[]), typeof(BoundingBox), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
         }.ToFrozenDictionary(static entry => (entry.Input, entry.Query), static entry => (entry.Factory, entry.Mode, entry.BufferSize, entry.Execute));
 
+    /// <summary>Orchestrate clustering operation via algebraic request dispatch.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusteringRequest request, IGeometryContext context) where T : GeometryBase =>
+        request switch {
+            Spatial.KMeansClusteringRequest { K: <= 0 } => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
+            Spatial.HierarchicalClusteringRequest { K: <= 0 } => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
+            Spatial.DBSCANClusteringRequest { Epsilon: <= 0 } => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidEpsilon),
+            Spatial.KMeansClusteringRequest kmeans => SpatialCompute.ClusterKMeans(geometry: geometry, k: kmeans.K, context: context)
+                .Map(static tuples => tuples.Select(static t => new Spatial.ClusteringResult(t.Centroid, t.Radii)).ToArray()),
+            Spatial.DBSCANClusteringRequest dbscan => SpatialCompute.ClusterDBSCAN(geometry: geometry, epsilon: dbscan.Epsilon, context: context)
+                .Map(static tuples => tuples.Select(static t => new Spatial.ClusteringResult(t.Centroid, t.Radii)).ToArray()),
+            Spatial.HierarchicalClusteringRequest hierarchical => SpatialCompute.ClusterHierarchical(geometry: geometry, k: hierarchical.K, context: context)
+                .Map(static tuples => tuples.Select(static t => new Spatial.ClusteringResult(t.Centroid, t.Radii)).ToArray()),
+            _ => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown clustering request type: {request.GetType().Name}")),
+        };
+
+    /// <summary>Orchestrate proximity field operation via algebraic request dispatch.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Spatial.ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) =>
+        SpatialCompute.ProximityField(geometry: geometry, direction: request.Direction, maxDist: request.MaxDistance, angleWeight: request.AngleWeight, context: context)
+            .Map(static tuples => tuples.Select(static t => new Spatial.ProximityFieldResult(t.Index, t.Distance, t.Angle)).ToArray());
+
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
         Func<object, RTree> factory,
         (Func<TInput, Point3d[], int, IEnumerable<int[]>>? kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>>? distLimited)? proximityFuncs = null
