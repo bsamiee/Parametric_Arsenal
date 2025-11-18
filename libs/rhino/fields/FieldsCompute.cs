@@ -380,7 +380,6 @@ internal static class FieldsCompute {
                                 Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);
                                 return stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4));
                             }))(),
-                            _ => throw new InvalidOperationException($"Unsupported integration scheme: {scheme.GetType().Name}"),
                         };
                         Point3d nextPoint = current + delta;
                         bool shouldContinue = bounds.Contains(nextPoint) && k1.Length >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
