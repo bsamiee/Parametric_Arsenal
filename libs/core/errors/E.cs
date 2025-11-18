@@ -157,7 +157,7 @@ public static class E {
             [2821] = "Mesh repair weld tolerance invalid (must be positive)",
             [2822] = "Mesh thickening failed or produced invalid geometry",
             [2823] = "Mesh unwrapping failed to generate texture coordinates",
-            [2825] = "Mesh welding operation failed or tolerance invalid",
+            [2824] = "Mesh welding operation failed or tolerance invalid",
 
             // Fitting Operations (2900-2910)
             [2900] = "Fitting operation failed: numerical instability or invalid configuration",
