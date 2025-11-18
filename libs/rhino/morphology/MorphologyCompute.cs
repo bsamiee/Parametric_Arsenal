@@ -288,6 +288,7 @@ internal static class MorphologyCompute {
                         prevPositions[i] = positions[i];
                     }
 
+                    _ = smoothed.Normals.ComputeNormals();
                     int iterPerformed = 0;
                     bool converged = false;
                     double threshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
@@ -302,7 +303,6 @@ internal static class MorphologyCompute {
                             _ = smoothed.Vertices.SetVertex(i, positions[i]);
                         }
 
-                        _ = smoothed.Normals.ComputeNormals();
                         iterPerformed++;
 
                         double rmsDisp = iter > 0
@@ -321,6 +321,8 @@ internal static class MorphologyCompute {
                         for (int i = 0; i < smoothed.Vertices.Count; i++) {
                             prevPositions[i] = positions[i];
                         }
+
+                        _ = smoothed.Normals.ComputeNormals();
                     }
 
                     _ = smoothed.Compact();
@@ -486,6 +488,12 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
+        int aspectCount = aspectRatios.Length;
+        int angleCount = minAngles.Length;
+        if (aspectCount == 0 || angleCount == 0) {
+            return ResultFactory.Create(value: mesh);
+        }
+
         (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
         return maxAspect > MorphologyConfig.AspectRatioThreshold
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
