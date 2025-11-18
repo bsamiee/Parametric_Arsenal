@@ -289,7 +289,7 @@ internal static class TopologyCore {
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i) switch {
             int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
             int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
-            int[] cf when cf.Length == 2 && computed && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(...)
+            int[] cf when cf.Length == 2 && computed && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]])
                 double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
                 double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
                 _ => Topology.EdgeContinuityType.Sharp,
