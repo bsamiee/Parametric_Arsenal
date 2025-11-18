@@ -648,7 +648,8 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRepairMetrics(
         Mesh original,
         Mesh repaired,
-        byte operations,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
+        double weldTolerance,
         IGeometryContext context) {
         bool hadHoles = original.DisjointMeshCount > 1;
         bool hadBadNormals = original.Normals.Count != original.Vertices.Count || original.Normals.Any(n => n.IsZero);
@@ -661,6 +662,7 @@ internal static class MorphologyCore {
                 OriginalFaceCount: original.Faces.Count,
                 RepairedFaceCount: repaired.Faces.Count,
                 OperationsPerformed: operations,
+                WeldTolerance: weldTolerance,
                 QualityScore: qualityValid ? 1.0 : 0.0,
                 HadHoles: hadHoles,
                 HadBadNormals: hadBadNormals),
