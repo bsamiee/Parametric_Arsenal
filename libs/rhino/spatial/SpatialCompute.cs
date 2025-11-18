@@ -127,12 +127,7 @@ internal static class SpatialCompute {
 
                 double maxShift = 0.0;
                 for (int i = 0; i < k; i++) {
-                    Point3d newCentroid = clusters[i].Count > 0
-                        ? new Point3d(
-                            clusters[i].Sum.X / clusters[i].Count,
-                            clusters[i].Sum.Y / clusters[i].Count,
-                            clusters[i].Sum.Z / clusters[i].Count)
-                        : centroids[i];
+                    Point3d newCentroid = clusters[i].Count > 0 ? (Point3d)(clusters[i].Sum / clusters[i].Count) : centroids[i];
                     maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
                     centroids[i] = newCentroid;
                 }
