@@ -569,4 +569,54 @@ internal static class MorphologyCompute {
                 };
             }))(),
         };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh> BrepToMesh(
+        Brep brep,
+        MeshingParameters? meshParams,
+        bool joinMeshes,
+        IGeometryContext __) =>
+        meshParams is null
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshingParametersInvalid.WithContext("Parameters cannot be null"))
+            : ((Func<Result<Mesh>>)(() => {
+                Mesh[]? meshes = Mesh.CreateFromBrep(brep: brep, meshingParameters: meshParams);
+                return (meshes is null || meshes.Length == 0) switch {
+                    true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext(
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Brep face count: {brep.Faces.Count}"))),
+                    false => ((Func<Result<Mesh>>)(() => {
+                        Mesh result = joinMeshes && meshes.Length > 1
+                            ? ((Func<Mesh>)(() => {
+                                Mesh joined = new();
+                                joined.Append(meshes);
+                                return joined;
+                            }))()
+                            : meshes[0];
+                        _ = result.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                        _ = result.Faces.CullDegenerateFaces();
+                        _ = result.Normals.ComputeNormals();
+                        _ = result.Compact();
+                        return result.IsValid
+                            ? ResultFactory.Create(value: result)
+                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext("Result mesh invalid"));
+                    }))(),
+                };
+            }))();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh> ThickenMesh(
+        Mesh mesh,
+        double thickness,
+        bool solidify,
+        Vector3d direction,
+        IGeometryContext _) =>
+        (!RhinoMath.IsValidDouble(thickness) || Math.Abs(thickness) < MorphologyConfig.MinThickenDistance || Math.Abs(thickness) > MorphologyConfig.MaxThickenDistance) switch {
+            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Thickness: {thickness:F6}, Range: [{MorphologyConfig.MinThickenDistance:F6}, {MorphologyConfig.MaxThickenDistance:F6}]"))),
+            false => ((Func<Result<Mesh>>)(() => {
+                Mesh? thickened = mesh.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? _);
+                return thickened?.IsValid is true
+                    ? ResultFactory.Create(value: thickened)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(thickened is null ? "Offset operation returned null" : "Generated mesh is invalid"));
+            }))(),
+        };
 }

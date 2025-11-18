@@ -21,7 +21,9 @@ internal static class MorphologyConfig {
             [(12, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshOffset"),
             [(13, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "MeshReduce"),
             [(14, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshRemesh"),
+            [(15, typeof(Brep))] = (V.Standard | V.BoundingBox, "BrepToMesh"),
             [(16, typeof(Mesh))] = (V.Standard | V.Topology | V.MeshSpecific, "MeshRepair"),
+            [(17, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshThicken"),
             [(19, typeof(Mesh))] = (V.Standard | V.Topology, "MeshSeparate"),
             [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
             [(21, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshWeld"),
@@ -47,7 +49,9 @@ internal static class MorphologyConfig {
     internal const byte OpOffset = 12;
     internal const byte OpReduce = 13;
     internal const byte OpRemesh = 14;
+    internal const byte OpBrepToMesh = 15;
     internal const byte OpMeshRepair = 16;
+    internal const byte OpMeshThicken = 17;
     internal const byte OpMeshSeparate = 19;
     internal const byte OpEvolveMeanCurvature = 20;
     internal const byte OpMeshWeld = 21;
@@ -109,4 +113,12 @@ internal static class MorphologyConfig {
     internal const double MinWeldTolerance = 0.0001;
     internal const double MaxWeldTolerance = 100.0;
     internal const double DefaultWeldTolerance = 0.01;
+
+    /// <summary>Brep to mesh conversion configuration.</summary>
+    internal const double MaxAcceptableAspectRatio = 10.0;
+    internal const double IdealTriangleAngleRadians = 1.0471976;
+
+    /// <summary>Mesh thickening configuration.</summary>
+    internal const double MinThickenDistance = 0.0001;
+    internal const double MaxThickenDistance = 10000.0;
 }

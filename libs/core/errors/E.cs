@@ -151,8 +151,11 @@ public static class E {
             [2815] = "Offset distance invalid or produces degenerate geometry",
             [2816] = "Reduction accuracy parameter out of valid range",
             [2817] = "Remeshing iteration limit exceeded without convergence",
+            [2818] = "Brep to mesh conversion failed",
+            [2819] = "Meshing parameters invalid or produced degenerate mesh",
             [2820] = "Mesh repair operation failed",
             [2821] = "Mesh repair weld tolerance invalid (must be positive)",
+            [2822] = "Mesh thickening failed or produced invalid geometry",
             [2825] = "Mesh welding operation failed or tolerance invalid",
 
             // Fitting Operations (2900-2910)
@@ -367,7 +370,7 @@ public static class E {
             public static readonly SystemError ResultValidationFailed = Get(2108);
         }
 
-        /// <summary>Morphology operation errors (2800-2817).</summary>
+        /// <summary>Morphology operation errors (2800-2825).</summary>
         public static class Morphology {
             public static readonly SystemError CageDeformFailed = Get(2800);
             public static readonly SystemError CageControlPointMismatch = Get(2801);
@@ -387,8 +390,11 @@ public static class E {
             public static readonly SystemError OffsetDistanceInvalid = Get(2815);
             public static readonly SystemError ReductionAccuracyInvalid = Get(2816);
             public static readonly SystemError RemeshIterationLimitExceeded = Get(2817);
+            public static readonly SystemError BrepToMeshFailed = Get(2818);
+            public static readonly SystemError MeshingParametersInvalid = Get(2819);
             public static readonly SystemError MeshRepairFailed = Get(2820);
             public static readonly SystemError WeldToleranceInvalid = Get(2821);
+            public static readonly SystemError MeshThickenFailed = Get(2822);
             public static readonly SystemError MeshWeldFailed = Get(2825);
         }
 

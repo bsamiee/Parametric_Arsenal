@@ -179,6 +179,47 @@ public static class Morphology {
             $"MeshWeld | V: {this.OriginalVertexCount}→{this.WeldedVertexCount} (-{this.VerticesRemoved}) | Tol={this.WeldTolerance:E2} | MaxDisp={this.MaxVertexDisplacement:F3}");
     }
 
+    /// <summary>Brep to mesh conversion result with quality metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record BrepToMeshResult(
+        Mesh Mesh,
+        int BrepFaceCount,
+        int MeshFaceCount,
+        double MinEdgeLength,
+        double MaxEdgeLength,
+        double MeanEdgeLength,
+        double EdgeLengthStdDev,
+        double MeanAspectRatio,
+        double MaxAspectRatio,
+        double MinTriangleAngleRadians,
+        double MeanTriangleAngleRadians,
+        int DegenerateFaceCount,
+        double QualityScore) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"BrepToMesh | BrepFaces={this.BrepFaceCount} | MeshFaces={this.MeshFaceCount} | MeanEdge={this.MeanEdgeLength:F3} | AspectRatio={this.MeanAspectRatio:F2} | Quality={this.QualityScore:F3}");
+    }
+
+    /// <summary>Mesh thickening result with solid shell metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshThickenResult(
+        Mesh Thickened,
+        double OffsetDistance,
+        bool IsSolid,
+        int OriginalVertexCount,
+        int ThickenedVertexCount,
+        int OriginalFaceCount,
+        int ThickenedFaceCount,
+        int WallFaceCount,
+        BoundingBox OriginalBounds,
+        BoundingBox ThickenedBounds) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshThicken | Dist={this.OffsetDistance:F3} | Solid={this.IsSolid} | V: {this.OriginalVertexCount}→{this.ThickenedVertexCount} | F: {this.OriginalFaceCount}→{this.ThickenedFaceCount} | WallFaces={this.WallFaceCount}");
+    }
+
     /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
