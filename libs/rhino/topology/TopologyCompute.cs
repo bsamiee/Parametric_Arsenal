@@ -166,7 +166,16 @@ internal static class TopologyCompute {
             ? ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid for feature extraction"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
-                .Map(validBrep => (V: validBrep.Vertices.Count, E: validBrep.Edges.Count, F: validBrep.Faces.Count, Solid: validBrep.IsSolid && validBrep.IsManifold, Loops: [.. validBrep.Loops.Select((l, i) => { using Curve? loopCurve = l.To3dCurve(); return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength)); }),]))
+                .Map(validBrep => (
+                    V: validBrep.Vertices.Count,
+                    E: validBrep.Edges.Count,
+                    F: validBrep.Faces.Count,
+                    Solid: validBrep.IsSolid && validBrep.IsManifold,
+                    Loops: [.. validBrep.Loops.Select((l, i) => {
+                        using Curve? loopCurve = l.To3dCurve();
+                        return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
+                    }),
+                    ]))
                 .Bind(data => data switch {
                     (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 && solid && (e - v - f + 2) / 2 is int genus && genus >= 0 => ResultFactory.Create(value: (Genus: genus, Loops: loops, IsSolid: solid, HandleCount: genus)),
                     (int v, int e, int f, bool solid, (int LoopIndex, bool IsHole)[] loops) when v > 0 && e > 0 && f > 0 => ResultFactory.Create(value: (Genus: 0, Loops: loops, IsSolid: solid, HandleCount: 0)),
