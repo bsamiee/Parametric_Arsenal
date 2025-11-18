@@ -438,7 +438,7 @@ internal static class MorphologyCompute {
         double weldTolerance,
         IGeometryContext _) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
-            ( <= 0.0, _) or ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
+            ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {weldTolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
             (_, null) or (_, { IsValid: false }) =>
