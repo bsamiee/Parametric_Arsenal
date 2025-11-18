@@ -51,8 +51,7 @@ internal static class SpatialCompute {
                                             Point3d point = pts[members[memberIndex]];
                                             sum += new Vector3d(point);
                                         }
-                                        double invCount = 1.0 / members.Length;
-                                        Point3d centroid = new(sum.X * invCount, sum.Y * invCount, sum.Z * invCount);
+                                        Point3d centroid = new(sum.X / members.Length, sum.Y / members.Length, sum.Z / members.Length);
                                         return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
                                     }))();
                             }),
