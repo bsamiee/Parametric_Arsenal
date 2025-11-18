@@ -10,8 +10,6 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Morphology;
 
-#pragma warning disable IDE0060 // Remove unused parameter
-#pragma warning disable RCS1163 // Unused parameter
 
 /// <summary>Morphology operation dispatch and execution engine with proper geometry validation.</summary>
 internal static class MorphologyCore {
