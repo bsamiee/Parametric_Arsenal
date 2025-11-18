@@ -4,7 +4,6 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
@@ -76,7 +75,7 @@ internal static class TopologyCompute {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
                     Brep? bestHealed = null;
                     Topology.Strategy? bestStrategy = null;
-                    int bestNakedEdges = int.MaxValue;
+                    int bestNakedEdges = originalNakedEdges;
 
                     foreach (Topology.Strategy currentStrategy in strategies) {
                         Brep copy = validBrep.DuplicateBrep();
@@ -114,7 +113,7 @@ internal static class TopologyCompute {
                                     }
                                     joinedAny = joinedAny || joinedThisPass;
                                     bool shouldContinue = joinedThisPass;
-                                    if (!shouldContinue) break;
+                                    if (!shouldContinue) { break; }
                                 }
                                 copy.Compact();
                                 return joinedAny;
@@ -127,15 +126,7 @@ internal static class TopologyCompute {
                                     Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
                                 };
                             }))(),
-                            }))(),
-                            Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
-                                Brep[] components = copy.GetConnectedComponents() ?? [];
-                                return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: context.AbsoluteTolerance) switch {
-                                    null or { Length: 0 } => false,
-                                    Brep[] { Length: 1 } joined => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
-                                    Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
-                                };
-                            }))(),
+                            _ => false,
                         };
                         string validationLog = string.Empty;
                         (bool isValid, int nakedEdges) = success && copy.IsValidTopology(out validationLog)
