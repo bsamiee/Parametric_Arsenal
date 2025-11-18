@@ -12,6 +12,24 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
+    /// <summary>Base type for all clustering algorithm requests.</summary>
+    public abstract record ClusteringRequest;
+
+    /// <summary>K-means clustering with specified cluster count.</summary>
+    public sealed record KMeansRequest(int K) : ClusteringRequest;
+
+    /// <summary>DBSCAN density-based clustering with epsilon neighborhood radius.</summary>
+    public sealed record DBSCANRequest(double Epsilon) : ClusteringRequest;
+
+    /// <summary>Hierarchical agglomerative clustering with specified cluster count.</summary>
+    public sealed record HierarchicalRequest(int K) : ClusteringRequest;
+
+    /// <summary>Proximity field request with directional bias and distance constraints.</summary>
+    public sealed record ProximityFieldRequest(
+        Vector3d Direction,
+        double MaxDistance,
+        double AngleWeight);
+
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
@@ -34,13 +52,13 @@ public static class Spatial {
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
-    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
+    /// <summary>Cluster geometry by proximity using algebraic request type → (centroid, radii[])[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
         T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
+        ClusteringRequest request,
         IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+        SpatialCompute.Cluster(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,13 +68,13 @@ public static class Spatial {
         IGeometryContext context) =>
         SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
 
-    /// <summary>Compute directional proximity field: (direction, maxDistance, angleWeight) → (index, distance, angle)[].</summary>
+    /// <summary>Compute directional proximity field using algebraic request → (index, distance, angle)[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
         GeometryBase[] geometry,
-        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
+        ProximityFieldRequest request,
         IGeometryContext context) =>
-        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
+        SpatialCompute.ProximityField(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
