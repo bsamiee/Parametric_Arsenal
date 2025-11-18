@@ -31,7 +31,7 @@ internal static class TransformCore {
                 s => Transform.Rotation(s.RotationVectors!.Value.Start, s.RotationVectors.Value.End, s.RotationVectors.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
             [6] = ((s, _) => (s.MirrorPlane is Plane p && p.IsValid, string.Empty),
                 s => Transform.Mirror(s.MirrorPlane!.Value), E.Geometry.Transformation.InvalidMirrorPlane),
-            [7] = ((s, _) => (s.Translation is Vector3d motion, string.Empty),
+            [7] = ((s, _) => (s.Translation is Vector3d _, string.Empty),
                 s => Transform.Translation(s.Translation!.Value), E.Geometry.Transformation.InvalidTransformSpec),
             [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double angle) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {Fmt(s.Shear?.Direction.Length ?? 0)}"),
                 s => Transform.Shear(s.Shear!.Value.Plane, s.Shear.Value.Direction * Math.Tan(s.Shear.Value.Angle), Vector3d.Zero, Vector3d.Zero), E.Geometry.Transformation.InvalidShearParameters),
