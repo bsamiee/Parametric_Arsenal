@@ -68,7 +68,12 @@ public sealed record GeometryContext(
     /// <summary>Converts length from current units to target units.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<double> ConvertLength(double value, UnitSystem targetUnits) =>
-        !RhinoMath.IsValidDouble(value) ? ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]) : this.GetLengthScale(targetUnits).Bind(scale => RhinoMath.IsValidDouble(value * scale) ? ResultFactory.Create(value: value * scale) : ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]));
+        !RhinoMath.IsValidDouble(value)
+            ? ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,])
+            : this.GetLengthScale(targetUnits).Bind(scale =>
+                RhinoMath.IsValidDouble(value * scale)
+                    ? ResultFactory.Create(value: value * scale)
+                    : ResultFactory.Create<double>(errors: [E.Validation.InvalidUnitConversion,]));
 
     /// <summary>Creates validated context with normalization.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -78,9 +83,9 @@ public sealed record GeometryContext(
         double normalizedAngleToleranceRadians = angleToleranceRadians <= 0d ? DefaultAngleToleranceRadians : angleToleranceRadians;
 
         SystemError[] invalidParametersArray = [
-            .. !RhinoMath.IsValidDouble(normalizedAbsoluteTolerance) ? (SystemError[])[E.Validation.ToleranceAbsoluteInvalid,] : [],
-            .. !RhinoMath.IsValidDouble(normalizedRelativeTolerance) ? (SystemError[])[E.Validation.ToleranceRelativeInvalid,] : [],
-            .. !RhinoMath.IsValidDouble(normalizedAngleToleranceRadians) ? (SystemError[])[E.Validation.ToleranceAngleInvalid,] : [],
+            .. (!RhinoMath.IsValidDouble(normalizedAbsoluteTolerance) ? [E.Validation.ToleranceAbsoluteInvalid] : Array.Empty<SystemError>()),
+            .. (!RhinoMath.IsValidDouble(normalizedRelativeTolerance) ? [E.Validation.ToleranceRelativeInvalid] : Array.Empty<SystemError>()),
+            .. (!RhinoMath.IsValidDouble(normalizedAngleToleranceRadians) ? [E.Validation.ToleranceAngleInvalid] : Array.Empty<SystemError>()),
         ];
 
         return invalidParametersArray is { Length: > 0 } parameterErrors
