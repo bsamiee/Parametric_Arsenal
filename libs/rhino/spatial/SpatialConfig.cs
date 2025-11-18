@@ -8,7 +8,7 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
 [Pure]
 internal static class SpatialConfig {
-    /// <summary>Polymorphic type extractors for centroids, RTree factories, and clustering dispatch.</summary>
+    /// <summary>Polymorphic type extractors for centroids and RTree factories.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
         new Dictionary<(string, Type), Func<object, object>> {
             [("Centroid", typeof(Curve))] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
@@ -19,14 +19,6 @@ internal static class SpatialConfig {
             [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
             [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
             [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
-                ? alg switch {
-                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
-                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
-                    2 => SpatialCompute.HierarchicalAssign(pts, k),
-                    _ => [],
-                }
-                : [],
         }.ToFrozenDictionary();
 
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
@@ -48,4 +40,17 @@ internal static class SpatialConfig {
     /// <summary>Delaunay triangulation super-triangle construction parameters.</summary>
     internal const double DelaunaySuperTriangleScale = 2.0;
     internal const double DelaunaySuperTriangleCenterWeight = 0.5;
+}
+
+/// <summary>Base type for clustering algorithm configuration requests.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0048:File name must match type name", Justification = "ClusteringRequest types are co-located with SpatialConfig for organizational limits")]
+public abstract record ClusteringRequest {
+    /// <summary>K-means clustering configuration with target cluster count.</summary>
+    public sealed record KMeans(int K) : ClusteringRequest;
+
+    /// <summary>DBSCAN density-based clustering configuration with epsilon radius and minimum point threshold.</summary>
+    public sealed record DBSCAN(double Epsilon, int MinPoints) : ClusteringRequest;
+
+    /// <summary>Hierarchical agglomerative clustering configuration with target cluster count.</summary>
+    public sealed record Hierarchical(int K) : ClusteringRequest;
 }

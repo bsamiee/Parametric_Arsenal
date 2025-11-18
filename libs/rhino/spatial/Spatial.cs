@@ -34,13 +34,13 @@ public static class Spatial {
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
-    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
+    /// <summary>Cluster geometry by proximity using algebraic clustering request configuration.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
         T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
+        ClusteringRequest request,
         IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+        SpatialCompute.Cluster(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
