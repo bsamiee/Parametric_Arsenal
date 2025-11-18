@@ -362,7 +362,7 @@ internal static class MorphologyCompute {
             ( < MorphologyConfig.MinReductionFaceCount, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext($"Target: {targetFaceCount}, Min: {MorphologyConfig.MinReductionFaceCount}")),
             (int target, _) when target >= mesh.Faces.Count =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext($"Target: {target} >= Current: {mesh.Faces.Count}")),
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Target: {target} >= Current: {mesh.Faces.Count}"))),
             (_, double acc) when !RhinoMath.IsValidDouble(acc) || acc < MorphologyConfig.MinReductionAccuracy || acc > MorphologyConfig.MaxReductionAccuracy =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionAccuracyInvalid.WithContext($"Accuracy: {acc:F3}")),
             _ => ((Func<Result<Mesh>>)(() => {
