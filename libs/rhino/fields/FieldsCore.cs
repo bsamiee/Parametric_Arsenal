@@ -43,7 +43,7 @@ internal static class FieldsCore {
                 ValidationMode: V.Standard | V.BoundingBox,
                 OperationName: FieldsConfig.OperationNames.SurfaceDistance,
                 BufferSize: FieldsConfig.SurfaceDistanceBuffer),
-        }.ToFrozenDictionary();
+        ,}.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] Distances)> DistanceField(
