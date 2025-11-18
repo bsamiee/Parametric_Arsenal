@@ -207,7 +207,7 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         double[] isovalues) =>
-        ResultFactory.Create(value: (ScalarField: scalarField, GridPoints: gridPoints, Isovalues: isovalues))
+        ResultFactory.Create(value: (scalarField, gridPoints, isovalues))
             .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points"))
             .Ensure(state => state.Isovalues.Length > 0, error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required"))
             .Ensure(state => state.Isovalues.All(value => RhinoMath.IsValidDouble(value)), error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles"))
