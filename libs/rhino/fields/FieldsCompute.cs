@@ -262,7 +262,7 @@ internal static class FieldsCompute {
         method switch {
             Fields.InterpolationMethod.Nearest => InterpolateNearest(query, field, grid),
             Fields.InterpolationMethod.Trilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
-            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {method.GetType().Name}")),
+            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unexpected interpolation method type: {method.GetType().FullName}")),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
