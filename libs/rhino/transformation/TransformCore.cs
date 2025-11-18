@@ -56,9 +56,10 @@ internal static class TransformCore {
         Transforms.TransformSpec spec,
         IGeometryContext context) =>
         DetectMode(spec) is byte mode and > 0 && _builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)
-            ? entry.validate(spec, context) is (true, _)
-                ? ResultFactory.Create(value: entry.build(spec))
-                : ResultFactory.Create<Transform>(error: entry.error.WithContext(entry.validate(spec, context).Context))
+            ? entry.validate(spec, context) switch {
+                (true, _) => ResultFactory.Create(value: entry.build(spec)),
+                (false, string ctx) => ResultFactory.Create<Transform>(error: entry.error.WithContext(ctx)),
+            }
             : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec);
 
     /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
@@ -74,13 +75,8 @@ internal static class TransformCore {
             ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
             : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
 
-        if (item is Extrusion && normalized is IDisposable disposable) {
-            disposable.Dispose();
-        }
-
-        if (!result.IsSuccess && duplicate is IDisposable duplicateDisposable) {
-            duplicateDisposable.Dispose();
-        }
+        (item is Extrusion && normalized is IDisposable disposable ? disposable : null)?.Dispose();
+        (!result.IsSuccess && duplicate is IDisposable duplicateDisposable ? duplicateDisposable : null)?.Dispose();
 
         return result;
     }

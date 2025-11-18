@@ -48,10 +48,6 @@ internal static class TransformConfig {
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;
 
-    private static readonly Comparer<Type> _typeInheritanceComparer =
-        Comparer<Type>.Create(static (a, b) =>
-            a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0);
-
     /// <summary>Get validation mode for geometry type with inheritance fallback.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static V GetValidationMode(Type geometryType) =>
@@ -59,8 +55,10 @@ internal static class TransformConfig {
             ? mode
             : ValidationModes
                 .Where(kv => kv.Key.IsAssignableFrom(geometryType))
-                .OrderByDescending(kv => kv.Key, _typeInheritanceComparer)
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(V.Standard)
-                .First();
+                .Aggregate(
+                    ((V?)null, (Type?)null),
+                    (best, kv) => best.Item2 is null || best.Item2.IsAssignableFrom(kv.Key)
+                        ? (kv.Value, kv.Key)
+                        : best)
+                .Item1 ?? V.Standard;
 }
