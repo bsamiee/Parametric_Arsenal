@@ -191,7 +191,7 @@ internal static class TopologyCore {
                     bool computed = EnsureMeshNormals(mesh);
                     int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(idx);
                     return connectedFaces switch {
-                        int[] { Length: 2 } af => {
+                        int[] { Length: 2 } af => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
                             bool hasValidNormals = computed && mesh.FaceNormals.Count > Math.Max(af[0], af[1]);
                             return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
                                 new Topology.AdjacencyData(
@@ -206,7 +206,7 @@ internal static class TopologyCore {
                                     IsManifold: true,
                                     IsBoundary: false),
                             ]);
-                        },
+                        }))(),
                         int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
                             new Topology.AdjacencyData(
                                 EdgeIndex: idx,
@@ -292,7 +292,7 @@ internal static class TopologyCore {
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i) switch {
             int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
             int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
-            int[] cf when cf.Length == 2 && computed && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]])
+            int[] cf when cf.Length == 2 && computed && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]]) switch {
                 double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
                 double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
                 _ => Topology.EdgeContinuityType.Sharp,
