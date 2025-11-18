@@ -229,7 +229,8 @@ internal static class TransformCompute {
                         double targetLength = stepLength * index;
                         bool resolved = path.LengthParameter(targetLength, out double tParameter);
                         double normalized = targetLength / curveLength;
-                        double clamped = normalized > 1.0 ? 1.0 : normalized;
+                        // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
+                        double clamped = Math.Clamp(normalized, 0.0, 1.0);
                         fallback[index] = resolved
                             ? tParameter
                             : path.Domain.ParameterAt(clamped);
