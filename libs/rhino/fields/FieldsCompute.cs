@@ -261,12 +261,12 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod,
+        Fields.InterpolationMethod interpolationMethod,
         Func<T, T, double, T> lerp) where T : struct =>
         interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, field, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
-            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            Fields.NearestInterpolation => InterpolateNearest(query, field, grid),
+            Fields.TrilinearInterpolation => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.GetType().Name}")),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -276,7 +276,7 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) =>
+        Fields.InterpolationMethod interpolationMethod) =>
         InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -286,7 +286,7 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) =>
+        Fields.InterpolationMethod interpolationMethod) =>
         InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -356,7 +356,7 @@ internal static class FieldsCompute {
         Point3d[] gridPoints,
         Point3d[] seeds,
         double stepSize,
-        byte integrationMethod,
+        Fields.IntegrationMethod integrationMethod,
         int resolution,
         BoundingBox bounds,
         IGeometryContext context) =>
@@ -372,9 +372,9 @@ internal static class FieldsCompute {
                         Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
                         Vector3d Interpolate(double coeff, Vector3d k) => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * coeff * k), resolution: resolution, bounds: bounds);
                         Vector3d delta = integrationMethod switch {
-                            0 => stepSize * k1,
-                            1 => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
-                            2 or 3 => ((Func<Vector3d>)(() => {
+                            Fields.EulerIntegration => stepSize * k1,
+                            Fields.RK2Integration => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
+                            Fields.RK4Integration => ((Func<Vector3d>)(() => {
                                 Vector3d k2 = Interpolate(FieldsConfig.RK4HalfSteps[0], k1);
                                 Vector3d k3 = Interpolate(FieldsConfig.RK4HalfSteps[1], k2);
                                 Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);
@@ -707,15 +707,15 @@ internal static class FieldsCompute {
                                 (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
                                 int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
                                 int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
-                                byte criticalType = (positiveCount, negativeCount) switch {
-                                    (3, 0) => FieldsConfig.CriticalPointMinimum,
-                                    (0, 3) => FieldsConfig.CriticalPointMaximum,
-                                    _ => FieldsConfig.CriticalPointSaddle,
+                                Fields.CriticalPointKind criticalKind = (positiveCount, negativeCount) switch {
+                                    (3, 0) => Fields.CriticalPointKind.Minimum,
+                                    (0, 3) => Fields.CriticalPointKind.Maximum,
+                                    _ => Fields.CriticalPointKind.Saddle,
                                 };
 
                                 criticalPoints.Add(new Fields.CriticalPoint(
                                     Location: grid[idx],
-                                    Type: criticalType,
+                                    Kind: criticalKind,
                                     Value: scalarField[idx],
                                     Eigenvectors: eigenvectors,
                                     Eigenvalues: eigenvalues));

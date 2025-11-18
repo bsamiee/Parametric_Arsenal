@@ -34,9 +34,40 @@ public static class Fields {
             : FieldsConfig.DefaultStepSize;
     }
 
+    /// <summary>Interpolation method for field sampling.</summary>
+    public abstract record InterpolationMethod;
+
+    /// <summary>Nearest-neighbor interpolation.</summary>
+    public sealed record NearestInterpolation : InterpolationMethod;
+
+    /// <summary>Trilinear interpolation.</summary>
+    public sealed record TrilinearInterpolation : InterpolationMethod;
+
+    /// <summary>Integration method for streamline computation.</summary>
+    public abstract record IntegrationMethod;
+
+    /// <summary>Euler integration (first-order).</summary>
+    public sealed record EulerIntegration : IntegrationMethod;
+
+    /// <summary>Runge-Kutta 2nd order integration.</summary>
+    public sealed record RK2Integration : IntegrationMethod;
+
+    /// <summary>Runge-Kutta 4th order integration.</summary>
+    public sealed record RK4Integration : IntegrationMethod;
+
+    /// <summary>Critical point classification.</summary>
+    public enum CriticalPointKind : byte {
+        /// <summary>Local minimum.</summary>
+        Minimum = 0,
+        /// <summary>Local maximum.</summary>
+        Maximum = 1,
+        /// <summary>Saddle point.</summary>
+        Saddle = 2,
+    }
+
     /// <summary>Critical point classification result with location, type (minimum/maximum/saddle), value, and eigendecomposition.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct CriticalPoint(Point3d Location, byte Type, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
+    public readonly record struct CriticalPoint(Point3d Location, CriticalPointKind Kind, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
 
     /// <summary>Field statistics including min, max, mean, standard deviation, and extreme value locations.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -131,11 +162,11 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds,
-        byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
+        InterpolationMethod? interpolationMethod = null) {
         bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        InterpolationMethod method = hasDegenerateAxis ? new NearestInterpolation() : interpolationMethod ?? new TrilinearInterpolation();
         return ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
             .Bind(state => FieldsCompute.InterpolateScalar(
@@ -155,11 +186,11 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds,
-        byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
+        InterpolationMethod? interpolationMethod = null) {
         bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        InterpolationMethod method = hasDegenerateAxis ? new NearestInterpolation() : interpolationMethod ?? new TrilinearInterpolation();
         return ResultFactory.Create(value: (Field: vectorField, Grid: gridPoints))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
             .Bind(state => FieldsCompute.InterpolateVector(
@@ -179,7 +210,8 @@ public static class Fields {
         Point3d[] seeds,
         FieldSpec spec,
         BoundingBox bounds,
-        IGeometryContext context) =>
+        IGeometryContext context,
+        IntegrationMethod? integrationMethod = null) =>
         ResultFactory.Create(value: (vectorField, gridPoints, seeds))
             .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
             .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
@@ -188,7 +220,7 @@ public static class Fields {
                 gridPoints: state.gridPoints,
                 seeds: state.seeds,
                 stepSize: spec.StepSize,
-                integrationMethod: FieldsConfig.IntegrationRK4,
+                integrationMethod: integrationMethod ?? new RK4Integration(),
                 resolution: spec.Resolution,
                 bounds: bounds,
                 context: context));
