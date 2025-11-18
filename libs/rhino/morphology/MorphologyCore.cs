@@ -237,7 +237,7 @@ internal static class MorphologyCore {
         Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
             .Aggregate((SumSq: 0.0, MaxDisp: 0.0, Count: 0), (acc, i) => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]) is double dist
                 ? (acc.SumSq + (dist * dist), Math.Max(acc.MaxDisp, dist), acc.Count + 1)
-                : acc) is (double sumSq, double maxDisp, int count) metrics && Math.Sqrt(sumSq / Math.Max(count, 1)) is double rms
+                : acc) is (double sumSq, double maxDisp, int count) && Math.Sqrt(sumSq / Math.Max(count, 1)) is double rms
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                 new Morphology.SmoothingResult(
                     smoothed,
