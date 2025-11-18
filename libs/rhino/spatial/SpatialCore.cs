@@ -83,7 +83,12 @@ internal static class SpatialCore {
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
             try {
-                void Collect(object? sender, RTreeEventArgs args) => count += count < buffer.Length && (buffer[count] = args.Id) is int ? 1 : 0;
+                void Collect(object? sender, RTreeEventArgs args) {
+                    if (count >= buffer.Length) {
+                        return;
+                    }
+                    buffer[count++] = args.Id;
+                }
                 _ = queryShape switch {
                     Sphere sphere => tree.Search(sphere, Collect),
                     BoundingBox box => tree.Search(box, Collect),
@@ -105,8 +110,8 @@ internal static class SpatialCore {
             double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
                 ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                 : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            int => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
-            double => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
+            int k => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK.WithContext(k.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            double d => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance.WithContext(d.ToString(System.Globalization.CultureInfo.InvariantCulture))),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
         };
 

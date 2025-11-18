@@ -166,7 +166,7 @@ internal static class TopologyCompute {
             ? ResultFactory.Create<(int, (int, bool)[], bool, int)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid for feature extraction"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
-                .Map(validBrep => (
+                .Map<(int V, int E, int F, bool Solid, (int LoopIndex, bool IsHole)[] Loops)>(validBrep => (
                     V: validBrep.Vertices.Count,
                     E: validBrep.Edges.Count,
                     F: validBrep.Faces.Count,

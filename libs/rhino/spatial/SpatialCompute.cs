@@ -57,7 +57,8 @@ internal static class SpatialCompute {
                             ])
                             : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
                         : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
-            }))();
+            }))(),
+        };
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
@@ -287,30 +288,31 @@ internal static class SpatialCompute {
             (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection),
             (_, _, true) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
             _ => ((Func<Result<(int, double, double)[]>>)(() => {
-                        using RTree tree = new();
-                        BoundingBox bounds = BoundingBox.Empty;
-                        Point3d[] centers = new Point3d[geometry.Length];
-                        for (int i = 0; i < geometry.Length; i++) {
-                            BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
-                            _ = tree.Insert(bbox, i);
-                            bounds.Union(bbox);
-                            centers[i] = bbox.Center;
-                        }
-                        Vector3d dir = direction / direction.Length;
-                        Point3d origin = bounds.Center;
-                        BoundingBox searchBox = new(origin - new Vector3d(maxDist, maxDist, maxDist), origin + new Vector3d(maxDist, maxDist, maxDist));
-                        List<(int, double, double)> results = [];
-                        _ = tree.Search(searchBox, (_, args) => {
-                            Vector3d toGeom = centers[args.Id] - origin;
-                            double dist = toGeom.Length;
-                            double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-                            double weightedDist = dist * (1.0 + (angleWeight * angle));
-                            if (weightedDist <= maxDist) {
-                                results.Add((args.Id, dist, angle));
-                            }
-                        });
-                        return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
-                    }))();
+                using RTree tree = new();
+                BoundingBox bounds = BoundingBox.Empty;
+                Point3d[] centers = new Point3d[geometry.Length];
+                for (int i = 0; i < geometry.Length; i++) {
+                    BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
+                    _ = tree.Insert(bbox, i);
+                    bounds.Union(bbox);
+                    centers[i] = bbox.Center;
+                }
+                Vector3d dir = direction / direction.Length;
+                Point3d origin = bounds.Center;
+                BoundingBox searchBox = new(origin - new Vector3d(maxDist, maxDist, maxDist), origin + new Vector3d(maxDist, maxDist, maxDist));
+                List<(int, double, double)> results = [];
+                _ = tree.Search(searchBox, (_, args) => {
+                    Vector3d toGeom = centers[args.Id] - origin;
+                    double dist = toGeom.Length;
+                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
+                    double weightedDist = dist * (1.0 + (angleWeight * angle));
+                    if (weightedDist <= maxDist) {
+                        results.Add((args.Id, dist, angle));
+                    }
+                });
+                return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
+            }))(),
+        };
 
     /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

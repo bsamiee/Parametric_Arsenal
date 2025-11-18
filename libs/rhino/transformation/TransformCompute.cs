@@ -203,7 +203,7 @@ internal static class TransformCompute {
         bool orientToPath,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformConfig.MaxArrayCount || path is null || !path.IsValid || !geometry.IsValid) {
+        if (count <= 0 || count > TransformConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,

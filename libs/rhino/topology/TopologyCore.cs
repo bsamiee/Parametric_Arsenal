@@ -306,7 +306,7 @@ internal static class TopologyCore {
                     mesh.TopologyVertices.ConnectedTopologyVertices(idx).ToArray(),
                     Enumerable.Range(0, mesh.TopologyEdges.Count)
                         .Where(e => mesh.TopologyEdges.GetTopologyVertices(e) switch {
-                            IndexPair verts => verts.I == idx || verts.J == idx
+                            IndexPair verts => verts.I == idx || verts.J == idx,
                         })
                         .ToArray()
                 ) switch {
