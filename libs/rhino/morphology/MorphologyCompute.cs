@@ -504,11 +504,11 @@ internal static class MorphologyCompute {
                         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Brep face count: {brep.Faces.Count}"))),
                     false => ((Func<Result<Mesh>>)(() => {
                         Mesh result = joinMeshes && meshes.Length > 1
-                            ? ((Func<Mesh>)(() => {
+                            ? (
                                 Mesh joined = new();
                                 joined.Append(meshes);
-                                return joined;
-                            }))()
+                                joined
+                            )
                             : meshes[0];
                         _ = result.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
                         _ = result.Faces.CullDegenerateFaces();
