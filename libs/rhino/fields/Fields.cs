@@ -191,9 +191,9 @@ public static class Fields {
             .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
             .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
             .Bind(state => FieldsCompute.IntegrateStreamlines(
-                vectorField: state.VectorField,
-                gridPoints: state.GridPoints,
-                seeds: state.Seeds,
+                vectorField: state.vectorField,
+                gridPoints: state.gridPoints,
+                seeds: state.seeds,
                 stepSize: spec.StepSize,
                 integrationMethod: FieldsConfig.IntegrationRK4,
                 resolution: spec.Resolution,
