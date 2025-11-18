@@ -378,7 +378,7 @@ internal static class TopologyCore {
         }
         (int Index, Curve Curve, double Length, int Valence)[] ordered = new (int, Curve, double, int)[edges.Length];
         bool[] visited = new bool[edges.Length];
-        double tol = Math.Max(tolerance, RhinoMath.ZeroTolerance);
+        double tol = tolerance;
         int writeIndex = 0;
         for (int seed = 0; seed < edges.Length; seed++) {
             if (visited[seed]) {
