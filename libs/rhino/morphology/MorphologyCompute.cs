@@ -490,7 +490,7 @@ internal static class MorphologyCompute {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         int aspectCount = aspectRatios.Length;
         int angleCount = minAngles.Length;
-        if (aspectCount == 0 || angleCount == 0) {
+        if (aspectCount == 0) {
             return ResultFactory.Create(value: mesh);
         }
 
