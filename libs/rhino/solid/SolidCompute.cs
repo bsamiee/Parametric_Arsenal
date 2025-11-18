@@ -308,7 +308,13 @@ internal static class SolidCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Solid.SolidOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Mesh.CreateBooleanSplit(meshes, cutters) switch {
+                : Mesh.CreateBooleanSplit(
+                      meshes: meshes,
+                      cutters: cutters,
+                      tolerance: tolerance,
+                      meshBooleanOptions: new MeshBooleanOptions {
+                          CombineCoplanarFaces = options.CombineCoplanarFaces,
+                      }) switch {
                     null => ResultFactory.Create<Solid.SolidOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh split returned null")),
                     { Length: 0 } => ResultFactory.Create(value: new Solid.SolidOutput(
