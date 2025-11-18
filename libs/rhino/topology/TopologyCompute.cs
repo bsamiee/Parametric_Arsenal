@@ -102,7 +102,10 @@ internal static class TopologyCompute {
                                                                  let eA = copy.Edges[idxA]
                                                                  let eB = copy.Edges[idxB]
                                                                  where eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked
-                                                                 let minDist = new[] { eA.PointAtStart.DistanceTo(eB.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd), eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd), }.Min()
+                                                                 let minDist = Math.Min(
+                                                                     Math.Min(eA.PointAtStart.DistanceTo(eB.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
+                                                                     Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd))
+                                                                 )
                                                                  where minDist < threshold
                                                                  select (idxA, idxB)).FirstOrDefault() switch {
                                                 (0, 0) => (state.Joined, false),
