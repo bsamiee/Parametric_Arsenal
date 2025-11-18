@@ -24,8 +24,15 @@ internal static class MorphologyConfig {
             [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
         }.ToFrozenDictionary();
 
+    /// <summary>Operation names by ID for O(1) lookup, derived from Operations.</summary>
+    private static readonly FrozenDictionary<byte, string> OperationNames =
+        Operations
+            .GroupBy(static kv => kv.Key.Op)
+            .ToDictionary(static g => g.Key, static g => g.First().Value.Name)
+            .ToFrozenDictionary();
+
     [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
-    [Pure] internal static string OperationName(byte op) => Operations.FirstOrDefault(kv => kv.Key.Op == op).Value.Name ?? $"Op{op}";
+    [Pure] internal static string OperationName(byte op) => OperationNames.TryGetValue(op, out string? name) ? name : $"Op{op}";
 
     /// <summary>Operation ID constants.</summary>
     internal const byte OpCageDeform = 1;
@@ -66,10 +73,6 @@ internal static class MorphologyConfig {
     internal const int MaxSmoothingIterations = 1000;
     internal const double ConvergenceMultiplier = 100.0;
     internal const double UniformLaplacianWeight = 1.0;
-
-    /// <summary>Taubin smoothing parameters.</summary>
-    internal const double TaubinLambda = 0.6307;
-    internal const double TaubinMu = -0.6732;
 
     /// <summary>Mesh quality validation thresholds.</summary>
     internal static readonly double MinAngleRadiansThreshold = RhinoMath.ToRadians(5.0);
