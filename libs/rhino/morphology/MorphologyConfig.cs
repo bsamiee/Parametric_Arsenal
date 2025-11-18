@@ -24,6 +24,7 @@ internal static class MorphologyConfig {
             [(15, typeof(Brep))] = (V.Standard | V.BoundingBox, "BrepToMesh"),
             [(16, typeof(Mesh))] = (V.Standard | V.Topology | V.MeshSpecific, "MeshRepair"),
             [(17, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshThicken"),
+            [(18, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshUnwrap"),
             [(19, typeof(Mesh))] = (V.Standard | V.Topology, "MeshSeparate"),
             [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
             [(21, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshWeld"),
@@ -52,6 +53,7 @@ internal static class MorphologyConfig {
     internal const byte OpBrepToMesh = 15;
     internal const byte OpMeshRepair = 16;
     internal const byte OpMeshThicken = 17;
+    internal const byte OpMeshUnwrap = 18;
     internal const byte OpMeshSeparate = 19;
     internal const byte OpEvolveMeanCurvature = 20;
     internal const byte OpMeshWeld = 21;

@@ -619,4 +619,23 @@ internal static class MorphologyCompute {
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(thickened is null ? "Offset operation returned null" : "Generated mesh is invalid"));
             }))(),
         };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh> UnwrapMesh(
+        Mesh mesh,
+        byte unwrapMethod,
+        IGeometryContext _) =>
+        unwrapMethod switch {
+            0 or 1 => ((Func<Result<Mesh>>)(() => {
+                Mesh unwrapped = mesh.DuplicateMesh();
+                using MeshUnwrapper unwrapper = new(unwrapped);
+                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                return success && unwrapped.TextureCoordinates.Count > 0
+                    ? ResultFactory.Create(value: unwrapped)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+            }))(),
+            _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
+        };
 }

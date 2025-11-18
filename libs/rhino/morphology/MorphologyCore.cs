@@ -28,6 +28,7 @@ internal static class MorphologyCore {
             [(MorphologyConfig.OpBrepToMesh, typeof(Brep))] = ExecuteBrepToMesh,
             [(MorphologyConfig.OpMeshRepair, typeof(Mesh))] = ExecuteMeshRepair,
             [(MorphologyConfig.OpMeshThicken, typeof(Mesh))] = ExecuteMeshThicken,
+            [(MorphologyConfig.OpMeshUnwrap, typeof(Mesh))] = ExecuteMeshUnwrap,
             [(MorphologyConfig.OpMeshSeparate, typeof(Mesh))] = ExecuteMeshSeparate,
             [(MorphologyConfig.OpMeshWeld, typeof(Mesh))] = ExecuteMeshWeld,
         }.ToFrozenDictionary();
@@ -487,6 +488,46 @@ internal static class MorphologyCore {
                 wallCount,
                 originalBounds,
                 thickenedBounds),
+        ]);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshUnwrap(object input, object parameters, IGeometryContext context) =>
+        Execute<Mesh, byte>(input, parameters, context, (mesh, unwrapMethod, ctx) =>
+            MorphologyCompute.UnwrapMesh(mesh, unwrapMethod, ctx).Bind(unwrapped => ComputeUnwrapMetrics(mesh, unwrapped, ctx)));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeUnwrapMetrics(
+        Mesh original,
+        Mesh unwrapped,
+        IGeometryContext _) {
+        bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
+        (double minU, double maxU, double minV, double maxV, double coverage) = hasUVs
+            ? ((Func<(double, double, double, double, double)>)(() => {
+                (double minU, double maxU, double minV, double maxV) = (double.MaxValue, double.MinValue, double.MaxValue, double.MinValue);
+                for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
+                    Point2f uv = unwrapped.TextureCoordinates[i];
+                    minU = Math.Min(minU, uv.X);
+                    maxU = Math.Max(maxU, uv.X);
+                    minV = Math.Min(minV, uv.Y);
+                    maxV = Math.Max(maxV, uv.Y);
+                }
+                double uvArea = (maxU - minU) * (maxV - minV);
+                double coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
+                return (minU, maxU, minV, maxV, coverage);
+            }))()
+            : (0.0, 0.0, 0.0, 0.0, 0.0);
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+            new Morphology.MeshUnwrapResult(
+                unwrapped,
+                hasUVs,
+                original.Faces.Count,
+                unwrapped.TextureCoordinates.Count,
+                minU,
+                maxU,
+                minV,
+                maxV,
+                coverage),
         ]);
     }
 }

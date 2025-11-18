@@ -220,6 +220,24 @@ public static class Morphology {
             $"MeshThicken | Dist={this.OffsetDistance:F3} | Solid={this.IsSolid} | V: {this.OriginalVertexCount}→{this.ThickenedVertexCount} | F: {this.OriginalFaceCount}→{this.ThickenedFaceCount} | WallFaces={this.WallFaceCount}");
     }
 
+    /// <summary>Mesh UV unwrapping result with texture coordinate metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshUnwrapResult(
+        Mesh Unwrapped,
+        bool HasTextureCoordinates,
+        int OriginalFaceCount,
+        int TextureCoordinateCount,
+        double MinU,
+        double MaxU,
+        double MinV,
+        double MaxV,
+        double UVCoverage) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
+    }
+
     /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(

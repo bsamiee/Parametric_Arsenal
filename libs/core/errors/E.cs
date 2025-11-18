@@ -156,6 +156,7 @@ public static class E {
             [2820] = "Mesh repair operation failed",
             [2821] = "Mesh repair weld tolerance invalid (must be positive)",
             [2822] = "Mesh thickening failed or produced invalid geometry",
+            [2823] = "Mesh unwrapping failed to generate texture coordinates",
             [2825] = "Mesh welding operation failed or tolerance invalid",
 
             // Fitting Operations (2900-2910)
@@ -395,6 +396,7 @@ public static class E {
             public static readonly SystemError MeshRepairFailed = Get(2820);
             public static readonly SystemError WeldToleranceInvalid = Get(2821);
             public static readonly SystemError MeshThickenFailed = Get(2822);
+            public static readonly SystemError MeshUnwrapFailed = Get(2823);
             public static readonly SystemError MeshWeldFailed = Get(2825);
         }
 
