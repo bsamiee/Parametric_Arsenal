@@ -371,9 +371,7 @@ internal static class TopologyCore {
             });
 
     private static (int Index, Curve Curve, double Length, int Valence)[] OrderNakedEdgesByLoop((int Index, Curve Curve, double Length, int Valence)[] edges, double tolerance) {
-        if (edges.Length <= 1) {
-            return edges;
-        }
+        return edges.Length <= 1 ? edges : /* main logic */;
         (int Index, Curve Curve, double Length, int Valence)[] ordered = new (int, Curve, double, int)[edges.Length];
         bool[] visited = new bool[edges.Length];
         double tol = tolerance;
