@@ -226,7 +226,7 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds) =>
         ResultFactory.Create(value: (ScalarField: scalarField, GridPoints: gridPoints))
-            .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points"))
+            .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points"))
             .Bind(_ => FieldsCompute.ComputeHessian(
                 scalarField: scalarField,
                 grid: gridPoints,
