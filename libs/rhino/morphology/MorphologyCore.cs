@@ -382,21 +382,17 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSeparationMetrics(
         Mesh[] components,
         IGeometryContext _) =>
-        components.Aggregate((VertCounts: new List<int>(), FaceCounts: new List<int>(), Bounds: new List<BoundingBox>()), (acc, m) => {
-            acc.VertCounts.Add(m.Vertices.Count);
-            acc.FaceCounts.Add(m.Faces.Count);
-            acc.Bounds.Add(m.GetBoundingBox(accurate: false));
-            return acc;
-        }) is (List<int> vertCounts, List<int> faceCounts, List<BoundingBox> bounds)
+        ([.. components.Select(static m => m.Vertices.Count),], [.. components.Select(static m => m.Faces.Count),],
+         [.. components.Select(static m => m.GetBoundingBox(accurate: false)),]) is var (vertCounts, faceCounts, bounds)
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                 new Morphology.MeshSeparationResult(
                     components,
                     components.Length,
                     vertCounts.Sum(),
                     faceCounts.Sum(),
-                    [.. vertCounts,],
-                    [.. faceCounts,],
-                    [.. bounds,]),
+                    vertCounts,
+                    faceCounts,
+                    bounds),
             ])
             : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount);
 
@@ -522,35 +518,24 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeUnwrapMetrics(
         Mesh original,
         Mesh unwrapped,
-        IGeometryContext _) {
-        bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
-        double minU = double.MaxValue;
-        double maxU = double.MinValue;
-        double minV = double.MaxValue;
-        double maxV = double.MinValue;
-        double coverage = 0.0;
-        if (hasUVs) {
-            for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
-                Point2f uv = unwrapped.TextureCoordinates[i];
-                minU = Math.Min(minU, uv.X);
-                maxU = Math.Max(maxU, uv.X);
-                minV = Math.Min(minV, uv.Y);
-                maxV = Math.Max(maxV, uv.Y);
-            }
-            double uvArea = (maxU - minU) * (maxV - minV);
-            coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
-        }
-        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-            new Morphology.MeshUnwrapResult(
-                unwrapped,
-                hasUVs,
-                original.Faces.Count,
-                unwrapped.TextureCoordinates.Count,
-                minU,
-                maxU,
-                minV,
-                maxV,
-                coverage),
-        ]);
-    }
+        IGeometryContext _) =>
+        unwrapped.TextureCoordinates.Count > 0
+            ? Enumerable.Range(0, unwrapped.TextureCoordinates.Count)
+                .Aggregate(
+                    (MinU: double.MaxValue, MaxU: double.MinValue, MinV: double.MaxValue, MaxV: double.MinValue),
+                    (acc, i) => unwrapped.TextureCoordinates[i] is Point2f uv
+                        ? (Math.Min(acc.MinU, uv.X), Math.Max(acc.MaxU, uv.X), Math.Min(acc.MinV, uv.Y), Math.Max(acc.MaxV, uv.Y))
+                        : acc) is var (minU, maxU, minV, maxV) && (maxU - minU) * (maxV - minV) is double uvArea
+                    ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                        new Morphology.MeshUnwrapResult(
+                            unwrapped, true, original.Faces.Count, unwrapped.TextureCoordinates.Count,
+                            minU, maxU, minV, maxV,
+                            uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0),
+                    ])
+                    : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount)
+            : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                new Morphology.MeshUnwrapResult(
+                    unwrapped, false, original.Faces.Count, 0,
+                    double.MaxValue, double.MinValue, double.MaxValue, double.MinValue, 0.0),
+            ]);
 }
