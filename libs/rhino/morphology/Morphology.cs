@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
@@ -124,14 +125,14 @@ public static class Morphology {
         int RepairedVertexCount,
         int OriginalFaceCount,
         int RepairedFaceCount,
-        byte OperationsPerformed,
+        IReadOnlyList<MeshRepairOperation> OperationsPerformed,
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
-            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={this.OperationsPerformed.Count} | Quality={this.QualityScore:F3}");
     }
 
     /// <summary>Mesh separation result with per-component statistics.</summary>
@@ -226,22 +227,133 @@ public static class Morphology {
             $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
     }
 
-    /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
+    /// <summary>Base request for all morphology operations.</summary>
+    public abstract record MorphologyRequest {
+        internal abstract GeometryBase Geometry { get; }
+    }
+
+    /// <summary>Base request for mesh-bound operations.</summary>
+    public abstract record MeshRequest(Mesh Mesh) : MorphologyRequest {
+        internal override GeometryBase Geometry => Mesh;
+    }
+
+    /// <summary>Base request for brep-bound operations.</summary>
+    public abstract record BrepRequest(Brep Brep) : MorphologyRequest {
+        internal override GeometryBase Geometry => Brep;
+    }
+
+    /// <summary>Cage deformation on meshes.</summary>
+    public sealed record MeshCageDeformationRequest(
+        Mesh Mesh,
+        GeometryBase Cage,
+        IReadOnlyList<Point3d> OriginalControlPoints,
+        IReadOnlyList<Point3d> DeformedControlPoints) : MeshRequest(Mesh);
+
+    /// <summary>Cage deformation on breps.</summary>
+    public sealed record BrepCageDeformationRequest(
+        Brep Brep,
+        GeometryBase Cage,
+        IReadOnlyList<Point3d> OriginalControlPoints,
+        IReadOnlyList<Point3d> DeformedControlPoints) : BrepRequest(Brep);
+
+    /// <summary>Mesh subdivision request with strategy selection.</summary>
+    public sealed record SubdivisionRequest(
+        Mesh Mesh,
+        SubdivisionStrategy Strategy,
+        int Levels) : MeshRequest(Mesh);
+
+    /// <summary>Base type for subdivision strategies.</summary>
+    public abstract record SubdivisionStrategy;
+
+    /// <summary>Catmull-Clark subdivision.</summary>
+    public sealed record CatmullClarkSubdivisionStrategy : SubdivisionStrategy;
+
+    /// <summary>Loop subdivision.</summary>
+    public sealed record LoopSubdivisionStrategy : SubdivisionStrategy;
+
+    /// <summary>Butterfly subdivision.</summary>
+    public sealed record ButterflySubdivisionStrategy : SubdivisionStrategy;
+
+    /// <summary>Smoothing request with algorithm selection.</summary>
+    public sealed record SmoothingRequest(
+        Mesh Mesh,
+        SmoothingStrategy Strategy) : MeshRequest(Mesh);
+
+    /// <summary>Base smoothing strategy.</summary>
+    public abstract record SmoothingStrategy(int Iterations);
+
+    /// <summary>Laplacian smoothing strategy.</summary>
+    public sealed record LaplacianSmoothingStrategy(int Iterations, bool LockBoundary) : SmoothingStrategy(Iterations);
+
+    /// <summary>Taubin smoothing strategy.</summary>
+    public sealed record TaubinSmoothingStrategy(int Iterations, double Lambda, double Mu) : SmoothingStrategy(Iterations);
+
+    /// <summary>Mean curvature flow strategy.</summary>
+    public sealed record MeanCurvatureFlowStrategy(int Iterations, double TimeStep) : SmoothingStrategy(Iterations);
+
+    /// <summary>Mesh offset request.</summary>
+    public sealed record MeshOffsetRequest(Mesh Mesh, double Distance, bool BothSides) : MeshRequest(Mesh);
+
+    /// <summary>Mesh reduction request.</summary>
+    public sealed record MeshReductionRequest(Mesh Mesh, int TargetFaceCount, bool PreserveBoundary, double Accuracy) : MeshRequest(Mesh);
+
+    /// <summary>Mesh remeshing request.</summary>
+    public sealed record MeshRemeshRequest(Mesh Mesh, double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : MeshRequest(Mesh);
+
+    /// <summary>Brep to mesh conversion request.</summary>
+    public sealed record BrepMeshingRequest(Brep Brep, MeshingParameters Parameters, bool JoinMeshes) : BrepRequest(Brep);
+
+    /// <summary>Mesh repair request with explicit operations.</summary>
+    public sealed record MeshRepairRequest(
+        Mesh Mesh,
+        double WeldTolerance,
+        IReadOnlyList<MeshRepairOperation> Operations) : MeshRequest(Mesh);
+
+    /// <summary>Base type for mesh repair operations.</summary>
+    public abstract record MeshRepairOperation;
+
+    /// <summary>Fill holes repair operation.</summary>
+    public sealed record FillHolesRepair : MeshRepairOperation;
+
+    /// <summary>Unify normals repair operation.</summary>
+    public sealed record UnifyNormalsRepair : MeshRepairOperation;
+
+    /// <summary>Cull degenerate faces repair operation.</summary>
+    public sealed record CullDegenerateFacesRepair : MeshRepairOperation;
+
+    /// <summary>Compact mesh repair operation.</summary>
+    public sealed record CompactRepair : MeshRepairOperation;
+
+    /// <summary>Weld vertices repair operation.</summary>
+    public sealed record WeldVerticesRepair : MeshRepairOperation;
+
+    /// <summary>Mesh thickening request.</summary>
+    public sealed record MeshThickenRequest(Mesh Mesh, double Thickness, bool Solidify, Vector3d Direction) : MeshRequest(Mesh);
+
+    /// <summary>Mesh unwrap request with explicit strategy.</summary>
+    public sealed record MeshUnwrapRequest(Mesh Mesh, MeshUnwrapStrategy Strategy) : MeshRequest(Mesh);
+
+    /// <summary>Base type for mesh unwrap strategies.</summary>
+    public abstract record MeshUnwrapStrategy;
+
+    /// <summary>Angle-based unwrap.</summary>
+    public sealed record AngleBasedUnwrapStrategy : MeshUnwrapStrategy;
+
+    /// <summary>Conformal energy minimization unwrap.</summary>
+    public sealed record ConformalEnergyUnwrapStrategy : MeshUnwrapStrategy;
+
+    /// <summary>Mesh separation request.</summary>
+    public sealed record MeshSeparationRequest(Mesh Mesh) : MeshRequest(Mesh);
+
+    /// <summary>Mesh welding request.</summary>
+    public sealed record MeshWeldRequest(Mesh Mesh, double Tolerance, bool RecalculateNormals) : MeshRequest(Mesh);
+
+    /// <summary>Unified morphology operation entry with algebraic configuration.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
-        T input,
-        (byte Operation, object Parameters) spec,
-        IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
-            ? UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
-                config: new OperationConfig<T, IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = MorphologyConfig.ValidationMode(spec.Operation, typeof(T)),
-                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(spec.Operation)}"),
-                    EnableDiagnostics = false,
-                })
-            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+    public static Result<IReadOnlyList<IMorphologyResult>> Apply(
+        MorphologyRequest request,
+        IGeometryContext context) =>
+        request is null
+            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext("Request is null"))
+            : MorphologyCore.Apply(request, context);
 }
