@@ -489,7 +489,7 @@ internal static class MorphologyCompute {
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         int aspectCount = aspectRatios.Length;
-        if (aspectCount == 0) {
+        if (aspectCount == 0 || angleCount == 0) {
             return ResultFactory.Create(value: mesh);
         }
 
