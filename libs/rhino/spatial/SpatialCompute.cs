@@ -23,23 +23,23 @@ internal static class SpatialCompute {
         ];
 
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
+    private static readonly Func<object, object> _clusterAssign = SpatialConfig.TypeExtractors[("ClusterAssign", typeof(void))];
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
             : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
             : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
             : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
             : ((Func<Result<(Point3d, double[])[]>>)(() => {
-                Point3d[] pts = new Point3d[geometry.Length];
-                for (int i = 0; i < geometry.Length; i++) {
-                    GeometryBase current = geometry[i];
-                    Type geometryType = current.GetType();
-                    Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
-                    pts[i] = (Point3d)extractor(current);
-                }
+                Point3d[] pts = Array.ConvertAll(geometry, current => {
+                    Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(current.GetType(), ResolveCentroidExtractor);
+                    return (Point3d)extractor(current);
+                });
                 return (algorithm is 0 or 2) && k > pts.Length
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
-                        ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
+                    : ((Func<Result<(Point3d, double[])[]>>)(() => {
+                        int[] assigns = _clusterAssign((algorithm, pts, k, epsilon, context)) as int[] ?? [];
+                        int clusterCount = assigns.Length > 0 ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) : 0;
+                        return clusterCount > 0
                             ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
                                 return members.Length is 0
@@ -54,9 +54,8 @@ internal static class SpatialCompute {
                                     }))();
                             }),
                             ])
-                            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
-                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
-            }))();
+                            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
+                    }))();
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
