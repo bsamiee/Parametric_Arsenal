@@ -24,20 +24,12 @@ internal static class MorphologyConfig {
             [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
         }.ToFrozenDictionary();
 
-    /// <summary>Operation names by ID for O(1) lookup.</summary>
+    /// <summary>Operation names by ID for O(1) lookup, derived from Operations.</summary>
     private static readonly FrozenDictionary<byte, string> OperationNames =
-        new Dictionary<byte, string> {
-            [1] = "CageDeform",
-            [2] = "SubdivideCatmullClark",
-            [3] = "SubdivideLoop",
-            [4] = "SubdivideButterfly",
-            [10] = "SmoothLaplacian",
-            [11] = "SmoothTaubin",
-            [12] = "MeshOffset",
-            [13] = "MeshReduce",
-            [14] = "MeshRemesh",
-            [20] = "EvolveMeanCurvature",
-        }.ToFrozenDictionary();
+        Operations
+            .GroupBy(static kv => kv.Key.Op)
+            .ToDictionary(static g => g.Key, static g => g.First().Value.Name)
+            .ToFrozenDictionary();
 
     [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
     [Pure] internal static string OperationName(byte op) => OperationNames.TryGetValue(op, out string? name) ? name : $"Op{op}";

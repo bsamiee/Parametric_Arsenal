@@ -102,7 +102,8 @@ internal static class MorphologyCore {
         Execute<Mesh, (int, double, double)>(input, parameters, context, (mesh, p, ctx) => {
             (int iterations, double lambda, double mu) = p;
             return mu >= -lambda
-                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext($"μ ({mu:F4}) must be < -λ ({(-lambda):F4})"))
+                ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({mu:F4}) must be < -λ ({(-lambda):F4})")))
                 : MorphologyCompute.SmoothWithConvergence(mesh, iterations, lockBoundary: false, (m, pos, _) => {
                     Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
                     Point3d[] blended1 = new Point3d[pos.Length];
