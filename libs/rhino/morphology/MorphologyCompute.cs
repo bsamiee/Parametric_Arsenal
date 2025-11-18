@@ -503,4 +503,70 @@ internal static class MorphologyCompute {
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
                 : ResultFactory.Create(value: mesh);
     }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh> RepairMesh(
+        Mesh mesh,
+        Morphology.MeshRepairOptions flags,
+        double weldTolerance,
+        IGeometryContext _) =>
+        (weldTolerance <= 0.0 || weldTolerance < MorphologyConfig.MinWeldTolerance || weldTolerance > MorphologyConfig.MaxWeldTolerance) switch {
+            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {weldTolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
+            false => ((Func<Result<Mesh>>)(() => {
+                Mesh repaired = mesh.DuplicateMesh();
+                bool hasFillHoles = (flags & Morphology.MeshRepairOptions.FillHoles) != Morphology.MeshRepairOptions.None;
+                bool hasUnifyNormals = (flags & Morphology.MeshRepairOptions.UnifyNormals) != Morphology.MeshRepairOptions.None;
+                bool hasCullDegenerateFaces = (flags & Morphology.MeshRepairOptions.CullDegenerateFaces) != Morphology.MeshRepairOptions.None;
+                bool hasWeld = (flags & Morphology.MeshRepairOptions.Weld) != Morphology.MeshRepairOptions.None;
+                bool hasCompact = (flags & Morphology.MeshRepairOptions.Compact) != Morphology.MeshRepairOptions.None;
+                return repaired.IsValid switch {
+                    false => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
+                    true => ((Func<Result<Mesh>>)(() => {
+                        bool fillResult = hasFillHoles && repaired.FillHoles();
+                        int unifyResult = hasUnifyNormals ? repaired.UnifyNormals() : 0;
+                        int cullResult = hasCullDegenerateFaces ? repaired.Faces.CullDegenerateFaces() : 0;
+                        bool weldResult = hasWeld && repaired.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                        bool compactResult = hasCompact && repaired.Compact();
+                        return repaired.Normals.ComputeNormals() switch {
+                            true => ResultFactory.Create(value: repaired),
+                            false => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Normal recomputation failed")),
+                        };
+                    }))(),
+                };
+            }))(),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
+        mesh switch {
+            { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
+            Mesh m when m.SplitDisjointPieces() is not Mesh[] components || components.Length == 0 =>
+                ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed")),
+            Mesh m => ResultFactory.Create(value: m.SplitDisjointPieces()),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Mesh> WeldMeshVertices(
+        Mesh mesh,
+        double tolerance,
+        bool weldNormals,
+        IGeometryContext _) =>
+        (tolerance <= 0.0 || tolerance < MorphologyConfig.MinWeldTolerance || tolerance > MorphologyConfig.MaxWeldTolerance) switch {
+            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {tolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
+            false => ((Func<Result<Mesh>>)(() => {
+                Mesh welded = mesh.DuplicateMesh();
+                return welded.IsValid switch {
+                    false => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed")),
+                    true => ((Func<Result<Mesh>>)(() => {
+                        bool combineResult = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                        return (weldNormals && !welded.Normals.ComputeNormals()) switch {
+                            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed")),
+                            false => ResultFactory.Create(value: welded),
+                        };
+                    }))(),
+                };
+            }))(),
+        };
 }

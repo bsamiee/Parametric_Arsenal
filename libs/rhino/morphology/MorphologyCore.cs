@@ -25,6 +25,9 @@ internal static class MorphologyCore {
             [(MorphologyConfig.OpOffset, typeof(Mesh))] = ExecuteOffset,
             [(MorphologyConfig.OpReduce, typeof(Mesh))] = ExecuteReduce,
             [(MorphologyConfig.OpRemesh, typeof(Mesh))] = ExecuteRemesh,
+            [(MorphologyConfig.OpMeshRepair, typeof(Mesh))] = ExecuteMeshRepair,
+            [(MorphologyConfig.OpMeshSeparate, typeof(Mesh))] = ExecuteMeshSeparate,
+            [(MorphologyConfig.OpMeshWeld, typeof(Mesh))] = ExecuteMeshWeld,
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -323,5 +326,84 @@ internal static class MorphologyCore {
 
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.RemeshResult(remeshed, targetEdge, mean, stdDev, uniformity, iterationsPerformed, converged, original.Faces.Count, remeshed.Faces.Count),]);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshRepair(object input, object parameters, IGeometryContext context) =>
+        Execute<Mesh, (Morphology.MeshRepairOptions, double)>(input, parameters, context, (mesh, p, ctx) => {
+            (Morphology.MeshRepairOptions flags, double weldTol) = p;
+            return MorphologyCompute.RepairMesh(mesh, flags, weldTol, ctx).Bind(repaired => ComputeRepairMetrics(mesh, repaired, flags, ctx));
+        });
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshSeparate(object input, object parameters, IGeometryContext context) =>
+        Execute<Mesh, ValueTuple>(input, parameters, context, (mesh, _, ctx) =>
+            MorphologyCompute.SeparateMeshComponents(mesh, ctx).Bind(components => ComputeSeparationMetrics(components, ctx)));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteMeshWeld(object input, object parameters, IGeometryContext context) =>
+        Execute<Mesh, (double, bool)>(input, parameters, context, (mesh, p, ctx) => {
+            (double tolerance, bool weldNormals) = p;
+            return MorphologyCompute.WeldMeshVertices(mesh, tolerance, weldNormals, ctx).Bind(welded => ComputeWeldMetrics(mesh, welded, tolerance, weldNormals, ctx));
+        });
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeRepairMetrics(
+        Mesh original,
+        Mesh repaired,
+        Morphology.MeshRepairOptions operations,
+        IGeometryContext context) =>
+        ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+            new Morphology.MeshRepairResult(
+                repaired,
+                original.Vertices.Count,
+                repaired.Vertices.Count,
+                original.Faces.Count,
+                repaired.Faces.Count,
+                operations,
+                MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
+                original.DisjointMeshCount > 1,
+                original.Normals.Count != original.Vertices.Count || !original.Normals.ComputeNormals()),
+        ]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSeparationMetrics(
+        Mesh[] components,
+        IGeometryContext _) {
+        int[] vertCounts = [.. components.Select(static m => m.Vertices.Count),];
+        int[] faceCounts = [.. components.Select(static m => m.Faces.Count),];
+        BoundingBox[] bounds = [.. components.Select(static m => m.GetBoundingBox(accurate: false)),];
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+            new Morphology.MeshSeparationResult(
+                components,
+                components.Length,
+                vertCounts.Sum(),
+                faceCounts.Sum(),
+                vertCounts,
+                faceCounts,
+                bounds),
+        ]);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeWeldMetrics(
+        Mesh original,
+        Mesh welded,
+        double tolerance,
+        bool normalsRecalculated,
+        IGeometryContext _) {
+        int vertCount = Math.Min(original.Vertices.Count, welded.Vertices.Count);
+        double[] displacements = [.. Enumerable.Range(0, vertCount).Select(i => ((Point3d)original.Vertices[i]).DistanceTo(welded.Vertices[i])),];
+        return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+            new Morphology.MeshWeldResult(
+                welded,
+                original.Vertices.Count,
+                welded.Vertices.Count,
+                original.Vertices.Count - welded.Vertices.Count,
+                tolerance,
+                displacements.Length > 0 ? displacements.Average() : 0.0,
+                displacements.Length > 0 ? displacements.Max() : 0.0,
+                normalsRecalculated),
+        ]);
     }
 }

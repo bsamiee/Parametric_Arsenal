@@ -18,6 +18,18 @@ public static class Morphology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
+    /// <summary>Mesh repair operations for composite fixing workflow.</summary>
+    [Flags]
+    public enum MeshRepairOptions {
+        None = 0,
+        FillHoles = 1,
+        UnifyNormals = 2,
+        CullDegenerateFaces = 4,
+        Compact = 8,
+        Weld = 16,
+        All = FillHoles | UnifyNormals | CullDegenerateFaces | Compact | Weld,
+    }
+
     /// <summary>Cage deformation result with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
@@ -114,6 +126,57 @@ public static class Morphology {
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"Remesh | Target={this.TargetEdgeLength:F3} | Mean={this.MeanEdgeLength:F3} | StdDev={this.EdgeLengthStdDev:F3} | Uniformity={this.UniformityScore:F3} | Iter={this.IterationsPerformed} | {(this.Converged ? "✓" : "diverged")}");
+    }
+
+    /// <summary>Mesh repair result with before/after metrics and quality score.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshRepairResult(
+        Mesh Repaired,
+        int OriginalVertexCount,
+        int RepairedVertexCount,
+        int OriginalFaceCount,
+        int RepairedFaceCount,
+        MeshRepairOptions OperationsPerformed,
+        double QualityScore,
+        bool HadHoles,
+        bool HadBadNormals) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={this.OperationsPerformed} | Quality={this.QualityScore:F3}");
+    }
+
+    /// <summary>Mesh separation result with per-component statistics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshSeparationResult(
+        Mesh[] Components,
+        int ComponentCount,
+        int TotalVertexCount,
+        int TotalFaceCount,
+        int[] VertexCountPerComponent,
+        int[] FaceCountPerComponent,
+        BoundingBox[] BoundsPerComponent) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshSeparate | Components={this.ComponentCount} | TotalV={this.TotalVertexCount} | TotalF={this.TotalFaceCount}");
+    }
+
+    /// <summary>Mesh welding result with vertex reduction and displacement metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshWeldResult(
+        Mesh Welded,
+        int OriginalVertexCount,
+        int WeldedVertexCount,
+        int VerticesRemoved,
+        double WeldTolerance,
+        double MeanVertexDisplacement,
+        double MaxVertexDisplacement,
+        bool NormalsRecalculated) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshWeld | V: {this.OriginalVertexCount}→{this.WeldedVertexCount} (-{this.VerticesRemoved}) | Tol={this.WeldTolerance:E2} | MaxDisp={this.MaxVertexDisplacement:F3}");
     }
 
     /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>

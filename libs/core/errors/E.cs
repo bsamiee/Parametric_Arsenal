@@ -151,6 +151,9 @@ public static class E {
             [2815] = "Offset distance invalid or produces degenerate geometry",
             [2816] = "Reduction accuracy parameter out of valid range",
             [2817] = "Remeshing iteration limit exceeded without convergence",
+            [2820] = "Mesh repair operation failed",
+            [2821] = "Mesh repair weld tolerance invalid (must be positive)",
+            [2825] = "Mesh welding operation failed or tolerance invalid",
 
             // Fitting Operations (2900-2910)
             [2900] = "Fitting operation failed: numerical instability or invalid configuration",
@@ -384,6 +387,9 @@ public static class E {
             public static readonly SystemError OffsetDistanceInvalid = Get(2815);
             public static readonly SystemError ReductionAccuracyInvalid = Get(2816);
             public static readonly SystemError RemeshIterationLimitExceeded = Get(2817);
+            public static readonly SystemError MeshRepairFailed = Get(2820);
+            public static readonly SystemError WeldToleranceInvalid = Get(2821);
+            public static readonly SystemError MeshWeldFailed = Get(2825);
         }
 
         /// <summary>Fitting operation errors (2900-2910).</summary>
