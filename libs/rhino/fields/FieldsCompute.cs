@@ -377,9 +377,9 @@ internal static class FieldsCompute {
                         Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
                         Vector3d Interpolate(double coeff, Vector3d k) => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * coeff * k), resolution: resolution, bounds: bounds);
                         Vector3d delta = integrationScheme switch {
-                            Fields.IntegrationScheme.EulerIntegrationScheme => stepSize * k1,
-                            Fields.IntegrationScheme.MidpointIntegrationScheme => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
-                            Fields.IntegrationScheme.RungeKuttaFourthOrderIntegrationScheme => ((Func<Vector3d>)(() => {
+                            Fields.IntegrationScheme.EulerIntegrationScheme _ => stepSize * k1,
+                            Fields.IntegrationScheme.MidpointIntegrationScheme _ => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
+                            Fields.IntegrationScheme.RungeKuttaFourthOrderIntegrationScheme _ => ((Func<Vector3d>)(() => {
                                 Vector3d k2 = Interpolate(FieldsConfig.RK4HalfSteps[0], k1);
                                 Vector3d k3 = Interpolate(FieldsConfig.RK4HalfSteps[1], k2);
                                 Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);
