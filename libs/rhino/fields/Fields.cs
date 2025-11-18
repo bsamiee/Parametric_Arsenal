@@ -32,10 +32,11 @@ public static class Fields {
         public double StepSize { get; }
 
         private static int NormalizeResolution(int resolution) =>
-            resolution switch {
-                < FieldsConfig.MinResolution => FieldsConfig.DefaultResolution,
-                _ => resolution,
-            };
+        resolution switch {
+            < FieldsConfig.MinResolution => FieldsConfig.MinResolution,
+            > FieldsConfig.MaxResolution => FieldsConfig.MaxResolution,
+            _ => resolution,
+        };
 
         private static double NormalizeStepSize(double? stepSize) =>
             stepSize switch {
