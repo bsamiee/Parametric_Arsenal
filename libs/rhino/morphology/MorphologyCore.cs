@@ -800,6 +800,7 @@ internal static class MorphologyCore {
         IGeometryContext _context) {
         Mesh? offsetForWallFaces = original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
         int wallCount = wallFaces?.Count ?? 0;
+        offsetForWallFaces?.Dispose();
         BoundingBox originalBounds = original.GetBoundingBox(accurate: false);
         BoundingBox thickenedBounds = thickened.GetBoundingBox(accurate: false);
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
