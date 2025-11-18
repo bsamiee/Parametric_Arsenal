@@ -52,12 +52,7 @@ public static class Fields {
         geometry is null
             ? ResultFactory.Create<(Point3d[], double[])>(
                 error: E.Geometry.UnsupportedAnalysis.WithContext("Geometry cannot be null"))
-            : FieldsCore.OperationRegistry.TryGetValue(
-                (FieldsConfig.OperationDistance, geometry.GetType()),
-                out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute,
-                    Core.Validation.V ValidationMode,
-                    int BufferSize,
-                    byte IntegrationMethod) config) switch {
+            : FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, geometry.GetType()), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
                 true => config.Execute(geometry, spec, context),
                 false => ResultFactory.Create<(Point3d[], double[])>(
                     error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometry.GetType().Name}")),
