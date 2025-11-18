@@ -504,14 +504,30 @@ internal static class MorphologyCore {
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.CageDeformResult(
                 Deformed: deformed,
-                MaxDisplacement: displacements.Length > 0 ? displacements.Max() : 0.0,
-                MeanDisplacement: displacements.Length > 0 ? displacements.Average() : 0.0,
+                MaxDisplacement: displacements.Length > 0
+                    ? GetMaxAndMean(displacements, out double meanDisp)
+                    : 0.0,
+                MeanDisplacement: displacements.Length > 0
+                    ? meanDisp
+                    : 0.0,
                 OriginalBounds: originalBounds,
                 DeformedBounds: deformedBounds,
                 VolumeRatio: volumeRatio),
             ]);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double GetMaxAndMean(double[] values, out double mean) {
+        double max = 0.0;
+        double sum = 0.0;
+        for (int i = 0; i < values.Length; i++) {
+            double v = values[i];
+            sum += v;
+            max = Math.Max(max, v);
+        }
+        mean = values.Length > 0 ? sum / values.Length : 0.0;
+        return max;
+    }
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSubdivisionMetrics(
         Mesh original,
