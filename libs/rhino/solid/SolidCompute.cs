@@ -192,7 +192,11 @@ internal static class SolidCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Solid.SolidOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Mesh.CreateBooleanUnion(meshes: meshes, tolerance: tolerance) switch {
+                : Mesh.CreateBooleanUnion(
+                    meshes: meshes,
+                    tolerance: tolerance,
+                    meshBooleanOptions: new MeshBooleanOptions { CombineCoplanarFaces = options.CombineCoplanarFaces },
+                ) switch {
                     null => ResultFactory.Create<Solid.SolidOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh union returned null - ensure meshes are closed and manifold")),
                     { Length: 0 } => ResultFactory.Create<Solid.SolidOutput>(
