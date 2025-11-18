@@ -208,7 +208,7 @@ internal static class TopologyCore {
                             new Topology.AdjacencyData(
                                 EdgeIndex: idx,
                                 AdjacentFaceIndices: af,
-                                FaceNormals: computed && af.All(fIdx => mesh.FaceNormals.Count > fIdx)
+                                FaceNormals: computed && af.Length > 0 && mesh.FaceNormals.Count > af.Max()
                                     ? [.. af.Select(i => mesh.FaceNormals[i]),]
                                     : [.. af.Select(_ => Vector3d.Unset),],
                                 DihedralAngle: 0.0,
