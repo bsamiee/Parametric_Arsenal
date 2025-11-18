@@ -188,30 +188,34 @@ internal static class TopologyCore {
                 }))(),
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
-                    _ = mesh.FaceNormals.Count == mesh.Faces.Count
+                    bool normalsValid = mesh.FaceNormals.Count == mesh.Faces.Count
                         ? true
                         : mesh.FaceNormals.ComputeFaceNormals();
                     _ = mesh.FaceNormals.UnitizeFaceNormals();
-                    return mesh.TopologyEdges.GetConnectedFaces(idx) switch {
-                        int[] { Length: 2 } af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                            new Topology.AdjacencyData(
-                                EdgeIndex: idx,
-                                AdjacentFaceIndices: af,
-                                FaceNormals: [mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]],],
-                                DihedralAngle: Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]]),
-                                IsManifold: true,
-                                IsBoundary: false),
-                        ]),
-                        int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                            new Topology.AdjacencyData(
-                                EdgeIndex: idx,
-                                AdjacentFaceIndices: af,
-                                FaceNormals: [.. af.Select(i => mesh.FaceNormals[i]),],
-                                DihedralAngle: 0.0,
-                                IsManifold: af.Length == 2,
-                                IsBoundary: af.Length == 1),
-                        ]),
-                    };
+                    return !normalsValid
+                        ? ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(
+                            error: E.Geometry.InvalidGeometry.WithContext("Failed to compute mesh face normals"),
+                        )
+                        : mesh.TopologyEdges.GetConnectedFaces(idx) switch {
+                            int[] { Length: 2 } af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                new Topology.AdjacencyData(
+                                    EdgeIndex: idx,
+                                    AdjacentFaceIndices: af,
+                                    FaceNormals: [mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]],],
+                                    DihedralAngle: Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]]),
+                                    IsManifold: true,
+                                    IsBoundary: false),
+                            ]),
+                            int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                new Topology.AdjacencyData(
+                                    EdgeIndex: idx,
+                                    AdjacentFaceIndices: af,
+                                    FaceNormals: [.. af.Select(i => mesh.FaceNormals[i]),],
+                                    DihedralAngle: 0.0,
+                                    IsManifold: af.Length == 2,
+                                    IsBoundary: af.Length == 1),
+                            ]),
+                        };
                 }))(),
                 (Mesh mesh, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
