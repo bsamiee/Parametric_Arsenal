@@ -698,17 +698,21 @@ internal static class MorphologyCore {
         int[] vertCounts = new int[components.Length];
         int[] faceCounts = new int[components.Length];
         BoundingBox[] bounds = new BoundingBox[components.Length];
+        int totalVertexCount = 0;
+        int totalFaceCount = 0;
         for (int i = 0; i < components.Length; i++) {
             vertCounts[i] = components[i].Vertices.Count;
             faceCounts[i] = components[i].Faces.Count;
             bounds[i] = components[i].GetBoundingBox(accurate: false);
+            totalVertexCount += vertCounts[i];
+            totalFaceCount += faceCounts[i];
         }
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
             value: [new Morphology.MeshSeparationResult(
                 Components: components,
                 ComponentCount: components.Length,
-                TotalVertexCount: vertCounts.Sum(),
-                TotalFaceCount: faceCounts.Sum(),
+                TotalVertexCount: totalVertexCount,
+                TotalFaceCount: totalFaceCount,
                 VertexCountPerComponent: vertCounts,
                 FaceCountPerComponent: faceCounts,
                 BoundsPerComponent: bounds),
