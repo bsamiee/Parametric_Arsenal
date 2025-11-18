@@ -49,7 +49,7 @@ public static class Fields {
         T geometry,
         FieldSpec spec,
         IGeometryContext context) where T : GeometryBase {
-        System.Type geometryType = geometry is null ? typeof(T) : geometry.GetType();
+        Type geometryType = geometry is null ? typeof(T) : geometry.GetType();
         return FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, geometryType), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
             true => UnifiedOperation.Apply(
                 input: geometry,
