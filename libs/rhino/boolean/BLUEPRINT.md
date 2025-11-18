@@ -37,12 +37,12 @@ Unified boolean operation library for Brep-Brep and Mesh-Mesh solid boolean oper
 - **New error codes allocated (2100-2108 range in E.Geometry.BooleanOps)**:
   - `2100` - Boolean operation failed (general SDK failure)
   - `2101` - Input geometry not closed or solid (Brep/Mesh requirement)
-  - `2102` - Not planar or coplanar (unused - reserved)
+  - `2102` - Not planar or coplanar (removed - not applicable to solid booleans)
   - `2103` - Mesh quality insufficient for boolean operation
   - `2104` - Operation produced degenerate or invalid result
-  - `2105` - Trim operation failed (unused - reserved)
+  - `2105` - Trim operation failed (used by TrimSolid helper method for Brep.Trim)
   - `2106` - Split operation failed (incomplete division)
-  - `2107` - Region extraction failed (unused - reserved)
+  - `2107` - Region extraction failed (reserved for future curve operations in separate library)
   - `2108` - Boolean result validation failed (post-operation check)
 
 #### Context
@@ -200,6 +200,12 @@ This boolean operation library uses the standard 3-file pattern:
   - Delegates to `BooleanCore.OperationRegistry` FrozenDictionary lookup
   - Falls back to `E.Geometry.UnsupportedConfiguration` for invalid type combinations
   - Uses UnifiedOperation.Apply for validation, diagnostics, error handling
+- `TrimSolid(Brep, Brep, IGeometryContext, BooleanOptions?)`: Helper method for Brep.Trim operation
+  - Wraps `Brep.Trim(Brep cutter, double tolerance)` SDK method
+  - Retains portions of target Brep inside (opposite normal) of cutter Brep
+  - Distinct from Difference operation (which creates new solids)
+  - Following Intersect pattern which has helper methods beyond main Execute
+  - Justifies error code 2105 (TrimFailed)
 
 **Code Style Example**:
 ```csharp
@@ -262,7 +268,7 @@ public static class Boolean {
 }
 ```
 
-**LOC Estimate**: 120-150 (dense API with nested types, pattern matching)
+**LOC Estimate**: 85-95 (main Execute + TrimSolid helper + nested types)
 
 ### File 2: `BooleanCore.cs`
 
@@ -481,11 +487,11 @@ internal static class BooleanCompute {
 - **BooleanCore** (internal static class)
 - **BooleanCompute** (internal static class)
 
-### Estimated Total LOC: 460-570
-- Boolean.cs: 120-150
-- BooleanCore.cs: 140-170
-- BooleanCompute.cs: 200-250
-- **Assessment**: Well within reasonable range for 3 files (average 153-190 LOC per file)
+### Estimated Total LOC: 505-600
+- Boolean.cs: 85-95 (main Execute + TrimSolid helper + nested types)
+- BooleanCore.cs: 140-170 (dispatch registry + routing)
+- BooleanCompute.cs: 280-335 (9 methods: 8 main + BrepTrim helper)
+- **Assessment**: Well within reasonable range for 3 files (average 168-200 LOC per file)
 
 ## Algorithmic Density Strategy
 

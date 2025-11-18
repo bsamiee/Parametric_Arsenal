@@ -403,11 +403,51 @@ Mesh.CreateBooleanUnion(
 - BrepIntersection: 30
 - BrepDifference: 30
 - BrepSplit: 30
+- BrepTrim: 30 (helper method for TrimSolid)
 - MeshUnion: 32 (inline MeshBooleanOptions)
 - MeshIntersection: 32
 - MeshDifference: 32
 - MeshSplit: 32
-- **Total**: 8 methods × ~31 LOC = ~248 LOC including using statements
+- **Total**: 9 methods × ~31 LOC = ~279 LOC including using statements
+
+### BrepTrim Method (Helper for TrimSolid)
+```csharp
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+internal static Result<Boolean.BooleanOutput> BrepTrim(
+    Brep target,
+    Brep cutter,
+    Boolean.BooleanOptions options,
+    IGeometryContext context) =>
+    ((Func<Result<Boolean.BooleanOutput>>)(() => {
+        double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
+        
+        return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
+            ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+            : target.Trim(cutter, tolerance) switch {
+                null => ResultFactory.Create<Boolean.BooleanOutput>(
+                    error: E.Geometry.BooleanOps.TrimFailed.WithContext("Trim returned null - verify Breps are valid and intersect")),
+                { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
+                    Breps: [target,],
+                    Meshes: [],
+                    ToleranceUsed: tolerance)),
+                Brep[] results => options.ValidateResult
+                    ? results.All(static b => b.IsValid)
+                        ? ResultFactory.Create(value: new Boolean.BooleanOutput(
+                            Breps: results,
+                            Meshes: [],
+                            ToleranceUsed: tolerance))
+                        : ResultFactory.Create<Boolean.BooleanOutput>(
+                            error: E.Validation.GeometryInvalid.WithContext(
+                                $"Invalid Breps: {results.Count(static b => !b.IsValid)} of {results.Length}"))
+                    : ResultFactory.Create(value: new Boolean.BooleanOutput(
+                        Breps: results,
+                        Meshes: [],
+                        ToleranceUsed: tolerance)),
+            };
+    }))();
+```
+
+**Note**: BrepTrim is a helper method supporting the `TrimSolid` public API method. Trim operation uses `Brep.Trim(Brep cutter, double tolerance)` which retains portions of the target Brep inside (opposite the normal) of the cutter Brep. This is distinct from Difference which creates new solids.
 
 ## XML Documentation Standards
 ```csharp

@@ -1,9 +1,9 @@
 # Boolean.cs Implementation Blueprint
 
 **File**: `libs/rhino/boolean/Boolean.cs`  
-**Purpose**: Public API surface with unified `Execute<T1, T2>` entry point  
+**Purpose**: Public API surface with unified `Execute<T1, T2>` entry point + TrimSolid helper  
 **Types**: 1 (Boolean class with 3 nested types)  
-**Estimated LOC**: 60-70
+**Estimated LOC**: 85-95
 
 ## File Structure
 
@@ -80,6 +80,29 @@ public static class Boolean {
                 error: E.Geometry.UnsupportedConfiguration.WithContext(
                     $"Operation: {operation}, Types: {typeof(T1).Name}, {typeof(T2).Name}")),
         };
+
+    /// <summary>Trims Brep using oriented cutter retaining portions inside cutter normal.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<BooleanOutput> TrimSolid(
+        Brep target,
+        Brep cutter,
+        IGeometryContext context,
+        BooleanOptions? options = null) =>
+        UnifiedOperation.Apply(
+            input: target,
+            operation: (Func<Brep, Result<IReadOnlyList<BooleanOutput>>>)(item => BooleanCompute.BrepTrim(
+                item,
+                cutter,
+                options ?? new BooleanOptions(),
+                context)
+                .Map(output => (IReadOnlyList<BooleanOutput>)[output])),
+            config: new OperationConfig<Brep, BooleanOutput> {
+                Context = context,
+                ValidationMode = V.Standard | V.Topology,
+                OperationName = "Boolean.TrimSolid",
+                EnableDiagnostics = false,
+            })
+            .Map(outputs => outputs.Count > 0 ? outputs[0] : BooleanOutput.Empty);
 }
 ```
 
@@ -116,14 +139,15 @@ public static class Boolean {
 - Ternary for output mapping: `outputs.Count > 0 ? outputs[0] : Empty`
 - Named parameters throughout
 
-### LOC Breakdown (Reduced Scope)
+### LOC Breakdown
 - Using statements: 9
 - Namespace + class declaration: 3
 - OperationType enum: 5 lines (4 values + declaration)
 - BooleanOptions record: 6 lines (4 parameters)
 - BooleanOutput record: 9 lines (4 fields + Empty)
 - Execute<T1, T2> method: 25-30 lines
-- Total: ~60-70 LOC (down from 140-180 with 6 operations)
+- TrimSolid helper method: 14 lines
+- Total: ~85-95 LOC (follows Intersect pattern with helper methods)
 
 ### Why BooleanOutput is Here (DEFINITIVELY)
 - **Pattern match**: libs/rhino/intersection/Intersect.cs nests IntersectionOutput in Intersect (public API class)
@@ -139,9 +163,9 @@ All error codes use `E.Geometry.BooleanOps.*` namespace (libs/core/errors/E.cs l
 - `E.Geometry.BooleanOps.NotPlanarOrCoplanar` (2102)
 - `E.Geometry.BooleanOps.InsufficientMeshQuality` (2103)
 - `E.Geometry.BooleanOps.DegenerateResult` (2104)
-- `E.Geometry.BooleanOps.TrimFailed` (2105)
+- `E.Geometry.BooleanOps.TrimFailed` (2105) (used by TrimSolid helper method)
 - `E.Geometry.BooleanOps.SplitFailed` (2106)
-- `E.Geometry.BooleanOps.RegionExtractionFailed` (2107)
+- `E.Geometry.BooleanOps.RegionExtractionFailed` (2107) (unused - reserved for future curve operations)
 - `E.Geometry.BooleanOps.ResultValidationFailed` (2108)
 
 **Never reference**: `E.Geometry.Boolean.*` (incorrect namespace)
