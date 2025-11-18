@@ -216,50 +216,50 @@ internal static class TransformCompute {
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")))
-            : /* continue with parameter computation logic */;
+            : ((Func<Result<IReadOnlyList<T>>>)(() => {
+                double[] parameters = count == 1
+                    ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
+                    : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
+                        ? divideParameters
+                        : ((Func<double[]>)(() => {
+                            double[] fallback = new double[count];
+                            double stepLength = curveLength / (count - 1);
+                            for (int index = 0; index < count; index++) {
+                                double targetLength = stepLength * index;
+                                bool resolved = path.LengthParameter(targetLength, out double tParameter);
+                                double normalized = targetLength / curveLength;
+                                // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
+                                double clamped = Math.Clamp(normalized, 0.0, 1.0);
+                                fallback[index] = resolved
+                                    ? tParameter
+                                    : path.Domain.ParameterAt(clamped);
+                            }
 
-        double[] parameters = count == 1
-            ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
-            : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
-                ? divideParameters
-                : ((Func<double[]>)(() => {
-                    double[] fallback = new double[count];
-                    double stepLength = curveLength / (count - 1);
-                    for (int index = 0; index < count; index++) {
-                        double targetLength = stepLength * index;
-                        bool resolved = path.LengthParameter(targetLength, out double tParameter);
-                        double normalized = targetLength / curveLength;
-                        // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
-                        double clamped = Math.Clamp(normalized, 0.0, 1.0);
-                        fallback[index] = resolved
-                            ? tParameter
-                            : path.Domain.ParameterAt(clamped);
-                    }
+                            return fallback;
+                        }))();
 
-                    return fallback;
-                }))();
+                Transform[] transforms = new Transform[count];
+                for (int i = 0; i < count; i++) {
+                    double t = parameters[i];
+                    Point3d pt = path.PointAt(t);
 
-        Transform[] transforms = new Transform[count];
-        for (int i = 0; i < count; i++) {
-            double t = parameters[i];
-            Point3d pt = path.PointAt(t);
+                    transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
+                        ? Transform.PlaneToPlane(Plane.WorldXY, frame)
+                        : Transform.Translation(pt - Point3d.Origin);
+                }
 
-            transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
-                ? Transform.PlaneToPlane(Plane.WorldXY, frame)
-                : Transform.Translation(pt - Point3d.Origin);
-        }
-
-        return UnifiedOperation.Apply(
-            input: transforms,
-            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                TransformCore.ApplyTransform(item: geometry, transform: xform)),
-            config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                Context = context,
-                ValidationMode = V.None,
-                AccumulateErrors = false,
-                OperationName = "Transforms.PathArray",
-                EnableDiagnostics = enableDiagnostics,
-            });
+                return UnifiedOperation.Apply(
+                    input: transforms,
+                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                        TransformCore.ApplyTransform(item: geometry, transform: xform)),
+                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                        Context = context,
+                        ValidationMode = V.None,
+                        AccumulateErrors = false,
+                        OperationName = "Transforms.PathArray",
+                        EnableDiagnostics = enableDiagnostics,
+                    });
+            }))();
     }
 
     /// <summary>Apply SpaceMorph to geometry with duplication.</summary>

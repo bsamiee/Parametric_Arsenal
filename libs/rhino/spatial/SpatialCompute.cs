@@ -260,12 +260,18 @@ internal static class SpatialCompute {
                             .SelectMany((cell, _) => cell.Length > 0
                                 ? Enumerable.Range(0, cell.Length).Select(j => (P1: cell[j], P2: cell[(j + 1) % cell.Length]))
                                 : [])
-                            .Select(edge => (edge.P1, edge.P2, Mid: Point3d.Interpolate(edge.P1, edge.P2, t: 0.5))) 
+                            .Select(edge => {
+                                Point3d mid = edge.P1;
+                                mid.X = (edge.P1.X + edge.P2.X) * 0.5;
+                                mid.Y = (edge.P1.Y + edge.P2.Y) * 0.5;
+                                mid.Z = (edge.P1.Z + edge.P2.Z) * 0.5;
+                                return (edge.P1, edge.P2, Mid: mid);
+                            })
                             .Select(edge => (edge.P1, edge.P2, edge.Mid, Mid3D: To3D(edge.Mid)))
                             .Where(edge => boundary.Contains(edge.Mid3D, plane, effectiveTolerance) is PointContainment.Inside)
                             .GroupBy(edge => (edge.P1, edge.P2) switch {
                                 (Point3d p1, Point3d p2) when p1.X < p2.X - context.AbsoluteTolerance || (Math.Abs(p1.X - p2.X) <= context.AbsoluteTolerance && p1.Y < p2.Y - context.AbsoluteTolerance) => (Min: p1, Max: p2),
-                                (Point3d p1, Point3d p2) => (Min: p2, Max: p1),
+                                _ => (Min: edge.P2, Max: edge.P1),
                             })
                             .Select(static g => g.First())
                             .Select(edge => (P1_3D: To3D(edge.P1), P2_3D: To3D(edge.P2), edge.Mid3D))
@@ -402,12 +408,14 @@ internal static class SpatialCompute {
     /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) {
-        if (points.Length < 3) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"));
+        if (points.Length < 3) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points")); }
+
         (double z0, double minX, double minY, double maxX, double maxY) = (points[0].Z, points[0].X, points[0].Y, points[0].X, points[0].Y);
         for (int i = 1; i < points.Length; i++) {
             double x = points[i].X;
             double y = points[i].Y;
-            if (Math.Abs(points[i].Z - z0) > context.AbsoluteTolerance) return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate"));
+            if (Math.Abs(points[i].Z - z0) > context.AbsoluteTolerance) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate")); }
+
             (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
         }
         (double dx, double dy) = ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale, (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale);
