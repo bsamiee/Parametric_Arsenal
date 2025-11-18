@@ -243,7 +243,7 @@ internal static class MorphologyCore {
                 double dist = ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]);
                 return (acc.Item1 + (dist * dist), Math.Max(acc.Item2, dist));
             });
-        double rms = vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0;
+        double rms = Math.Sqrt(sumSq / Math.Max(vertCount, 1));
         double convergenceThreshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.SmoothingResult(
