@@ -1,10 +1,7 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -12,35 +9,55 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
+    /// <summary>Algebraic query request for Spatial.Analyze.</summary>
+    public abstract record Query;
+
+    /// <summary>Range query against a spherical region.</summary>
+    public sealed record SphereQuery(Sphere Sphere) : Query;
+
+    /// <summary>Range query against a bounding box.</summary>
+    public sealed record BoundingBoxQuery(BoundingBox BoundingBox) : Query;
+
+    /// <summary>Proximity search returning k nearest indices.</summary>
+    public sealed record KNearestProximityQuery(Point3d[] Needles, int Count) : Query;
+
+    /// <summary>Proximity search constrained by a maximum distance.</summary>
+    public sealed record DistanceProximityQuery(Point3d[] Needles, double Distance) : Query;
+
+    /// <summary>Mesh overlap search with adjustable tolerance.</summary>
+    public sealed record MeshOverlapQuery(double AdditionalTolerance) : Query;
+
+    /// <summary>Base clustering request.</summary>
+    public abstract record ClusterRequest;
+
+    /// <summary>K-means clustering request.</summary>
+    public sealed record KMeansClusterRequest(int ClusterCount) : ClusterRequest;
+
+    /// <summary>DBSCAN clustering request.</summary>
+    public sealed record DbscanClusterRequest(double Epsilon) : ClusterRequest;
+
+    /// <summary>Hierarchical clustering request.</summary>
+    public sealed record HierarchicalClusterRequest(int ClusterCount) : ClusterRequest;
+
+    /// <summary>Directional proximity field specification.</summary>
+    public sealed record ProximityFieldRequest(Vector3d Direction, double MaxDistance, double AngleWeight);
+
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
+    public static Result<IReadOnlyList<int>> Analyze<TInput>(
         TInput input,
-        TQuery query,
+        Query query,
         IGeometryContext context,
-        int? bufferSize = null) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.OperationRegistry.TryGetValue((typeof(TInput), typeof(TQuery)), out (Func<object, RTree>? _, V mode, int bufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> execute) config) switch {
-            true => UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => config.execute(item, query, context, bufferSize ?? config.bufferSize)),
-                config: new OperationConfig<TInput, int> {
-                    Context = context,
-                    ValidationMode = config.mode,
-                    OperationName = $"Spatial.{typeof(TInput).Name}.{typeof(TQuery).Name}",
-                    EnableDiagnostics = false,
-                }),
-            false => ResultFactory.Create<IReadOnlyList<int>>(
-                error: E.Spatial.UnsupportedTypeCombo.WithContext(
-                    $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
-        };
+        int? bufferSize = null) where TInput : notnull =>
+        SpatialCore.Analyze(input: input, query: query, context: context, bufferSizeOverride: bufferSize);
 
     /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
         T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
+        ClusterRequest request,
         IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+        SpatialCompute.Cluster(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -54,9 +71,9 @@ public static class Spatial {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
         GeometryBase[] geometry,
-        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
+        ProximityFieldRequest request,
         IGeometryContext context) =>
-        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
+        SpatialCompute.ProximityField(geometry: geometry, direction: request.Direction, maxDist: request.MaxDistance, angleWeight: request.AngleWeight, context: context);
 
     /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
