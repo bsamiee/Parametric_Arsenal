@@ -3,14 +3,9 @@ using Rhino;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
+/// <summary>Configuration constants for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    internal const byte OperationDistance = 0;
-    internal const byte IntegrationRK4 = 2;
-    internal const byte InterpolationNearest = 0;
-    internal const byte InterpolationTrilinear = 1;
-
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
     internal const int MaxResolution = 256;
@@ -31,9 +26,17 @@ internal static class FieldsConfig {
 
     internal const int FieldRTreeThreshold = 100;
 
-    internal const byte CriticalPointMinimum = 0;
-    internal const byte CriticalPointMaximum = 1;
-    internal const byte CriticalPointSaddle = 2;
+    internal const int MeshDistanceBuffer = 4096;
+    internal const int BrepDistanceBuffer = 8192;
+    internal const int CurveDistanceBuffer = 2048;
+    internal const int SurfaceDistanceBuffer = 4096;
+
+    internal static class OperationNames {
+        internal const string MeshDistance = "Fields.MeshDistance";
+        internal const string BrepDistance = "Fields.BrepDistance";
+        internal const string CurveDistance = "Fields.CurveDistance";
+        internal const string SurfaceDistance = "Fields.SurfaceDistance";
+    }
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
