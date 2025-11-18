@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -15,7 +16,6 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
-        GeometryBase _,
         Point3d[] originalControlPoints,
         Point3d[] deformedControlPoints,
         IGeometryContext __) =>
@@ -82,7 +82,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
-        byte algorithm,
+        MorphologyConfig.SubdivisionScheme algorithm,
         int levels,
         IGeometryContext context) =>
         levels <= 0
@@ -93,9 +93,9 @@ internal static class MorphologyCompute {
                     ResultFactory.Create(value: mesh.DuplicateMesh()),
                     (result, level) => result.Bind(current => {
                         Mesh? next = algorithm switch {
-                            MorphologyConfig.OpSubdivideCatmullClark => current.DuplicateMesh(),
-                            MorphologyConfig.OpSubdivideLoop => SubdivideLoop(current),
-                            MorphologyConfig.OpSubdivideButterfly => SubdivideButterfly(current),
+                            MorphologyConfig.SubdivisionScheme.CatmullClark => current.DuplicateMesh(),
+                            MorphologyConfig.SubdivisionScheme.Loop => SubdivideLoop(current),
+                            MorphologyConfig.SubdivisionScheme.Butterfly => SubdivideButterfly(current),
                             _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
@@ -489,7 +489,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
-        byte flags,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
         double weldTolerance,
         IGeometryContext _) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
@@ -499,10 +499,12 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < 5; i++) {
-                    byte flag = (byte)(1 << i);
-                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
-                        bool success = entry.action(repaired, tol);
+                if (operations is not null) {
+                    for (int i = 0; i < operations.Count; i++) {
+                        Morphology.MeshRepairOperation operation = operations[i];
+                        if (MorphologyConfig.TryGetRepairOperation(operation.GetType(), out (string Name, Func<Mesh, double, bool> Action) entry)) {
+                            _ = entry.Action(repaired, tol);
+                        }
                     }
                 }
                 return repaired.Normals.ComputeNormals()
@@ -597,19 +599,19 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
-        byte unwrapMethod,
+        MeshUnwrapMethod method,
         IGeometryContext _) =>
-        unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
+        method switch {
+            MeshUnwrapMethod.AngleBased or MeshUnwrapMethod.Conformal => ((Func<Result<Mesh>>)(() => {
                 Mesh unwrapped = mesh.DuplicateMesh();
                 using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                bool success = unwrapper.Unwrap(method: method);
                 return success && unwrapped.TextureCoordinates.Count > 0
                     ? ResultFactory.Create(value: unwrapped)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {method}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
             }))(),
             _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {method}"))),
         };
 }
