@@ -26,7 +26,9 @@ internal static class TransformCore {
             [3] = ((s, _) => (s.NonUniformScale is (Plane p, double x, double y, double z) && p.IsValid && x is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && y is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && z is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Plane: {s.NonUniformScale?.Plane.IsValid ?? false}, X: {Fmt(s.NonUniformScale?.X ?? 0)}, Y: {Fmt(s.NonUniformScale?.Y ?? 0)}, Z: {Fmt(s.NonUniformScale?.Z ?? 0)}"),
                 s => Transform.Scale(s.NonUniformScale!.Value.Plane, s.NonUniformScale.Value.X, s.NonUniformScale.Value.Y, s.NonUniformScale.Value.Z), E.Geometry.Transformation.InvalidScaleFactor),
             [4] = ((s, c) => (s.Rotation is (double angle, Vector3d a, Point3d center) && a.Length > c.AbsoluteTolerance, $"Axis: {Fmt(s.Rotation?.Axis.Length ?? 0)}"),
-                s => Transform.Rotation(s.Rotation!.Value.Angle, s.Rotation.Value.Axis, s.Rotation!.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
+                s => s.Rotation is { } rot
+                    ? Transform.Rotation(rot.Angle, rot.Axis, rot.Center)
+                    : Transform.Identity, E.Geometry.Transformation.InvalidRotationAxis),
             [5] = ((s, c) => (s.RotationVectors is (Vector3d st, Vector3d en, Point3d center) && st.Length > c.AbsoluteTolerance && en.Length > c.AbsoluteTolerance, $"Start: {Fmt(s.RotationVectors?.Start.Length ?? 0)}, End: {Fmt(s.RotationVectors?.End.Length ?? 0)}"),
                 s => Transform.Rotation(s.RotationVectors!.Value.Start, s.RotationVectors.Value.End, s.RotationVectors.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
             [6] = ((s, _) => (s.MirrorPlane is Plane p && p.IsValid, string.Empty),
