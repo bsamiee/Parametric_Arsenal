@@ -222,11 +222,11 @@ internal static class MorphologyCore {
                 subdivided,
                 original.Faces.Count,
                 subdivided.Faces.Count,
-                edgeLengths.Min(),
-                edgeLengths.Max(),
-                edgeLengths.Average(),
-                aspectRatios.Average(),
-                minAngles.Min()),
+                edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+                edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0,
+                edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0,
+                aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                minAngles.Length > 0 ? minAngles.Min() : 0.0),
         ]);
     }
 
@@ -243,14 +243,16 @@ internal static class MorphologyCore {
                 double dist = ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]);
                 return (acc.Item1 + (dist * dist), Math.Max(acc.Item2, dist));
             });
+        double rms = Math.Sqrt(sumSq / Math.Max(vertCount, 1));
+        double convergenceThreshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.SmoothingResult(
                 smoothed,
                 iterations,
-                vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0,
+                rms,
                 maxDisp,
                 MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0,
-                Math.Sqrt(sumSq / Math.Max(vertCount, 1)) < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier),
+                rms < convergenceThreshold),
         ]);
     }
 
