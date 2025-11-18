@@ -219,7 +219,7 @@ internal static class SpatialCompute {
                         if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
                             continue;
                         }
-                        double dist = pts[cluster1].DistanceTo(pts[cluster2]);
+                        double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
                         (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
                     }
                 }
