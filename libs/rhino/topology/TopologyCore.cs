@@ -284,8 +284,7 @@ internal static class TopologyCore {
 
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyMeshEdges(Mesh mesh, double angleThreshold) {
         _ = mesh.FaceNormals.Count == mesh.Faces.Count
-            ? true
-            : mesh.FaceNormals.ComputeFaceNormals();
+            || mesh.FaceNormals.ComputeFaceNormals();
         _ = mesh.FaceNormals.UnitizeFaceNormals();
         double curvatureThreshold = angleThreshold * TopologyConfig.CurvatureThresholdRatio;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
