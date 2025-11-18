@@ -387,7 +387,7 @@ internal static class MorphologyCore {
         Enumerable.Range(0, Math.Min(original.Vertices.Count, welded.Vertices.Count))
             .Aggregate((Sum: 0.0, Max: 0.0, Count: 0), (acc, i) => ((Point3d)original.Vertices[i]).DistanceTo(welded.Vertices[i]) is double dist
                 ? (acc.Sum + dist, Math.Max(acc.Max, dist), acc.Count + 1)
-                : acc) is (double sum, double max, int count) displ
+                : acc) is (double sum, double max, int count)
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                 new Morphology.MeshWeldResult(
                     welded,
