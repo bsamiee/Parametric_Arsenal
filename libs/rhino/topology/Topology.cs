@@ -313,5 +313,5 @@ public static class Topology {
     public static Result<TopologicalFeatures> ExtractTopologicalFeatures(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.ExtractFeatures(brep: brep, context);
+        TopologyCompute.ExtractFeatures(brep: brep, context: context);
 }
