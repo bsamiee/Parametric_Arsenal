@@ -118,9 +118,28 @@ internal static class MorphologyConfig {
 
     /// <summary>Brep to mesh conversion configuration.</summary>
     internal const double MaxAcceptableAspectRatio = 10.0;
-    internal const double IdealTriangleAngleRadians = 1.0471976;
+    internal static readonly double IdealTriangleAngleRadians = RhinoMath.ToRadians(60.0);
 
     /// <summary>Mesh thickening configuration.</summary>
     internal const double MinThickenDistance = 0.0001;
     internal const double MaxThickenDistance = 10000.0;
+
+    /// <summary>Mesh repair operation flags for bitwise composition.</summary>
+    internal const byte RepairNone = 0;
+    internal const byte RepairFillHoles = 1;
+    internal const byte RepairUnifyNormals = 2;
+    internal const byte RepairCullDegenerateFaces = 4;
+    internal const byte RepairCompact = 8;
+    internal const byte RepairWeld = 16;
+    internal const byte RepairAll = RepairFillHoles | RepairUnifyNormals | RepairCullDegenerateFaces | RepairCompact | RepairWeld;
+
+    /// <summary>Mesh repair operation dispatch: flag → (operation name, mesh action).</summary>
+    internal static readonly FrozenDictionary<byte, (string Name, Func<Mesh, double, bool> Action)> RepairOperations =
+        new Dictionary<byte, (string, Func<Mesh, double, bool>)> {
+            [RepairFillHoles] = ("FillHoles", static (m, _) => m.FillHoles()),
+            [RepairUnifyNormals] = ("UnifyNormals", static (m, _) => m.UnifyNormals() >= 0),
+            [RepairCullDegenerateFaces] = ("CullDegenerateFaces", static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
+            [RepairCompact] = ("Compact", static (m, _) => m.Compact()),
+            [RepairWeld] = ("Weld", static (m, _) => m.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true)),
+        }.ToFrozenDictionary();
 }
