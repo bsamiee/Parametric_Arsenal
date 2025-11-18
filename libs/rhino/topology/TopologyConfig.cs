@@ -28,28 +28,27 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
-    internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];
+    /// <summary>Healing strategy tolerance multipliers mapped by strategy type.</summary>
+    internal static readonly FrozenDictionary<Type, double> HealingToleranceMultipliers =
+        new Dictionary<Type, double> {
+            [typeof(Topology.HealingStrategy.ConservativeRepair)] = 0.1,
+            [typeof(Topology.HealingStrategy.ModerateJoin)] = 1.0,
+            [typeof(Topology.HealingStrategy.AggressiveJoin)] = 10.0,
+            [typeof(Topology.HealingStrategy.Combined)] = 1.0,
+            [typeof(Topology.HealingStrategy.TargetedJoin)] = 1.0,
+            [typeof(Topology.HealingStrategy.ComponentJoin)] = 1.0,
+        }.ToFrozenDictionary();
 
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 
     /// <summary>Edge analysis thresholds for continuity classification.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
-    /// <summary>Practical minimum loop length (1 micrometer) used as fallback when context tolerance is smaller. Approximately 1000× larger than RhinoMath.SqrtEpsilon for robust loop detection.</remarks>
+    /// <summary>Practical minimum loop length (1 micrometer) used as fallback when context tolerance is smaller. Approximately 1000× larger than RhinoMath.SqrtEpsilon for robust loop detection.</summary>
     internal const double MinLoopLength = 1e-6;
 
     /// <summary>Diagnostic thresholds for topology problem detection.</summary>
     internal const double NearMissMultiplier = 100.0;
-    /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
+    /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</summary>
     internal const int MaxEdgesForNearMissAnalysis = 100;
-
-    /// <summary>Healing strategy identifiers for progressive topology repair.</summary>
-    internal const byte StrategyConservativeRepair = 0;
-    internal const byte StrategyModerateJoin = 1;
-    internal const byte StrategyAggressiveJoin = 2;
-    internal const byte StrategyCombined = 3;
-    internal const byte StrategyTargetedJoin = 4;
-    internal const byte StrategyComponentJoin = 5;
-    internal const int MaxHealingStrategies = 6;
 }
