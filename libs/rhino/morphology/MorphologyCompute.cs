@@ -586,7 +586,7 @@ internal static class MorphologyCompute {
                     (string _, Func<Mesh, double, bool> action) = MorphologyConfig.RepairOperations.TryGetValue(operationType, out (string Name, Func<Mesh, double, bool> Action) entry)
                         ? entry
                         : throw new InvalidOperationException(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Unknown repair operation: {operationType.Name}"));
-                    bool success = action(repaired, tol);
+                    action(repaired, tol);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
