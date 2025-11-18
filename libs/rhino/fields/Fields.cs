@@ -190,10 +190,10 @@ public static class Fields {
         ResultFactory.Create(value: (vectorField, gridPoints, seeds))
             .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
             .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
-            .Bind(_ => FieldsCompute.IntegrateStreamlines(
-                vectorField: vectorField,
-                gridPoints: gridPoints,
-                seeds: seeds,
+            .Bind(state => FieldsCompute.IntegrateStreamlines(
+                vectorField: state.VectorField,
+                gridPoints: state.GridPoints,
+                seeds: state.Seeds,
                 stepSize: spec.StepSize,
                 integrationMethod: FieldsConfig.IntegrationRK4,
                 resolution: spec.Resolution,
