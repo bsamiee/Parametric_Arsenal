@@ -10,9 +10,6 @@ using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Morphology;
 
-#pragma warning disable IDE0060 // Remove unused parameter
-#pragma warning disable RCS1163 // Unused parameter
-
 /// <summary>Morphology algorithm implementations with convergence tracking.</summary>
 internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
