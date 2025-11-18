@@ -187,9 +187,9 @@ public static class Fields {
         FieldSpec spec,
         BoundingBox bounds,
         IGeometryContext context) =>
-        ResultFactory.Create(value: (VectorField: vectorField, GridPoints: gridPoints, Seeds: seeds))
-            .Ensure(state => state.VectorField.Length == state.GridPoints.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
-            .Ensure(state => state.Seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
+        ResultFactory.Create(value: (vectorField, gridPoints, seeds))
+            .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
+            .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
             .Bind(_ => FieldsCompute.IntegrateStreamlines(
                 vectorField: vectorField,
                 gridPoints: gridPoints,
