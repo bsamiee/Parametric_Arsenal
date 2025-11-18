@@ -41,22 +41,21 @@ internal static class MorphologyCore {
         IGeometryContext context) =>
         (input, request) is not (GeometryBase geom, Morphology.CageDeformationRequest r)
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidGeometryType.WithContext($"Expected: GeometryBase"))
-            : MorphologyCompute.CageDeform(geom, r.Cage, r.OriginalControlPoints, r.DeformedControlPoints, context).Bind(deformed => {
-                BoundingBox originalBounds = geom.GetBoundingBox(accurate: false);
-                BoundingBox deformedBounds = deformed.GetBoundingBox(accurate: false);
-                double[] displacements = [.. r.OriginalControlPoints.Zip(r.DeformedControlPoints, static (o, d) => o.DistanceTo(d)),];
-                return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
-                    value: [new Morphology.CageDeformResult(
-                        deformed,
-                        displacements.Length > 0 ? displacements.Max() : 0.0,
-                        displacements.Length > 0 ? displacements.Average() : 0.0,
-                        originalBounds,
-                        deformedBounds,
-                        RhinoMath.IsValidDouble(originalBounds.Volume) && originalBounds.Volume > RhinoMath.ZeroTolerance
-                            ? deformedBounds.Volume / originalBounds.Volume
-                            : 1.0),
-                    ]);
-            });
+            : MorphologyCompute.CageDeform(geom, r.Cage, r.OriginalControlPoints, r.DeformedControlPoints, context).Map(deformed =>
+                (geom.GetBoundingBox(accurate: false), deformed.GetBoundingBox(accurate: false),
+                 [.. r.OriginalControlPoints.Zip(r.DeformedControlPoints, static (o, d) => o.DistanceTo(d)),]) is var (origBounds, defBounds, disps)
+                    ? (IReadOnlyList<Morphology.IMorphologyResult>)[
+                        new Morphology.CageDeformResult(
+                            deformed,
+                            disps.Length > 0 ? disps.Max() : 0.0,
+                            disps.Length > 0 ? disps.Average() : 0.0,
+                            origBounds,
+                            defBounds,
+                            RhinoMath.IsValidDouble(origBounds.Volume) && origBounds.Volume > RhinoMath.ZeroTolerance
+                                ? defBounds.Volume / origBounds.Volume
+                                : 1.0),
+                    ]
+                    : []);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivideCatmullClark(
@@ -80,7 +79,7 @@ internal static class MorphologyCore {
         ExecuteSubdivision(input, request, context, SubdivisionAlgorithm.Butterfly);
 
     /// <summary>Internal enum for subdivision algorithm dispatch.</summary>
-    private enum SubdivisionAlgorithm : byte { CatmullClark, Loop, Butterfly, }
+    internal enum SubdivisionAlgorithm : byte { CatmullClark, Loop, Butterfly, }
 
     /// <summary>Unified subdivision executor for CatmullClark, Loop, and Butterfly algorithms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -117,19 +116,12 @@ internal static class MorphologyCore {
             : r.Mu >= -r.Lambda
                 ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.TaubinParametersInvalid.WithContext(
                     string.Create(System.Globalization.CultureInfo.InvariantCulture, $"μ ({r.Mu:F4}) must be < -λ ({(-r.Lambda):F4})")))
-                : MorphologyCompute.SmoothWithConvergence(mesh, r.Iterations, lockBoundary: false, (m, pos, _) => {
-                    Point3d[] step1 = LaplacianUpdate(m, pos, useCotangent: false);
-                    Point3d[] blended1 = new Point3d[pos.Length];
-                    for (int i = 0; i < pos.Length; i++) {
-                        blended1[i] = pos[i] + (r.Lambda * (step1[i] - pos[i]));
-                    }
-                    Point3d[] step2 = LaplacianUpdate(m, blended1, useCotangent: false);
-                    Point3d[] result = new Point3d[pos.Length];
-                    for (int i = 0; i < pos.Length; i++) {
-                        result[i] = blended1[i] + (r.Mu * (step2[i] - blended1[i]));
-                    }
-                    return result;
-                }, context).Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, r.Iterations, context));
+                : MorphologyCompute.SmoothWithConvergence(mesh, r.Iterations, lockBoundary: false, (m, pos, _) =>
+                    LaplacianUpdate(m, pos, useCotangent: false) is Point3d[] step1 &&
+                    pos.Zip(step1, (p, s) => p + (r.Lambda * (s - p))).ToArray() is Point3d[] blended1 &&
+                    LaplacianUpdate(m, blended1, useCotangent: false) is Point3d[] step2
+                        ? [.. blended1.Zip(step2, (b, s) => b + (r.Mu * (s - b))),]
+                        : pos, context).Bind(smoothed => ComputeSmoothingMetrics(mesh, smoothed, r.Iterations, context));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteEvolveMeanCurvature(
