@@ -1,81 +1,127 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
+/// <summary>Spatial indexing, clustering, and tessellation APIs with algebraic configuration.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
-    /// <summary>Spatial query via type-based dispatch and RTree.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
-        TInput input,
-        TQuery query,
-        IGeometryContext context,
-        int? bufferSize = null) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.OperationRegistry.TryGetValue((typeof(TInput), typeof(TQuery)), out (Func<object, RTree>? _, V mode, int bufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> execute) config) switch {
-            true => UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => config.execute(item, query, context, bufferSize ?? config.bufferSize)),
-                config: new OperationConfig<TInput, int> {
-                    Context = context,
-                    ValidationMode = config.mode,
-                    OperationName = $"Spatial.{typeof(TInput).Name}.{typeof(TQuery).Name}",
-                    EnableDiagnostics = false,
-                }),
-            false => ResultFactory.Create<IReadOnlyList<int>>(
-                error: E.Spatial.UnsupportedTypeCombo.WithContext(
-                    $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
-        };
+    /// <summary>Base request type for spatial operations.</summary>
+    public abstract record Request;
 
-    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
-        T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
-        IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+    /// <summary>Base request for clustering operations.</summary>
+    public abstract record ClusteringRequest(GeometryBase[] Geometry) : Request;
 
-    /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(
-        Brep brep,
-        double tolerance,
-        IGeometryContext context) =>
-        SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
+    /// <summary>RTree spatial query request.</summary>
+    public sealed record RTreeQueryRequest(QuerySource Source, Query Query, int? BufferSize = null) : Request;
 
-    /// <summary>Compute directional proximity field: (direction, maxDistance, angleWeight) → (index, distance, angle)[].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
-        GeometryBase[] geometry,
-        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
-        IGeometryContext context) =>
-        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
+    /// <summary>K-means clustering configuration.</summary>
+    public sealed record KMeansClusteringRequest(GeometryBase[] Geometry, int ClusterCount) : ClusteringRequest(Geometry);
 
-    /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<int[][]> ConvexHull3D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.ConvexHull3D(points: points, context: context);
+    /// <summary>DBSCAN clustering configuration.</summary>
+    public sealed record DBSCANClusteringRequest(GeometryBase[] Geometry, double Epsilon, int MinPoints) : ClusteringRequest(Geometry);
 
-    /// <summary>Compute 2D Delaunay triangulation → triangle vertex indices as int[][].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<int[][]> DelaunayTriangulation2D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.DelaunayTriangulation2D(points: points, context: context);
+    /// <summary>Hierarchical clustering configuration.</summary>
+    public sealed record HierarchicalClusteringRequest(GeometryBase[] Geometry, int ClusterCount) : ClusteringRequest(Geometry);
 
-    /// <summary>Compute 2D Voronoi diagram → cell vertices Point3d[][] for each input point.</summary>
+    /// <summary>Medial axis computation request.</summary>
+    public sealed record MedialAxisRequest(Brep Brep, double Tolerance) : Request;
+
+    /// <summary>Directional proximity field request.</summary>
+    public sealed record ProximityFieldRequest(GeometryBase[] Geometry, Vector3d Direction, double MaxDistance, double AngleWeight) : Request;
+
+    /// <summary>Convex hull computation request.</summary>
+    public sealed record ConvexHull3DRequest(Point3d[] Points) : Request;
+
+    /// <summary>Delaunay triangulation request.</summary>
+    public sealed record DelaunayTriangulationRequest(Point3d[] Points) : Request;
+
+    /// <summary>Voronoi diagram request.</summary>
+    public sealed record VoronoiDiagramRequest(Point3d[] Points) : Request;
+
+    /// <summary>Result record for clustering operations.</summary>
+    public sealed record ClusterResult(Point3d Centroid, double[] Radii);
+
+    /// <summary>Result record for directional proximity queries.</summary>
+    public sealed record ProximitySample(int Index, double Distance, double Angle);
+
+    /// <summary>Base type for spatial query sources.</summary>
+    public abstract record QuerySource;
+
+    /// <summary>Point array RTree source.</summary>
+    public sealed record PointArraySource(Point3d[] Points) : QuerySource;
+
+    /// <summary>Point cloud RTree source.</summary>
+    public sealed record PointCloudSource(PointCloud PointCloud) : QuerySource;
+
+    /// <summary>Mesh RTree source.</summary>
+    public sealed record MeshSource(Mesh Mesh) : QuerySource;
+
+    /// <summary>Mesh pair source for overlap detection.</summary>
+    public sealed record MeshPairSource(Mesh First, Mesh Second) : QuerySource;
+
+    /// <summary>Curve array RTree source.</summary>
+    public sealed record CurveArraySource(Curve[] Curves) : QuerySource;
+
+    /// <summary>Surface array RTree source.</summary>
+    public sealed record SurfaceArraySource(Surface[] Surfaces) : QuerySource;
+
+    /// <summary>Brep array RTree source.</summary>
+    public sealed record BrepArraySource(Brep[] Breps) : QuerySource;
+
+    /// <summary>Base type for spatial queries.</summary>
+    public abstract record Query;
+
+    /// <summary>Sphere range query.</summary>
+    public sealed record RTreeSphereQuery(Sphere Sphere) : Query;
+
+    /// <summary>Bounding box range query.</summary>
+    public sealed record RTreeBoundingBoxQuery(BoundingBox BoundingBox) : Query;
+
+    /// <summary>K-nearest neighborhood query.</summary>
+    public sealed record KNearestQuery(Point3d[] Needles, int Count) : Query;
+
+    /// <summary>Distance threshold proximity query.</summary>
+    public sealed record DistanceThresholdQuery(Point3d[] Needles, double Distance) : Query;
+
+    /// <summary>Mesh overlap query.</summary>
+    public sealed record MeshOverlapQuery(double ExtraTolerance) : Query;
+
+    /// <summary>Spatial query via algebraic source/query configuration.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<Point3d[][]> VoronoiDiagram2D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.VoronoiDiagram2D(points: points, context: context);
+    public static Result<IReadOnlyList<int>> Query(RTreeQueryRequest request, IGeometryContext context) =>
+        SpatialCore.Query(request: request, context: context);
+
+    /// <summary>Cluster geometry using the specified algebraic request.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<ClusterResult[]> Cluster(ClusteringRequest request, IGeometryContext context) =>
+        SpatialCore.Cluster(request: request, context: context);
+
+    /// <summary>Compute medial axis skeleton for planar Breps.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(MedialAxisRequest request, IGeometryContext context) =>
+        SpatialCore.MedialAxis(request: request, context: context);
+
+    /// <summary>Compute directional proximity field.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<ProximitySample[]> ProximityField(ProximityFieldRequest request, IGeometryContext context) =>
+        SpatialCore.ProximityField(request: request, context: context);
+
+    /// <summary>Compute 3D convex hull.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<int[][]> ConvexHull3D(ConvexHull3DRequest request, IGeometryContext context) =>
+        SpatialCore.ConvexHull3D(request: request, context: context);
+
+    /// <summary>Compute 2D Delaunay triangulation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<int[][]> DelaunayTriangulation2D(DelaunayTriangulationRequest request, IGeometryContext context) =>
+        SpatialCore.DelaunayTriangulation2D(request: request, context: context);
+
+    /// <summary>Compute 2D Voronoi diagram.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<Point3d[][]> VoronoiDiagram2D(VoronoiDiagramRequest request, IGeometryContext context) =>
+        SpatialCore.VoronoiDiagram2D(request: request, context: context);
 }
