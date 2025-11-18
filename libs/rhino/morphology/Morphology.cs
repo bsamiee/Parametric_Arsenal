@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -14,6 +16,101 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Mesh morphology operations: cage deformation, subdivision, smoothing, evolution.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
+    /// <summary>Base type for morphology operation requests.</summary>
+    public abstract record MorphologyRequest;
+
+    /// <summary>Base type for subdivision requests.</summary>
+    public abstract record SubdivisionRequest(int Levels) : MorphologyRequest;
+
+    /// <summary>Cage deformation specification.</summary>
+    public sealed record CageDeformRequest(
+        GeometryBase Cage,
+        IReadOnlyList<Point3d> OriginalControlPoints,
+        IReadOnlyList<Point3d> DeformedControlPoints) : MorphologyRequest;
+
+    /// <summary>Catmull-Clark subdivision request.</summary>
+    public sealed record CatmullClarkSubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    /// <summary>Loop subdivision request (requires triangulated input).</summary>
+    public sealed record LoopSubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    /// <summary>Butterfly subdivision request (requires triangulated input).</summary>
+    public sealed record ButterflySubdivisionRequest(int Levels) : SubdivisionRequest(Levels);
+
+    /// <summary>Laplacian smoothing request.</summary>
+    public sealed record LaplacianSmoothingRequest(int Iterations, bool LockBoundary) : MorphologyRequest;
+
+    /// <summary>Taubin smoothing request.</summary>
+    public sealed record TaubinSmoothingRequest(int Iterations, double Lambda, double Mu) : MorphologyRequest;
+
+    /// <summary>Mean curvature flow evolution request.</summary>
+    public sealed record MeanCurvatureFlowRequest(double TimeStep, int Iterations) : MorphologyRequest;
+
+    /// <summary>Mesh offset request.</summary>
+    public sealed record MeshOffsetRequest(double Distance, bool BothSides) : MorphologyRequest;
+
+    /// <summary>Mesh reduction request.</summary>
+    public sealed record MeshReductionRequest(int TargetFaceCount, bool PreserveBoundary, double Accuracy) : MorphologyRequest;
+
+    /// <summary>Isotropic remeshing request.</summary>
+    public sealed record RemeshRequest(double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : MorphologyRequest;
+
+    /// <summary>Brep to mesh conversion request.</summary>
+    public sealed record BrepToMeshRequest(MeshingParameters? Parameters, bool JoinMeshes) : MorphologyRequest;
+
+    /// <summary>Mesh repair request with explicit operations.</summary>
+    public sealed record MeshRepairRequest(IReadOnlyList<MeshRepairOperation> Operations, double WeldTolerance) : MorphologyRequest;
+
+    /// <summary>Mesh thickening request.</summary>
+    public sealed record MeshThickenRequest(double Thickness, bool Solidify, Vector3d Direction) : MorphologyRequest;
+
+    /// <summary>Mesh unwrap request.</summary>
+    public sealed record MeshUnwrapRequest(MeshUnwrapMode Mode) : MorphologyRequest;
+
+    /// <summary>Mesh separation request.</summary>
+    public sealed record MeshSeparationRequest() : MorphologyRequest;
+
+    /// <summary>Mesh welding request.</summary>
+    public sealed record MeshWeldRequest(double Tolerance, bool RecalculateNormals) : MorphologyRequest;
+
+    /// <summary>Mesh repair operations.</summary>
+    public abstract record MeshRepairOperation {
+        public abstract string Name { get; }
+    }
+
+    public sealed record FillHolesRepairOperation() : MeshRepairOperation {
+        public override string Name => "FillHoles";
+    }
+
+    public sealed record UnifyNormalsRepairOperation() : MeshRepairOperation {
+        public override string Name => "UnifyNormals";
+    }
+
+    public sealed record CullDegenerateFacesRepairOperation() : MeshRepairOperation {
+        public override string Name => "CullDegenerateFaces";
+    }
+
+    public sealed record CompactRepairOperation() : MeshRepairOperation {
+        public override string Name => "Compact";
+    }
+
+    public sealed record WeldRepairOperation() : MeshRepairOperation {
+        public override string Name => "Weld";
+    }
+
+    /// <summary>Mesh unwrap mode abstraction.</summary>
+    public abstract record MeshUnwrapMode(MeshUnwrapMethod Method) {
+        public abstract string Name { get; }
+    }
+
+    public sealed record AngleBasedMeshUnwrapMode() : MeshUnwrapMode(MeshUnwrapMethod.AngleBased) {
+        public override string Name => "AngleBased";
+    }
+
+    public sealed record ConformalEnergyMeshUnwrapMode() : MeshUnwrapMode(MeshUnwrapMethod.Conformal) {
+        public override string Name => "Conformal";
+    }
+
     /// <summary>Marker interface for polymorphic morphology result dispatch.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
@@ -124,14 +221,15 @@ public static class Morphology {
         int RepairedVertexCount,
         int OriginalFaceCount,
         int RepairedFaceCount,
-        byte OperationsPerformed,
+        IReadOnlyList<MeshRepairOperation> OperationsPerformed,
+        double WeldTolerance,
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
-            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={string.Join('|', this.OperationsPerformed.Select(operation => operation.Name))} | Tol={this.WeldTolerance:E2} | Quality={this.QualityScore:F3}");
     }
 
     /// <summary>Mesh separation result with per-component statistics.</summary>
@@ -230,18 +328,9 @@ public static class Morphology {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,
-        (byte Operation, object Parameters) spec,
+        MorphologyRequest request,
         IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
-            ? UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
-                config: new OperationConfig<T, IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = MorphologyConfig.ValidationMode(spec.Operation, typeof(T)),
-                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(spec.Operation)}"),
-                    EnableDiagnostics = false,
-                })
-            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+        request is null
+            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext("Request cannot be null"))
+            : MorphologyCore.Apply(input, request, context);
 }
