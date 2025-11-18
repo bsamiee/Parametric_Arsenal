@@ -14,8 +14,10 @@ public static class Fields {
     /// <summary>Field specification for grid resolution, bounds, and integration step size.</summary>
     public sealed record FieldSpec {
         public FieldSpec(int? resolution = null, BoundingBox? bounds = null, double? stepSize = null) {
-            int normalized = NormalizeResolution(resolution ?? FieldsConfig.DefaultResolution);
-            this.Resolution = RhinoMath.Clamp(normalized, FieldsConfig.MinResolution, FieldsConfig.MaxResolution);
+            this.Resolution = RhinoMath.Clamp(
+                resolution ?? FieldsConfig.DefaultResolution, 
+                FieldsConfig.MinResolution, 
+                FieldsConfig.MaxResolution);
             this.Bounds = bounds;
             this.StepSize = NormalizeStepSize(stepSize);
         }
