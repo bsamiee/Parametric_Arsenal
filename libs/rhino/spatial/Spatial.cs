@@ -56,9 +56,7 @@ public static class Spatial {
         GeometryBase[] geometry,
         (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
         IGeometryContext context) =>
-        parameters.Direction.Length > context.AbsoluteTolerance
-            ? SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context)
-            : ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection);
+        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
 
     /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -24,11 +24,12 @@ internal static class SpatialCompute {
 
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
     internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        geometry.Length is 0 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
-            : algorithm is > 2 ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}"))
-            : (algorithm is 0 or 2 && k <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK)
-            : (algorithm is 1 && epsilon <= 0) ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon)
-            : ((Func<Result<(Point3d, double[])[]>>)(() => {
+        (geometry.Length, algorithm, k, epsilon) switch {
+            (0, _, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
+            (_, > 2, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}")),
+            (_, 0 or 2, <= 0, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
+            (_, 1, _, <= 0) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon),
+            _ => ((Func<Result<(Point3d, double[])[]>>)(() => {
                 Point3d[] pts = new Point3d[geometry.Length];
                 for (int i = 0; i < geometry.Length; i++) {
                     GeometryBase current = geometry[i];
@@ -148,19 +149,17 @@ internal static class SpatialCompute {
         // SDK RTree.CreateFromPointArray for O(log n) neighbor queries (vs O(n) linear scan) when pts.Length > 100
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
-        int[] GetNeighbors(int idx) {
-            return tree is not null
-                ? ((Func<int[]>)(() => {
-                    List<int> buffer = [];
-                    _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
-                        if (args.Id != idx) {
-                            buffer.Add(args.Id);
-                        }
-                    });
-                    return [.. buffer,];
-                }))()
-                : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
-        }
+        int[] GetNeighbors(int idx) => tree is not null
+            ? ((Func<int[]>)(() => {
+                List<int> buffer = [];
+                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
+                    if (args.Id != idx) {
+                        buffer.Add(args.Id);
+                    }
+                });
+                return [.. buffer,];
+            }))()
+            : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
 
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
@@ -283,13 +282,11 @@ internal static class SpatialCompute {
             };
 
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
-        geometry.Length is 0
-            ? ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry"))
-            : direction.Length <= context.AbsoluteTolerance
-                ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection)
-                : maxDist <= context.AbsoluteTolerance
-                    ? ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance"))
-                    : ((Func<Result<(int, double, double)[]>>)(() => {
+        (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
+            (0, _, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
+            (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection),
+            (_, _, true) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
+            _ => ((Func<Result<(int, double, double)[]>>)(() => {
                         using RTree tree = new();
                         BoundingBox bounds = BoundingBox.Empty;
                         Point3d[] centers = new Point3d[geometry.Length];
