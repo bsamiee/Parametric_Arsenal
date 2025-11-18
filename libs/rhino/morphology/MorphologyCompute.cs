@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -489,7 +490,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
-        byte flags,
+        IReadOnlyList<Morphology.MeshRepairOperation> operations,
         double weldTolerance,
         IGeometryContext _) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
@@ -499,11 +500,13 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < 5; i++) {
-                    byte flag = (byte)(1 << i);
-                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
-                        bool success = entry.action(repaired, tol);
-                    }
+                IReadOnlyList<Morphology.MeshRepairOperation> repairOperations = operations ?? System.Array.Empty<Morphology.MeshRepairOperation>();
+                int operationCount = repairOperations.Count;
+                for (int i = 0; i < operationCount; i++) {
+                    Morphology.MeshRepairOperation operation = repairOperations[i];
+                    _ = MorphologyConfig.RepairOperationHandlers.TryGetValue(operation.GetType(), out Func<Mesh, double, bool> action)
+                        ? action(repaired, tol)
+                        : false;
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -597,19 +600,22 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
-        byte unwrapMethod,
+        Morphology.MeshUnwrapStrategy strategy,
         IGeometryContext _) =>
-        unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
+        strategy switch {
+            Morphology.AngleBasedMeshUnwrapStrategy => 0,
+            Morphology.ConformalEnergyMeshUnwrapStrategy => 1,
+            _ => -1,
+        } is int method && method >= 0
+            ? ((Func<Result<Mesh>>)(() => {
                 Mesh unwrapped = mesh.DuplicateMesh();
                 using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)method);
                 return success && unwrapped.TextureCoordinates.Count > 0
                     ? ResultFactory.Create(value: unwrapped)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
-            }))(),
-            _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
-        };
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(method == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+            }))()
+            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap strategy: {strategy.GetType().Name}")));
 }
