@@ -366,13 +366,14 @@ internal static class MorphologyCore {
                 operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                     MorphologyCompute.RepairMesh(
                         mesh: m,
-                        flags: request.Operations,
+                        operations: request.Operations,
                         weldTolerance: request.WeldTolerance,
                         context: context)
                     .Bind(repaired => ComputeRepairMetrics(
                         original: m,
                         repaired: repaired,
                         operations: request.Operations,
+                        weldTolerance: request.WeldTolerance,
                         context: context))),
                 config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                     Context = context,
@@ -423,7 +424,7 @@ internal static class MorphologyCore {
                 operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                     MorphologyCompute.UnwrapMesh(
                         mesh: m,
-                        unwrapMethod: request.UnwrapMethod,
+                        strategy: request.Strategy,
                         context: context)
                     .Bind(unwrapped => ComputeUnwrapMetrics(
                         original: m,

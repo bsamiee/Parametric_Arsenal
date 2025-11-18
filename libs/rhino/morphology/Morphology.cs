@@ -57,14 +57,41 @@ public static class Morphology {
     /// <summary>Brep to mesh conversion request with meshing parameters.</summary>
     public sealed record BrepToMeshRequest(MeshingParameters? Parameters, bool JoinMeshes) : MorphologyRequest;
 
-    /// <summary>Mesh repair request with operation flags and weld tolerance.</summary>
-    public sealed record MeshRepairRequest(byte Operations, double WeldTolerance) : MorphologyRequest;
+    /// <summary>Abstract base for mesh repair operations.</summary>
+    public abstract record MeshRepairOperation;
+
+    /// <summary>Fill holes mesh repair operation.</summary>
+    public sealed record FillHolesRepairOperation : MeshRepairOperation;
+
+    /// <summary>Unify normals mesh repair operation.</summary>
+    public sealed record UnifyNormalsRepairOperation : MeshRepairOperation;
+
+    /// <summary>Cull degenerate faces mesh repair operation.</summary>
+    public sealed record CullDegenerateFacesRepairOperation : MeshRepairOperation;
+
+    /// <summary>Compact mesh repair operation.</summary>
+    public sealed record CompactRepairOperation : MeshRepairOperation;
+
+    /// <summary>Weld vertices mesh repair operation.</summary>
+    public sealed record WeldVerticesRepairOperation : MeshRepairOperation;
+
+    /// <summary>Mesh repair request with operation list and weld tolerance.</summary>
+    public sealed record MeshRepairRequest(IReadOnlyList<MeshRepairOperation> Operations, double WeldTolerance) : MorphologyRequest;
 
     /// <summary>Mesh thickening request with offset distance and solidification option.</summary>
     public sealed record MeshThickenRequest(double Thickness, bool Solidify, Vector3d Direction) : MorphologyRequest;
 
-    /// <summary>Mesh UV unwrapping request with algorithm selection (0=AngleBased, 1=ConformalEnergyMinimization).</summary>
-    public sealed record MeshUnwrapRequest(byte UnwrapMethod) : MorphologyRequest;
+    /// <summary>Abstract base for mesh unwrap strategies.</summary>
+    public abstract record MeshUnwrapStrategy;
+
+    /// <summary>Angle-based mesh unwrapping strategy.</summary>
+    public sealed record AngleBasedUnwrapStrategy : MeshUnwrapStrategy;
+
+    /// <summary>Conformal energy minimization mesh unwrapping strategy.</summary>
+    public sealed record ConformalEnergyMinimizationUnwrapStrategy : MeshUnwrapStrategy;
+
+    /// <summary>Mesh UV unwrapping request with strategy selection.</summary>
+    public sealed record MeshUnwrapRequest(MeshUnwrapStrategy Strategy) : MorphologyRequest;
 
     /// <summary>Mesh component separation request (no parameters).</summary>
     public sealed record MeshSeparateRequest : MorphologyRequest;
@@ -178,14 +205,15 @@ public static class Morphology {
         int RepairedVertexCount,
         int OriginalFaceCount,
         int RepairedFaceCount,
-        byte OperationsPerformed,
+        IReadOnlyList<MeshRepairOperation> OperationsPerformed,
+        double WeldTolerance,
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
-            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={this.OperationsPerformed.Count} | Quality={this.QualityScore:F3}");
     }
 
     /// <summary>Mesh separation result with per-component statistics.</summary>
