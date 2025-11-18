@@ -210,12 +210,38 @@ internal static class TransformCompute {
                     $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")));
         }
 
-        Transform[] transforms = new Transform[count];
-        Interval domain = path.Domain;
-        double step = count > 1 ? domain.Length / (count - 1) : 0.0;
+        double curveLength = path.GetLength();
+        return curveLength <= context.AbsoluteTolerance
+            ? ResultFactory.Create<IReadOnlyList<T>>(
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")))
+            : /* continue with parameter computation logic */;
 
+        double[] parameters = count == 1
+            ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
+            : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
+                ? divideParameters
+                : ((Func<double[]>)(() => {
+                    double[] fallback = new double[count];
+                    double stepLength = curveLength / (count - 1);
+                    for (int index = 0; index < count; index++) {
+                        double targetLength = stepLength * index;
+                        bool resolved = path.LengthParameter(targetLength, out double tParameter);
+                        double normalized = targetLength / curveLength;
+                        // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
+                        double clamped = Math.Clamp(normalized, 0.0, 1.0);
+                        fallback[index] = resolved
+                            ? tParameter
+                            : path.Domain.ParameterAt(clamped);
+                    }
+
+                    return fallback;
+                }))();
+
+        Transform[] transforms = new Transform[count];
         for (int i = 0; i < count; i++) {
-            double t = count > 1 ? domain.Min + (step * i) : domain.Mid;
+            double t = parameters[i];
             Point3d pt = path.PointAt(t);
 
             transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
