@@ -283,13 +283,13 @@ internal static class TopologyCore {
     }
 
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyMeshEdges(Mesh mesh, double angleThreshold) {
-        _ = EnsureMeshNormals(mesh);
+        bool computed = EnsureMeshNormals(mesh);
         double curvatureThreshold = angleThreshold * TopologyConfig.CurvatureThresholdRatio;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i) switch {
             int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
             int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
-            int[] cf when cf.Length == 2 && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]]) switch {
+            int[] cf when cf.Length == 2 && computed && mesh.FaceNormals.Count > Math.Max(cf[0], cf[1]) => Vector3d.VectorAngle(...)
                 double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
                 double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
                 _ => Topology.EdgeContinuityType.Sharp,
