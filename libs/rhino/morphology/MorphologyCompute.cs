@@ -479,7 +479,7 @@ internal static class MorphologyCompute {
                 return welded.IsValid switch {
                     false => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed")),
                     true => ((Func<Result<Mesh>>)(() => {
-                        bool combineResult = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                        _ = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
                         return (weldNormals && !welded.Normals.ComputeNormals()) switch {
                             true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed")),
                             false => ResultFactory.Create(value: welded),
