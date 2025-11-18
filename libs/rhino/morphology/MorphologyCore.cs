@@ -216,21 +216,7 @@ internal static class MorphologyCore {
         Mesh original,
         Mesh subdivided,
         IGeometryContext context) {
-        double[] edgeLengths = [.. Enumerable.Range(0, subdivided.TopologyEdges.Count).Select(i => subdivided.TopologyEdges.EdgeLine(i).Length),];
-        (double aspectRatio, double[] angles)[] metrics = [.. Enumerable.Range(0, subdivided.Faces.Count).Select(i => {
-            (Point3d a, Point3d b, Point3d c) = (subdivided.Vertices[subdivided.Faces[i].A], subdivided.Vertices[subdivided.Faces[i].B], subdivided.Vertices[subdivided.Faces[i].C]);
-            (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
-            (double maxEdge, double minEdge) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
-            return (
-                aspectRatio: minEdge > context.AbsoluteTolerance ? maxEdge / minEdge : double.MaxValue,
-                angles: new[] {
-                    Vector3d.VectorAngle(b - a, c - a),
-                    Vector3d.VectorAngle(a - b, c - b),
-                    Vector3d.VectorAngle(a - c, b - c),
-                }
-            );
-        }),
-        ];
+        (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.SubdivisionResult(
                 subdivided,
@@ -239,8 +225,8 @@ internal static class MorphologyCore {
                 edgeLengths.Min(),
                 edgeLengths.Max(),
                 edgeLengths.Average(),
-                metrics.Average(m => m.aspectRatio),
-                metrics.SelectMany(m => m.angles).Min()),
+                aspectRatios.Average(),
+                minAngles.Min()),
         ]);
     }
 
@@ -257,14 +243,16 @@ internal static class MorphologyCore {
                 double dist = ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]);
                 return (acc.Item1 + (dist * dist), Math.Max(acc.Item2, dist));
             });
+        double rms = vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0;
+        double convergenceThreshold = context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
             new Morphology.SmoothingResult(
                 smoothed,
                 iterations,
-                vertCount > 0 ? Math.Sqrt(sumSq / vertCount) : 0.0,
+                rms,
                 maxDisp,
                 MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0,
-                Math.Sqrt(sumSq / Math.Max(vertCount, 1)) < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier),
+                rms < convergenceThreshold),
         ]);
     }
 
