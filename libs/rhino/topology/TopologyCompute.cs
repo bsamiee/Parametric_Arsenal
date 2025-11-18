@@ -127,7 +127,15 @@ internal static class TopologyCompute {
                                     Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
                                 };
                             }))(),
-                            Topology.Strategy => false,
+                            }))(),
+                            Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
+                                Brep[] components = copy.GetConnectedComponents() ?? [];
+                                return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: context.AbsoluteTolerance) switch {
+                                    null or { Length: 0 } => false,
+                                    Brep[] { Length: 1 } joined => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
+                                    Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
+                                };
+                            }))(),
                         };
                         string validationLog = string.Empty;
                         (bool isValid, int nakedEdges) = success && copy.IsValidTopology(out validationLog)
