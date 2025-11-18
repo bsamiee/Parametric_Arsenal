@@ -97,12 +97,15 @@ internal static class TopologyCompute {
                                             int idxA = nakedEdgeIndices[i];
                                             int idxB = nakedEdgeIndices[j];
                                             bool validIndices = idxA < copy.Edges.Count && idxB < copy.Edges.Count;
-                                            BrepEdge eA = validIndices ? copy.Edges[idxA] : null!;
-                                            BrepEdge eB = validIndices ? copy.Edges[idxB] : null!;
-                                            bool bothNaked = validIndices && eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked;
+                                            BrepEdge? eA = validIndices ? copy.Edges[idxA] : null;
+                                            BrepEdge? eB = validIndices ? copy.Edges[idxB] : null;
+                                            bool bothNaked = validIndices
+                                                && eA is not null && eB is not null
+                                                && eA.Valence == EdgeAdjacency.Naked
+                                                && eB.Valence == EdgeAdjacency.Naked;
                                             double minDist = bothNaked
                                                 ? Math.Min(
-                                                    Math.Min(eA.PointAtStart.DistanceTo(eB.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
+                                                    Math.Min(eA!.PointAtStart.DistanceTo(eB!.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
                                                     Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd)))
                                                 : double.MaxValue;
                                             bool shouldJoin = bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false);
