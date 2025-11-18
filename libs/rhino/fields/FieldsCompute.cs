@@ -261,12 +261,12 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod,
+        Fields.InterpolationMode interpolationMode,
         Func<T, T, double, T> lerp) where T : struct =>
-        interpolationMethod switch {
-            FieldsConfig.InterpolationNearest => InterpolateNearest(query, field, grid),
-            FieldsConfig.InterpolationTrilinear => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
-            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation method: {interpolationMethod.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+        interpolationMode switch {
+            Fields.InterpolationMode.NearestInterpolationMode => InterpolateNearest(query, field, grid),
+            Fields.InterpolationMode.TrilinearInterpolationMode => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {interpolationMode.GetType().Name}")),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -276,8 +276,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) =>
-        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
+        Fields.InterpolationMode interpolationMode) =>
+        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, interpolationMode: interpolationMode, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Vector3d> InterpolateVector(
@@ -286,8 +286,8 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         BoundingBox bounds,
-        byte interpolationMethod) =>
-        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, interpolationMethod: interpolationMethod, lerp: (a, b, t) => a + (t * (b - a)));
+        Fields.InterpolationMode interpolationMode) =>
+        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, interpolationMode: interpolationMode, lerp: (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
@@ -356,25 +356,30 @@ internal static class FieldsCompute {
         Point3d[] gridPoints,
         Point3d[] seeds,
         double stepSize,
-        byte integrationMethod,
+        Fields.IntegrationScheme integrationScheme,
         int resolution,
         BoundingBox bounds,
-        IGeometryContext context) =>
-        ((Func<Result<Curve[]>>)(() => {
-            Curve[] streamlines = new Curve[seeds.Length];
-            Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
-            try {
-                for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
-                    Point3d current = seeds[seedIdx];
+        IGeometryContext context) {
+        bool supported = integrationScheme is Fields.IntegrationScheme.EulerIntegrationScheme
+            || integrationScheme is Fields.IntegrationScheme.MidpointIntegrationScheme
+            || integrationScheme is Fields.IntegrationScheme.RungeKuttaFourthOrderIntegrationScheme;
+        return supported switch {
+            false => ResultFactory.Create<Curve[]>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Integration scheme {integrationScheme.GetType().Name} is not supported")),
+            true => ((Func<Result<Curve[]>>)(() => {
+                Curve[] streamlines = new Curve[seeds.Length];
+                Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
+                try {
+                    for (int seedIdx = 0; seedIdx < seeds.Length; seedIdx++) {
+                        Point3d current = seeds[seedIdx];
                     int stepCount = 0;
                     pathBuffer[stepCount++] = current;
                     for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
                         Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
                         Vector3d Interpolate(double coeff, Vector3d k) => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * coeff * k), resolution: resolution, bounds: bounds);
-                        Vector3d delta = integrationMethod switch {
-                            0 => stepSize * k1,
-                            1 => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
-                            2 or 3 => ((Func<Vector3d>)(() => {
+                        Vector3d delta = integrationScheme switch {
+                            Fields.IntegrationScheme.EulerIntegrationScheme => stepSize * k1,
+                            Fields.IntegrationScheme.MidpointIntegrationScheme => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
+                            Fields.IntegrationScheme.RungeKuttaFourthOrderIntegrationScheme => ((Func<Vector3d>)(() => {
                                 Vector3d k2 = Interpolate(FieldsConfig.RK4HalfSteps[0], k1);
                                 Vector3d k3 = Interpolate(FieldsConfig.RK4HalfSteps[1], k2);
                                 Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);
@@ -395,7 +400,9 @@ internal static class FieldsCompute {
             } finally {
                 ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
             }
-        }))();
+        }))(),
+        };
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) =>
@@ -645,22 +652,24 @@ internal static class FieldsCompute {
         double[] scalarField,
         Vector3d[] vectorField,
         Point3d[] grid,
-        int component) =>
-        (component is >= 0 and <= 2) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldComposition.WithContext("Component must be 0 (X), 1 (Y), or 2 (Z)")),
-            true => ApplyBinaryFieldOperation(
+        Fields.VectorComponent component) {
+        Func<Vector3d, double>? selector = component switch {
+            Fields.VectorComponent.XComponent => v => v.X,
+            Fields.VectorComponent.YComponent => v => v.Y,
+            Fields.VectorComponent.ZComponent => v => v.Z,
+            _ => null,
+        };
+        return selector is null
+            ? ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.InvalidFieldComposition.WithContext($"Unsupported vector component: {component.GetType().Name}"))
+            : ApplyBinaryFieldOperation(
                 inputField1: scalarField,
                 inputField2: vectorField,
                 grid: grid,
-                operation: (scalar, vector, _) => component switch {
-                    0 => scalar * vector.X,
-                    1 => scalar * vector.Y,
-                    2 => scalar * vector.Z,
-                    _ => 0.0,
-                },
+                operation: (scalar, vector, _) => scalar * selector(vector),
                 error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
-                error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points")),
-        };
+                error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
@@ -707,15 +716,13 @@ internal static class FieldsCompute {
                                 (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
                                 int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
                                 int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
-                                byte criticalType = (positiveCount, negativeCount) switch {
-                                    (3, 0) => FieldsConfig.CriticalPointMinimum,
-                                    (0, 3) => FieldsConfig.CriticalPointMaximum,
-                                    _ => FieldsConfig.CriticalPointSaddle,
-                                };
-
                                 criticalPoints.Add(new Fields.CriticalPoint(
                                     Location: grid[idx],
-                                    Type: criticalType,
+                                    Kind: (positiveCount, negativeCount) switch {
+                                        (3, 0) => Fields.CriticalPointKind.Minimum,
+                                        (0, 3) => Fields.CriticalPointKind.Maximum,
+                                        _ => Fields.CriticalPointKind.Saddle,
+                                    },
                                     Value: scalarField[idx],
                                     Eigenvectors: eigenvectors,
                                     Eigenvalues: eigenvalues));
