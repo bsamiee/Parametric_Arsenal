@@ -3,8 +3,6 @@ using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
