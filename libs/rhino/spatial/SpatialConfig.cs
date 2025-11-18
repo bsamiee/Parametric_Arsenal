@@ -32,7 +32,6 @@ internal static class SpatialConfig {
         internal const string ProximityField = "Spatial.ProximityField";
     }
 
-
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
     internal const int DefaultBufferSize = 2048;
     internal const int LargeBufferSize = 4096;
