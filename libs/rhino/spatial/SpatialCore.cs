@@ -1,9 +1,11 @@
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
@@ -21,48 +23,81 @@ internal static class SpatialCore {
     private static readonly Func<object, RTree> _brepArrayFactory = static s => BuildGeometryArrayTree((Brep[])s);
 
     /// <summary>(Input, Query) type pairs to (Factory, Mode, BufferSize, Execute) mapping.</summary>
-    internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
-        new (Type Input, Type Query, Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)[] {
-            (typeof(Point3d[]), typeof(Sphere), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
-            (typeof(Point3d[]), typeof(BoundingBox), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory)),
-            (typeof(Point3d[]), typeof((Point3d[], int)), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
-            (typeof(Point3d[]), typeof((Point3d[], double)), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeExecutor<Point3d[]>(_pointArrayFactory, (RTree.Point3dKNeighbors, RTree.Point3dClosestPoints))),
-            (typeof(PointCloud), typeof(Sphere), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            (typeof(PointCloud), typeof(BoundingBox), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory)),
-            (typeof(PointCloud), typeof((Point3d[], int)), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
-            (typeof(PointCloud), typeof((Point3d[], double)), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeExecutor<PointCloud>(_pointCloudFactory, (RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints))),
-            (typeof(Mesh), typeof(Sphere), _meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
-            (typeof(Mesh), typeof(BoundingBox), _meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeExecutor<Mesh>(_meshFactory)),
-            (typeof((Mesh, Mesh)), typeof(double), null, V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
-            (typeof(Curve[]), typeof(Sphere), _curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
-            (typeof(Curve[]), typeof(BoundingBox), _curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeExecutor<Curve[]>(_curveArrayFactory)),
-            (typeof(Surface[]), typeof(Sphere), _surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
-            (typeof(Surface[]), typeof(BoundingBox), _surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeExecutor<Surface[]>(_surfaceArrayFactory)),
-            (typeof(Brep[]), typeof(Sphere), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
-            (typeof(Brep[]), typeof(BoundingBox), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
+    internal static readonly FrozenDictionary<(Type Input, Type Query), (Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)> OperationRegistry =
+        new (Type Input, Type Query, Func<object, RTree>? Factory, V Mode, int BufferSize, Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute)[] {
+            (typeof(Point3d[]), typeof(Spatial.SphereQuery), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Point3d[], Spatial.SphereQuery>(_pointArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Point3d[]), typeof(Spatial.BoundingBoxQuery), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Point3d[], Spatial.BoundingBoxQuery>(_pointArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Point3d[]), typeof(Spatial.KNearestNeighborsQuery), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeProximityExecutor<Point3d[]>(RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
+            (typeof(Point3d[]), typeof(Spatial.DistanceLimitedQuery), _pointArrayFactory, V.None, SpatialConfig.DefaultBufferSize, MakeProximityExecutor<Point3d[]>(RTree.Point3dKNeighbors, RTree.Point3dClosestPoints)),
+            (typeof(PointCloud), typeof(Spatial.SphereQuery), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<PointCloud, Spatial.SphereQuery>(_pointCloudFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(PointCloud), typeof(Spatial.BoundingBoxQuery), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<PointCloud, Spatial.BoundingBoxQuery>(_pointCloudFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(PointCloud), typeof(Spatial.KNearestNeighborsQuery), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeProximityExecutor<PointCloud>(RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints)),
+            (typeof(PointCloud), typeof(Spatial.DistanceLimitedQuery), _pointCloudFactory, V.Standard, SpatialConfig.DefaultBufferSize, MakeProximityExecutor<PointCloud>(RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints)),
+            (typeof(Mesh), typeof(Spatial.SphereQuery), _meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Mesh, Spatial.SphereQuery>(_meshFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Mesh), typeof(Spatial.BoundingBoxQuery), _meshFactory, V.MeshSpecific, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Mesh, Spatial.BoundingBoxQuery>(_meshFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof((Mesh, Mesh)), typeof(Spatial.MeshOverlapQuery), null, V.MeshSpecific, SpatialConfig.LargeBufferSize, MakeMeshOverlapExecutor()),
+            (typeof(Curve[]), typeof(Spatial.SphereQuery), _curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Curve[], Spatial.SphereQuery>(_curveArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Curve[]), typeof(Spatial.BoundingBoxQuery), _curveArrayFactory, V.Degeneracy, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Curve[], Spatial.BoundingBoxQuery>(_curveArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Surface[]), typeof(Spatial.SphereQuery), _surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Surface[], Spatial.SphereQuery>(_surfaceArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Surface[]), typeof(Spatial.BoundingBoxQuery), _surfaceArrayFactory, V.BoundingBox, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Surface[], Spatial.BoundingBoxQuery>(_surfaceArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Brep[]), typeof(Spatial.SphereQuery), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Brep[], Spatial.SphereQuery>(_brepArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
+            (typeof(Brep[]), typeof(Spatial.BoundingBoxQuery), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeRangeExecutor<Brep[], Spatial.BoundingBoxQuery>(_brepArrayFactory, static (tree, query, buffer) => ExecuteRangeSearch(tree, query, buffer))),
         }.ToFrozenDictionary(static entry => (entry.Input, entry.Query), static entry => (entry.Factory, entry.Mode, entry.BufferSize, entry.Execute));
 
-    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
-        Func<object, RTree> factory,
-        (Func<TInput, Point3d[], int, IEnumerable<int[]>>? kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>>? distLimited)? proximityFuncs = null
-    ) where TInput : notnull =>
-        proximityFuncs is (Func<TInput, Point3d[], int, IEnumerable<int[]>> nearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> limited)
-            ? (i, q, _, _) => q switch {
-                (Point3d[] needles, int countLimit) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: countLimit, kNearest: nearest, distLimited: limited),
-                (Point3d[] needles, double distanceLimit) => ExecuteProximitySearch(source: (TInput)i, needles: needles, limit: distanceLimit, kNearest: nearest, distLimited: limited),
-                _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
-            }
-            : (i, q, _, b) => {
-                using RTree tree = factory(i);
-                return ExecuteRangeSearch(tree: tree, queryShape: q, bufferSize: b);
-            };
+    internal static Result<IReadOnlyList<int>> Analyze<TInput>(
+        TInput input,
+        Spatial.Query query,
+        IGeometryContext context,
+        int? bufferSize) where TInput : notnull =>
+        OperationRegistry.TryGetValue((typeof(TInput), query.GetType()), out (Func<object, RTree>? _, V Mode, int BufferSize, Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> Execute) config) switch {
+            true => UnifiedOperation.Apply(
+                input: input,
+                operation: (Func<TInput, Result<IReadOnlyList<int>>>)(item => config.Execute(item, query, context, bufferSize ?? config.BufferSize)),
+                config: new OperationConfig<TInput, int> {
+                    Context = context,
+                    ValidationMode = config.Mode,
+                    OperationName = SpatialConfig.BuildOperationName(typeof(TInput), query.GetType()),
+                    EnableDiagnostics = false,
+                }),
+            false => ResultFactory.Create<IReadOnlyList<int>>(
+                error: E.Spatial.UnsupportedTypeCombo.WithContext(
+                    $"Input: {typeof(TInput).Name}, Query: {query.GetType().Name}")),
+        };
 
-    private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
-        (i, q, c, b) => i is (Mesh m1, Mesh m2) && q is double tolerance
+    private static Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeRangeExecutor<TInput, TQuery>(
+        Func<object, RTree> factory,
+        Func<RTree, TQuery, int, Result<IReadOnlyList<int>>> executor) where TInput : notnull where TQuery : Spatial.Query =>
+        (input, query, _, buffer) => query is TQuery typed
+            ? ((Func<Result<IReadOnlyList<int>>>)(() => {
+                using RTree tree = factory(input);
+                return executor(tree, typed, buffer);
+            }))()
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
+
+    private static Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeProximityExecutor<TInput>(
+        Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest,
+        Func<TInput, Point3d[], double, IEnumerable<int[]>> distanceLimited) where TInput : notnull =>
+        (input, query, _, _) => query switch {
+            Spatial.KNearestNeighborsQuery nearest => ExecuteKNearestSearch(
+                source: (TInput)input,
+                needles: nearest.Points,
+                count: nearest.Count,
+                kNearest: kNearest),
+            Spatial.DistanceLimitedQuery distanceQuery => ExecuteDistanceLimitedSearch(
+                source: (TInput)input,
+                needles: distanceQuery.Points,
+                distance: distanceQuery.Distance,
+                distanceLimited: distanceLimited),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo),
+        };
+
+    private static Func<object, Spatial.Query, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeMeshOverlapExecutor() =>
+        (input, query, context, buffer) => input is (Mesh m1, Mesh m2) && query is Spatial.MeshOverlapQuery overlap
             ? ((Func<Result<IReadOnlyList<int>>>)(() => {
                 using RTree tree1 = _meshFactory(m1);
                 using RTree tree2 = _meshFactory(m2);
-                return ExecuteOverlapSearch(tree1: tree1, tree2: tree2, tolerance: c.AbsoluteTolerance + tolerance, bufferSize: b);
+                double tolerance = context.AbsoluteTolerance + overlap.AdditionalTolerance;
+                return ExecuteOverlapSearch(tree1: tree1, tree2: tree2, tolerance: tolerance, bufferSize: buffer);
             }))()
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo);
 
@@ -76,9 +111,16 @@ internal static class SpatialCore {
         return tree;
     }
 
-    /// <summary>Execute RTree range search with ArrayPool buffer for zero allocation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) =>
+    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, Spatial.SphereQuery query, int bufferSize) =>
+        ExecuteRangeSearch(tree, handler => tree.Search(query.Sphere, handler), bufferSize);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, Spatial.BoundingBoxQuery query, int bufferSize) =>
+        ExecuteRangeSearch(tree, handler => tree.Search(query.BoundingBox, handler), bufferSize);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, Func<System.EventHandler<RTreeEventArgs>, bool> search, int bufferSize) =>
         ((Func<Result<IReadOnlyList<int>>>)(() => {
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
@@ -89,31 +131,36 @@ internal static class SpatialCore {
                     }
                     buffer[count++] = args.Id;
                 }
-                _ = queryShape switch {
-                    Sphere sphere => tree.Search(sphere, Collect),
-                    BoundingBox box => tree.Search(box, Collect),
-                    _ => false,
-                };
+                _ = search(Collect);
                 return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
             } finally {
                 ArrayPool<int>.Shared.Return(buffer, clearArray: true);
             }
         }))();
 
-    /// <summary>Execute k-nearest or distance-limited proximity search via RTree.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteProximitySearch<T>(T source, Point3d[] needles, object limit, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
-        limit switch {
-            int k when k > 0 => kNearest(source, needles, k).ToArray() is int[][] results
+    private static Result<IReadOnlyList<int>> ExecuteKNearestSearch<T>(
+        T source,
+        Point3d[] needles,
+        int count,
+        Func<T, Point3d[], int, IEnumerable<int[]>> kNearest) where T : notnull =>
+        count > 0
+            ? kNearest(source, needles, count).ToArray() is int[][] results
                 ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            double d when d > 0 => distLimited(source, needles, d).ToArray() is int[][] results
+                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK.WithContext(count.ToString(CultureInfo.InvariantCulture)));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedSearch<T>(
+        T source,
+        Point3d[] needles,
+        double distance,
+        Func<T, Point3d[], double, IEnumerable<int[]>> distanceLimited) where T : notnull =>
+        distance > 0.0
+            ? distanceLimited(source, needles, distance).ToArray() is int[][] results
                 ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-            int k => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK.WithContext(k.ToString(System.Globalization.CultureInfo.InvariantCulture))),
-            double d => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance.WithContext(d.ToString(System.Globalization.CultureInfo.InvariantCulture))),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
-        };
+                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance.WithContext(distance.ToString(CultureInfo.InvariantCulture)));
 
     /// <summary>Execute mesh face overlap detection between two RTrees with tolerance.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

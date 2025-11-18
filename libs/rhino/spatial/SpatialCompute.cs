@@ -23,13 +23,14 @@ internal static class SpatialCompute {
         ];
 
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
-    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        (geometry.Length, algorithm, k, epsilon) switch {
-            (0, _, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
-            (_, > 2, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}")),
-            (_, 0 or 2, <= 0, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
-            (_, 1, _, <= 0) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon),
-            _ => ((Func<Result<(Point3d, double[])[]>>)(() => {
+    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, Spatial.ClusteringRequest request, IGeometryContext context) where T : GeometryBase {
+        if (request is null) {
+            return ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Request cannot be null"));
+        }
+
+        return geometry.Length is 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry"))
+            : ((Func<Result<(Point3d, double[])[]>>)(() => {
                 Point3d[] pts = new Point3d[geometry.Length];
                 for (int i = 0; i < geometry.Length; i++) {
                     GeometryBase current = geometry[i];
@@ -37,29 +38,31 @@ internal static class SpatialCompute {
                     Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
                     pts[i] = (Point3d)extractor(current);
                 }
-                return (algorithm is 0 or 2) && k > pts.Length
-                    ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
-                        ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
-                            ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
-                                int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
-                                return members.Length is 0
-                                    ? (Point3d.Origin, Array.Empty<double>())
-                                    : ((Func<(Point3d, double[])>)(() => {
-                                        Vector3d sum = Vector3d.Zero;
-                                        for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
-                                            Point3d point = pts[members[memberIndex]];
-                                            sum += new Vector3d(point);
-                                        }
-                                        Point3d centroid = Point3d.Origin + (sum / members.Length);
-                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
-                                    }))();
-                            }),
-                            ])
+
+                return request switch {
+                    Spatial.KMeansClusteringRequest { ClusterCount: <= 0 } => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
+                    Spatial.KMeansClusteringRequest { ClusterCount: int clusterCount } when clusterCount > pts.Length => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount),
+                    Spatial.KMeansClusteringRequest { ClusterCount: int clusterCount } => BuildClusterOutput(
+                        pts: pts,
+                        assignments: KMeansAssign(pts, clusterCount, context.AbsoluteTolerance, SpatialConfig.KMeansMaxIterations),
+                        clusterCount: clusterCount),
+                    Spatial.HierarchicalClusteringRequest { ClusterCount: <= 0 } => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
+                    Spatial.HierarchicalClusteringRequest { ClusterCount: int clusterCount } when clusterCount > pts.Length => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount),
+                    Spatial.HierarchicalClusteringRequest { ClusterCount: int clusterCount } => BuildClusterOutput(
+                        pts: pts,
+                        assignments: HierarchicalAssign(pts, clusterCount),
+                        clusterCount: clusterCount),
+                    Spatial.DBSCANClusteringRequest { Epsilon: <= 0.0 } => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon),
+                    Spatial.DBSCANClusteringRequest { MinPoints: <= 1 } => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("DBSCAN requires at least two points per cluster")),
+                    Spatial.DBSCANClusteringRequest dbscan => DBSCANAssign(pts, dbscan.Epsilon, dbscan.MinPoints) is int[] assigns && assigns.Length > 0
+                        ? assigns.Where(static assignment => assignment >= 0).DefaultIfEmpty(-1).Max() + 1 is int clusterCount && clusterCount > 0
+                            ? BuildClusterOutput(pts: pts, assignments: assigns, clusterCount: clusterCount)
                             : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
-                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
-            }))(),
-        };
+                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed),
+                    _ => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed),
+                };
+            }))();
+    }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
@@ -289,8 +292,12 @@ internal static class SpatialCompute {
                 _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary is not closed, planar, or degenerate")),
             };
 
-    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
-        (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
+    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Spatial.ProximityFieldRequest request, IGeometryContext context) {
+        if (request is null) {
+            return ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection.WithContext("Request cannot be null"));
+        }
+
+        return (geometry.Length, request.Direction.Length <= context.AbsoluteTolerance, request.MaxDistance <= context.AbsoluteTolerance) switch {
             (0, _, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
             (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection),
             (_, _, true) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
@@ -304,22 +311,24 @@ internal static class SpatialCompute {
                     bounds.Union(bbox);
                     centers[i] = bbox.Center;
                 }
-                Vector3d dir = direction / direction.Length;
+                Vector3d dir = request.Direction / request.Direction.Length;
                 Point3d origin = bounds.Center;
-                BoundingBox searchBox = new(origin - new Vector3d(maxDist, maxDist, maxDist), origin + new Vector3d(maxDist, maxDist, maxDist));
+                double maxDistance = request.MaxDistance;
+                BoundingBox searchBox = new(origin - new Vector3d(maxDistance, maxDistance, maxDistance), origin + new Vector3d(maxDistance, maxDistance, maxDistance));
                 List<(int, double, double)> results = [];
                 _ = tree.Search(searchBox, (_, args) => {
                     Vector3d toGeom = centers[args.Id] - origin;
                     double dist = toGeom.Length;
                     double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-                    double weightedDist = dist * (1.0 + (angleWeight * angle));
-                    if (weightedDist <= maxDist) {
+                    double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
+                    if (weightedDist <= maxDistance) {
                         results.Add((args.Id, dist, angle));
                     }
                 });
                 return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
             }))(),
         };
+    }
 
     /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -510,4 +519,23 @@ internal static class SpatialCompute {
             : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(geometryType)) is int match and >= 0
                 ? _centroidFallbacks[match].Extractor
                 : static geometry => geometry is GeometryBase baseGeometry ? baseGeometry.GetBoundingBox(accurate: false).Center : Point3d.Origin;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<(Point3d, double[])[]> BuildClusterOutput(Point3d[] pts, int[] assignments, int clusterCount) =>
+        clusterCount > 0
+            ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(cluster => {
+                int[] members = [.. Enumerable.Range(0, pts.Length).Where(index => assignments[index] == cluster),];
+                return members.Length is 0
+                    ? (Point3d.Origin, Array.Empty<double>())
+                    : ((Func<(Point3d, double[])>>)(() => {
+                        Vector3d sum = Vector3d.Zero;
+                        for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
+                            Point3d point = pts[members[memberIndex]];
+                            sum += new Vector3d(point);
+                        }
+                        Point3d centroid = Point3d.Origin + (sum / members.Length);
+                        return (centroid, [.. members.Select(index => pts[index].DistanceTo(centroid)),]);
+                    }))();
+            }),])
+            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
 }

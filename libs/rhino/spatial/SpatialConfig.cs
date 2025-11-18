@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
-using Arsenal.Core.Context;
+using System.Globalization;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -8,7 +8,7 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
 [Pure]
 internal static class SpatialConfig {
-    /// <summary>Polymorphic type extractors for centroids, RTree factories, and clustering dispatch.</summary>
+    /// <summary>Polymorphic type extractors for centroids and RTree factories.</summary>
     internal static readonly FrozenDictionary<(string Operation, Type GeometryType), Func<object, object>> TypeExtractors =
         new Dictionary<(string, Type), Func<object, object>> {
             [("Centroid", typeof(Curve))] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
@@ -19,14 +19,6 @@ internal static class SpatialConfig {
             [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
             [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
             [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
-                ? alg switch {
-                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
-                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
-                    2 => SpatialCompute.HierarchicalAssign(pts, k),
-                    _ => [],
-                }
-                : [],
         }.ToFrozenDictionary();
 
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
@@ -48,4 +40,10 @@ internal static class SpatialConfig {
     /// <summary>Delaunay triangulation super-triangle construction parameters.</summary>
     internal const double DelaunaySuperTriangleScale = 2.0;
     internal const double DelaunaySuperTriangleCenterWeight = 0.5;
+
+    [Pure]
+    internal static string BuildOperationName(Type inputType, Type queryType) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Spatial.{inputType.Name}.{queryType.Name}");
 }
