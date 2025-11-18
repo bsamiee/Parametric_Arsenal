@@ -7,8 +7,6 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
-#pragma warning disable CA1716 // Namespace Boolean conflicts with keyword but is intentional
-
 namespace Arsenal.Rhino.Boolean;
 
 /// <summary>FrozenDictionary dispatch with type-based operation routing.</summary>

@@ -7,7 +7,7 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
-#pragma warning disable CA1716 // Namespace Boolean conflicts with keyword but is intentional
+[assembly: System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1716:IdentifiersShouldNotMatchKeywords", Scope = "namespace", Target = "~N:Arsenal.Rhino.Boolean", Justification = "Boolean is intentional name for boolean operations API")]
 
 namespace Arsenal.Rhino.Boolean;
 

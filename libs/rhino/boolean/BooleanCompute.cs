@@ -6,8 +6,6 @@ using Arsenal.Core.Results;
 using Rhino;
 using Rhino.Geometry;
 
-#pragma warning disable CA1716 // Namespace Boolean conflicts with keyword but is intentional
-
 namespace Arsenal.Rhino.Boolean;
 
 /// <summary>Dense boolean algorithm implementations wrapping RhinoCommon SDK.</summary>
@@ -23,7 +21,7 @@ internal static class BooleanCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Brep.CreateBooleanUnion(breps, tolerance) switch {
+                : Brep.CreateBooleanUnion(breps: breps, tolerance: tolerance) switch {
                     null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Union returned null - verify input Breps are closed, valid, and have compatible tolerances")),
                     { Length: 0 } => ResultFactory.Create<Boolean.BooleanOutput>(
@@ -57,7 +55,7 @@ internal static class BooleanCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Brep.CreateBooleanIntersection(firstSet, secondSet, tolerance) switch {
+                : Brep.CreateBooleanIntersection(firstSet: firstSet, secondSet: secondSet, tolerance: tolerance) switch {
                     null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Intersection returned null - verify Breps are closed and overlap")),
                     { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
@@ -208,7 +206,7 @@ internal static class BooleanCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Mesh.CreateBooleanUnion(meshes, tolerance) switch {
+                : Mesh.CreateBooleanUnion(meshes: meshes, tolerance: tolerance) switch {
                     null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh union returned null - ensure meshes are closed and manifold")),
                     { Length: 0 } => ResultFactory.Create<Boolean.BooleanOutput>(
@@ -242,7 +240,7 @@ internal static class BooleanCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Mesh.CreateBooleanIntersection(firstSet, secondSet) switch {
+                : Mesh.CreateBooleanIntersection(firstSet: firstSet, secondSet: secondSet) switch {
                     null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh intersection returned null")),
                     { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
@@ -279,7 +277,7 @@ internal static class BooleanCompute {
 
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
                 ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
-                : Mesh.CreateBooleanDifference(firstSet, secondSet) switch {
+                : Mesh.CreateBooleanDifference(firstSet: firstSet, secondSet: secondSet) switch {
                     null => ResultFactory.Create<Boolean.BooleanOutput>(
                         error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh difference returned null")),
                     { Length: 0 } => ResultFactory.Create(value: new Boolean.BooleanOutput(
