@@ -211,12 +211,12 @@ internal static class TransformCompute {
         }
 
         double curveLength = path.GetLength();
-        if (curveLength <= context.AbsoluteTolerance) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
+        return curveLength <= context.AbsoluteTolerance
+            ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")));
-        }
+                    $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")))
+            : /* continue with parameter computation logic */;
 
         double[] parameters = count == 1
             ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
