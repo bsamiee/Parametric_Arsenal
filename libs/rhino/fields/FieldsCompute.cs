@@ -701,8 +701,11 @@ internal static class FieldsCompute {
                                 }
 
                                 (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
-                                int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
-                                int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
+                                (int positiveCount, int negativeCount) = (0, 0);
+                                for (int evIdx = 0; evIdx < eigenvalues.Length; evIdx++) {
+                                    positiveCount += eigenvalues[evIdx] > FieldsConfig.EigenvalueThreshold ? 1 : 0;
+                                    negativeCount += eigenvalues[evIdx] < -FieldsConfig.EigenvalueThreshold ? 1 : 0;
+                                }
                                 Fields.CriticalPointClassification classification = (positiveCount, negativeCount) switch {
                                     (3, 0) => new Fields.CriticalPointClassification.Minimum(),
                                     (0, 3) => new Fields.CriticalPointClassification.Maximum(),

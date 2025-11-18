@@ -6,6 +6,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
@@ -45,11 +46,19 @@ internal static class FieldsCore {
         T geometry,
         Fields.FieldSpec spec,
         IGeometryContext context) where T : GeometryBase =>
-        ((Func<Result<(Point3d[], double[])>>)(() => {
-            BoundingBox bounds = spec.Bounds ?? geometry.GetBoundingBox(accurate: true);
-            return bounds.IsValid switch {
-                false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds),
-                true => ((Func<Result<(Point3d[], double[])>>)(() => {
+        OperationRegistry.TryGetValue(typeof(T), out DistanceFieldEntry entry) switch {
+            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {typeof(T).Name}")),
+            true => ((Func<Result<(Point3d[], double[])>>)(() => {
+                SystemError[] validationErrors = entry.ValidationMode != V.None
+                    ? ValidationRules.GetOrCompileValidator(typeof(T), entry.ValidationMode)(geometry, context)
+                    : [];
+                return validationErrors.Length > 0
+                    ? ResultFactory.Create<(Point3d[], double[])>(errors: validationErrors)
+                    : ((Func<Result<(Point3d[], double[])>>)(() => {
+                        BoundingBox bounds = spec.Bounds ?? geometry.GetBoundingBox(accurate: true);
+                        return bounds.IsValid switch {
+                            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds),
+                            true => ((Func<Result<(Point3d[], double[])>>)(() => {
                     int resolution = spec.Resolution;
                     int totalSamples = resolution * resolution * resolution;
                     int bufferSize = OperationRegistry.TryGetValue(typeof(T), out DistanceFieldEntry config)
@@ -99,7 +108,10 @@ internal static class FieldsCore {
                         ArrayPool<Point3d>.Shared.Return(grid, clearArray: true);
                         ArrayPool<double>.Shared.Return(distances, clearArray: true);
                     }
-                }))(),
+                            }))(),
+                        };
+                    }))(),
             };
-        }))();
+        }))(),
+        };
 }
