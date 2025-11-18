@@ -92,23 +92,21 @@ internal static class TopologyCompute {
                                 bool joinedAny = false;
                                 for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
                                     int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
-                                    bool joinedThisPass = nakedEdgeIndices.Length == 0
-                                        ? false
-                                        : (from i in Enumerable.Range(0, nakedEdgeIndices.Length)
-                                           from j in Enumerable.Range(i + 1, nakedEdgeIndices.Length - i - 1)
-                                           let idxA = nakedEdgeIndices[i]
-                                           let idxB = nakedEdgeIndices[j]
-                                           where idxA < copy.Edges.Count && idxB < copy.Edges.Count
-                                           let eA = copy.Edges[idxA]
-                                           let eB = copy.Edges[idxB]
-                                           where eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked
-                                           let minDist = Math.Min(
-                                               Math.Min(eA.PointAtStart.DistanceTo(eB.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
-                                               Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd)))
-                                           where minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)
-                                           select true).Any();
+                                    bool joinedThisPass = nakedEdgeIndices.Length != 0 && (from i in Enumerable.Range(0, nakedEdgeIndices.Length)
+                                                                                           from j in Enumerable.Range(i + 1, nakedEdgeIndices.Length - i - 1)
+                                                                                           let idxA = nakedEdgeIndices[i]
+                                                                                           let idxB = nakedEdgeIndices[j]
+                                                                                           where idxA < copy.Edges.Count && idxB < copy.Edges.Count
+                                                                                           let eA = copy.Edges[idxA]
+                                                                                           let eB = copy.Edges[idxB]
+                                                                                           where eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked
+                                                                                           let minDist = Math.Min(
+                                                                                               Math.Min(eA.PointAtStart.DistanceTo(eB.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
+                                                                                               Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd)))
+                                                                                           where minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)
+                                                                                           select true).Any();
                                     joinedAny = joinedAny || joinedThisPass;
-                                    _ = joinedThisPass ? true : ((Func<bool>)(() => { iteration = TopologyConfig.MaxEdgesForNearMissAnalysis; return false; }))();
+                                    _ = joinedThisPass || ((Func<bool>)(() => { iteration = TopologyConfig.MaxEdgesForNearMissAnalysis; return false; }))();
                                 }
                                 copy.Compact();
                                 return joinedAny;

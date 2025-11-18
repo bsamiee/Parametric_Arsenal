@@ -240,14 +240,16 @@ internal static class TopologyCore {
         IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => getBounds(fIdx) switch {
             BoundingBox fBox when union.IsValid => BoundingBox.Union(union, fBox),
             BoundingBox fBox => fBox,
-        })),];
+        })),
+        ];
         return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(
             ComponentIndices: components,
             ComponentSizes: [.. components.Select(static c => c.Count),],
             ComponentBounds: bounds,
             TotalComponents: componentCount,
             IsFullyConnected: componentCount == 1,
-            AdjacencyGraph: Enumerable.Range(0, faceCount).ToFrozenDictionary(keySelector: i => i, elementSelector: getAdjacentForGraph)),]);
+            AdjacencyGraph: Enumerable.Range(0, faceCount).ToFrozenDictionary(keySelector: i => i, elementSelector: getAdjacentForGraph)),
+        ]);
     }
 
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyBrepEdges(Brep brep, Continuity minContinuity, double angleThreshold) {
@@ -320,7 +322,8 @@ internal static class TopologyCore {
                         ConnectedFaceIndices: mesh.TopologyVertices.ConnectedFaces(idx),
                         Valence: mesh.TopologyVertices.ConnectedTopologyVertices(idx).Length,
                         IsBoundary: connectedEdges.Any(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 1),
-                        IsManifold: connectedEdges.All(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 2)),]);
+                        IsManifold: connectedEdges.All(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 2)),
+                    ]);
                 }))(),
                 (Mesh mesh, int idx) => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.InvalidVertexIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"VertexIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyVertices.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),

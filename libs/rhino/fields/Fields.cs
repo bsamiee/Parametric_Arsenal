@@ -295,25 +295,21 @@ public static class Fields {
         double[,][] hessian,
         Point3d[] gridPoints,
         FieldSpec spec) =>
-        bool hessianValid =
-            hessian.GetLength(0) == 3
+        (hessian.GetLength(0) == 3
             && hessian.GetLength(1) == 3
             && Enumerable.Range(0, 3).All(row =>
                 Enumerable.Range(0, 3).All(col =>
                     hessian[row, col] is not null
-                    && hessian[row, col].Length == gridPoints.Length,
-                ),
-            );
-        return hessianValid switch {
-            false => ResultFactory.Create<CriticalPoint[]>(
-                error: E.Geometry.InvalidCriticalPointDetection.WithContext("Hessian must be a 3x3 tensor with entries per grid sample")),
-            true => FieldsCompute.DetectCriticalPoints(
-                scalarField: scalarField,
-                gradientField: gradientField,
-                hessian: hessian,
-                grid: gridPoints,
-                resolution: spec.Resolution),
-        };
+                    && hessian[row, col].Length == gridPoints.Length))) switch {
+                        false => ResultFactory.Create<CriticalPoint[]>(
+                            error: E.Geometry.InvalidCriticalPointDetection.WithContext("Hessian must be a 3x3 tensor with entries per grid sample")),
+                        true => FieldsCompute.DetectCriticalPoints(
+                            scalarField: scalarField,
+                            gradientField: gradientField,
+                            hessian: hessian,
+                            grid: gridPoints,
+                            resolution: spec.Resolution),
+                    };
 
     /// <summary>Compute field statistics: scalar field → (min, max, mean, std dev, min location, max location).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
