@@ -393,9 +393,11 @@ internal static class FieldsCompute {
                             _ => Vector3d.Zero,
                         };
                         Point3d nextPoint = current + delta;
-                        (current, pathBuffer[stepCount], stepCount, step) = bounds.Contains(nextPoint) && k1.Length >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1
-                            ? (nextPoint, nextPoint, stepCount + 1, step)
-                            : (current, pathBuffer[stepCount], stepCount, FieldsConfig.MaxStreamlineSteps);
+                        bool shouldContinue = bounds.Contains(nextPoint) && k1.Length >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
+                        pathBuffer[stepCount] = shouldContinue ? nextPoint : pathBuffer[stepCount];
+                        current = shouldContinue ? nextPoint : current;
+                        stepCount += shouldContinue ? 1 : 0;
+                        step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
                     }
                     streamlines[seedIdx] = stepCount > 1 ? Curve.CreateInterpolatedCurve([.. pathBuffer[..stepCount]], degree: 3) : new LineCurve(seeds[seedIdx], seeds[seedIdx] + new Vector3d(context.AbsoluteTolerance, 0, 0));
                 }
