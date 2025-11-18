@@ -6,10 +6,9 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    internal const byte OperationDistance = 0;
-    internal const byte IntegrationRK4 = 2;
-    internal const byte InterpolationNearest = 0;
-    internal const byte InterpolationTrilinear = 1;
+    internal static class OperationNames {
+        internal const string DistanceField = "fields.distance-field";
+    }
 
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
@@ -31,9 +30,10 @@ internal static class FieldsConfig {
 
     internal const int FieldRTreeThreshold = 100;
 
-    internal const byte CriticalPointMinimum = 0;
-    internal const byte CriticalPointMaximum = 1;
-    internal const byte CriticalPointSaddle = 2;
+    internal const int DistanceFieldMeshBuffer = 4096;
+    internal const int DistanceFieldBrepBuffer = 8192;
+    internal const int DistanceFieldCurveBuffer = 2048;
+    internal const int DistanceFieldSurfaceBuffer = 4096;
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),

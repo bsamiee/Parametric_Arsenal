@@ -4,6 +4,7 @@ using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
@@ -13,33 +14,98 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Fields dispatch registry with unified FrozenDictionary following SpatialCore pattern.</summary>
 [Pure]
 internal static class FieldsCore {
-    /// <summary>Unified operation dispatch table: (operation, geometry type) → (execute function, validation mode, buffer size, integration method).</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)> OperationRegistry =
-        new Dictionary<(byte, Type), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>, V, int, byte)> {
-            [(FieldsConfig.OperationDistance, typeof(Mesh))] = (ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Brep))] = (ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Curve))] = (ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Surface))] = (ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
+    /// <summary>Distance field operation metadata keyed by compile-time geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, (Func<GeometryBase, Fields.FieldSampling, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode)> DistanceOperations =
+        new Dictionary<Type, (Func<GeometryBase, Fields.FieldSampling, IGeometryContext, Result<(Point3d[], double[])>>, V)> {
+            [typeof(Mesh)] = (
+                static (geometry, sampling, context) => ExecuteDistanceField(
+                    (Mesh)geometry,
+                    sampling,
+                    context,
+                    FieldsConfig.DistanceFieldMeshBuffer),
+                V.Standard | V.MeshSpecific),
+            [typeof(Brep)] = (
+                static (geometry, sampling, context) => ExecuteDistanceField(
+                    (Brep)geometry,
+                    sampling,
+                    context,
+                    FieldsConfig.DistanceFieldBrepBuffer),
+                V.Standard | V.Topology),
+            [typeof(Curve)] = (
+                static (geometry, sampling, context) => ExecuteDistanceField(
+                    (Curve)geometry,
+                    sampling,
+                    context,
+                    FieldsConfig.DistanceFieldCurveBuffer),
+                V.Standard | V.Degeneracy),
+            [typeof(Surface)] = (
+                static (geometry, sampling, context) => ExecuteDistanceField(
+                    (Surface)geometry,
+                    sampling,
+                    context,
+                    FieldsConfig.DistanceFieldSurfaceBuffer),
+                V.Standard | V.BoundingBox),
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d[] Grid, double[] Distances)> DistanceField(
+        GeometryBase geometry,
+        Fields.FieldSampling sampling,
+        IGeometryContext context) =>
+        geometry switch {
+            null => ResultFactory.Create<(Point3d[], double[])>(
+                error: E.Geometry.UnsupportedAnalysis.WithContext("Geometry cannot be null")),
+            _ when !TryGetDistanceOperation(geometry.GetType(), out (Func<GeometryBase, Fields.FieldSampling, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode) entry) =>
+                ResultFactory.Create<(Point3d[], double[])>(
+                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometry.GetType().Name}")),
+            _ => UnifiedOperation.Apply(
+                    input: geometry,
+                    operation: (Func<GeometryBase, Result<(Point3d[], double[])>>)(item => entry.Execute(item, sampling, context)),
+                    config: new OperationConfig<GeometryBase, (Point3d[], double[])> {
+                        Context = context,
+                        ValidationMode = entry.ValidationMode,
+                        OperationName = FieldsConfig.OperationNames.DistanceField,
+                        EnableDiagnostics = false,
+                    })
+                .Bind(results => results.Count switch {
+                    0 => ResultFactory.Create<(Point3d[], double[])>(
+                        error: E.Geometry.UnsupportedAnalysis.WithContext("Distance field produced no samples")),
+                    _ => ResultFactory.Create(value: results[0]),
+                }),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryGetDistanceOperation(
+        Type geometryType,
+        out (Func<GeometryBase, Fields.FieldSampling, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode) entry) {
+        Type? current = geometryType;
+        while (current is not null) {
+            if (DistanceOperations.TryGetValue(current, out entry)) {
+                return true;
+            }
+            current = current.BaseType;
+        }
+
+        entry = default;
+        return false;
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
-        object geometry,
-        Fields.FieldSpec spec,
-        IGeometryContext context) where T : GeometryBase =>
+        T geometry,
+        Fields.FieldSampling sampling,
+        IGeometryContext context,
+        int bufferSize) where T : GeometryBase =>
         ((Func<Result<(Point3d[], double[])>>)(() => {
-            T typed = (T)geometry;
-            BoundingBox bounds = spec.Bounds ?? typed.GetBoundingBox(accurate: true);
+            BoundingBox bounds = sampling.Bounds ?? geometry.GetBoundingBox(accurate: true);
             if (!bounds.IsValid) {
                 return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds);
             }
-            int resolution = spec.Resolution;
+            int resolution = sampling.Resolution;
             int totalSamples = resolution * resolution * resolution;
-            int bufferSize = OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod) config)
-                ? Math.Max(totalSamples, config.BufferSize)
-                : totalSamples;
-            Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(bufferSize);
-            double[] distances = ArrayPool<double>.Shared.Rent(bufferSize);
+            int capacity = Math.Max(totalSamples, bufferSize);
+            Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(capacity);
+            double[] distances = ArrayPool<double>.Shared.Rent(capacity);
             try {
                 Vector3d delta = (bounds.Max - bounds.Min) / (resolution - 1);
                 int gridIndex = 0;
@@ -51,7 +117,7 @@ internal static class FieldsCore {
                     }
                 }
                 for (int i = 0; i < totalSamples; i++) {
-                    Point3d closest = typed switch {
+                    Point3d closest = geometry switch {
                         Mesh m => m.ClosestPoint(grid[i]),
                         Brep b => b.ClosestPoint(grid[i]),
                         Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
@@ -59,7 +125,7 @@ internal static class FieldsCore {
                         _ => grid[i],
                     };
                     double unsignedDist = grid[i].DistanceTo(closest);
-                    bool inside = typed switch {
+                    bool inside = geometry switch {
                         Brep brep => brep.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance * FieldsConfig.InsideOutsideToleranceMultiplier, strictlyIn: false),
                         Mesh mesh when mesh.IsClosed => mesh.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance, strictlyIn: false),
                         _ => false,
