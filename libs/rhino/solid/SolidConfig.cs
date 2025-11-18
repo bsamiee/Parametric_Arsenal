@@ -12,5 +12,4 @@ internal static class SolidConfig {
     internal const byte IntersectionOp = 1;
     internal const byte DifferenceOp = 2;
     internal const byte SplitOp = 3;
-    internal const byte TrimOp = 4;
 }
