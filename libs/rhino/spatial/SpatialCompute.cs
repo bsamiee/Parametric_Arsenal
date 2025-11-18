@@ -23,13 +23,18 @@ internal static class SpatialCompute {
         ];
 
     private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
-    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
-        (geometry.Length, algorithm, k, epsilon) switch {
-            (0, _, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
-            (_, > 2, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}")),
-            (_, 0 or 2, <= 0, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidClusterK),
-            (_, 1, _, <= 0) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.InvalidEpsilon),
-            _ => ((Func<Result<(Point3d, double[])[]>>)(() => {
+    internal static Result<Spatial.ClusterProfile[]> Cluster(Spatial.ClusteringRequest request, IGeometryContext context) {
+        GeometryBase[] geometry = request.Geometry;
+        Spatial.ClusteringStrategy strategy = request.Strategy;
+        return (geometry.Length, strategy) switch {
+            (0, _) => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
+            (_, Spatial.KMeansClusteringStrategy { ClusterCount: <= 0 }) => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.InvalidClusterK),
+            (_, Spatial.HierarchicalClusteringStrategy { ClusterCount: <= 0 }) => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.InvalidClusterK),
+            (_, Spatial.KMeansClusteringStrategy { ClusterCount: int clusterCount }) when clusterCount > geometry.Length => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.KExceedsPointCount),
+            (_, Spatial.HierarchicalClusteringStrategy { ClusterCount: int clusterCount }) when clusterCount > geometry.Length => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.KExceedsPointCount),
+            (_, Spatial.DBSCANClusteringStrategy { Epsilon: <= 0.0 }) => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.InvalidEpsilon),
+            (_, Spatial.DBSCANClusteringStrategy { MinimumPoints: int minPts }) when minPts < SpatialConfig.DBSCANMinPoints => ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.InvalidClusterK),
+            _ => ((Func<Result<Spatial.ClusterProfile[]>>)(() => {
                 Point3d[] pts = new Point3d[geometry.Length];
                 for (int i = 0; i < geometry.Length; i++) {
                     GeometryBase current = geometry[i];
@@ -37,29 +42,38 @@ internal static class SpatialCompute {
                     Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
                     pts[i] = (Point3d)extractor(current);
                 }
-                return (algorithm is 0 or 2) && k > pts.Length
-                    ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
-                        ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
-                            ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
-                                int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
-                                return members.Length is 0
-                                    ? (Point3d.Origin, Array.Empty<double>())
-                                    : ((Func<(Point3d, double[])>)(() => {
-                                        Vector3d sum = Vector3d.Zero;
-                                        for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
-                                            Point3d point = pts[members[memberIndex]];
-                                            sum += new Vector3d(point);
-                                        }
-                                        Point3d centroid = Point3d.Origin + (sum / members.Length);
-                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
-                                    }))();
-                            }),
-                            ])
-                            : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
-                        : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed);
-            }))(),
+                int[] assignments = strategy switch {
+                    Spatial.KMeansClusteringStrategy kMeans => KMeansAssign(pts, kMeans.ClusterCount, context.AbsoluteTolerance, SpatialConfig.KMeansMaxIterations),
+                    Spatial.DBSCANClusteringStrategy dbscan => DBSCANAssign(pts, dbscan.Epsilon, dbscan.MinimumPoints),
+                    Spatial.HierarchicalClusteringStrategy hierarchical => HierarchicalAssign(pts, hierarchical.ClusterCount),
+                    _ => [],
+                };
+                return assignments.Length is 0
+                    ? ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.ClusteringFailed)
+                    : (strategy switch {
+                        Spatial.KMeansClusteringStrategy kMeans => kMeans.ClusterCount,
+                        Spatial.HierarchicalClusteringStrategy hierarchical => hierarchical.ClusterCount,
+                        Spatial.DBSCANClusteringStrategy => assignments.Where(static a => a >= 0).DefaultIfEmpty(-1).Max() + 1,
+                        _ => 0,
+                    }) is int clusterCount && clusterCount > 0
+                        ? ResultFactory.Create<Spatial.ClusterProfile[]>(value: [.. Enumerable.Range(0, clusterCount).Select(clusterIndex => {
+                            int[] members = [.. Enumerable.Range(0, pts.Length).Where(pointIndex => assignments[pointIndex] == clusterIndex),];
+                            return members.Length is 0
+                                ? new Spatial.ClusterProfile(Point3d.Origin, Array.Empty<double>())
+                                : ((Func<Spatial.ClusterProfile>)(() => {
+                                    Vector3d sum = Vector3d.Zero;
+                                    for (int memberIndex = 0; memberIndex < members.Length; memberIndex++) {
+                                        Point3d point = pts[members[memberIndex]];
+                                        sum += new Vector3d(point);
+                                    }
+                                    Point3d centroid = Point3d.Origin + (sum / members.Length);
+                                    return new Spatial.ClusterProfile(centroid, [.. members.Select(index => pts[index].DistanceTo(centroid)),]);
+                                }))();
+                        }),])
+                        : ResultFactory.Create<Spatial.ClusterProfile[]>(error: E.Spatial.ClusteringFailed);
+            }))();
         };
+    }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
         int[] assignments = new int[pts.Length];
@@ -240,13 +254,15 @@ internal static class SpatialCompute {
         }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
-        brep.Faces.Count is 0
-            ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
+    internal static Result<Spatial.MedialAxisSkeleton> MedialAxis(Spatial.MedialAxisRequest request, IGeometryContext context) {
+        Brep brep = request.Brep;
+        double tolerance = request.Tolerance;
+        return brep.Faces.Count is 0
+            ? ResultFactory.Create<Spatial.MedialAxisSkeleton>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
             : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
-                (false, _) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.NonPlanarNotSupported),
-                (true, { Length: 0 }) => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
-                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: Math.Max(tolerance, context.AbsoluteTolerance), preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: Math.Max(tolerance, context.AbsoluteTolerance)) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<(Curve[], double[])>>)(() => {
+                (false, _) => ResultFactory.Create<Spatial.MedialAxisSkeleton>(error: E.Spatial.NonPlanarNotSupported),
+                (true, { Length: 0 }) => ResultFactory.Create<Spatial.MedialAxisSkeleton>(error: E.Spatial.MedialAxisFailed.WithContext("No boundary")),
+                (true, Curve[] edges) when Curve.JoinCurves(edges, joinTolerance: Math.Max(tolerance, context.AbsoluteTolerance), preserveDirection: false).FirstOrDefault() is Curve boundary && boundary.IsClosed && boundary.TryGetPlane(out Plane plane, tolerance: Math.Max(tolerance, context.AbsoluteTolerance)) && boundary.GetLength() > context.AbsoluteTolerance => ((Func<Result<Spatial.MedialAxisSkeleton>>)(() => {
                     double effectiveTolerance = Math.Max(tolerance, context.AbsoluteTolerance);
                     double length = boundary.GetLength();
                     int sampleCount = (int)RhinoMath.Clamp(length / effectiveTolerance, SpatialConfig.MedialAxisMinSampleCount, SpatialConfig.MedialAxisMaxSampleCount);
@@ -281,20 +297,27 @@ internal static class SpatialCompute {
                             .Where(static pair => pair.Item1 is not null),
                         ];
                         return skeleton.Length > 0
-                            ? ResultFactory.Create<(Curve[], double[])>(value: ([.. skeleton.Select(static s => s.Item1!),], [.. skeleton.Select(static s => s.Item2),]))
-                            : ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary"));
+                            ? ResultFactory.Create<Spatial.MedialAxisSkeleton>(value: new Spatial.MedialAxisSkeleton(
+                                Skeleton: [.. skeleton.Select(static s => s.Item1!),],
+                                Stability: [.. skeleton.Select(static s => s.Item2),]))
+                            : ResultFactory.Create<Spatial.MedialAxisSkeleton>(error: E.Spatial.MedialAxisFailed.WithContext("No skeleton edges inside boundary"));
                     });
                 }))()
                 ,
-                _ => ResultFactory.Create<(Curve[], double[])>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary is not closed, planar, or degenerate")),
+                _ => ResultFactory.Create<Spatial.MedialAxisSkeleton>(error: E.Spatial.MedialAxisFailed.WithContext("Boundary is not closed, planar, or degenerate")),
             };
+    }
 
-    internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
-        (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
-            (0, _, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
-            (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection),
-            (_, _, true) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
-            _ => ((Func<Result<(int, double, double)[]>>)(() => {
+    internal static Result<Spatial.ProximitySample[]> ProximityField(Spatial.ProximityFieldRequest request, IGeometryContext context) {
+        GeometryBase[] geometry = request.Geometry;
+        Vector3d direction = request.Direction;
+        double maxDist = request.MaxDistance;
+        double angleWeight = request.AngleWeight;
+        return (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
+            (0, _, _) => ResultFactory.Create<Spatial.ProximitySample[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
+            (_, true, _) => ResultFactory.Create<Spatial.ProximitySample[]>(error: E.Spatial.ZeroLengthDirection),
+            (_, _, true) => ResultFactory.Create<Spatial.ProximitySample[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
+            _ => ((Func<Result<Spatial.ProximitySample[]>>)(() => {
                 using RTree tree = new();
                 BoundingBox bounds = BoundingBox.Empty;
                 Point3d[] centers = new Point3d[geometry.Length];
@@ -307,19 +330,20 @@ internal static class SpatialCompute {
                 Vector3d dir = direction / direction.Length;
                 Point3d origin = bounds.Center;
                 BoundingBox searchBox = new(origin - new Vector3d(maxDist, maxDist, maxDist), origin + new Vector3d(maxDist, maxDist, maxDist));
-                List<(int, double, double)> results = [];
+                List<Spatial.ProximitySample> results = [];
                 _ = tree.Search(searchBox, (_, args) => {
                     Vector3d toGeom = centers[args.Id] - origin;
                     double dist = toGeom.Length;
                     double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
                     double weightedDist = dist * (1.0 + (angleWeight * angle));
                     if (weightedDist <= maxDist) {
-                        results.Add((args.Id, dist, angle));
+                        results.Add(new Spatial.ProximitySample(args.Id, dist, angle));
                     }
                 });
-                return ResultFactory.Create(value: results.OrderBy(static r => r.Item2).ToArray());
+                return ResultFactory.Create(value: results.OrderBy(static sample => sample.Distance).ToArray());
             }))(),
         };
+    }
 
     /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

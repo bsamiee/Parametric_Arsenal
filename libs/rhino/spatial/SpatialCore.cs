@@ -4,6 +4,7 @@ using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino.Geometry;
@@ -41,6 +42,93 @@ internal static class SpatialCore {
             (typeof(Brep[]), typeof(Sphere), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
             (typeof(Brep[]), typeof(BoundingBox), _brepArrayFactory, V.Topology, SpatialConfig.DefaultBufferSize, MakeExecutor<Brep[]>(_brepArrayFactory)),
         }.ToFrozenDictionary(static entry => (entry.Input, entry.Query), static entry => (entry.Factory, entry.Mode, entry.BufferSize, entry.Execute));
+
+    /// <summary>Cluster geometry using strongly-typed strategies.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Spatial.ClusterProfile[]> Cluster(Spatial.ClusteringRequest request, IGeometryContext context) =>
+        SpatialConfig.ClusterOperationMetadata.TryGetValue(request.Strategy.GetType(), out (V Mode, string OperationName) meta) switch {
+            true => UnifiedOperation.Apply(
+                    input: request,
+                    operation: (Func<Spatial.ClusteringRequest, Result<IReadOnlyList<Spatial.ClusterProfile>>>)(current =>
+                        SpatialCompute.Cluster(request: current, context: context)
+                            .Map(static value => (IReadOnlyList<Spatial.ClusterProfile>)value)),
+                    config: new OperationConfig<Spatial.ClusteringRequest, Spatial.ClusterProfile> {
+                        Context = context,
+                        ValidationMode = meta.Mode,
+                        OperationName = meta.OperationName,
+                    })
+                .Map(static list => list.ToArray()),
+            false => ResultFactory.Create<Spatial.ClusterProfile[]>(
+                error: E.Spatial.ClusteringFailed.WithContext($"Strategy: {request.Strategy.GetType().Name}")),
+        };
+
+    /// <summary>Medial axis orchestration via UnifiedOperation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Spatial.MedialAxisSkeleton> MedialAxis(Spatial.MedialAxisRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Spatial.MedialAxisRequest, Result<Spatial.MedialAxisSkeleton>>)(current =>
+                SpatialCompute.MedialAxis(request: current, context: context)),
+            config: new OperationConfig<Spatial.MedialAxisRequest, Spatial.MedialAxisSkeleton> {
+                Context = context,
+                ValidationMode = SpatialConfig.MedialAxisOperation.Mode,
+                OperationName = SpatialConfig.MedialAxisOperation.OperationName,
+            })
+        .Map(static list => list.Count > 0 ? list[0] : SpatialConfig.EmptyMedialAxis);
+
+    /// <summary>Proximity field orchestration.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Spatial.ProximitySample[]> ProximityField(Spatial.ProximityFieldRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Spatial.ProximityFieldRequest, Result<IReadOnlyList<Spatial.ProximitySample>>>)(current =>
+                SpatialCompute.ProximityField(request: current, context: context)
+                    .Map(static value => (IReadOnlyList<Spatial.ProximitySample>)value)),
+            config: new OperationConfig<Spatial.ProximityFieldRequest, Spatial.ProximitySample> {
+                Context = context,
+                ValidationMode = SpatialConfig.ProximityFieldOperation.Mode,
+                OperationName = SpatialConfig.ProximityFieldOperation.OperationName,
+            })
+        .Map(static list => list.ToArray());
+
+    /// <summary>Convex hull orchestration.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: points,
+            operation: (Func<Point3d[], Result<int[][]>>)(pts => SpatialCompute.ConvexHull3D(points: pts, context: context)),
+            config: new OperationConfig<Point3d[], int[]> {
+                Context = context,
+                ValidationMode = SpatialConfig.ConvexHull3DOperation.Mode,
+                OperationName = SpatialConfig.ConvexHull3DOperation.OperationName,
+            })
+        .Map(static list => list.ToArray());
+
+    /// <summary>Delaunay orchestration.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: points,
+            operation: (Func<Point3d[], Result<int[][]>>)(pts => SpatialCompute.DelaunayTriangulation2D(points: pts, context: context)),
+            config: new OperationConfig<Point3d[], int[]> {
+                Context = context,
+                ValidationMode = SpatialConfig.DelaunayOperation.Mode,
+                OperationName = SpatialConfig.DelaunayOperation.OperationName,
+            })
+        .Map(static list => list.ToArray());
+
+    /// <summary>Voronoi orchestration.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: points,
+            operation: (Func<Point3d[], Result<Point3d[][]>>)(pts => SpatialCompute.VoronoiDiagram2D(points: pts, context: context)),
+            config: new OperationConfig<Point3d[], Point3d[]> {
+                Context = context,
+                ValidationMode = SpatialConfig.VoronoiOperation.Mode,
+                OperationName = SpatialConfig.VoronoiOperation.OperationName,
+            })
+        .Map(static list => list.ToArray());
 
     private static Func<object, object, IGeometryContext, int, Result<IReadOnlyList<int>>> MakeExecutor<TInput>(
         Func<object, RTree> factory,

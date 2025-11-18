@@ -12,6 +12,39 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
+    /// <summary>Base type for all spatial requests.</summary>
+    public abstract record SpatialRequest;
+
+    /// <summary>Aggregate request for clustering geometry collections.</summary>
+    public sealed record ClusteringRequest(GeometryBase[] Geometry, ClusteringStrategy Strategy) : SpatialRequest;
+
+    /// <summary>Request for planar Brep medial axis extraction.</summary>
+    public sealed record MedialAxisRequest(Brep Brep, double Tolerance) : SpatialRequest;
+
+    /// <summary>Request for weighted proximity field sampling.</summary>
+    public sealed record ProximityFieldRequest(GeometryBase[] Geometry, Vector3d Direction, double MaxDistance, double AngleWeight) : SpatialRequest;
+
+    /// <summary>Base type for clustering strategies.</summary>
+    public abstract record ClusteringStrategy;
+
+    /// <summary>K-means clustering with explicit cluster count.</summary>
+    public sealed record KMeansClusteringStrategy(int ClusterCount) : ClusteringStrategy;
+
+    /// <summary>Density-based spatial clustering with epsilon neighborhood.</summary>
+    public sealed record DBSCANClusteringStrategy(double Epsilon, int MinimumPoints) : ClusteringStrategy;
+
+    /// <summary>Hierarchical agglomerative clustering down to target clusters.</summary>
+    public sealed record HierarchicalClusteringStrategy(int ClusterCount) : ClusteringStrategy;
+
+    /// <summary>Cluster centroid + member radii summary.</summary>
+    public sealed record ClusterProfile(Point3d Centroid, double[] Radii);
+
+    /// <summary>Medial axis skeleton curves with per-edge stability.</summary>
+    public sealed record MedialAxisSkeleton(Curve[] Skeleton, double[] Stability);
+
+    /// <summary>Directional proximity field sample.</summary>
+    public sealed record ProximitySample(int Index, double Distance, double Angle);
+
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
@@ -34,48 +67,48 @@ public static class Spatial {
                     $"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
-    /// <summary>Cluster geometry by proximity: (algorithm: 0=KMeans|1=DBSCAN|2=Hierarchical, k, epsilon) → (centroid, radii[])[].</summary>
+    /// <summary>Cluster geometry by proximity using explicit strategy variants.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Point3d Centroid, double[] Radii)[]> Cluster<T>(
+    public static Result<ClusterProfile[]> Cluster<T>(
         T[] geometry,
-        (byte Algorithm, int K, double Epsilon) parameters,
+        ClusteringStrategy strategy,
         IGeometryContext context) where T : GeometryBase =>
-        SpatialCompute.Cluster(geometry: geometry, algorithm: parameters.Algorithm, k: parameters.K, epsilon: parameters.Epsilon, context: context);
+        SpatialCore.Cluster(
+            request: new ClusteringRequest(Geometry: geometry, Strategy: strategy),
+            context: context);
 
-    /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
+    /// <summary>Compute medial axis skeleton for planar Breps.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(
-        Brep brep,
-        double tolerance,
+    public static Result<MedialAxisSkeleton> MedialAxis(
+        MedialAxisRequest request,
         IGeometryContext context) =>
-        SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
+        SpatialCore.MedialAxis(request: request, context: context);
 
-    /// <summary>Compute directional proximity field: (direction, maxDistance, angleWeight) → (index, distance, angle)[].</summary>
+    /// <summary>Compute directional proximity field using strongly-typed configuration.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(int Index, double Distance, double Angle)[]> ProximityField(
-        GeometryBase[] geometry,
-        (Vector3d Direction, double MaxDistance, double AngleWeight) parameters,
+    public static Result<ProximitySample[]> ProximityField(
+        ProximityFieldRequest request,
         IGeometryContext context) =>
-        SpatialCompute.ProximityField(geometry: geometry, direction: parameters.Direction, maxDist: parameters.MaxDistance, angleWeight: parameters.AngleWeight, context: context);
+        SpatialCore.ProximityField(request: request, context: context);
 
     /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<int[][]> ConvexHull3D(
         Point3d[] points,
         IGeometryContext context) =>
-        SpatialCompute.ConvexHull3D(points: points, context: context);
+        SpatialCore.ConvexHull3D(points: points, context: context);
 
     /// <summary>Compute 2D Delaunay triangulation → triangle vertex indices as int[][].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<int[][]> DelaunayTriangulation2D(
         Point3d[] points,
         IGeometryContext context) =>
-        SpatialCompute.DelaunayTriangulation2D(points: points, context: context);
+        SpatialCore.DelaunayTriangulation2D(points: points, context: context);
 
     /// <summary>Compute 2D Voronoi diagram → cell vertices Point3d[][] for each input point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<Point3d[][]> VoronoiDiagram2D(
         Point3d[] points,
         IGeometryContext context) =>
-        SpatialCompute.VoronoiDiagram2D(points: points, context: context);
+        SpatialCore.VoronoiDiagram2D(points: points, context: context);
 }

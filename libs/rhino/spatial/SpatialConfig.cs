@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -19,14 +20,6 @@ internal static class SpatialConfig {
             [("RTreeFactory", typeof(Point3d[]))] = static s => RTree.CreateFromPointArray((Point3d[])s) ?? new RTree(),
             [("RTreeFactory", typeof(PointCloud))] = static s => RTree.CreatePointCloudTree((PointCloud)s) ?? new RTree(),
             [("RTreeFactory", typeof(Mesh))] = static s => RTree.CreateMeshFaceTree((Mesh)s) ?? new RTree(),
-            [("ClusterAssign", typeof(void))] = static input => input is (byte alg, Point3d[] pts, int k, double eps, IGeometryContext ctx)
-                ? alg switch {
-                    0 => SpatialCompute.KMeansAssign(pts, k, ctx.AbsoluteTolerance, KMeansMaxIterations),
-                    1 => SpatialCompute.DBSCANAssign(pts, eps, DBSCANMinPoints),
-                    2 => SpatialCompute.HierarchicalAssign(pts, k),
-                    _ => [],
-                }
-                : [],
         }.ToFrozenDictionary();
 
     /// <summary>Buffer sizes for RTree spatial query operations.</summary>
@@ -48,4 +41,30 @@ internal static class SpatialConfig {
     /// <summary>Delaunay triangulation super-triangle construction parameters.</summary>
     internal const double DelaunaySuperTriangleScale = 2.0;
     internal const double DelaunaySuperTriangleCenterWeight = 0.5;
+
+    /// <summary>Operation metadata per clustering strategy type.</summary>
+    internal static readonly FrozenDictionary<Type, (V Mode, string OperationName)> ClusterOperationMetadata =
+        new Dictionary<Type, (V, string)> {
+            [typeof(Spatial.KMeansClusteringStrategy)] = (V.Standard | V.MassProperties, "Spatial.Cluster.KMeans"),
+            [typeof(Spatial.DBSCANClusteringStrategy)] = (V.None, "Spatial.Cluster.DBSCAN"),
+            [typeof(Spatial.HierarchicalClusteringStrategy)] = (V.Standard, "Spatial.Cluster.Hierarchical"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Medial axis orchestration metadata.</summary>
+    internal static readonly (V Mode, string OperationName) MedialAxisOperation = (V.Topology | V.Degeneracy, "Spatial.MedialAxis");
+
+    /// <summary>Proximity field orchestration metadata.</summary>
+    internal static readonly (V Mode, string OperationName) ProximityFieldOperation = (V.BoundingBox, "Spatial.ProximityField");
+
+    /// <summary>Convex hull orchestration metadata.</summary>
+    internal static readonly (V Mode, string OperationName) ConvexHull3DOperation = (V.None, "Spatial.ConvexHull3D");
+
+    /// <summary>Delaunay orchestration metadata.</summary>
+    internal static readonly (V Mode, string OperationName) DelaunayOperation = (V.None, "Spatial.DelaunayTriangulation2D");
+
+    /// <summary>Voronoi orchestration metadata.</summary>
+    internal static readonly (V Mode, string OperationName) VoronoiOperation = (V.None, "Spatial.VoronoiDiagram2D");
+
+    /// <summary>Default empty medial axis skeleton.</summary>
+    internal static readonly Spatial.MedialAxisSkeleton EmptyMedialAxis = new([], []);
 }
