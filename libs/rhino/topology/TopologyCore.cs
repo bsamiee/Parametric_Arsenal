@@ -14,8 +14,6 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Topology execution via breadth-first search and edge classification algorithms.</summary>
 [Pure]
 internal static class TopologyCore {
-    private static readonly IReadOnlyList<int> EmptyIndices = [];
-
     private static Result<TResult> Execute<T, TResult>(T input, IGeometryContext context, TopologyConfig.OpType opType, Func<T, Result<IReadOnlyList<TResult>>> operation) where T : notnull =>
         TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out (V ValidationMode, string OpName) meta)
             ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta.ValidationMode, OperationName = meta.OpName, EnableDiagnostics = false }).Map(results => results[0])
@@ -33,10 +31,10 @@ internal static class TopologyCore {
                         new Topology.NakedEdgeData(
                             EdgeCurves: nakedCurves,
                             EdgeIndices: [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),],
-                            Valences: [.. nakedCurves.Select(_ => 1),],
+                            Valences: [.. nakedCurves.Select(static _ => 1),],
                             IsOrdered: orderLoops,
                             TotalEdgeCount: brep.Edges.Count,
-                            TotalLength: nakedCurves.Sum(c => c.GetLength())),
+                            TotalLength: nakedCurves.Sum(static c => c.GetLength())),
                     ]),
                 },
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
@@ -76,9 +74,9 @@ internal static class TopologyCore {
                         Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) is Curve[] j ? j : [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                             Loops: [.. joined,],
-                            EdgeIndicesPerLoop: [.. joined.Select(_ => EmptyIndices),],
-                            LoopLengths: [.. joined.Select(c => c.GetLength()),],
-                            IsClosedPerLoop: [.. joined.Select(c => c.IsClosed),],
+                            EdgeIndicesPerLoop: [.. joined.Select(static _ => (IReadOnlyList<int>)[]),],
+                            LoopLengths: [.. joined.Select(static c => c.GetLength()),],
+                            IsClosedPerLoop: [.. joined.Select(static c => c.IsClosed),],
                             JoinTolerance: tol,
                             FailedJoins: nakedCurves.Length - joined.Length),
                         ]);
@@ -143,7 +141,15 @@ internal static class TopologyCore {
                     getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()),
                     getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false),
                     getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
-                Mesh mesh => ComputeConnectivity(_: mesh, faceCount: mesh.Faces.Count, getAdjacent: fIdx => mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0), getBounds: fIdx => mesh.Faces[fIdx] switch { MeshFace face => face.IsQuad ? new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C], mesh.Vertices[face.D],]) : new BoundingBox([mesh.Vertices[face.A], mesh.Vertices[face.B], mesh.Vertices[face.C],]) }, getAdjacentForGraph: fIdx => [.. mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),]),
+                Mesh mesh => ComputeConnectivity(
+                    _: mesh,
+                    faceCount: mesh.Faces.Count,
+                    getAdjacent: fIdx => mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),
+                    getBounds: fIdx => mesh.Faces[fIdx] switch {
+                        MeshFace f when f.IsQuad => new BoundingBox([mesh.Vertices[f.A], mesh.Vertices[f.B], mesh.Vertices[f.C], mesh.Vertices[f.D],]),
+                        MeshFace f => new BoundingBox([mesh.Vertices[f.A], mesh.Vertices[f.B], mesh.Vertices[f.C],]),
+                    },
+                    getAdjacentForGraph: fIdx => [.. mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),]),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.ConnectivityData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
@@ -231,12 +237,17 @@ internal static class TopologyCore {
                 }))() + 1;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
-        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => {
-            BoundingBox fBox = getBounds(fIdx);
-            return union.IsValid ? BoundingBox.Union(union, fBox) : fBox;
-        })),
-        ];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(ComponentIndices: components, ComponentSizes: [.. components.Select(c => c.Count),], ComponentBounds: bounds, TotalComponents: componentCount, IsFullyConnected: componentCount == 1, AdjacencyGraph: Enumerable.Range(0, faceCount).ToFrozenDictionary(keySelector: i => i, elementSelector: getAdjacentForGraph)),]);
+        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => getBounds(fIdx) switch {
+            BoundingBox fBox when union.IsValid => BoundingBox.Union(union, fBox),
+            BoundingBox fBox => fBox,
+        })),];
+        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(
+            ComponentIndices: components,
+            ComponentSizes: [.. components.Select(static c => c.Count),],
+            ComponentBounds: bounds,
+            TotalComponents: componentCount,
+            IsFullyConnected: componentCount == 1,
+            AdjacencyGraph: Enumerable.Range(0, faceCount).ToFrozenDictionary(keySelector: i => i, elementSelector: getAdjacentForGraph)),]);
     }
 
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyBrepEdges(Brep brep, Continuity minContinuity, double angleThreshold) {
@@ -300,28 +311,17 @@ internal static class TopologyCore {
                     ]);
                 }))(),
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.InvalidVertexIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"VertexIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Vertices.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyVertices.Count => (
-                    new Point3d(mesh.TopologyVertices[idx]),
-                    mesh.TopologyVertices.ConnectedFaces(idx).ToArray(),
-                    mesh.TopologyVertices.ConnectedTopologyVertices(idx).ToArray(),
-                    Enumerable.Range(0, mesh.TopologyEdges.Count)
-                        .Where(e => mesh.TopologyEdges.GetTopologyVertices(e) switch {
-                            IndexPair verts => verts.I == idx || verts.J == idx,
-                        })
-                        .ToArray()
-                ) switch {
-                    (Point3d location, int[] connectedFaces, int[] connectedVerts, int[] connectedEdges) =>
-                        ResultFactory.Create(value: (IReadOnlyList<Topology.VertexData>)[
-                            new Topology.VertexData(
-                                VertexIndex: idx,
-                                Location: location,
-                                ConnectedEdgeIndices: connectedEdges,
-                                ConnectedFaceIndices: connectedFaces,
-                                Valence: connectedVerts.Length,
-                                IsBoundary: connectedEdges.Any(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 1),
-                                IsManifold: connectedEdges.All(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 2)),
-                        ]),
-                },
+                (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyVertices.Count => ((Func<Result<IReadOnlyList<Topology.VertexData>>>)(() => {
+                    int[] connectedEdges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Where(e => mesh.TopologyEdges.GetTopologyVertices(e) is IndexPair v && (v.I == idx || v.J == idx)),];
+                    return ResultFactory.Create(value: (IReadOnlyList<Topology.VertexData>)[new Topology.VertexData(
+                        VertexIndex: idx,
+                        Location: new Point3d(mesh.TopologyVertices[idx]),
+                        ConnectedEdgeIndices: connectedEdges,
+                        ConnectedFaceIndices: mesh.TopologyVertices.ConnectedFaces(idx),
+                        Valence: mesh.TopologyVertices.ConnectedTopologyVertices(idx).Length,
+                        IsBoundary: connectedEdges.Any(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 1),
+                        IsManifold: connectedEdges.All(e => mesh.TopologyEdges.GetConnectedFaces(e).Length == 2)),]);
+                }))(),
                 (Mesh mesh, int idx) => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.InvalidVertexIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"VertexIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyVertices.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
