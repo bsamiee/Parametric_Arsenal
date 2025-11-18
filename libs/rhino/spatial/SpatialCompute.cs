@@ -404,7 +404,7 @@ internal static class SpatialCompute {
                     (double minX, double minY, double maxX, double maxY) = (points.Min(p => p.X), points.Min(p => p.Y), points.Max(p => p.X), points.Max(p => p.Y));
                     double dx = (maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale;
                     double dy = (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale;
-                    Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, 0), new Point3d(maxX + dx, minY - dy, 0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, 0),];
+                    Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, z0), new Point3d(maxX + dx, minY - dy, z0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, z0),];
                     HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
                 Point3d[] allPoints = [.. points, .. superTriangle,];
                 for (int i = 0; i < points.Length; i++) {
