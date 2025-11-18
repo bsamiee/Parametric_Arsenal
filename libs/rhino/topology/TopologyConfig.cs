@@ -47,13 +47,8 @@ internal static class TopologyConfig {
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 
-    /// <summary>Edge analysis thresholds for continuity classification.</summary>
     internal const double CurvatureThresholdRatio = 0.1;
-    /// <summary>Practical minimum loop length (1 micrometer) used as fallback when context tolerance is smaller. Approximately 1000× larger than RhinoMath.SqrtEpsilon for robust loop detection.</remarks>
     internal const double MinLoopLength = 1e-6;
-
-    /// <summary>Diagnostic thresholds for topology problem detection.</summary>
     internal const double NearMissMultiplier = 100.0;
-    /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
     internal const int MaxEdgesForNearMissAnalysis = 100;
 }
