@@ -34,7 +34,7 @@ internal static class FieldsCore {
             if (!bounds.IsValid) {
                 return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds);
             }
-            int resolution = RhinoMath.Clamp(spec.Resolution, FieldsConfig.MinResolution, FieldsConfig.MaxResolution);
+            int resolution = spec.Resolution;
             int totalSamples = resolution * resolution * resolution;
             int bufferSize = OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod) config)
                 ? Math.Max(totalSamples, config.BufferSize)
