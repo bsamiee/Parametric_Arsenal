@@ -75,8 +75,8 @@ internal static class TransformCore {
             ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
             : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
 
-        (item is Extrusion && normalized is IDisposable disposable ? disposable : null)?.Dispose();
-        (!result.IsSuccess && duplicate is IDisposable duplicateDisposable ? duplicateDisposable : null)?.Dispose();
+        (item is Extrusion ? normalized : null)?.Dispose();
+        (!result.IsSuccess ? duplicate : null)?.Dispose();
 
         return result;
     }

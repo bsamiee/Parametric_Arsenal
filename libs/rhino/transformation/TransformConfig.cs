@@ -57,7 +57,7 @@ internal static class TransformConfig {
                 .Where(kv => kv.Key.IsAssignableFrom(geometryType))
                 .Aggregate(
                     ((V?)null, (Type?)null),
-                    (best, kv) => best.Item2 is null || best.Item2.IsAssignableFrom(kv.Key)
+                    (best, kv) => best.Item2?.IsAssignableFrom(kv.Key) != false
                         ? (kv.Value, kv.Key)
                         : best)
                 .Item1 ?? V.Standard;
