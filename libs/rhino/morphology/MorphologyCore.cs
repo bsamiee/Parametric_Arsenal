@@ -584,7 +584,14 @@ internal static class MorphologyCore {
         int sampleCount = Math.Min(original.Vertices.Count, offset.Vertices.Count);
         double actualDistance = sampleCount switch {
             0 => 0.0,
-            int n => Enumerable.Range(0, n).Average(i => ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i])),
+            int n => 
+                {
+                    double sum = 0.0;
+                    for (int i = 0; i < n; i++) {
+                        sum += ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]);
+                    }
+                    return n > 0 ? sum / n : 0.0;
+                }(),
         };
         bool hasDegeneracies = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
