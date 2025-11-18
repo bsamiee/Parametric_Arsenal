@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -15,15 +16,23 @@ internal static class SpatialCompute {
     private static readonly IComparer<Type> _typeSpecificity = Comparer<Type>.Create(static (left, right) =>
         left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
 
-    private static readonly (Type GeometryType, Func<object, object> Extractor)[] _centroidFallbacks =
-        [.. SpatialConfig.TypeExtractors
-            .Where(static kv => string.Equals(kv.Key.Operation, "Centroid", StringComparison.Ordinal))
-            .OrderByDescending(static kv => kv.Key.GeometryType, _typeSpecificity)
-            .Select(static kv => (kv.Key.GeometryType, kv.Value)),
+    private static readonly (Type GeometryType, Func<GeometryBase, Point3d> Extractor)[] _centroidFallbacks =
+        [.. SpatialConfig.CentroidExtractors
+            .OrderByDescending(static kv => kv.Key, _typeSpecificity)
+            .Select(static kv => (kv.Key, kv.Value)),
         ];
 
-    private static readonly ConcurrentDictionary<Type, Func<object, object>> _centroidExtractorCache = new();
-    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
+    private static readonly ConcurrentDictionary<Type, Func<GeometryBase, Point3d>> _centroidExtractorCache = new();
+
+    internal static Result<(Point3d, double[])[]> Cluster<T>(T[] geometry, Spatial.ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
+        request switch {
+            Spatial.KMeansCluster variant => ClusterInternal(geometry: geometry, algorithm: 0, k: variant.ClusterCount, epsilon: 0.0, context: context),
+            Spatial.DBSCANCluster variant => ClusterInternal(geometry: geometry, algorithm: 1, k: SpatialConfig.DBSCANMinPoints, epsilon: variant.Epsilon, context: context),
+            Spatial.HierarchicalCluster variant => ClusterInternal(geometry: geometry, algorithm: 2, k: variant.ClusterCount, epsilon: 0.0, context: context),
+            _ => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext("Unsupported cluster request")),
+        };
+
+    internal static Result<(Point3d, double[])[]> ClusterInternal<T>(T[] geometry, byte algorithm, int k, double epsilon, IGeometryContext context) where T : GeometryBase =>
         (geometry.Length, algorithm, k, epsilon) switch {
             (0, _, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
             (_, > 2, _, _) => ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown algorithm: {algorithm}")),
@@ -34,12 +43,17 @@ internal static class SpatialCompute {
                 for (int i = 0; i < geometry.Length; i++) {
                     GeometryBase current = geometry[i];
                     Type geometryType = current.GetType();
-                    Func<object, object> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
-                    pts[i] = (Point3d)extractor(current);
+                    Func<GeometryBase, Point3d> extractor = _centroidExtractorCache.GetOrAdd(geometryType, ResolveCentroidExtractor);
+                    pts[i] = extractor(current);
                 }
                 return (algorithm is 0 or 2) && k > pts.Length
                     ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
-                    : SpatialConfig.TypeExtractors.TryGetValue(("ClusterAssign", typeof(void)), out Func<object, object>? assignFunc) && assignFunc((algorithm, pts, k, epsilon, context)) is int[] assigns && assigns.Length > 0
+                    : (algorithm switch {
+                        0 => KMeansAssign(pts, k, context.AbsoluteTolerance, SpatialConfig.KMeansMaxIterations),
+                        1 => DBSCANAssign(pts, epsilon, k),
+                        2 => HierarchicalAssign(pts, k),
+                        _ => Array.Empty<int>(),
+                    }) is int[] assigns && assigns.Length > 0
                         ? (algorithm is 1 ? assigns.Where(a => a >= 0).DefaultIfEmpty(-1).Max() + 1 : k) is int clusterCount && clusterCount > 0
                             ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
@@ -504,10 +518,10 @@ internal static class SpatialCompute {
                 return ResultFactory.Create(value: cells);
             }))());
 
-    private static Func<object, object> ResolveCentroidExtractor(Type geometryType) =>
-        SpatialConfig.TypeExtractors.TryGetValue(("Centroid", geometryType), out Func<object, object>? exact)
-            ? exact!
+    private static Func<GeometryBase, Point3d> ResolveCentroidExtractor(Type geometryType) =>
+        SpatialConfig.CentroidExtractors.TryGetValue(geometryType, out Func<GeometryBase, Point3d>? exact)
+            ? exact
             : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(geometryType)) is int match and >= 0
                 ? _centroidFallbacks[match].Extractor
-                : static geometry => geometry is GeometryBase baseGeometry ? baseGeometry.GetBoundingBox(accurate: false).Center : Point3d.Origin;
+                : static geometry => geometry.GetBoundingBox(accurate: false).Center;
 }
