@@ -14,9 +14,8 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Mesh morphology operations: cage deformation, subdivision, smoothing, evolution.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
-    /// <summary>Marker interface for polymorphic morphology result dispatch.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
-    public interface IMorphologyResult;
+    /// <summary>Base type for all morphology operation results.</summary>
+    public abstract record MorphologyResult;
 
     /// <summary>Base type for all morphology operation requests.</summary>
     public abstract record MorphologyRequest;
@@ -116,7 +115,7 @@ public static class Morphology {
         double MeanDisplacement,
         BoundingBox OriginalBounds,
         BoundingBox DeformedBounds,
-        double VolumeRatio) : IMorphologyResult {
+        double VolumeRatio) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -131,7 +130,7 @@ public static class Morphology {
         double RMSDisplacement,
         double MaxVertexDisplacement,
         double QualityScore,
-        bool Converged) : IMorphologyResult {
+        bool Converged) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -147,7 +146,7 @@ public static class Morphology {
         int OriginalVertexCount,
         int OffsetVertexCount,
         int OriginalFaceCount,
-        int OffsetFaceCount) : IMorphologyResult {
+        int OffsetFaceCount) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -164,7 +163,7 @@ public static class Morphology {
         double MaxEdgeLength,
         double MeanEdgeLength,
         double MeanAspectRatio,
-        double MinTriangleAngleRadians) : IMorphologyResult {
+        double MinTriangleAngleRadians) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -181,7 +180,7 @@ public static class Morphology {
         double QualityScore,
         double MeanAspectRatio,
         double MinEdgeLength,
-        double MaxEdgeLength) : IMorphologyResult {
+        double MaxEdgeLength) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -199,7 +198,7 @@ public static class Morphology {
         int IterationsPerformed,
         bool Converged,
         int OriginalFaceCount,
-        int RemeshedFaceCount) : IMorphologyResult {
+        int RemeshedFaceCount) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -217,7 +216,7 @@ public static class Morphology {
         MeshRepairOperations OperationsPerformed,
         double QualityScore,
         bool HadHoles,
-        bool HadBadNormals) : IMorphologyResult {
+        bool HadBadNormals) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -233,7 +232,7 @@ public static class Morphology {
         int TotalFaceCount,
         int[] VertexCountPerComponent,
         int[] FaceCountPerComponent,
-        BoundingBox[] BoundsPerComponent) : IMorphologyResult {
+        BoundingBox[] BoundsPerComponent) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -250,7 +249,7 @@ public static class Morphology {
         double WeldTolerance,
         double MeanVertexDisplacement,
         double MaxVertexDisplacement,
-        bool NormalsRecalculated) : IMorphologyResult {
+        bool NormalsRecalculated) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -272,7 +271,7 @@ public static class Morphology {
         double MinTriangleAngleRadians,
         double MeanTriangleAngleRadians,
         int DegenerateFaceCount,
-        double QualityScore) : IMorphologyResult {
+        double QualityScore) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -291,7 +290,7 @@ public static class Morphology {
         int ThickenedFaceCount,
         int WallFaceCount,
         BoundingBox OriginalBounds,
-        BoundingBox ThickenedBounds) : IMorphologyResult {
+        BoundingBox ThickenedBounds) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -309,7 +308,7 @@ public static class Morphology {
         double MaxU,
         double MinV,
         double MaxV,
-        double UVCoverage) : IMorphologyResult {
+        double UVCoverage) : MorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
@@ -318,17 +317,17 @@ public static class Morphology {
 
     /// <summary>Unified morphology operation entry with polymorphic dispatch on algebraic request types.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
+    public static Result<IReadOnlyList<MorphologyResult>> Apply<T>(
         T input,
         MorphologyRequest request,
         IGeometryContext context) where T : GeometryBase =>
         MorphologyCore.GetRequestHandler(request, typeof(T)) is not { } handler
-            ? ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
+            ? ResultFactory.Create<IReadOnlyList<MorphologyResult>>(
                 error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Request: {request.GetType().Name}, Type: {typeof(T).Name}"))
             : UnifiedOperation.Apply(
                 input: input,
-                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => handler(item, request, context)),
-                config: new OperationConfig<T, IMorphologyResult> {
+                operation: (Func<T, Result<IReadOnlyList<MorphologyResult>>>)(item => handler(item, request, context)),
+                config: new OperationConfig<T, MorphologyResult> {
                     Context = context,
                     ValidationMode = MorphologyConfig.GetValidationMode(request, typeof(T)),
                     OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.GetOperationName(request)}"),
