@@ -144,6 +144,7 @@ internal static class MorphologyCore {
                     string.Create(
                         System.Globalization.CultureInfo.InvariantCulture,
                         $"Unsupported subdivision request type: {request.GetType().Name}")),
+            };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothLaplacian<T>(
@@ -584,14 +585,13 @@ internal static class MorphologyCore {
         int sampleCount = Math.Min(original.Vertices.Count, offset.Vertices.Count);
         double actualDistance = sampleCount switch {
             0 => 0.0,
-            int n => 
-                {
-                    double sum = 0.0;
-                    for (int i = 0; i < n; i++) {
-                        sum += ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]);
-                    }
-                    return n > 0 ? sum / n : 0.0;
-                }(),
+            int n => ((Func<double>)(() => {
+                double sum = 0.0;
+                for (int i = 0; i < n; i++) {
+                    sum += ((Point3d)original.Vertices[i]).DistanceTo(offset.Vertices[i]);
+                }
+                return n > 0 ? sum / n : 0.0;
+            }))(),
         };
         bool hasDegeneracies = !MorphologyCompute.ValidateMeshQuality(offset, context).IsSuccess;
         return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
