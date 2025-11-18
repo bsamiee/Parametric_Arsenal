@@ -359,7 +359,7 @@ internal static class MorphologyCore {
                 operations,
                 MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
                 original.DisjointMeshCount > 1,
-                original.Normals.Count != original.Vertices.Count || !original.Normals.ComputeNormals()),
+                original.Normals.Count != original.Vertices.Count || original.Normals.Any(n => n.IsZero)),
         ]);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
