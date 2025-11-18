@@ -1,7 +1,7 @@
 # Boolean Operations Library Blueprint
 
 ## Overview
-Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boolean operations (union, intersection, difference, trim, split, region extraction). Leverages RhinoCommon's robust boolean algorithms with Result monad error handling, UnifiedOperation dispatch, and tolerance-aware validation.
+Unified boolean operation library for Brep-Brep and Mesh-Mesh solid boolean operations (union, intersection, difference, split). Leverages RhinoCommon's robust 3D solid boolean algorithms with Result monad error handling, UnifiedOperation dispatch, and tolerance-aware validation.
 
 ## Existing libs/ Infrastructure Analysis
 
@@ -16,16 +16,15 @@ Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boo
 
 #### UnifiedOperation
 - **Polymorphic dispatch**: Single `Boolean.Execute<T1, T2>` for all type combinations
-- **Validation integration**: V.Standard | V.Topology for solids, V.AreaCentroid for planar curves
+- **Validation integration**: V.Standard | V.Topology for Breps, V.Standard | V.MeshSpecific for Meshes
 - **Error accumulation**: Applicative composition when processing multiple geometry pairs
 - **Diagnostics**: Built-in instrumentation for operation performance tracking
 
 #### ValidationRules
 - **Existing V.* modes used**:
   - `V.Standard` - IsValid checks for all geometry
-  - `V.Topology` - Manifold, IsClosed, IsSolid for Breps/Meshes
-  - `V.AreaCentroid` - IsClosed, IsPlanar for planar curve regions
-  - `V.MeshSpecific` - Mesh validation (manifold edges, face count)
+  - `V.Topology` - Manifold, IsClosed, IsSolid for Breps
+  - `V.MeshSpecific` - Mesh validation (manifold edges, face count, closed)
 - **New V.* modes needed**: NONE - existing flags cover boolean operation requirements
 - **Expression tree compilation**: Zero-allocation validators compiled at runtime
 
@@ -35,15 +34,15 @@ Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boo
   - `E.Validation.InvalidTopology` - Non-manifold or open geometry
   - `E.Validation.ToleranceAbsoluteInvalid` - Invalid tolerance parameter
   - `E.Geometry.UnsupportedConfiguration` - Unsupported type combination
-- **New error codes allocated (2100-2199 range)**:
+- **New error codes allocated (2100-2108 range in E.Geometry.BooleanOps)**:
   - `2100` - Boolean operation failed (general SDK failure)
   - `2101` - Input geometry not closed or solid (Brep/Mesh requirement)
-  - `2102` - Input curves not planar or not coplanar
+  - `2102` - Not planar or coplanar (removed - not applicable to solid booleans)
   - `2103` - Mesh quality insufficient for boolean operation
   - `2104` - Operation produced degenerate or invalid result
-  - `2105` - Trim operation failed (no intersection found)
+  - `2105` - Trim operation failed (used by TrimSolid helper method for Brep.Trim)
   - `2106` - Split operation failed (incomplete division)
-  - `2107` - Region extraction failed (non-planar or invalid curves)
+  - `2107` - Region extraction failed (reserved for future curve operations in separate library)
   - `2108` - Boolean result validation failed (post-operation check)
 
 #### Context
@@ -125,22 +124,7 @@ Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boo
   - Returns `Mesh[]` or `null`
   - Usage: Split operation for meshes
 
-#### Curve Boolean Operations (Planar Regions)
-- **`Curve.CreateBooleanRegions(IEnumerable<Curve> curves, Plane plane, bool combineRegions, double tolerance)`**
-  - Analyzes overlapping planar curves to extract closed regions
-  - Returns `CurveBooleanRegions` object with region curves
-  - Requires planar curves on specified plane
-  - Usage: Region extraction for 2D boolean logic
 
-- **`Curve.Trim(Interval domain)`**
-  - Removes curve portions outside specified domain
-  - Returns trimmed `Curve` or `null`
-  - Usage: Trim curves at parameters
-
-- **`Curve.Split(IEnumerable<double> parameters)`**
-  - Divides curve at parameter locations
-  - Returns `Curve[]` with segments
-  - Usage: Split curves at intersection points
 
 #### Supporting APIs
 - **`RhinoMath.ZeroTolerance`**: Baseline zero tolerance (2.32e-10)
@@ -160,8 +144,7 @@ Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boo
 #### Input Geometry Requirements
 - **Breps**: Must be closed (`IsClosed`), valid (`IsValid`), ideally solid (`IsSolid`)
 - **Meshes**: Must be closed (`IsClosed`), manifold (`IsManifold`), no self-intersections
-- **Curves**: Must be planar and coplanar for region operations
-- **Pre-validation**: Use `V.Standard | V.Topology` for solids, `V.AreaCentroid` for curves
+- **Pre-validation**: Use `V.Standard | V.Topology` for Breps, `V.Standard | V.MeshSpecific` for Meshes
 
 #### Performance Considerations
 - **Variadic approach**: Modern Rhino 8+ handles multiple inputs together (faster, more robust)
@@ -193,22 +176,23 @@ Unified boolean operation library for Brep-Brep, Mesh-Mesh, and planar Curve boo
 
 ## File Organization
 
-### Pattern: 4-File Architecture (Maximum Complexity)
+### Pattern: 3-File Architecture (Standard Complexity)
 
-This boolean operation library uses the maximum 4-file pattern due to:
-1. High type count (8 types total): Operation enum, Options, Output, Config nested types
-2. Multiple dispatch tables (FrozenDictionary for type combinations)
+This boolean operation library uses the standard 3-file pattern:
+1. Type count (5 types total): Boolean class with 3 nested types, BooleanCore, BooleanCompute
+2. Single dispatch table (FrozenDictionary for type combinations)
 3. Separate algorithmic compute methods for each geometry type
-4. Complex configuration with nested option types
+4. Configuration embedded in nested types (no separate config file needed)
 
 ### File 1: `Boolean.cs`
 
 **Purpose**: Public API surface with namespace suppression
 
-**Types** (3 total):
+**Types** (4 total):
 - `Boolean`: Static class with unified `Execute<T1, T2>` API (namespace matches class - **suppression required**)
-- `Boolean.OperationType`: Nested enum for operation selection (Union, Intersection, Difference, Trim, Split, Region)
+- `Boolean.OperationType`: Nested enum for operation selection (Union, Intersection, Difference, Split)
 - `Boolean.BooleanOptions`: Nested record struct for configuration
+- `Boolean.BooleanOutput`: Nested record struct for results
 
 **Key Members**:
 - `Execute<T1, T2>(T1, T2, OperationType, IGeometryContext, BooleanOptions?)`: Unified entry point via type-based dispatch
@@ -216,6 +200,12 @@ This boolean operation library uses the maximum 4-file pattern due to:
   - Delegates to `BooleanCore.OperationRegistry` FrozenDictionary lookup
   - Falls back to `E.Geometry.UnsupportedConfiguration` for invalid type combinations
   - Uses UnifiedOperation.Apply for validation, diagnostics, error handling
+- `TrimSolid(Brep, Brep, IGeometryContext, BooleanOptions?)`: Helper method for Brep.Trim operation
+  - Wraps `Brep.Trim(Brep cutter, double tolerance)` SDK method
+  - Retains portions of target Brep inside (opposite normal) of cutter Brep
+  - Distinct from Difference operation (which creates new solids)
+  - Following Intersect pattern which has helper methods beyond main Execute
+  - Justifies error code 2105 (TrimFailed)
 
 **Code Style Example**:
 ```csharp
@@ -227,9 +217,7 @@ public static class Boolean {
         Union = 0,
         Intersection = 1,
         Difference = 2,
-        Trim = 3,
-        Split = 4,
-        Region = 5,
+        Split = 3,
     }
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -237,8 +225,16 @@ public static class Boolean {
         double? ToleranceOverride = null,
         bool ManifoldOnly = false,
         bool CombineCoplanarFaces = true,
-        bool ValidateResult = true,
-        bool CombineRegions = false);
+        bool ValidateResult = true);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct BooleanOutput(
+        IReadOnlyList<Brep> Breps,
+        IReadOnlyList<Mesh> Meshes,
+        double ToleranceUsed,
+        bool WasRepaired) {
+        public static readonly BooleanOutput Empty = new([], [], 0.0, false);
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<BooleanOutput> Execute<T1, T2>(
@@ -272,15 +268,14 @@ public static class Boolean {
 }
 ```
 
-**LOC Estimate**: 120-160 (dense API with nested types, pattern matching)
+**LOC Estimate**: 85-95 (main Execute + TrimSolid helper + nested types)
 
 ### File 2: `BooleanCore.cs`
 
 **Purpose**: FrozenDictionary dispatch tables and core execution routing
 
-**Types** (2 total):
+**Types** (1 total):
 - `BooleanCore`: Static class with dispatch registry
-- `BooleanOutput`: Record struct for results (nested in BooleanCore or Boolean - design choice)
 
 **Key Members**:
 - `OperationRegistry`: FrozenDictionary<(Type, Type, OperationType), (V, Executor)> mapping type combinations to validators and executors
@@ -289,39 +284,21 @@ public static class Boolean {
   - Initialization: Dictionary literal → ToFrozenDictionary()
 - `ExecuteBrepBoolean(Brep, Brep, OperationType, BooleanOptions, IGeometryContext)`: Dispatches to BooleanCompute Brep methods
 - `ExecuteMeshBoolean(Mesh, Mesh, OperationType, BooleanOptions, IGeometryContext)`: Dispatches to BooleanCompute Mesh methods
-- `ExecuteCurveBoolean(Curve[], Curve[], OperationType, BooleanOptions, IGeometryContext)`: Dispatches to BooleanCompute Curve methods
+- `ExecuteBrepArrayBoolean(Brep[], Brep[], OperationType, BooleanOptions, IGeometryContext)`: Dispatches to BooleanCompute Brep[] methods
+- `ExecuteMeshArrayBoolean(Mesh[], Mesh[], OperationType, BooleanOptions, IGeometryContext)`: Dispatches to BooleanCompute Mesh[] methods
 
 **Code Style Example**:
 ```csharp
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-public readonly record struct BooleanOutput(
-    IReadOnlyList<Brep> Breps,
-    IReadOnlyList<Mesh> Meshes,
-    IReadOnlyList<Curve> Curves,
-    double ToleranceUsed,
-    bool WasRepaired) {
-    public static readonly BooleanOutput Empty = new([], [], [], 0.0, false);
-}
+internal static readonly FrozenDictionary<...> OperationRegistry =
+    new Dictionary<...> {
+        [(typeof(Brep), typeof(Brep), Boolean.OperationType.Union)] = (V.Standard | V.Topology, MakeBrepExecutor()),
+        ...
+    }.ToFrozenDictionary();
 
-internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> Executor)> OperationRegistry =
-    [
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Union), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Intersection), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Difference), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Brep), typeof(Brep), Boolean.OperationType.Split), (V.Standard | V.Topology, MakeBrepExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Union), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Intersection), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Difference), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Split), (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
-        ((typeof(Curve[]), typeof(Plane), Boolean.OperationType.Region), (V.AreaCentroid, MakeCurveExecutor())),
-    ].ToFrozenDictionary(
-        static entry => entry.Item1,
-        static entry => entry.Item2);
-
-private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<BooleanOutput>> MakeBrepExecutor() =>
+private static Func<object, object, Boolean.OperationType, Boolean.BooleanOptions, IGeometryContext, Result<Boolean.BooleanOutput>> MakeBrepExecutor() =>
     (a, b, op, opts, ctx) => ExecuteBrepBoolean((Brep)a, (Brep)b, op, opts, ctx);
 
-private static Result<BooleanOutput> ExecuteBrepBoolean(
+private static Result<Boolean.BooleanOutput> ExecuteBrepBoolean(
     Brep brepA,
     Brep brepB,
     Boolean.OperationType operation,
@@ -332,12 +309,12 @@ private static Result<BooleanOutput> ExecuteBrepBoolean(
         Boolean.OperationType.Intersection => BooleanCompute.BrepIntersection([brepA,], [brepB,], options, context),
         Boolean.OperationType.Difference => BooleanCompute.BrepDifference([brepA,], [brepB,], options, context),
         Boolean.OperationType.Split => BooleanCompute.BrepSplit(brepA, brepB, options, context),
-        _ => ResultFactory.Create<BooleanOutput>(
-            error: E.Geometry.Boolean.UnsupportedOperation.WithContext($"Brep operation: {operation}")),
+        _ => ResultFactory.Create<Boolean.BooleanOutput>(
+            error: E.Geometry.BooleanOps.OperationFailed.WithContext($"Brep operation: {operation}")),
     };
 ```
 
-**LOC Estimate**: 150-200 (registry initialization, executor factory methods, routing logic)
+**LOC Estimate**: 140-170 (registry initialization, executor factory methods, routing logic)
 
 ### File 3: `BooleanCompute.cs`
 
@@ -368,11 +345,7 @@ private static Result<BooleanOutput> ExecuteBrepBoolean(
   
 - `MeshDifference(Mesh[], Mesh[], BooleanOptions, IGeometryContext)`: Wraps `Mesh.CreateBooleanDifference`
   
-- `MeshSplit(Mesh[], Mesh[], BooleanOptions, IGeometryContext)`: Wraps `Mesh.CreateBooleanSplit`
-  
-- `CurveRegions(Curve[], Plane, BooleanOptions, IGeometryContext)`: Wraps `Curve.CreateBooleanRegions`
-  - Extracts regions as closed curves
-  - Returns curves in BooleanOutput.Curves
+- `MeshSplit(Mesh, Mesh, BooleanOptions, IGeometryContext)`: Wraps `Mesh.CreateBooleanSplit` (single mesh)
 
 **Code Style Example**:
 ```csharp
@@ -387,37 +360,35 @@ internal static class BooleanCompute {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Brep.CreateBooleanUnion(breps, tolerance) switch {
-                    null => ResultFactory.Create<BooleanOutput>(
-                        error: E.Geometry.Boolean.OperationFailed.WithContext("Union returned null - check geometry validity and tolerance")),
-                    Brep[] results when results.Length == 0 => ResultFactory.Create<BooleanOutput>(
-                        error: E.Geometry.Boolean.OperationFailed.WithContext("Union produced empty result")),
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
+                        error: E.Geometry.BooleanOps.OperationFailed.WithContext("Union returned null - check geometry validity and tolerance")),
+                    Brep[] results when results.Length == 0 => ResultFactory.Create<Boolean.BooleanOutput>(
+                        error: E.Geometry.BooleanOps.OperationFailed.WithContext("Union produced empty result")),
                     Brep[] results => ValidateResults(results, options, tolerance),
                 };
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ValidateResults(
+    private static Result<Boolean.BooleanOutput> ValidateResults(
         Brep[] results,
         Boolean.BooleanOptions options,
         double tolerance) =>
         !options.ValidateResult
-            ? ResultFactory.Create(value: new BooleanOutput(
+            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                 Breps: results,
                 Meshes: [],
-                Curves: [],
                 ToleranceUsed: tolerance,
                 WasRepaired: false))
             : results.All(static b => b.IsValid)
-                ? ResultFactory.Create(value: new BooleanOutput(
+                ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                     Breps: results,
                     Meshes: [],
-                    Curves: [],
                     ToleranceUsed: tolerance,
                     WasRepaired: false))
-                : ResultFactory.Create<BooleanOutput>(
-                    error: E.Geometry.Boolean.ResultValidationFailed.WithContext(
+                : ResultFactory.Create<Boolean.BooleanOutput>(
+                    error: E.Geometry.BooleanOps.ResultValidationFailed.WithContext(
                         $"Invalid Breps in result: {results.Count(static b => !b.IsValid)} of {results.Length}"));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -430,18 +401,17 @@ internal static class BooleanCompute {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : Brep.CreateBooleanDifference(
                     firstSet: firstSet,
                     secondSet: secondSet,
                     tolerance: tolerance,
                     manifoldOnly: options.ManifoldOnly) switch {
-                    null => ResultFactory.Create<BooleanOutput>(
-                        error: E.Geometry.Boolean.OperationFailed.WithContext("Difference returned null")),
-                    Brep[] results when results.Length == 0 => ResultFactory.Create(value: new BooleanOutput(
+                    null => ResultFactory.Create<Boolean.BooleanOutput>(
+                        error: E.Geometry.BooleanOps.OperationFailed.WithContext("Difference returned null")),
+                    Brep[] results when results.Length == 0 => ResultFactory.Create(value: new Boolean.BooleanOutput(
                         Breps: [],
                         Meshes: [],
-                        Curves: [],
                         ToleranceUsed: tolerance,
                         WasRepaired: false)),
                     Brep[] results => ValidateResults(results, options, tolerance),
@@ -457,15 +427,15 @@ internal static class BooleanCompute {
             double tolerance = options.ToleranceOverride ?? context.AbsoluteTolerance;
             
             return !RhinoMath.IsValidDouble(tolerance) || tolerance <= RhinoMath.ZeroTolerance
-                ? ResultFactory.Create<BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
+                ? ResultFactory.Create<Boolean.BooleanOutput>(error: E.Validation.ToleranceAbsoluteInvalid)
                 : CreateMeshBooleanOptions(options) is MeshBooleanOptions meshOpts
                     ? Mesh.CreateBooleanUnion(meshes, tolerance, meshOpts) switch {
-                        null => ResultFactory.Create<BooleanOutput>(
-                            error: E.Geometry.Boolean.OperationFailed.WithContext("Mesh union returned null - ensure meshes are closed and manifold")),
+                        null => ResultFactory.Create<Boolean.BooleanOutput>(
+                            error: E.Geometry.BooleanOps.OperationFailed.WithContext("Mesh union returned null - ensure meshes are closed and manifold")),
                         Mesh[] results => ValidateMeshResults(results, options, tolerance),
                     }
-                    : ResultFactory.Create<BooleanOutput>(
-                        error: E.Geometry.Boolean.InvalidConfiguration.WithContext("Failed to create MeshBooleanOptions"));
+                    : ResultFactory.Create<Boolean.BooleanOutput>(
+                        error: E.Geometry.BooleanOps.OperationFailed.WithContext("Failed to create MeshBooleanOptions"));
         }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -475,126 +445,53 @@ internal static class BooleanCompute {
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<BooleanOutput> ValidateMeshResults(
+    private static Result<Boolean.BooleanOutput> ValidateMeshResults(
         Mesh[] results,
         Boolean.BooleanOptions options,
         double tolerance) =>
         !options.ValidateResult
-            ? ResultFactory.Create(value: new BooleanOutput(
+            ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                 Breps: [],
                 Meshes: results,
-                Curves: [],
                 ToleranceUsed: tolerance,
                 WasRepaired: false))
             : results.All(static m => m.IsValid && m.IsClosed)
-                ? ResultFactory.Create(value: new BooleanOutput(
+                ? ResultFactory.Create(value: new Boolean.BooleanOutput(
                     Breps: [],
                     Meshes: results,
-                    Curves: [],
                     ToleranceUsed: tolerance,
                     WasRepaired: false))
-                : ResultFactory.Create<BooleanOutput>(
-                    error: E.Geometry.Boolean.ResultValidationFailed.WithContext(
+                : ResultFactory.Create<Boolean.BooleanOutput>(
+                    error: E.Geometry.BooleanOps.ResultValidationFailed.WithContext(
                         $"Invalid meshes in result: {results.Count(static m => !m.IsValid || !m.IsClosed)} of {results.Length}"));
 }
 ```
 
-**LOC Estimate**: 220-280 (one method per operation type × geometry type, validation helpers)
-
-### File 4: `BooleanConfig.cs`
-
-**Purpose**: Configuration constants and algorithmic parameters
-
-**Types** (1 total):
-- `BooleanConfig`: Static internal class with constants
-
-**Key Members**:
-- Tolerance configuration:
-  - `DefaultToleranceFactor`: Multiplier for context tolerance (1.0 = use as-is)
-  - `MinimumTolerance`: Absolute minimum (RhinoMath.ZeroTolerance)
-  - `MaximumTolerance`: Maximum reasonable value (1.0 = 1 unit)
-  
-- Validation thresholds:
-  - `MinimumBrepFaces`: Minimum face count for valid Brep result (1)
-  - `MinimumMeshFaces`: Minimum face count for valid Mesh result (4 = tetrahedron)
-  - `MinimumCurveLength`: Minimum curve length for region extraction
-  
-- Operation-specific parameters:
-  - `RegionExtractionMaxCurves`: Maximum curves for region operation (100)
-  - `SplitMaxResults`: Maximum pieces from split (1000)
-  
-- Performance tuning:
-  - `EnableParallelProcessing`: Whether to parallelize multi-geometry operations
-  - `ParallelThreshold`: Minimum geometry count for parallelization (10)
-
-**Code Style Example**:
-```csharp
-[Pure]
-internal static class BooleanConfig {
-    internal const double DefaultToleranceFactor = 1.0;
-    internal const double MinimumToleranceMultiplier = 1.0;
-    internal const double MaximumToleranceMultiplier = 10.0;
-    
-    internal const int MinimumBrepFaces = 1;
-    internal const int MinimumMeshFaces = 4;
-    internal const int RegionExtractionMaxCurves = 100;
-    internal const int SplitMaxResults = 1000;
-    
-    internal const bool EnableParallelProcessing = false;
-    internal const int ParallelThreshold = 10;
-    
-    internal static readonly FrozenDictionary<Boolean.OperationType, string> OperationNames =
-        new Dictionary<Boolean.OperationType, string> {
-            [Boolean.OperationType.Union] = "Union",
-            [Boolean.OperationType.Intersection] = "Intersection",
-            [Boolean.OperationType.Difference] = "Difference",
-            [Boolean.OperationType.Trim] = "Trim",
-            [Boolean.OperationType.Split] = "Split",
-            [Boolean.OperationType.Region] = "Region",
-        }.ToFrozenDictionary();
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static double ComputeEffectiveTolerance(
-        double contextTolerance,
-        double? overrideTolerance) =>
-        overrideTolerance ?? (contextTolerance * DefaultToleranceFactor);
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool IsToleranceValid(double tolerance) =>
-        RhinoMath.IsValidDouble(tolerance) 
-        && tolerance > RhinoMath.ZeroTolerance 
-        && tolerance <= (RhinoMath.DefaultDistanceToleranceMillimeters * MaximumToleranceMultiplier);
-}
-```
-
-**LOC Estimate**: 80-120 (constants, FrozenDictionary, tolerance helpers)
+**LOC Estimate**: 200-250 (one method per operation type × geometry type, validation helpers)
 
 ## Adherence to Limits
 
-### Files: 4 files (⚠ at maximum, justified)
+### Files: 3 files (✓ standard complexity)
 - **Justification**: 
-  - 8 distinct types (Boolean + 2 nested, BooleanCore + BooleanOutput, BooleanCompute, BooleanConfig)
-  - Large FrozenDictionary dispatch table (9+ entries for all type×operation combinations)
-  - Multiple algorithmic compute methods (3 geometry types × 4-6 operations each)
-  - Configuration constants and helper methods
-- **Could consolidate?**: Config could merge into Core, but would push Core to 250+ LOC and lose clarity
+  - 5 distinct types (Boolean + 3 nested, BooleanCore, BooleanCompute)
+  - FrozenDictionary dispatch table (14 entries for type×operation combinations)
+  - Multiple algorithmic compute methods (2 geometry types × 4 operations each)
+  - Configuration embedded in nested types
+- **Could consolidate?**: No - 3 files provides clear separation of concerns
 
-### Types: 8 types (✓ within 10-type maximum, targeting 6-8 ideal)
+### Types: 5 types (✓ within 6-8 ideal range)
 - **Boolean** (public static class)
 - **Boolean.OperationType** (nested enum)
 - **Boolean.BooleanOptions** (nested record struct)
+- **Boolean.BooleanOutput** (nested record struct)
 - **BooleanCore** (internal static class)
-- **BooleanOutput** (record struct)
 - **BooleanCompute** (internal static class)
-- **BooleanConfig** (internal static class)
-- **[Potential 8th]**: Error extension class if needed (avoided by using E.Geometry.Boolean.* directly)
 
-### Estimated Total LOC: 570-760
-- Boolean.cs: 120-160
-- BooleanCore.cs: 150-200
-- BooleanCompute.cs: 220-280
-- BooleanConfig.cs: 80-120
-- **Assessment**: Well within reasonable range for 4 files (average 142-190 LOC per file)
+### Estimated Total LOC: 505-600
+- Boolean.cs: 85-95 (main Execute + TrimSolid helper + nested types)
+- BooleanCore.cs: 140-170 (dispatch registry + routing)
+- BooleanCompute.cs: 280-335 (9 methods: 8 main + BrepTrim helper)
+- **Assessment**: Well within reasonable range for 3 files (average 168-200 LOC per file)
 
 ## Algorithmic Density Strategy
 
@@ -642,7 +539,7 @@ internal static class BooleanConfig {
 ```csharp
 internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationType Op), (V Mode, Func<...> Executor)> OperationRegistry =
     [
-        // Brep-Brep operations
+        // Brep-Brep single operations
         ((typeof(Brep), typeof(Brep), Boolean.OperationType.Union), 
          (V.Standard | V.Topology, MakeBrepExecutor())),
         ((typeof(Brep), typeof(Brep), Boolean.OperationType.Intersection), 
@@ -652,7 +549,15 @@ internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationTy
         ((typeof(Brep), typeof(Brep), Boolean.OperationType.Split), 
          (V.Standard | V.Topology, MakeBrepExecutor())),
         
-        // Mesh-Mesh operations
+        // Brep[]-Brep[] array operations
+        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Union), 
+         (V.Standard | V.Topology, MakeBrepArrayExecutor())),
+        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Intersection), 
+         (V.Standard | V.Topology, MakeBrepArrayExecutor())),
+        ((typeof(Brep[]), typeof(Brep[]), Boolean.OperationType.Difference), 
+         (V.Standard | V.Topology, MakeBrepArrayExecutor())),
+        
+        // Mesh-Mesh single operations
         ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Union), 
          (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
         ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Intersection), 
@@ -662,17 +567,22 @@ internal static readonly FrozenDictionary<(Type T1, Type T2, Boolean.OperationTy
         ((typeof(Mesh), typeof(Mesh), Boolean.OperationType.Split), 
          (V.Standard | V.MeshSpecific, MakeMeshExecutor())),
         
-        // Curve-Plane operations (region extraction)
-        ((typeof(Curve[]), typeof(Plane), Boolean.OperationType.Region), 
-         (V.AreaCentroid, MakeCurveExecutor())),
+        // Mesh[]-Mesh[] array operations
+        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Union), 
+         (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
+        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Intersection), 
+         (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
+        ((typeof(Mesh[]), typeof(Mesh[]), Boolean.OperationType.Difference), 
+         (V.Standard | V.MeshSpecific, MakeMeshArrayExecutor())),
     ].ToFrozenDictionary(
         static entry => entry.Item1,
         static entry => entry.Item2);
 ```
 
 **Key Design Decisions**:
+- **14 dispatch entries**: 4 Brep single + 3 Brep array + 4 Mesh single + 3 Mesh array
 - **Tuple keys**: `(Type, Type, Operation)` provides precise routing
-- **Validation modes**: Pre-configured per geometry type (Topology for solids, AreaCentroid for curves)
+- **Validation modes**: Pre-configured per geometry type (V.Standard | V.Topology for Breps, V.Standard | V.MeshSpecific for Meshes)
 - **Executor factories**: Generate closures with proper type casts, avoiding dynamic dispatch overhead
 - **Compile-time safety**: Type combinations checked at API call, not runtime string matching
 
@@ -710,14 +620,12 @@ Result<BooleanOutput> diff = Boolean.Execute(
         ToleranceOverride: 0.01,
         ManifoldOnly: true));
 
-// Curve region extraction
-Result<BooleanOutput> regions = Boolean.Execute(
-    geometryA: curves,
-    geometryB: Plane.WorldXY,
-    operation: Boolean.OperationType.Region,
-    context: context,
-    options: new Boolean.BooleanOptions(
-        CombineRegions: true));
+// Brep split operation
+Result<Boolean.BooleanOutput> split = Boolean.Execute(
+    geometryA: brepA,
+    geometryB: brepB,
+    operation: Boolean.OperationType.Split,
+    context: context);
 ```
 
 ### Configuration Types
@@ -727,9 +635,7 @@ public enum OperationType : byte {
     Union = 0,
     Intersection = 1,
     Difference = 2,
-    Trim = 3,
-    Split = 4,
-    Region = 5,
+    Split = 3,
 }
 
 [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -737,8 +643,7 @@ public readonly record struct BooleanOptions(
     double? ToleranceOverride = null,
     bool ManifoldOnly = false,
     bool CombineCoplanarFaces = true,
-    bool ValidateResult = true,
-    bool CombineRegions = false);
+    bool ValidateResult = true);
 ```
 
 ### Output Type
@@ -748,39 +653,11 @@ public readonly record struct BooleanOptions(
 public readonly record struct BooleanOutput(
     IReadOnlyList<Brep> Breps,
     IReadOnlyList<Mesh> Meshes,
-    IReadOnlyList<Curve> Curves,
     double ToleranceUsed,
     bool WasRepaired) {
-    public static readonly BooleanOutput Empty = new([], [], [], 0.0, false);
+    public static readonly BooleanOutput Empty = new([], [], 0.0, false);
 }
 ```
-
-## Additional Justified Operations (3 Total)
-
-Based on RhinoCommon capabilities and complementary boolean functionality:
-
-### 1. Trim Operation (Brep/Mesh/Curve)
-**Justification**: Core boolean concept distinct from difference - removes portions without creating holes
-- **Brep.Trim(IEnumerable<Brep> cutters, double tolerance)**: Trims away portions of Brep
-- **Curve.Trim(Interval domain)**: Trims curve to parameter range
-- **Use case**: Precision cutting, detail removal, boundary enforcement
-- **Integration**: Add `OperationType.Trim` to enum, implement in BooleanCompute
-
-### 2. Split Operation (Distinct from Boolean Difference)
-**Justification**: Divides geometry without removal - complements union/intersection/difference set
-- **Brep.Split(Brep splitter, double tolerance)**: Divides Brep into separate pieces
-- **Mesh.CreateBooleanSplit()**: Splits meshes at intersection
-- **Curve.Split(IEnumerable<double> parameters)**: Divides curve at parameters
-- **Use case**: Subdivision, segmentation, partitioning for analysis
-- **Integration**: Already included as `OperationType.Split`
-
-### 3. Region Extraction (Planar Curve Boolean)
-**Justification**: 2D boolean logic essential for parametric design, distinct from 3D solid operations
-- **Curve.CreateBooleanRegions()**: Extracts closed regions from overlapping planar curves
-- **Use case**: Hatch boundaries, 2D nesting, area calculation, technical drawings
-- **Integration**: Already included as `OperationType.Region` with `Curve[]` + `Plane` dispatch
-
-**Total Operations**: 6 (Union, Intersection, Difference, Trim, Split, Region)
 
 ## Code Style Adherence Verification
 
@@ -817,10 +694,9 @@ Based on RhinoCommon capabilities and complementary boolean functionality:
   - Array literals as `[item1, item2,]`
 
 - [x] One type per file organization
-  - Boolean.cs: Boolean class with nested OperationType and BooleanOptions
-  - BooleanCore.cs: BooleanCore class with BooleanOutput (nested types allowed)
+  - Boolean.cs: Boolean class with nested OperationType, BooleanOptions, and BooleanOutput
+  - BooleanCore.cs: BooleanCore class only
   - BooleanCompute.cs: BooleanCompute class only
-  - BooleanConfig.cs: BooleanConfig class only
 
 - [x] All member estimates under 300 LOC
   - Largest: BooleanCompute methods ~30-40 LOC each
@@ -838,30 +714,28 @@ Based on RhinoCommon capabilities and complementary boolean functionality:
 1. ✓ Read this blueprint thoroughly
 2. ✓ Double-check SDK usage patterns (completed via web research)
 3. ✓ Verify libs/ integration strategy (analyzed Result, UnifiedOperation, ValidationRules, E registry)
-4. [ ] Create folder structure with 4 files
-5. [ ] Implement BooleanConfig.cs (constants, configuration)
-6. [ ] Implement BooleanOutput record struct in BooleanCore.cs
-7. [ ] Implement Boolean.OperationType enum in Boolean.cs
-8. [ ] Implement Boolean.BooleanOptions record struct in Boolean.cs
-9. [ ] Implement BooleanCompute.cs algorithmic methods (SDK wrappers)
-10. [ ] Implement BooleanCore.cs dispatch registry and executor factories
-11. [ ] Implement Boolean.Execute<T1, T2> public API with UnifiedOperation
-12. [ ] Add new error codes to E.cs (2100-2108 in E.Geometry.Boolean nested class)
-13. [ ] Add diagnostic instrumentation (if EnableDiagnostics = true in config)
-14. [ ] Verify patterns match exemplars (Spatial, Intersection, Analysis)
-15. [ ] Check LOC limits per member (≤300)
-16. [ ] Check LOC limits per file (targeting 150-250)
-17. [ ] Verify file/type limits (4 files, 8 types - both within limits)
-18. [ ] Verify code style compliance (no var, no if/else, named params, trailing commas, etc.)
-19. [ ] Add XML documentation comments to public API
-20. [ ] Build and verify zero warnings
+4. [ ] Create folder structure with 3 files
+5. [ ] Implement Boolean.OperationType enum in Boolean.cs
+6. [ ] Implement Boolean.BooleanOptions record struct in Boolean.cs
+7. [ ] Implement Boolean.BooleanOutput record struct in Boolean.cs
+8. [ ] Implement BooleanCompute.cs algorithmic methods (SDK wrappers)
+9. [ ] Implement BooleanCore.cs dispatch registry and executor factories
+10. [ ] Implement Boolean.Execute<T1, T2> public API with UnifiedOperation
+11. [ ] Verify error codes exist in E.cs (2100-2108 in E.Geometry.BooleanOps nested class)
+12. [ ] Add diagnostic instrumentation (if EnableDiagnostics = true in config)
+13. [ ] Verify patterns match exemplars (Spatial, Intersection, Analysis)
+14. [ ] Check LOC limits per member (≤300)
+15. [ ] Check LOC limits per file (targeting 150-200)
+16. [ ] Verify file/type limits (3 files, 5 types - both within limits)
+17. [ ] Verify code style compliance (no var, no if/else, named params, trailing commas, etc.)
+18. [ ] Add XML documentation comments to public API
+19. [ ] Build and verify zero warnings
 
 ## References
 
 ### SDK Documentation
 - [RhinoCommon Brep Boolean Operations](https://developer.rhino3d.com/api/rhinocommon/rhino.geometry.brep)
 - [RhinoCommon Mesh Boolean Operations](https://developer.rhino3d.com/api/rhinocommon/rhino.geometry.mesh)
-- [RhinoCommon Curve.CreateBooleanRegions](https://developer.rhino3d.com/api/rhinocommon/rhino.geometry.curve/createbooleanregions)
 - [RhinoMath Class Reference](https://developer.rhino3d.com/api/rhinocommon/rhino.rhinomath)
 - [MeshBooleanOptions Configuration](https://developer.rhino3d.com/api/rhinocommon/rhino.geometry.meshbooleanoptions)
 
@@ -903,15 +777,16 @@ Based on RhinoCommon capabilities and complementary boolean functionality:
 - [x] Researched performance optimization strategies
 
 ### Architecture
-- [x] File count: 4 files (justified for complexity)
-- [x] Type count: 8 types (within 6-10 ideal range)
+- [x] File count: 3 files (standard complexity)
+- [x] Type count: 5 types (within 6-8 ideal range)
 - [x] Every type justified with clear purpose
 - [x] Result<T> integration clearly defined
 - [x] UnifiedOperation dispatch pattern specified
 - [x] V.* validation modes identified (no new ones needed)
-- [x] Error codes allocated with proper range (2100-2108)
+- [x] Error codes exist in E.Geometry.BooleanOps (2100-2108)
 - [x] Algorithmic density strategy articulated
 - [x] Public API surface minimized (single Execute<T1, T2> method)
+- [x] Operations limited to 4 core solid booleans (Union, Intersection, Difference, Split)
 
 ### Code Quality
 - [x] Blueprint strictly follows code style (no var, no if/else, pattern matching)
@@ -938,8 +813,10 @@ Based on RhinoCommon capabilities and complementary boolean functionality:
 1. **Namespace Suppression**: Boolean.cs MUST include `[SuppressMessage("Naming", "MA0049")]` for class name matching namespace
 2. **No Extension Methods**: All functionality integrated via proper type nesting or added to E.cs registry
 3. **No Helper Methods**: Inline complex logic, use pattern matching and Result composition
-4. **Type Nesting**: OperationType and BooleanOptions nested in Boolean class, BooleanOutput in BooleanCore
+4. **Type Nesting**: OperationType, BooleanOptions, and BooleanOutput nested in Boolean class
 5. **RhinoMath Usage**: Always use `RhinoMath.IsValidDouble`, `RhinoMath.ZeroTolerance` for validation, never magic numbers
 6. **SDK Null Handling**: All SDK calls wrapped in pattern matching with detailed error context on null
 7. **Tolerance Consistency**: Always use `context.AbsoluteTolerance` unless explicitly overridden
-8. **Validation Integration**: Use `V.Standard | V.Topology` for solids, `V.AreaCentroid` for curves - never custom validators
+8. **Validation Integration**: Use `V.Standard | V.Topology` for Breps, `V.Standard | V.MeshSpecific` for Meshes - never custom validators
+9. **Error Namespace**: Use `E.Geometry.BooleanOps.*` NOT `E.Geometry.Boolean.*`
+10. **Operations**: Only 4 operations supported: Union, Intersection, Difference, Split (no Trim, no Region)

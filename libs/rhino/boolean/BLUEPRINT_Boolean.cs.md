@@ -1,9 +1,9 @@
 # Boolean.cs Implementation Blueprint
 
 **File**: `libs/rhino/boolean/Boolean.cs`  
-**Purpose**: Public API surface with unified `Execute<T1, T2>` entry point  
+**Purpose**: Public API surface with unified `Execute<T1, T2>` entry point + TrimSolid helper  
 **Types**: 1 (Boolean class with 3 nested types)  
-**Estimated LOC**: 140-180
+**Estimated LOC**: 85-95
 
 ## File Structure
 
@@ -38,7 +38,7 @@ public static class Boolean {
         bool CombineCoplanarFaces = true,
         bool ValidateResult = true);
 
-    /// <summary>Boolean operation result containing geometry arrays and metadata.</summary>
+    /// <summary>Boolean operation result containing geometry arrays and metadata. Only ONE array populated per call.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct BooleanOutput(
         IReadOnlyList<Brep> Breps,
@@ -80,21 +80,44 @@ public static class Boolean {
                 error: E.Geometry.UnsupportedConfiguration.WithContext(
                     $"Operation: {operation}, Types: {typeof(T1).Name}, {typeof(T2).Name}")),
         };
+
+    /// <summary>Trims Brep using oriented cutter retaining portions inside cutter normal.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<BooleanOutput> TrimSolid(
+        Brep target,
+        Brep cutter,
+        IGeometryContext context,
+        BooleanOptions? options = null) =>
+        UnifiedOperation.Apply(
+            input: target,
+            operation: (Func<Brep, Result<IReadOnlyList<BooleanOutput>>>)(item => BooleanCompute.BrepTrim(
+                item,
+                cutter,
+                options ?? new BooleanOptions(),
+                context)
+                .Map(output => (IReadOnlyList<BooleanOutput>)[output])),
+            config: new OperationConfig<Brep, BooleanOutput> {
+                Context = context,
+                ValidationMode = V.Standard | V.Topology,
+                OperationName = "Boolean.TrimSolid",
+                EnableDiagnostics = false,
+            })
+            .Map(outputs => outputs.Count > 0 ? outputs[0] : BooleanOutput.Empty);
 }
 ```
 
 ## Key Design Notes
 
 ### Type Nesting (CRITICAL)
-- **Boolean** static class: Main API container - ONLY type at namespace level
-- **OperationType** enum: Nested in Boolean class (byte enum for memory efficiency)
-- **BooleanOptions** record struct: Nested in Boolean class with StructLayout.Auto
-- **BooleanOutput** record struct: Nested in Boolean class (NOT in BooleanCore - matches Intersect.IntersectionOutput pattern)
+- **Boolean** static class: Main API container - ONLY type at namespace level (THIS IS THE ONLY FILE WITH NESTED TYPES)
+- **OperationType** enum: Nested in Boolean class (byte enum for memory efficiency) - 4 operations only
+- **BooleanOptions** record struct: Nested in Boolean class with StructLayout.Auto - 4 parameters
+- **BooleanOutput** record struct: Nested in Boolean class (matches libs/rhino/intersection/Intersect.cs IntersectionOutput pattern)
 
-### Namespace Suppression
+### Namespace Suppression (REQUIRED)
 - **REQUIRED**: `[SuppressMessage("MA0049")]` attribute on Boolean class
-- **Justification**: Class name matches namespace (Arsenal.Rhino.Boolean.Boolean)
-- **Rule**: This is the ONLY file that can use a suppression
+- **Justification**: Class name matches namespace (Arsenal.Rhino.Boolean.Boolean) - this is intentional for primary API entry point
+- **Rule**: This is the ONLY file in the boolean/ folder that uses a suppression - absolutely required and justified
 
 ### Validation Modes
 - Retrieved from `BooleanCore.OperationRegistry` FrozenDictionary
@@ -117,25 +140,42 @@ public static class Boolean {
 - Named parameters throughout
 
 ### LOC Breakdown
-- Using statements: 10
+- Using statements: 9
 - Namespace + class declaration: 3
-- OperationType enum: 6
-- BooleanOptions record: 7
-- BooleanOutput record: 10
-- Execute<T1, T2> method: 30
-- Total: ~66 LOC base + XML comments
+- OperationType enum: 5 lines (4 values + declaration)
+- BooleanOptions record: 6 lines (4 parameters)
+- BooleanOutput record: 9 lines (4 fields + Empty)
+- Execute<T1, T2> method: 25-30 lines
+- TrimSolid helper method: 14 lines
+- Total: ~85-95 LOC (follows Intersect pattern with helper methods)
 
-### Why BooleanOutput is Here (Not in BooleanCore)
-- **Pattern match**: Intersect.IntersectionOutput is nested in Intersect (public API class)
+### Why BooleanOutput is Here (DEFINITIVELY)
+- **Pattern match**: libs/rhino/intersection/Intersect.cs nests IntersectionOutput in Intersect (public API class)
 - **Rule**: Only ONE type per file at namespace level (no mixed types in bracket)
-- **BooleanCore.cs must have ONLY BooleanCore class** at namespace level
-- **Public output types belong with public API**, not internal implementation
+- **BooleanCore.cs has ONLY BooleanCore class** at namespace level - no nested types
+- **Public output types belong with public API** - BooleanOutput is definitively in Boolean.cs
+- **Field usage**: Only ONE array populated per operation call (Breps for Brep ops, Meshes for Mesh ops)
+
+## Error References
+All error codes use `E.Geometry.BooleanOps.*` namespace (libs/core/errors/E.cs line 355):
+- `E.Geometry.BooleanOps.OperationFailed` (2100)
+- `E.Geometry.BooleanOps.NotClosedOrSolid` (2101)
+- `E.Geometry.BooleanOps.NotPlanarOrCoplanar` (2102)
+- `E.Geometry.BooleanOps.InsufficientMeshQuality` (2103)
+- `E.Geometry.BooleanOps.DegenerateResult` (2104)
+- `E.Geometry.BooleanOps.TrimFailed` (2105) (used by TrimSolid helper method)
+- `E.Geometry.BooleanOps.SplitFailed` (2106)
+- `E.Geometry.BooleanOps.RegionExtractionFailed` (2107) (unused - reserved for future curve operations)
+- `E.Geometry.BooleanOps.ResultValidationFailed` (2108)
+
+**Never reference**: `E.Geometry.Boolean.*` (incorrect namespace)
 
 ## XML Documentation Standards
 ```csharp
 /// <summary>Unified boolean operations for Brep, Mesh, and planar Curve geometry.</summary>
 /// <summary>Boolean operation type selector.</summary>
 /// <summary>Boolean operation configuration options.</summary>
+/// <summary>Boolean operation result containing geometry arrays and metadata. Only ONE array populated per call.</summary>
 /// <summary>Executes type-detected boolean operation with automatic validation and dispatch.</summary>
 ```
 
