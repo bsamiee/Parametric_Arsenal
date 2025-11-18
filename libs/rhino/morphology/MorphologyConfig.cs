@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
@@ -8,58 +7,45 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology operation configuration constants and dispatch tables.</summary>
 internal static class MorphologyConfig {
-    /// <summary>Operation metadata: validation, name, parameter type.</summary>
-    internal static readonly FrozenDictionary<(byte Op, Type Type), (V Validation, string Name)> Operations =
-        new Dictionary<(byte, Type), (V, string)> {
-            [(1, typeof(Mesh))] = (V.Standard | V.Topology, "CageDeform"),
-            [(1, typeof(Brep))] = (V.Standard | V.Topology, "CageDeform"),
-            [(2, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideCatmullClark"),
-            [(3, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideLoop"),
-            [(4, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "SubdivideButterfly"),
-            [(10, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "SmoothLaplacian"),
-            [(11, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "SmoothTaubin"),
-            [(12, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshOffset"),
-            [(13, typeof(Mesh))] = (V.Standard | V.MeshSpecific | V.Topology, "MeshReduce"),
-            [(14, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshRemesh"),
-            [(15, typeof(Brep))] = (V.Standard | V.BoundingBox, "BrepToMesh"),
-            [(16, typeof(Mesh))] = (V.Standard | V.Topology | V.MeshSpecific, "MeshRepair"),
-            [(17, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshThicken"),
-            [(18, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshUnwrap"),
-            [(19, typeof(Mesh))] = (V.Standard | V.Topology, "MeshSeparate"),
-            [(20, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "EvolveMeanCurvature"),
-            [(21, typeof(Mesh))] = (V.Standard | V.MeshSpecific, "MeshWeld"),
-        }.ToFrozenDictionary();
+    /// <summary>Map subdivision strategy to internal algorithm code.</summary>
+    [Pure]
+    internal static byte GetSubdivisionAlgorithm(Morphology.SubdivisionStrategy strategy) =>
+        strategy switch {
+            Morphology.CatmullClarkSubdivision => OpSubdivideCatmullClark,
+            Morphology.LoopSubdivision => OpSubdivideLoop,
+            Morphology.ButterflySubdivision => OpSubdivideButterfly,
+            _ => 0,
+        };
 
-    /// <summary>Operation names by ID for O(1) lookup, derived from Operations.</summary>
-    private static readonly FrozenDictionary<byte, string> OperationNames =
-        Operations
-            .GroupBy(static kv => kv.Key.Op)
-            .ToDictionary(static g => g.Key, static g => g.First().Value.Name)
-            .ToFrozenDictionary();
+    /// <summary>Map repair strategy to internal flags and tolerance.</summary>
+    [Pure]
+    internal static (byte Flags, double Tolerance) GetRepairFlags(Morphology.MeshRepairStrategy strategy) =>
+        strategy switch {
+            Morphology.FillHolesRepair => (RepairFillHoles, DefaultWeldTolerance),
+            Morphology.UnifyNormalsRepair => (RepairUnifyNormals, DefaultWeldTolerance),
+            Morphology.CullDegenerateFacesRepair => (RepairCullDegenerateFaces, DefaultWeldTolerance),
+            Morphology.CompactRepair => (RepairCompact, DefaultWeldTolerance),
+            Morphology.WeldRepair => (RepairWeld, DefaultWeldTolerance),
+            Morphology.CompositeRepair composite => (
+                composite.Strategies.Aggregate(RepairNone, (acc, s) => (byte)(acc | GetRepairFlags(s).Flags)),
+                composite.WeldTolerance),
+            _ => (RepairNone, DefaultWeldTolerance),
+        };
 
-    [Pure] internal static V ValidationMode(byte op, Type type) => Operations.TryGetValue((op, type), out (V v, string _) meta) ? meta.v : V.Standard;
-    [Pure] internal static string OperationName(byte op) => OperationNames.TryGetValue(op, out string? name) ? name : $"Op{op}";
+    /// <summary>Map unwrap strategy to internal method code.</summary>
+    [Pure]
+    internal static byte GetUnwrapMethod(Morphology.UnwrapStrategy strategy) =>
+        strategy switch {
+            Morphology.PlanarUnwrap => 0,
+            Morphology.CylindricalUnwrap => 1,
+            Morphology.SphericalUnwrap => 2,
+            _ => 0,
+        };
 
-    /// <summary>Operation ID constants.</summary>
-    internal const byte OpCageDeform = 1;
+    /// <summary>Internal operation ID constants for compute layer.</summary>
     internal const byte OpSubdivideCatmullClark = 2;
     internal const byte OpSubdivideLoop = 3;
     internal const byte OpSubdivideButterfly = 4;
-    internal const byte OpSmoothLaplacian = 10;
-    internal const byte OpSmoothTaubin = 11;
-    internal const byte OpOffset = 12;
-    internal const byte OpReduce = 13;
-    internal const byte OpRemesh = 14;
-    internal const byte OpBrepToMesh = 15;
-    internal const byte OpMeshRepair = 16;
-    internal const byte OpMeshThicken = 17;
-    internal const byte OpMeshUnwrap = 18;
-    internal const byte OpMeshSeparate = 19;
-    internal const byte OpEvolveMeanCurvature = 20;
-    internal const byte OpMeshWeld = 21;
-
-    /// <summary>Subdivision algorithms requiring triangulated meshes.</summary>
-    internal static readonly FrozenSet<byte> TriangulatedSubdivisionOps = new HashSet<byte> { OpSubdivideLoop, OpSubdivideButterfly, }.ToFrozenSet();
 
     /// <summary>Cage deformation configuration.</summary>
     internal const int MinCageControlPoints = 8;

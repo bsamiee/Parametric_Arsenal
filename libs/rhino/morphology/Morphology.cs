@@ -18,6 +18,93 @@ public static class Morphology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
+    /// <summary>Base type for all morphology operation requests.</summary>
+    public abstract record Operation;
+
+    /// <summary>Cage deformation with control point displacement.</summary>
+    public sealed record CageDeformOperation(
+        GeometryBase Cage,
+        Point3d[] OriginalControlPoints,
+        Point3d[] DeformedControlPoints) : Operation;
+
+    /// <summary>Base type for subdivision strategies.</summary>
+    public abstract record SubdivisionStrategy(int Levels) : Operation;
+
+    /// <summary>Catmull-Clark subdivision for quad-dominant meshes.</summary>
+    public sealed record CatmullClarkSubdivision(int Levels) : SubdivisionStrategy(Levels);
+
+    /// <summary>Loop subdivision for triangulated meshes.</summary>
+    public sealed record LoopSubdivision(int Levels) : SubdivisionStrategy(Levels);
+
+    /// <summary>Butterfly subdivision for triangulated meshes.</summary>
+    public sealed record ButterflySubdivision(int Levels) : SubdivisionStrategy(Levels);
+
+    /// <summary>Base type for smoothing strategies.</summary>
+    public abstract record SmoothingStrategy(int Iterations, bool LockBoundary) : Operation;
+
+    /// <summary>Laplacian smoothing with optional cotangent weighting.</summary>
+    public sealed record LaplacianSmoothing(int Iterations, bool LockBoundary) : SmoothingStrategy(Iterations, LockBoundary);
+
+    /// <summary>Taubin smoothing with λ-μ filtering to prevent shrinkage.</summary>
+    public sealed record TaubinSmoothing(int Iterations, double Lambda, double Mu) : SmoothingStrategy(Iterations, LockBoundary: false);
+
+    /// <summary>Mean curvature flow evolution.</summary>
+    public sealed record MeanCurvatureFlowSmoothing(double TimeStep, int Iterations) : SmoothingStrategy(Iterations, LockBoundary: false);
+
+    /// <summary>Mesh offset operation.</summary>
+    public sealed record MeshOffsetOperation(double Distance, bool BothSides) : Operation;
+
+    /// <summary>Mesh reduction with quality preservation.</summary>
+    public sealed record MeshReductionOperation(int TargetFaceCount, bool PreserveBoundary, double Accuracy) : Operation;
+
+    /// <summary>Isotropic remeshing for uniform edge lengths.</summary>
+    public sealed record IsotropicRemeshOperation(double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : Operation;
+
+    /// <summary>Brep to mesh conversion.</summary>
+    public sealed record BrepToMeshOperation(MeshingParameters? Parameters, bool JoinMeshes) : Operation;
+
+    /// <summary>Base type for mesh repair strategies.</summary>
+    public abstract record MeshRepairStrategy : Operation;
+
+    /// <summary>Fill holes in mesh.</summary>
+    public sealed record FillHolesRepair : MeshRepairStrategy;
+
+    /// <summary>Unify mesh normals.</summary>
+    public sealed record UnifyNormalsRepair : MeshRepairStrategy;
+
+    /// <summary>Cull degenerate faces.</summary>
+    public sealed record CullDegenerateFacesRepair : MeshRepairStrategy;
+
+    /// <summary>Compact mesh by removing unused vertices.</summary>
+    public sealed record CompactRepair : MeshRepairStrategy;
+
+    /// <summary>Weld coincident vertices.</summary>
+    public sealed record WeldRepair : MeshRepairStrategy;
+
+    /// <summary>Composite repair operation with tolerance.</summary>
+    public sealed record CompositeRepair(IReadOnlyList<MeshRepairStrategy> Strategies, double WeldTolerance) : MeshRepairStrategy;
+
+    /// <summary>Mesh thickening to create solid shell.</summary>
+    public sealed record MeshThickenOperation(double OffsetDistance, bool Solidify, Vector3d Direction) : Operation;
+
+    /// <summary>Base type for mesh unwrapping strategies.</summary>
+    public abstract record UnwrapStrategy : Operation;
+
+    /// <summary>Planar unwrap projection.</summary>
+    public sealed record PlanarUnwrap : UnwrapStrategy;
+
+    /// <summary>Cylindrical unwrap projection.</summary>
+    public sealed record CylindricalUnwrap : UnwrapStrategy;
+
+    /// <summary>Spherical unwrap projection.</summary>
+    public sealed record SphericalUnwrap : UnwrapStrategy;
+
+    /// <summary>Separate mesh into disconnected components.</summary>
+    public sealed record MeshSeparateOperation : Operation;
+
+    /// <summary>Weld mesh vertices within tolerance.</summary>
+    public sealed record MeshWeldOperation(double Tolerance, bool RecalculateNormals) : Operation;
+
     /// <summary>Cage deformation result with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
@@ -226,22 +313,11 @@ public static class Morphology {
             $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
     }
 
-    /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
+    /// <summary>Apply morphology operation with algebraic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
         T input,
-        (byte Operation, object Parameters) spec,
+        Operation operation,
         IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.OperationDispatch.TryGetValue((spec.Operation, typeof(T)), out Func<object, object, IGeometryContext, Result<IReadOnlyList<IMorphologyResult>>>? executor) && executor is not null
-            ? UnifiedOperation.Apply(
-                input: input,
-                operation: (Func<T, Result<IReadOnlyList<IMorphologyResult>>>)(item => executor(item, spec.Parameters, context)),
-                config: new OperationConfig<T, IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = MorphologyConfig.ValidationMode(spec.Operation, typeof(T)),
-                    OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{MorphologyConfig.OperationName(spec.Operation)}"),
-                    EnableDiagnostics = false,
-                })
-            : ResultFactory.Create<IReadOnlyList<IMorphologyResult>>(
-                error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {spec.Operation}, Type: {typeof(T).Name}"));
+        MorphologyCore.Execute(input, operation, context);
 }
