@@ -28,9 +28,6 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>Healing strategy tolerance multipliers: [Conservative=0.1×, Moderate=1.0×, Aggressive=10.0×].</summary>
-    internal static readonly double[] HealingToleranceMultipliers = [0.1, 1.0, 10.0,];
-
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 
@@ -44,12 +41,14 @@ internal static class TopologyConfig {
     /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
     internal const int MaxEdgesForNearMissAnalysis = 100;
 
-    /// <summary>Healing strategy identifiers for progressive topology repair.</summary>
-    internal const byte StrategyConservativeRepair = 0;
-    internal const byte StrategyModerateJoin = 1;
-    internal const byte StrategyAggressiveJoin = 2;
-    internal const byte StrategyCombined = 3;
-    internal const byte StrategyTargetedJoin = 4;
-    internal const byte StrategyComponentJoin = 5;
-    internal const int MaxHealingStrategies = 6;
+    /// <summary>Strategy to tolerance multiplier mapping for healing operations.</summary>
+    internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
+        new Dictionary<Type, double> {
+            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
+            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
+            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
+            [typeof(Topology.CombinedStrategy)] = 1.0,
+            [typeof(Topology.TargetedJoinStrategy)] = 100.0,
+            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
+        }.ToFrozenDictionary();
 }

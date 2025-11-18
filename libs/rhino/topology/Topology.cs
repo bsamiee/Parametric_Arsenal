@@ -34,6 +34,68 @@ public static class Topology {
         public static readonly EdgeContinuityType NonManifold = new(5);
     }
 
+    /// <summary>Base type for topology healing strategies.</summary>
+    public abstract record Strategy;
+
+    /// <summary>Conservative repair: minimal tolerance multiplier (0.1×) for precise geometry preservation.</summary>
+    public sealed record ConservativeRepairStrategy : Strategy;
+
+    /// <summary>Moderate join: standard tolerance multiplier (1.0×) for balanced joining.</summary>
+    public sealed record ModerateJoinStrategy : Strategy;
+
+    /// <summary>Aggressive join: high tolerance multiplier (10.0×) for maximum joining.</summary>
+    public sealed record AggressiveJoinStrategy : Strategy;
+
+    /// <summary>Combined approach: conservative repair followed by moderate join.</summary>
+    public sealed record CombinedStrategy : Strategy;
+
+    /// <summary>Targeted join: analyze near-miss edge pairs and join within threshold.</summary>
+    public sealed record TargetedJoinStrategy : Strategy;
+
+    /// <summary>Component join: join disconnected brep components.</summary>
+    public sealed record ComponentJoinStrategy : Strategy;
+
+    /// <summary>Topology diagnosis results with edge gaps, near-misses, and recommended strategies.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record TopologyDiagnosis(
+        IReadOnlyList<double> EdgeGaps,
+        IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> NearMisses,
+        IReadOnlyList<Strategy> SuggestedStrategies) : IResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"Diagnosis: Gaps={this.EdgeGaps.Count} | NearMisses={this.NearMisses.Count} | Strategies={this.SuggestedStrategies.Count}");
+    }
+
+    /// <summary>Topological feature extraction results: genus, loops, solid classification, handle count.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record TopologicalFeatures(
+        int Genus,
+        IReadOnlyList<(int LoopIndex, bool IsHole)> Loops,
+        bool IsSolid,
+        int HandleCount) : IResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"Features: Genus={this.Genus} | Loops={this.Loops.Count} | Solid={this.IsSolid} | Handles={this.HandleCount}");
+    }
+
+    /// <summary>Healing result with healed geometry, applied strategy, and success status.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record HealingResult(
+        Brep Healed,
+        Strategy AppliedStrategy,
+        bool Success) : IResult {
+        [Pure]
+        private string DebuggerDisplay => this.Success
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"Healing: Success | Strategy={this.AppliedStrategy.GetType().Name}")
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"Healing: Failed | Strategy={this.AppliedStrategy.GetType().Name}");
+    }
+
     /// <summary>Naked edge analysis: boundary curves, indices, valences, and metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record NakedEdgeData(
@@ -230,23 +292,23 @@ public static class Topology {
 
     /// <summary>Diagnose topology with edge gaps, near-misses, and repair strategy suggestions.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> DiagnoseTopology(
+    public static Result<TopologyDiagnosis> DiagnoseTopology(
         Brep brep,
         IGeometryContext context) =>
         TopologyCompute.Diagnose(brep: brep, context: context);
 
     /// <summary>Progressive healing with automatic rollback and strategy selection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Brep Healed, byte Strategy, bool Success)> HealTopology(
+    public static Result<HealingResult> HealTopology(
         Brep brep,
-        byte maxStrategy,
+        IReadOnlyList<Strategy> strategies,
         IGeometryContext context) =>
-        TopologyCompute.Heal(brep: brep, maxStrategy: maxStrategy, context: context);
+        TopologyCompute.Heal(brep: brep, strategies: strategies, context: context);
 
     /// <summary>Extract genus, holes, handles, and solid classification via Euler.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractTopologicalFeatures(
+    public static Result<TopologicalFeatures> ExtractTopologicalFeatures(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.ExtractFeatures(brep: brep, context);
+        TopologyCompute.ExtractFeatures(brep: brep, context: context);
 }
