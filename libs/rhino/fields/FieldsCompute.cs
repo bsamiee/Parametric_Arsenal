@@ -278,7 +278,7 @@ internal static class FieldsCompute {
                             };
                         }))(),
                     };
-                }))(),
+                }))()),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

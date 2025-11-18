@@ -75,7 +75,7 @@ internal static class TransformCompute {
                 morph: new BendSpaceMorph(
                     start: spine.From,
                     end: spine.To,
-                    point: spine.From + spine.Direction * (spine.Length * 0.5),
+                    point: spine.From + (spine.Direction * (spine.Length * 0.5)),
                     angle: angle,
                     straight: false,
                     symmetric: false) {
@@ -209,7 +209,9 @@ internal static class TransformCompute {
         bool enableDiagnostics) where T : GeometryBase {
         if (path is null || count <= 0 || count > TransformConfig.MaxArrayCount || !path.IsValid || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")));
         }
 
         Transform[] transforms = new Transform[count];

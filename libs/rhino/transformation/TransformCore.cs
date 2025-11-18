@@ -44,18 +44,7 @@ internal static class TransformCore {
         }.ToFrozenDictionary();
 
     private static byte DetectMode(Transforms.TransformSpec spec) =>
-        spec switch {
-            { Matrix: not null } => 1,
-            { UniformScale: not null } => 2,
-            { NonUniformScale: not null } => 3,
-            { Rotation: not null } => 4,
-            { RotationVectors: not null } => 5,
-            { MirrorPlane: not null } => 6,
-            { Translation: not null } => 7,
-            { Shear: not null } => 8,
-            { ProjectionPlane: not null } => 9,
-            { ChangeBasis: not null } => 10,
-            { PlaneToPlane: not null } => 11,
+        spec switch { { Matrix: not null } => 1, { UniformScale: not null } => 2, { NonUniformScale: not null } => 3, { Rotation: not null } => 4, { RotationVectors: not null } => 5, { MirrorPlane: not null } => 6, { Translation: not null } => 7, { Shear: not null } => 8, { ProjectionPlane: not null } => 9, { ChangeBasis: not null } => 10, { PlaneToPlane: not null } => 11,
             _ => 0,
         };
 
@@ -78,17 +67,16 @@ internal static class TransformCore {
         bool isExtrusion = item is Extrusion;
         GeometryBase normalized = isExtrusion ? ((Extrusion)(object)item).ToBrep(splitKinkyFaces: true) : item;
         bool shouldDispose = isExtrusion;
+        T duplicate = (T)normalized.Duplicate();
+        Result<IReadOnlyList<T>> result = duplicate.Transform(transform)
+            ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
+            : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
 
-        try {
-            T duplicate = (T)normalized.Duplicate();
-            return duplicate.Transform(transform)
-                ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
-                : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
-        } finally {
-            } finally {
-                (shouldDispose ? normalized as IDisposable : null)?.Dispose();
-            }
+        if (shouldDispose && normalized is IDisposable disposable) {
+            disposable.Dispose();
         }
+
+        return result;
     }
 
     /// <summary>Generate rectangular grid array transforms.</summary>
@@ -110,7 +98,9 @@ internal static class TransformCore {
             || Math.Abs(ySpacing) <= context.AbsoluteTolerance
             || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}")));
         }
 
         Transform[] transforms = new Transform[totalCount];
@@ -154,7 +144,9 @@ internal static class TransformCore {
             || axis.Length <= context.AbsoluteTolerance
             || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Axis: {Fmt(axis.Length)}, Angle: {Fmt(totalAngle)}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Count: {count}, Axis: {Fmt(axis.Length)}, Angle: {Fmt(totalAngle)}")));
         }
 
         Transform[] transforms = new Transform[count];
@@ -193,7 +185,9 @@ internal static class TransformCore {
             || direction.Length <= context.AbsoluteTolerance
             || Math.Abs(spacing) <= context.AbsoluteTolerance) {
             return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {count}, Direction: {Fmt(direction.Length)}, Spacing: {Fmt(spacing)}"));
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Count: {count}, Direction: {Fmt(direction.Length)}, Spacing: {Fmt(spacing)}")));
         }
 
         Transform[] transforms = new Transform[count];
