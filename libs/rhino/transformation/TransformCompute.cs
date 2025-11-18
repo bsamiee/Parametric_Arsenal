@@ -13,10 +13,6 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
 internal static class TransformCompute {
-    private const string DoubleFormat = "F6";
-
-    private static string Fmt(double value) => value.ToString(DoubleFormat, System.Globalization.CultureInfo.InvariantCulture);
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double MorphTolerance(IGeometryContext context) =>
         Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance);
@@ -61,7 +57,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {Fmt(angleRadians)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {TransformCore.Fmt(angleRadians)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Bend geometry along spine.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -75,7 +71,7 @@ internal static class TransformCompute {
                 morph: new BendSpaceMorph(
                     start: spine.From,
                     end: spine.To,
-                    point: spine.From + (spine.Direction * (spine.Length * 0.5)),
+                    point: spine.PointAt(0.5),
                     angle: angle,
                     straight: false,
                     symmetric: false) {
@@ -84,7 +80,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {Fmt(angle)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {TransformCore.Fmt(angle)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -111,7 +107,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {Fmt(startWidth)}, End: {Fmt(endWidth)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {TransformCore.Fmt(startWidth)}, End: {TransformCore.Fmt(endWidth)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Stretch geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -196,7 +192,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {Fmt(radius)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {TransformCore.Fmt(radius)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -207,7 +203,7 @@ internal static class TransformCompute {
         bool orientToPath,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (path is null || count <= 0 || count > TransformConfig.MaxArrayCount || !path.IsValid || !geometry.IsValid) {
+        if (count <= 0 || count > TransformConfig.MaxArrayCount || path is null || !path.IsValid || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -216,7 +212,7 @@ internal static class TransformCompute {
 
         Transform[] transforms = new Transform[count];
         Interval domain = path.Domain;
-        double step = count > 1 ? (domain.Max - domain.Min) / (count - 1) : 0.0;
+        double step = count > 1 ? domain.Length / (count - 1) : 0.0;
 
         for (int i = 0; i < count; i++) {
             double t = count > 1 ? domain.Min + (step * i) : domain.Mid;

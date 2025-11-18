@@ -13,27 +13,29 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform matrix construction, validation, and application.</summary>
 internal static class TransformCore {
-    private const string DoubleFormat = "F6";
+    internal const string DoubleFormat = "F6";
 
-    private static string Fmt(double value) => value.ToString(DoubleFormat, System.Globalization.CultureInfo.InvariantCulture);
+    internal static string Fmt(double value) => value.ToString(DoubleFormat, System.Globalization.CultureInfo.InvariantCulture);
 
     private static readonly FrozenDictionary<byte, (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> Validate, Func<Transforms.TransformSpec, Transform> Build, SystemError Error)> _builders =
         new Dictionary<byte, (Func<Transforms.TransformSpec, IGeometryContext, (bool, string)>, Func<Transforms.TransformSpec, Transform>, SystemError)> {
             [1] = ((s, c) => (s.Matrix is Transform m && m.IsValid && Math.Abs(m.Determinant) > c.AbsoluteTolerance, $"Valid: {s.Matrix?.IsValid ?? false}, Det: {Fmt(s.Matrix?.Determinant ?? 0)}"),
                 s => s.Matrix!.Value, E.Geometry.Transformation.InvalidTransformMatrix),
-            [2] = ((s, _) => (s.UniformScale is (Point3d, double f) && f is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Factor: {Fmt(s.UniformScale?.Factor ?? 0)}"),
+            [2] = ((s, _) => (s.UniformScale is (Point3d anchor, double f) && f is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Factor: {Fmt(s.UniformScale?.Factor ?? 0)}"),
                 s => Transform.Scale(s.UniformScale!.Value.Anchor, s.UniformScale.Value.Factor), E.Geometry.Transformation.InvalidScaleFactor),
             [3] = ((s, _) => (s.NonUniformScale is (Plane p, double x, double y, double z) && p.IsValid && x is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && y is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && z is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Plane: {s.NonUniformScale?.Plane.IsValid ?? false}, X: {Fmt(s.NonUniformScale?.X ?? 0)}, Y: {Fmt(s.NonUniformScale?.Y ?? 0)}, Z: {Fmt(s.NonUniformScale?.Z ?? 0)}"),
                 s => Transform.Scale(s.NonUniformScale!.Value.Plane, s.NonUniformScale.Value.X, s.NonUniformScale.Value.Y, s.NonUniformScale.Value.Z), E.Geometry.Transformation.InvalidScaleFactor),
-            [4] = ((s, c) => (s.Rotation is (double, Vector3d a, Point3d) && a.Length > c.AbsoluteTolerance, $"Axis: {Fmt(s.Rotation?.Axis.Length ?? 0)}"),
-                s => Transform.Rotation(s.Rotation!.Value.Angle, s.Rotation.Value.Axis, s.Rotation.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
-            [5] = ((s, c) => (s.RotationVectors is (Vector3d st, Vector3d en, Point3d) && st.Length > c.AbsoluteTolerance && en.Length > c.AbsoluteTolerance, $"Start: {Fmt(s.RotationVectors?.Start.Length ?? 0)}, End: {Fmt(s.RotationVectors?.End.Length ?? 0)}"),
+            [4] = ((s, c) => (s.Rotation is (double angle, Vector3d a, Point3d center) && a.Length > c.AbsoluteTolerance, $"Axis: {Fmt(s.Rotation?.Axis.Length ?? 0)}"),
+                s => s.Rotation is { } rot
+                    ? Transform.Rotation(rot.Angle, rot.Axis, rot.Center)
+                    : Transform.Identity, E.Geometry.Transformation.InvalidRotationAxis),
+            [5] = ((s, c) => (s.RotationVectors is (Vector3d st, Vector3d en, Point3d center) && st.Length > c.AbsoluteTolerance && en.Length > c.AbsoluteTolerance, $"Start: {Fmt(s.RotationVectors?.Start.Length ?? 0)}, End: {Fmt(s.RotationVectors?.End.Length ?? 0)}"),
                 s => Transform.Rotation(s.RotationVectors!.Value.Start, s.RotationVectors.Value.End, s.RotationVectors.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
             [6] = ((s, _) => (s.MirrorPlane is Plane p && p.IsValid, string.Empty),
                 s => Transform.Mirror(s.MirrorPlane!.Value), E.Geometry.Transformation.InvalidMirrorPlane),
-            [7] = ((s, _) => (s.Translation is Vector3d, string.Empty),
+            [7] = ((s, _) => (s.Translation is Vector3d _, string.Empty),
                 s => Transform.Translation(s.Translation!.Value), E.Geometry.Transformation.InvalidTransformSpec),
-            [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {Fmt(s.Shear?.Direction.Length ?? 0)}"),
+            [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double angle) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {Fmt(s.Shear?.Direction.Length ?? 0)}"),
                 s => Transform.Shear(s.Shear!.Value.Plane, s.Shear.Value.Direction * Math.Tan(s.Shear.Value.Angle), Vector3d.Zero, Vector3d.Zero), E.Geometry.Transformation.InvalidShearParameters),
             [9] = ((s, _) => (s.ProjectionPlane is Plane p && p.IsValid, string.Empty),
                 s => Transform.PlanarProjection(s.ProjectionPlane!.Value), E.Geometry.Transformation.InvalidProjectionPlane),
@@ -64,16 +66,20 @@ internal static class TransformCore {
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
         Transform transform) where T : GeometryBase {
-        bool isExtrusion = item is Extrusion;
-        GeometryBase normalized = isExtrusion ? ((Extrusion)(object)item).ToBrep(splitKinkyFaces: true) : item;
-        bool shouldDispose = isExtrusion;
+        GeometryBase normalized = item is Extrusion extrusion
+            ? extrusion.ToBrep(splitKinkyFaces: true)
+            : item;
         T duplicate = (T)normalized.Duplicate();
         Result<IReadOnlyList<T>> result = duplicate.Transform(transform)
             ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
             : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
 
-        if (shouldDispose && normalized is IDisposable disposable) {
+        if (item is Extrusion && normalized is IDisposable disposable) {
             disposable.Dispose();
+        }
+
+        if (!result.IsSuccess && duplicate is IDisposable duplicateDisposable) {
+            duplicateDisposable.Dispose();
         }
 
         return result;
@@ -181,17 +187,18 @@ internal static class TransformCore {
         double spacing,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
+        double dirLength = direction.Length;
         if (count <= 0 || count > TransformConfig.MaxArrayCount
-            || direction.Length <= context.AbsoluteTolerance
+            || dirLength <= context.AbsoluteTolerance
             || Math.Abs(spacing) <= context.AbsoluteTolerance) {
             return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Direction: {Fmt(direction.Length)}, Spacing: {Fmt(spacing)}")));
+                    $"Count: {count}, Direction: {Fmt(dirLength)}, Spacing: {Fmt(spacing)}")));
         }
 
         Transform[] transforms = new Transform[count];
-        Vector3d step = (direction / direction.Length) * spacing;
+        Vector3d step = (direction / dirLength) * spacing;
 
         for (int i = 0; i < count; i++) {
             transforms[i] = Transform.Translation(step * i);
