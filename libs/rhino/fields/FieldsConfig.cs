@@ -1,15 +1,44 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using Arsenal.Core.Validation;
 using Rhino;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
+/// <summary>Configuration constants and metadata for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    internal const byte OperationDistance = 0;
-    internal const byte IntegrationRK4 = 2;
-    internal const byte InterpolationNearest = 0;
-    internal const byte InterpolationTrilinear = 1;
+    internal sealed record DistanceOperationMetadata(V ValidationMode, int BufferSize);
+
+    internal static class OperationNames {
+        internal const string DistanceField = "Fields.DistanceField";
+    }
+
+    internal enum InterpolationModeKind {
+        Nearest,
+        Trilinear,
+    }
+
+    internal enum StreamlineScheme {
+        Euler,
+        RungeKutta2,
+        RungeKutta4,
+    }
+
+    internal enum VectorComponentKind {
+        X = 0,
+        Y = 1,
+        Z = 2,
+    }
+
+    internal enum CriticalPointKind {
+        Minimum,
+        Maximum,
+        Saddle,
+    }
 
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
@@ -31,9 +60,13 @@ internal static class FieldsConfig {
 
     internal const int FieldRTreeThreshold = 100;
 
-    internal const byte CriticalPointMinimum = 0;
-    internal const byte CriticalPointMaximum = 1;
-    internal const byte CriticalPointSaddle = 2;
+    internal static readonly FrozenDictionary<Type, DistanceOperationMetadata> DistanceOperationMetadataByType =
+        new Dictionary<Type, DistanceOperationMetadata> {
+            [typeof(Mesh)] = new DistanceOperationMetadata(V.Standard | V.MeshSpecific, 4096),
+            [typeof(Brep)] = new DistanceOperationMetadata(V.Standard | V.Topology, 8192),
+            [typeof(Curve)] = new DistanceOperationMetadata(V.Standard | V.Degeneracy, 2048),
+            [typeof(Surface)] = new DistanceOperationMetadata(V.Standard | V.BoundingBox, 4096),
+        }.ToFrozenDictionary();
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),

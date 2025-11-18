@@ -12,31 +12,162 @@ namespace Arsenal.Rhino.Fields;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Fields is the primary API entry point")]
 public static class Fields {
     /// <summary>Field specification for grid resolution, bounds, and step size.</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly struct FieldSpec(
-        int resolution = FieldsConfig.DefaultResolution,
-        BoundingBox? bounds = null,
-        double? stepSize = null) {
+    public sealed record FieldSpec {
+        /// <summary>Initializes a field specification with normalized resolution and step size.</summary>
+        /// <param name="resolution">Cube root of sample count.</param>
+        /// <param name="bounds">Optional sampling bounds (null uses geometry bounds).</param>
+        /// <param name="stepSize">Optional integration/sampling step size.</param>
+        public FieldSpec(
+            int resolution = FieldsConfig.DefaultResolution,
+            BoundingBox? bounds = null,
+            double? stepSize = null) {
+            this.Resolution = RhinoMath.Clamp(
+                NormalizeResolution(resolution),
+                FieldsConfig.MinResolution,
+                FieldsConfig.MaxResolution);
+            this.Bounds = bounds;
+            this.StepSize = stepSize is double value && value >= FieldsConfig.MinStepSize && value <= FieldsConfig.MaxStepSize
+                ? value
+                : FieldsConfig.DefaultStepSize;
+        }
+
         /// <summary>Grid resolution (cube root of sample count).</summary>
+        public int Resolution { get; }
+
+        /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
+        public BoundingBox? Bounds { get; }
+
+        /// <summary>Integration/sampling step size.</summary>
+        public double StepSize { get; }
+
         private static int NormalizeResolution(int resolution) =>
             resolution >= FieldsConfig.MinResolution
                 ? resolution
                 : FieldsConfig.DefaultResolution;
-        public readonly int Resolution = RhinoMath.Clamp(
-            NormalizeResolution(resolution),
-            FieldsConfig.MinResolution,
-            FieldsConfig.MaxResolution);
-        /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
-        public readonly BoundingBox? Bounds = bounds;
-        /// <summary>Integration/sampling step size.</summary>
-        public readonly double StepSize = stepSize is { } value && value >= FieldsConfig.MinStepSize && value <= FieldsConfig.MaxStepSize
-            ? value
-            : FieldsConfig.DefaultStepSize;
     }
 
-    /// <summary>Critical point classification result with location, type (minimum/maximum/saddle), value, and eigendecomposition.</summary>
+    /// <summary>Interpolation mode describing how scalar/vector values are sampled.</summary>
+    public sealed record InterpolationMode {
+        private InterpolationMode(FieldsConfig.InterpolationModeKind kind, string name) {
+            this.Kind = kind;
+            this.Name = name;
+        }
+
+        internal FieldsConfig.InterpolationModeKind Kind { get; }
+
+        /// <summary>Mode display name.</summary>
+        public string Name { get; }
+
+        /// <summary>Nearest-neighbor interpolation.</summary>
+        public static InterpolationMode Nearest { get; } = new InterpolationMode(
+            FieldsConfig.InterpolationModeKind.Nearest,
+            name: "Nearest");
+
+        /// <summary>Trilinear interpolation across the sampling cube.</summary>
+        public static InterpolationMode Trilinear { get; } = new InterpolationMode(
+            FieldsConfig.InterpolationModeKind.Trilinear,
+            name: "Trilinear");
+
+        /// <summary>Returns the mode name.</summary>
+        public override string ToString() => this.Name;
+    }
+
+    /// <summary>Streamline integration strategy.</summary>
+    public sealed record StreamlineIntegration {
+        private StreamlineIntegration(FieldsConfig.StreamlineScheme scheme, string name) {
+            this.Scheme = scheme;
+            this.Name = name;
+        }
+
+        internal FieldsConfig.StreamlineScheme Scheme { get; }
+
+        /// <summary>Integration scheme display name.</summary>
+        public string Name { get; }
+
+        /// <summary>Explicit Euler integration.</summary>
+        public static StreamlineIntegration Euler { get; } = new StreamlineIntegration(
+            FieldsConfig.StreamlineScheme.Euler,
+            name: "Euler");
+
+        /// <summary>Second-order Runge-Kutta (midpoint) integration.</summary>
+        public static StreamlineIntegration RungeKutta2 { get; } = new StreamlineIntegration(
+            FieldsConfig.StreamlineScheme.RungeKutta2,
+            name: "RungeKutta2");
+
+        /// <summary>Fourth-order Runge-Kutta integration.</summary>
+        public static StreamlineIntegration RungeKutta4 { get; } = new StreamlineIntegration(
+            FieldsConfig.StreamlineScheme.RungeKutta4,
+            name: "RungeKutta4");
+
+        /// <summary>Returns the scheme name.</summary>
+        public override string ToString() => this.Name;
+    }
+
+    /// <summary>Vector component selector for scalar-vector products.</summary>
+    public sealed record VectorComponent {
+        private VectorComponent(FieldsConfig.VectorComponentKind kind, string axisName) {
+            this.Kind = kind;
+            this.AxisName = axisName;
+        }
+
+        internal FieldsConfig.VectorComponentKind Kind { get; }
+
+        /// <summary>Axis label.</summary>
+        public string AxisName { get; }
+
+        /// <summary>X-axis component.</summary>
+        public static VectorComponent X { get; } = new VectorComponent(
+            FieldsConfig.VectorComponentKind.X,
+            axisName: "X");
+
+        /// <summary>Y-axis component.</summary>
+        public static VectorComponent Y { get; } = new VectorComponent(
+            FieldsConfig.VectorComponentKind.Y,
+            axisName: "Y");
+
+        /// <summary>Z-axis component.</summary>
+        public static VectorComponent Z { get; } = new VectorComponent(
+            FieldsConfig.VectorComponentKind.Z,
+            axisName: "Z");
+
+        /// <summary>Returns the axis name.</summary>
+        public override string ToString() => this.AxisName;
+    }
+
+    /// <summary>Critical point classification (minimum, maximum, saddle).</summary>
+    public sealed record CriticalPointClassification {
+        private CriticalPointClassification(FieldsConfig.CriticalPointKind kind, string name) {
+            this.Kind = kind;
+            this.Name = name;
+        }
+
+        internal FieldsConfig.CriticalPointKind Kind { get; }
+
+        /// <summary>Classification label.</summary>
+        public string Name { get; }
+
+        /// <summary>Minimum classification.</summary>
+        public static CriticalPointClassification Minimum { get; } = new CriticalPointClassification(
+            FieldsConfig.CriticalPointKind.Minimum,
+            name: "Minimum");
+
+        /// <summary>Maximum classification.</summary>
+        public static CriticalPointClassification Maximum { get; } = new CriticalPointClassification(
+            FieldsConfig.CriticalPointKind.Maximum,
+            name: "Maximum");
+
+        /// <summary>Saddle classification.</summary>
+        public static CriticalPointClassification Saddle { get; } = new CriticalPointClassification(
+            FieldsConfig.CriticalPointKind.Saddle,
+            name: "Saddle");
+
+        /// <summary>Returns the classification label.</summary>
+        public override string ToString() => this.Name;
+    }
+
+    /// <summary>Critical point classification result with location, classification, value, and eigendecomposition.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct CriticalPoint(Point3d Location, byte Type, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
+    public readonly record struct CriticalPoint(Point3d Location, CriticalPointClassification Classification, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
 
     /// <summary>Field statistics including min, max, mean, standard deviation, and extreme value locations.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -51,11 +182,7 @@ public static class Fields {
         geometry is null
             ? ResultFactory.Create<(Point3d[], double[])>(
                 error: E.Geometry.UnsupportedAnalysis.WithContext("Geometry cannot be null"))
-            : FieldsCore.OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, geometry.GetType()), out (Func<object, FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, Core.Validation.V ValidationMode, int BufferSize, byte IntegrationMethod) config) switch {
-                true => config.Execute(geometry, spec, context),
-                false => ResultFactory.Create<(Point3d[], double[])>(
-                    error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometry.GetType().Name}")),
-            };
+            : FieldsCore.DistanceField(geometry: geometry, spec: spec, context: context);
 
     /// <summary>Compute gradient field: geometry → (grid points[], gradient vectors[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,11 +258,12 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds,
-        byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
+        InterpolationMode? interpolationMode = null) {
+        InterpolationMode preferred = interpolationMode ?? InterpolationMode.Trilinear;
         bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        InterpolationMode method = hasDegenerateAxis ? InterpolationMode.Nearest : preferred;
         return ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
             .Bind(state => FieldsCompute.InterpolateScalar(
@@ -155,11 +283,12 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSpec spec,
         BoundingBox bounds,
-        byte interpolationMethod = FieldsConfig.InterpolationTrilinear) {
+        InterpolationMode? interpolationMode = null) {
+        InterpolationMode preferred = interpolationMode ?? InterpolationMode.Trilinear;
         bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
             || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        byte method = hasDegenerateAxis ? FieldsConfig.InterpolationNearest : interpolationMethod;
+        InterpolationMode method = hasDegenerateAxis ? InterpolationMode.Nearest : preferred;
         return ResultFactory.Create(value: (Field: vectorField, Grid: gridPoints))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
             .Bind(state => FieldsCompute.InterpolateVector(
@@ -179,7 +308,8 @@ public static class Fields {
         Point3d[] seeds,
         FieldSpec spec,
         BoundingBox bounds,
-        IGeometryContext context) =>
+        IGeometryContext context,
+        StreamlineIntegration? integration = null) =>
         ResultFactory.Create(value: (vectorField, gridPoints, seeds))
             .Ensure(state => state.vectorField.Length == state.gridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
             .Ensure(state => state.seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
@@ -188,7 +318,7 @@ public static class Fields {
                 gridPoints: state.gridPoints,
                 seeds: state.seeds,
                 stepSize: spec.StepSize,
-                integrationMethod: FieldsConfig.IntegrationRK4,
+                integration: integration ?? StreamlineIntegration.RungeKutta4,
                 resolution: spec.Resolution,
                 bounds: bounds,
                 context: context));
@@ -254,17 +384,19 @@ public static class Fields {
             .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"))
             .Bind(_ => FieldsCompute.NormalizeVectorField(vectorField: vectorField, grid: gridPoints));
 
-    /// <summary>Scalar-vector field product: (scalar field, vector field, component) → (grid points[], product[]) where component 0=X, 1=Y, 2=Z.</summary>
+    /// <summary>Scalar-vector field product: (scalar field, vector field, component) → (grid points[], product[]) where component selects the target axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
         double[] scalarField,
         Vector3d[] vectorField,
         Point3d[] gridPoints,
-        int component) =>
-        ResultFactory.Create(value: (scalarField, vectorField, gridPoints))
+        VectorComponent? component) {
+        VectorComponent selectedComponent = component ?? VectorComponent.X;
+        return ResultFactory.Create(value: (scalarField, vectorField, gridPoints))
             .Ensure(v => v.scalarField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"))
             .Ensure(v => v.vectorField.Length == v.gridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"))
-            .Bind(_ => FieldsCompute.ScalarVectorProduct(scalarField: scalarField, vectorField: vectorField, grid: gridPoints, component: component));
+            .Bind(_ => FieldsCompute.ScalarVectorProduct(scalarField: scalarField, vectorField: vectorField, grid: gridPoints, component: selectedComponent));
+    }
 
     /// <summary>Vector-vector dot product field: (vector field 1, vector field 2) → (grid points[], dot products[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
