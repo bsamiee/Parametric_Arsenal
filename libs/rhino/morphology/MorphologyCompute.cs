@@ -15,10 +15,10 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
-        GeometryBase _cage,
+        GeometryBase _,
         Point3d[] originalControlPoints,
         Point3d[] deformedControlPoints,
-        IGeometryContext _context) =>
+        IGeometryContext __) =>
         originalControlPoints.Length != deformedControlPoints.Length
             ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}"))
             : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
@@ -82,7 +82,7 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
-        MorphologyCore.SubdivisionAlgorithm algorithm,
+        byte algorithm,
         int levels,
         IGeometryContext context) =>
         levels <= 0
@@ -93,10 +93,10 @@ internal static class MorphologyCompute {
                     ResultFactory.Create(value: mesh.DuplicateMesh()),
                     (result, level) => result.Bind(current => {
                         Mesh? next = algorithm switch {
-                            MorphologyCore.SubdivisionAlgorithm.CatmullClark => current.DuplicateMesh(),
-                            MorphologyCore.SubdivisionAlgorithm.Loop => SubdivideLoop(current),
-                            MorphologyCore.SubdivisionAlgorithm.Butterfly => SubdivideButterfly(current),
-                            _ => throw new InvalidOperationException($"Unsupported subdivision algorithm: {algorithm}"),
+                            MorphologyConfig.OpSubdivideCatmullClark => current.DuplicateMesh(),
+                            MorphologyConfig.OpSubdivideLoop => SubdivideLoop(current),
+                            MorphologyConfig.OpSubdivideButterfly => SubdivideButterfly(current),
+                            _ => null,
                         };
                         bool valid = next?.IsValid is true && ValidateMeshQuality(next, context).IsSuccess;
                         if (level > 0) {
@@ -104,11 +104,10 @@ internal static class MorphologyCompute {
                         }
                         if (!valid) {
                             next?.Dispose();
-                        }
-                        return valid
-                            ? ResultFactory.Create(value: next)
-                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(
+                            return ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.SubdivisionFailed.WithContext(
                                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Level: {level}, Algorithm: {algorithm}")));
+                        }
+                        return ResultFactory.Create(value: next);
                     }));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -251,87 +250,6 @@ internal static class MorphologyCompute {
                     : state;
             });
 
-    /// <summary>Laplacian smoothing update with uniform or cotangent weights.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Point3d[] LaplacianUpdate(Mesh mesh, Point3d[] positions, bool useCotangent) =>
-        [.. Enumerable.Range(0, positions.Length).Select(i => {
-            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
-            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
-            return neighbors.Length is 0
-                ? positions[i]
-                : neighbors.Aggregate(
-                    (weightedSum: Vector3d.Zero, weightSum: 0.0),
-                    (acc, neighborIdx) => {
-                        Point3d neighborPos = positions[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]];
-                        double weight = useCotangent
-                            ? MorphologyConfig.UniformLaplacianWeight / Math.Max(positions[i].DistanceTo(neighborPos), RhinoMath.ZeroTolerance)
-                            : MorphologyConfig.UniformLaplacianWeight;
-                        return (acc.weightedSum + (weight * (Vector3d)neighborPos), acc.weightSum + weight);
-                    }) is (Vector3d wSum, double wTotal) && wTotal > RhinoMath.ZeroTolerance
-                        ? (Point3d)(wSum / wTotal)
-                        : positions[i];
-        }),
-        ];
-
-    /// <summary>Taubin smoothing update with pass-band filtering (two-step lambda/mu).</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Point3d[] TaubinUpdate(Mesh mesh, Point3d[] positions, double lambda, double mu) {
-        Point3d[] step1 = LaplacianUpdate(mesh: mesh, positions: positions, useCotangent: false);
-        Point3d[] blended1 = new Point3d[positions.Length];
-        for (int i = 0; i < positions.Length; i++) {
-            blended1[i] = positions[i] + (lambda * (step1[i] - positions[i]));
-        }
-        Point3d[] step2 = LaplacianUpdate(mesh: mesh, positions: blended1, useCotangent: false);
-        Point3d[] result = new Point3d[positions.Length];
-        for (int i = 0; i < positions.Length; i++) {
-            result[i] = blended1[i] + (mu * (step2[i] - blended1[i]));
-        }
-        return result;
-    }
-
-    /// <summary>Mean curvature flow update with time step integration.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep) =>
-        [.. Enumerable.Range(0, positions.Length).Select(i => {
-            int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
-            int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
-            return neighbors.Length is 0
-                ? positions[i]
-                : positions[i] + ((timeStep * (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis) *
-                    ((neighbors.Aggregate(Point3d.Origin, (acc, neighborIdx) =>
-                        acc + (positions[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]] - positions[i])) / neighbors.Length) - Point3d.Origin)) *
-                    (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis));
-        }),
-        ];
-
-    /// <summary>Computes mesh quality metrics. Assumes triangulated mesh - only processes first 3 vertices (.A, .B, .C) of each face. Quad faces (.D) are ignored.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static (double[] EdgeLengths, double[] AspectRatios, double[] MinAngles) ComputeMeshMetrics(Mesh mesh, IGeometryContext context) {
-        int faceCount = mesh.Faces.Count;
-        int edgeCount = mesh.TopologyEdges.Count;
-        double[] edges = new double[edgeCount];
-        double[] aspects = new double[faceCount];
-        double[] angles = new double[faceCount];
-
-        for (int i = 0; i < edgeCount; i++) {
-            edges[i] = mesh.TopologyEdges.EdgeLine(i).Length;
-        }
-
-        for (int i = 0; i < faceCount; i++) {
-            (Point3d a, Point3d b, Point3d c) = (mesh.Vertices[mesh.Faces[i].A], mesh.Vertices[mesh.Faces[i].B], mesh.Vertices[mesh.Faces[i].C]);
-            (double ab, double bc, double ca) = (a.DistanceTo(b), b.DistanceTo(c), c.DistanceTo(a));
-            (double maxE, double minE) = (Math.Max(Math.Max(ab, bc), ca), Math.Min(Math.Min(ab, bc), ca));
-            aspects[i] = minE > context.AbsoluteTolerance ? maxE / minE : double.MaxValue;
-            (Vector3d vAB, Vector3d vBC, Vector3d vCA) = (b - a, c - b, a - c);
-            angles[i] = Math.Min(Math.Min(
-                Vector3d.VectorAngle(vAB, -vCA),
-                Vector3d.VectorAngle(vBC, -vAB)),
-                Vector3d.VectorAngle(vCA, -vBC));
-        }
-
-        return (edges, aspects, angles);
-    }
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> SmoothWithConvergence(
         Mesh mesh,
@@ -404,7 +322,7 @@ internal static class MorphologyCompute {
         Mesh mesh,
         double distance,
         bool bothSides,
-        IGeometryContext _context) =>
+        IGeometryContext __) =>
         Math.Abs(distance) switch {
             double abs when !RhinoMath.IsValidDouble(distance) || abs < MorphologyConfig.MinOffsetDistance =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
@@ -424,9 +342,9 @@ internal static class MorphologyCompute {
     internal static Result<Mesh> ReduceMesh(
         Mesh mesh,
         int targetFaceCount,
-        bool _preserveBoundary,
+        bool _,
         double accuracy,
-        IGeometryContext _context) =>
+        IGeometryContext __) =>
         (targetFaceCount, accuracy) switch {
             ( < MorphologyConfig.MinReductionFaceCount, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.ReductionTargetInvalid.WithContext(
@@ -512,7 +430,7 @@ internal static class MorphologyCompute {
                         for (int i = 0; i < vertexCount; i++) {
                             positions[i] = remeshed.Vertices[i];
                         }
-                        Point3d[] relaxed = LaplacianUpdate(remeshed, positions, useCotangent: false);
+                        Point3d[] relaxed = MorphologyCore.LaplacianUpdate(remeshed, positions, useCotangent: false);
                         for (int i = 0; i < vertexCount; i++) {
                             if (preserveFeatures && boundaryMask.Length > i && boundaryMask[i]) {
                                 continue;
@@ -551,28 +469,29 @@ internal static class MorphologyCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
-        (double[] _, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(mesh, context);
+        (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         int aspectCount = aspectRatios.Length;
         int angleCount = minAngles.Length;
-        return (aspectCount == 0 || angleCount == 0)
-            ? ResultFactory.Create(value: mesh)
-            : (aspectRatios.Max(), minAngles.Min()) is (double maxAspect, double minAngle)
-                ? maxAspect > MorphologyConfig.AspectRatioThreshold
-                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
-                    : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                        ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
-                        : ResultFactory.Create(value: mesh)
+        if (aspectCount == 0 || angleCount == 0) {
+            return ResultFactory.Create(value: mesh);
+        }
+
+        (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
+        return maxAspect > MorphologyConfig.AspectRatioThreshold
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
+            : minAngle < MorphologyConfig.MinAngleRadiansThreshold
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
                 : ResultFactory.Create(value: mesh);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
-        IReadOnlyList<Morphology.MeshRepairOperation> operations,
+        byte flags,
         double weldTolerance,
-        IGeometryContext _context) =>
+        IGeometryContext _) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
             ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
@@ -580,13 +499,11 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < operations.Count; i++) {
-                    Morphology.MeshRepairOperation operation = operations[i];
-                    Type operationType = operation.GetType();
-                    (string _, Func<Mesh, double, bool> action) = MorphologyConfig.RepairOperations.TryGetValue(operationType, out (string Name, Func<Mesh, double, bool> Action) entry)
-                        ? entry
-                        : throw new InvalidOperationException(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Unknown repair operation: {operationType.Name}"));
-                    action(repaired, tol);
+                for (int i = 0; i < 5; i++) {
+                    byte flag = (byte)(1 << i);
+                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
+                        bool success = entry.action(repaired, tol);
+                    }
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -595,7 +512,7 @@ internal static class MorphologyCompute {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _context) =>
+    internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
         mesh switch { { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
             Mesh m => ((Func<Result<Mesh[]>>)(() => {
                 Mesh[] components = m.SplitDisjointPieces();
@@ -610,7 +527,7 @@ internal static class MorphologyCompute {
         Mesh mesh,
         double tolerance,
         bool weldNormals,
-        IGeometryContext _context) =>
+        IGeometryContext _) =>
         (tolerance < MorphologyConfig.MinWeldTolerance || tolerance > MorphologyConfig.MaxWeldTolerance) switch {
             true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {tolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
@@ -632,7 +549,7 @@ internal static class MorphologyCompute {
         Brep brep,
         MeshingParameters? meshParams,
         bool joinMeshes,
-        IGeometryContext _context) =>
+        IGeometryContext __) =>
         meshParams is null
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshingParametersInvalid.WithContext("Parameters cannot be null"))
             : ((Func<Result<Mesh>>)(() => {
@@ -665,7 +582,7 @@ internal static class MorphologyCompute {
         double thickness,
         bool solidify,
         Vector3d direction,
-        IGeometryContext _context) =>
+        IGeometryContext _) =>
         (!RhinoMath.IsValidDouble(thickness) || Math.Abs(thickness) < MorphologyConfig.MinThickenDistance || Math.Abs(thickness) > MorphologyConfig.MaxThickenDistance) switch {
             true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Thickness: {thickness:F6}, Range: [{MorphologyConfig.MinThickenDistance:F6}, {MorphologyConfig.MaxThickenDistance:F6}]"))),
@@ -680,19 +597,19 @@ internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
-        Morphology.MeshUnwrapStrategy strategy,
-        IGeometryContext _context) =>
-        ((Func<Result<Mesh>>)(() => {
-            Type strategyType = strategy.GetType();
-            MeshUnwrapMethod method = MorphologyConfig.UnwrapMethods.TryGetValue(strategyType, out MeshUnwrapMethod m)
-                ? m
-                : throw new InvalidOperationException(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Unknown unwrap strategy: {strategyType.Name}"));
-            Mesh unwrapped = mesh.DuplicateMesh();
-            using MeshUnwrapper unwrapper = new(unwrapped);
-            bool success = unwrapper.Unwrap(method: method);
-            return success && unwrapped.TextureCoordinates.Count > 0
-                ? ResultFactory.Create(value: unwrapped)
-                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {method}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
-        }))();
+        byte unwrapMethod,
+        IGeometryContext _) =>
+        unwrapMethod switch {
+            0 or 1 => ((Func<Result<Mesh>>)(() => {
+                Mesh unwrapped = mesh.DuplicateMesh();
+                using MeshUnwrapper unwrapper = new(unwrapped);
+                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
+                return success && unwrapped.TextureCoordinates.Count > 0
+                    ? ResultFactory.Create(value: unwrapped)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
+                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
+            }))(),
+            _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
+        };
 }

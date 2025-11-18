@@ -18,86 +18,92 @@ public static class Morphology {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
-    /// <summary>Abstract base for all morphology operation requests. Use sealed derived types to specify operation parameters.</summary>
-    public abstract record MorphologyRequest;
+    /// <summary>Base type for all morphology operation requests.</summary>
+    public abstract record Operation;
 
-    /// <summary>Cage deformation request with control point arrays.</summary>
-    public sealed record CageDeformRequest(
+    /// <summary>Cage deformation with control point displacement.</summary>
+    public sealed record CageDeformOperation(
         GeometryBase Cage,
         Point3d[] OriginalControlPoints,
-        Point3d[] DeformedControlPoints) : MorphologyRequest;
+        Point3d[] DeformedControlPoints) : Operation;
 
-    /// <summary>Catmull-Clark subdivision request with iteration count.</summary>
-    public sealed record SubdivideCatmullClarkRequest(int Levels) : MorphologyRequest;
+    /// <summary>Base type for subdivision strategies.</summary>
+    public abstract record SubdivisionStrategy(int Levels) : Operation;
 
-    /// <summary>Loop subdivision request with iteration count (requires triangulated mesh).</summary>
-    public sealed record SubdivideLoopRequest(int Levels) : MorphologyRequest;
+    /// <summary>Catmull-Clark subdivision for quad-dominant meshes.</summary>
+    public sealed record CatmullClarkSubdivision(int Levels) : SubdivisionStrategy(Levels);
 
-    /// <summary>Butterfly subdivision request with iteration count (requires triangulated mesh).</summary>
-    public sealed record SubdiveButterflyRequest(int Levels) : MorphologyRequest;
+    /// <summary>Loop subdivision for triangulated meshes.</summary>
+    public sealed record LoopSubdivision(int Levels) : SubdivisionStrategy(Levels);
 
-    /// <summary>Laplacian smoothing request with iteration and boundary lock parameters.</summary>
-    public sealed record SmoothLaplacianRequest(int Iterations, bool LockBoundary) : MorphologyRequest;
+    /// <summary>Butterfly subdivision for triangulated meshes.</summary>
+    public sealed record ButterflySubdivision(int Levels) : SubdivisionStrategy(Levels);
 
-    /// <summary>Taubin smoothing request with lambda/mu parameters for pass-band filtering.</summary>
-    public sealed record SmoothTaubinRequest(int Iterations, double Lambda, double Mu) : MorphologyRequest;
+    /// <summary>Base type for smoothing strategies.</summary>
+    public abstract record SmoothingStrategy(int Iterations, bool LockBoundary) : Operation;
 
-    /// <summary>Mean curvature flow evolution request with time step and iterations.</summary>
-    public sealed record EvolveMeanCurvatureRequest(double TimeStep, int Iterations) : MorphologyRequest;
+    /// <summary>Laplacian smoothing with optional cotangent weighting.</summary>
+    public sealed record LaplacianSmoothing(int Iterations, bool LockBoundary) : SmoothingStrategy(Iterations, LockBoundary);
 
-    /// <summary>Mesh offset request with distance and two-sided flag.</summary>
-    public sealed record OffsetRequest(double Distance, bool BothSides) : MorphologyRequest;
+    /// <summary>Taubin smoothing with λ-μ filtering to prevent shrinkage.</summary>
+    public sealed record TaubinSmoothing(int Iterations, double Lambda, double Mu) : SmoothingStrategy(Iterations, LockBoundary: false);
 
-    /// <summary>Mesh reduction request with target face count and accuracy parameters.</summary>
-    public sealed record ReduceRequest(int TargetFaces, bool PreserveBoundary, double Accuracy) : MorphologyRequest;
+    /// <summary>Mean curvature flow evolution.</summary>
+    public sealed record MeanCurvatureFlowSmoothing(double TimeStep, int Iterations) : SmoothingStrategy(Iterations, LockBoundary: false);
 
-    /// <summary>Isotropic remeshing request with target edge length and iteration limit.</summary>
-    public sealed record RemeshRequest(double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : MorphologyRequest;
+    /// <summary>Mesh offset operation.</summary>
+    public sealed record MeshOffsetOperation(double Distance, bool BothSides) : Operation;
 
-    /// <summary>Brep to mesh conversion request with meshing parameters.</summary>
-    public sealed record BrepToMeshRequest(MeshingParameters? Parameters, bool JoinMeshes) : MorphologyRequest;
+    /// <summary>Mesh reduction with quality preservation.</summary>
+    public sealed record MeshReductionOperation(int TargetFaceCount, bool PreserveBoundary, double Accuracy) : Operation;
 
-    /// <summary>Abstract base for mesh repair operations.</summary>
-    public abstract record MeshRepairOperation;
+    /// <summary>Isotropic remeshing for uniform edge lengths.</summary>
+    public sealed record IsotropicRemeshOperation(double TargetEdgeLength, int MaxIterations, bool PreserveFeatures) : Operation;
 
-    /// <summary>Fill holes mesh repair operation.</summary>
-    public sealed record FillHolesRepairOperation : MeshRepairOperation;
+    /// <summary>Brep to mesh conversion.</summary>
+    public sealed record BrepToMeshOperation(MeshingParameters? Parameters, bool JoinMeshes) : Operation;
 
-    /// <summary>Unify normals mesh repair operation.</summary>
-    public sealed record UnifyNormalsRepairOperation : MeshRepairOperation;
+    /// <summary>Base type for mesh repair strategies.</summary>
+    public abstract record MeshRepairStrategy : Operation;
 
-    /// <summary>Cull degenerate faces mesh repair operation.</summary>
-    public sealed record CullDegenerateFacesRepairOperation : MeshRepairOperation;
+    /// <summary>Fill holes in mesh.</summary>
+    public sealed record FillHolesRepair : MeshRepairStrategy;
 
-    /// <summary>Compact mesh repair operation.</summary>
-    public sealed record CompactRepairOperation : MeshRepairOperation;
+    /// <summary>Unify mesh normals.</summary>
+    public sealed record UnifyNormalsRepair : MeshRepairStrategy;
 
-    /// <summary>Weld vertices mesh repair operation.</summary>
-    public sealed record WeldVerticesRepairOperation : MeshRepairOperation;
+    /// <summary>Cull degenerate faces.</summary>
+    public sealed record CullDegenerateFacesRepair : MeshRepairStrategy;
 
-    /// <summary>Mesh repair request with operation list and weld tolerance.</summary>
-    public sealed record MeshRepairRequest(IReadOnlyList<MeshRepairOperation> Operations, double WeldTolerance) : MorphologyRequest;
+    /// <summary>Compact mesh by removing unused vertices.</summary>
+    public sealed record CompactRepair : MeshRepairStrategy;
 
-    /// <summary>Mesh thickening request with offset distance and solidification option.</summary>
-    public sealed record MeshThickenRequest(double Thickness, bool Solidify, Vector3d Direction) : MorphologyRequest;
+    /// <summary>Weld coincident vertices.</summary>
+    public sealed record WeldRepair : MeshRepairStrategy;
 
-    /// <summary>Abstract base for mesh unwrap strategies.</summary>
-    public abstract record MeshUnwrapStrategy;
+    /// <summary>Composite repair operation with tolerance.</summary>
+    public sealed record CompositeRepair(IReadOnlyList<MeshRepairStrategy> Strategies, double WeldTolerance) : MeshRepairStrategy;
 
-    /// <summary>Angle-based mesh unwrapping strategy.</summary>
-    public sealed record AngleBasedUnwrapStrategy : MeshUnwrapStrategy;
+    /// <summary>Mesh thickening to create solid shell.</summary>
+    public sealed record MeshThickenOperation(double OffsetDistance, bool Solidify, Vector3d Direction) : Operation;
 
-    /// <summary>Conformal energy minimization mesh unwrapping strategy.</summary>
-    public sealed record ConformalEnergyMinimizationUnwrapStrategy : MeshUnwrapStrategy;
+    /// <summary>Base type for mesh unwrapping strategies.</summary>
+    public abstract record UnwrapStrategy : Operation;
 
-    /// <summary>Mesh UV unwrapping request with strategy selection.</summary>
-    public sealed record MeshUnwrapRequest(MeshUnwrapStrategy Strategy) : MorphologyRequest;
+    /// <summary>Planar unwrap projection.</summary>
+    public sealed record PlanarUnwrap : UnwrapStrategy;
 
-    /// <summary>Mesh component separation request (no parameters).</summary>
-    public sealed record MeshSeparateRequest : MorphologyRequest;
+    /// <summary>Cylindrical unwrap projection.</summary>
+    public sealed record CylindricalUnwrap : UnwrapStrategy;
 
-    /// <summary>Mesh vertex welding request with tolerance and normal handling.</summary>
-    public sealed record MeshWeldRequest(double Tolerance, bool WeldNormals) : MorphologyRequest;
+    /// <summary>Spherical unwrap projection.</summary>
+    public sealed record SphericalUnwrap : UnwrapStrategy;
+
+    /// <summary>Separate mesh into disconnected components.</summary>
+    public sealed record MeshSeparateOperation : Operation;
+
+    /// <summary>Weld mesh vertices within tolerance.</summary>
+    public sealed record MeshWeldOperation(double Tolerance, bool RecalculateNormals) : Operation;
 
     /// <summary>Cage deformation result with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
@@ -205,15 +211,14 @@ public static class Morphology {
         int RepairedVertexCount,
         int OriginalFaceCount,
         int RepairedFaceCount,
-        IReadOnlyList<MeshRepairOperation> OperationsPerformed,
-        double WeldTolerance,
+        byte OperationsPerformed,
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
         [Pure]
         private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
-            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops={this.OperationsPerformed.Count} | Quality={this.QualityScore:F3}");
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
     }
 
     /// <summary>Mesh separation result with per-component statistics.</summary>
@@ -308,14 +313,11 @@ public static class Morphology {
             $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
     }
 
-    /// <summary>Unified morphology operation entry with polymorphic dispatch. CRITICAL: Validates the GEOMETRY, not the request.</summary>
+    /// <summary>Apply morphology operation with algebraic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
-        T geometry,
-        MorphologyRequest request,
+        T input,
+        Operation operation,
         IGeometryContext context) where T : GeometryBase =>
-        MorphologyCore.ExecuteRequest(
-            geometry: geometry,
-            request: request,
-            context: context);
+        MorphologyCore.Execute(input, operation, context);
 }
