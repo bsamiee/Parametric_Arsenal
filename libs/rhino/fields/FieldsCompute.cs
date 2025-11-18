@@ -264,8 +264,8 @@ internal static class FieldsCompute {
         Fields.InterpolationMode interpolationMode,
         Func<T, T, double, T> lerp) where T : struct =>
         interpolationMode switch {
-            Fields.InterpolationMode.NearestInterpolationMode => InterpolateNearest(query, field, grid),
-            Fields.InterpolationMode.TrilinearInterpolationMode => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            Fields.InterpolationMode.NearestInterpolationMode _ => InterpolateNearest(query, field, grid),
+            Fields.InterpolationMode.TrilinearInterpolationMode _ => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {interpolationMode.GetType().Name}")),
         };
 
