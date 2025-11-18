@@ -45,9 +45,10 @@ internal static class SpatialCompute {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
                                 return members.Length is 0
                                     ? (Point3d.Origin, Array.Empty<double>())
-                                    : (members.Aggregate(Point3d.Origin, (sum, idx) => sum + pts[idx]) / members.Length) is Point3d centroid
-                                        ? (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),])
-                                        : (Point3d.Origin, Array.Empty<double>());
+                                    : ((Func<(Point3d, double[])>)(() => {
+                                        Point3d centroid = members.Aggregate(Point3d.Origin, (sum, idx) => sum + pts[idx]) / members.Length;
+                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
+                                    }))();
                             }),
                             ])
                             : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
