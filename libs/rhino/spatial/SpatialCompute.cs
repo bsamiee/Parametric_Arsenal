@@ -163,13 +163,13 @@ internal static class SpatialCompute {
                 continue;
             }
 
-            visited[i] = true;
             int[] neighbors = GetNeighbors(i);
 
             if ((neighbors.Length + 1) < minPts) {
                 continue;
             }
 
+            visited[i] = true;
             assignments[i] = clusterId;
             Queue<int> queue = new(neighbors);
 
