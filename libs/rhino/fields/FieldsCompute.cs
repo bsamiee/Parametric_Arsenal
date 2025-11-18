@@ -79,8 +79,7 @@ internal static class FieldsCompute {
         TIn[] inputField,
         Point3d[] grid,
         int resolution,
-        Vector3d gridDelta,
-        Func<TIn[], int, int, int, int, int, int, (double, double, double, double, double, double), TOut> stencilOp,
+        Func<TIn[], int, int, int, int, int, int, TOut> stencilOp,
         SystemError lengthError,
         SystemError resolutionError) where TIn : struct where TOut : struct =>
         (inputField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
@@ -90,13 +89,12 @@ internal static class FieldsCompute {
                 int totalSamples = inputField.Length;
                 TOut[] output = ArrayPool<TOut>.Shared.Rent(totalSamples);
                 try {
-                    (double dx, double dy, double dz, double twoDx, double twoDy, double twoDz) = (gridDelta.X, gridDelta.Y, gridDelta.Z, 2.0 * gridDelta.X, 2.0 * gridDelta.Y, 2.0 * gridDelta.Z);
                     int resSquared = resolution * resolution;
                     for (int i = 0; i < resolution; i++) {
                         for (int j = 0; j < resolution; j++) {
                             for (int k = 0; k < resolution; k++) {
                                 int idx = (i * resSquared) + (j * resolution) + k;
-                                output[idx] = stencilOp(inputField, idx, i, j, k, resolution, resSquared, (dx, dy, dz, twoDx, twoDy, twoDz));
+                                output[idx] = stencilOp(inputField, idx, i, j, k, resolution, resSquared);
                             }
                         }
                     }
@@ -114,24 +112,19 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
-        double invTwoDx = hasDx ? 0.5 / gridDelta.X : 0.0;
-        double invTwoDy = hasDy ? 0.5 / gridDelta.Y : 0.0;
-        double invTwoDz = hasDz ? 0.5 / gridDelta.Z : 0.0;
+        (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
+        (double invTwoDx, double invTwoDy, double invTwoDz) = (hasDx ? 0.5 / gridDelta.X : 0.0, hasDy ? 0.5 / gridDelta.Y : 0.0, hasDz ? 0.5 / gridDelta.Z : 0.0);
         return ComputeDerivativeField(
             inputField: vectorField,
             grid: grid,
             resolution: resolution,
-            gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
-                double dFz_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].Z - field[idx - res].Z) * invTwoDy : 0.0;
-                double dFy_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].Y - field[idx - 1].Y) * invTwoDz : 0.0;
-                double dFx_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].X - field[idx - 1].X) * invTwoDz : 0.0;
-                double dFz_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].Z - field[idx - resSquared].Z) * invTwoDx : 0.0;
-                double dFy_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].Y - field[idx - resSquared].Y) * invTwoDx : 0.0;
-                double dFx_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].X - field[idx - res].X) * invTwoDy : 0.0;
+            stencilOp: (field, idx, i, j, k, res, resSquared) => {
+                double dFz_dy = hasDy && j > 0 && j < res - 1 ? (field[idx + res].Z - field[idx - res].Z) * invTwoDy : 0.0;
+                double dFy_dz = hasDz && k > 0 && k < res - 1 ? (field[idx + 1].Y - field[idx - 1].Y) * invTwoDz : 0.0;
+                double dFx_dz = hasDz && k > 0 && k < res - 1 ? (field[idx + 1].X - field[idx - 1].X) * invTwoDz : 0.0;
+                double dFz_dx = hasDx && i > 0 && i < res - 1 ? (field[idx + resSquared].Z - field[idx - resSquared].Z) * invTwoDx : 0.0;
+                double dFy_dx = hasDx && i > 0 && i < res - 1 ? (field[idx + resSquared].Y - field[idx - resSquared].Y) * invTwoDx : 0.0;
+                double dFx_dy = hasDy && j > 0 && j < res - 1 ? (field[idx + res].X - field[idx - res].X) * invTwoDy : 0.0;
                 return new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
             },
             lengthError: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"),
@@ -144,21 +137,16 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
-        double invTwoDx = hasDx ? 0.5 / gridDelta.X : 0.0;
-        double invTwoDy = hasDy ? 0.5 / gridDelta.Y : 0.0;
-        double invTwoDz = hasDz ? 0.5 / gridDelta.Z : 0.0;
+        (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
+        (double invTwoDx, double invTwoDy, double invTwoDz) = (hasDx ? 0.5 / gridDelta.X : 0.0, hasDy ? 0.5 / gridDelta.Y : 0.0, hasDz ? 0.5 / gridDelta.Z : 0.0);
         return ComputeDerivativeField(
             inputField: vectorField,
             grid: grid,
             resolution: resolution,
-            gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
-                double dFx_dx = hasDx && i < res - 1 && i > 0 ? (field[idx + resSquared].X - field[idx - resSquared].X) * invTwoDx : 0.0;
-                double dFy_dy = hasDy && j < res - 1 && j > 0 ? (field[idx + res].Y - field[idx - res].Y) * invTwoDy : 0.0;
-                double dFz_dz = hasDz && k < res - 1 && k > 0 ? (field[idx + 1].Z - field[idx - 1].Z) * invTwoDz : 0.0;
+            stencilOp: (field, idx, i, j, k, res, resSquared) => {
+                double dFx_dx = hasDx && i > 0 && i < res - 1 ? (field[idx + resSquared].X - field[idx - resSquared].X) * invTwoDx : 0.0;
+                double dFy_dy = hasDy && j > 0 && j < res - 1 ? (field[idx + res].Y - field[idx - res].Y) * invTwoDy : 0.0;
+                double dFz_dz = hasDz && k > 0 && k < res - 1 ? (field[idx + 1].Z - field[idx - 1].Z) * invTwoDz : 0.0;
                 return dFx_dx + dFy_dy + dFz_dz;
             },
             lengthError: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"),
@@ -171,18 +159,13 @@ internal static class FieldsCompute {
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
-        bool hasDx = Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance;
-        bool hasDy = Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance;
-        bool hasDz = Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance;
-        double invDx2 = hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0;
-        double invDy2 = hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0;
-        double invDz2 = hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0;
+        (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
+        (double invDx2, double invDy2, double invDz2) = (hasDx ? 1.0 / (gridDelta.X * gridDelta.X) : 0.0, hasDy ? 1.0 / (gridDelta.Y * gridDelta.Y) : 0.0, hasDz ? 1.0 / (gridDelta.Z * gridDelta.Z) : 0.0);
         return ComputeDerivativeField(
             inputField: scalarField,
             grid: grid,
             resolution: resolution,
-            gridDelta: gridDelta,
-            stencilOp: (field, idx, i, j, k, res, resSquared, _) => {
+            stencilOp: (field, idx, i, j, k, res, resSquared) => {
                 double d2f_dx2 = hasDx && i > 0 && i < res - 1 ? (field[idx + resSquared] - (2.0 * field[idx]) + field[idx - resSquared]) * invDx2 : 0.0;
                 double d2f_dy2 = hasDy && j > 0 && j < res - 1 ? (field[idx + res] - (2.0 * field[idx]) + field[idx - res]) * invDy2 : 0.0;
                 double d2f_dz2 = hasDz && k > 0 && k < res - 1 ? (field[idx + 1] - (2.0 * field[idx]) + field[idx - 1]) * invDz2 : 0.0;
@@ -378,10 +361,6 @@ internal static class FieldsCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Vector3d> InterpolateTrilinearVector(Point3d query, Vector3d[] vectorField, int resolution, BoundingBox bounds) =>
-        InterpolateTrilinear(query: query, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)));
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Curve[]> IntegrateStreamlines(
         Vector3d[] vectorField,
         Point3d[] gridPoints,
@@ -401,36 +380,22 @@ internal static class FieldsCompute {
                     pathBuffer[stepCount++] = current;
                     for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
                         Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
-                        double k1Magnitude = k1.Length;
-                        Vector3d k2 = integrationMethod switch {
-                            0 => k1,
-                            1 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK2HalfStep * k1), resolution: resolution, bounds: bounds),
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[0] * k1), resolution: resolution, bounds: bounds),
-                            _ => k1,
-                        };
-                        Vector3d k3 = integrationMethod switch {
-                            0 or 1 => k1,
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[1] * k2), resolution: resolution, bounds: bounds),
-                            _ => k1,
-                        };
-                        Vector3d k4 = integrationMethod switch {
-                            0 or 1 => k1,
-                            2 or 3 => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * FieldsConfig.RK4HalfSteps[2] * k3), resolution: resolution, bounds: bounds),
-                            _ => k1,
-                        };
+                        Vector3d Interpolate(double coeff, Vector3d k) => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * coeff * k), resolution: resolution, bounds: bounds);
                         Vector3d delta = integrationMethod switch {
                             0 => stepSize * k1,
-                            1 => stepSize * k2,
-                            2 or 3 => stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4)),
+                            1 => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
+                            2 or 3 => ((Func<Vector3d>)(() => {
+                                Vector3d k2 = Interpolate(FieldsConfig.RK4HalfSteps[0], k1);
+                                Vector3d k3 = Interpolate(FieldsConfig.RK4HalfSteps[1], k2);
+                                Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);
+                                return stepSize * ((FieldsConfig.RK4Weights[0] * k1) + (FieldsConfig.RK4Weights[1] * k2) + (FieldsConfig.RK4Weights[2] * k3) + (FieldsConfig.RK4Weights[3] * k4));
+                            }))(),
                             _ => Vector3d.Zero,
                         };
                         Point3d nextPoint = current + delta;
-                        bool shouldContinue = bounds.Contains(nextPoint) && k1Magnitude >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1;
-                        if (shouldContinue) {
-                            current = nextPoint;
-                            pathBuffer[stepCount++] = current;
-                        }
-                        step = shouldContinue ? step : FieldsConfig.MaxStreamlineSteps;
+                        (current, pathBuffer[stepCount], stepCount, step) = bounds.Contains(nextPoint) && k1.Length >= FieldsConfig.MinFieldMagnitude && delta.Length >= RhinoMath.ZeroTolerance && stepCount < FieldsConfig.MaxStreamlineSteps - 1
+                            ? (nextPoint, nextPoint, stepCount + 1, step)
+                            : (current, pathBuffer[stepCount], stepCount, FieldsConfig.MaxStreamlineSteps);
                     }
                     streamlines[seedIdx] = stepCount > 1 ? Curve.CreateInterpolatedCurve([.. pathBuffer[..stepCount]], degree: 3) : new LineCurve(seeds[seedIdx], seeds[seedIdx] + new Vector3d(context.AbsoluteTolerance, 0, 0));
                 }
@@ -442,11 +407,9 @@ internal static class FieldsCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) =>
-    InterpolateTrilinearVector(query: query, vectorField: vectorField, resolution: resolution, bounds: bounds)
-        .OnError(_ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints))
-        .Match(
-            onSuccess: value => value,
-            onFailure: _ => Vector3d.Zero);
+        InterpolateTrilinear(query: query, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
+            .OnError(_ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints))
+            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(

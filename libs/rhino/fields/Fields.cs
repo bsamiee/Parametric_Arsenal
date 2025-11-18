@@ -293,30 +293,10 @@ public static class Fields {
         double[,][] hessian,
         Point3d[] gridPoints,
         FieldSpec spec) =>
-        ((Func<(bool ScalarLengthMatches, bool GradientLengthMatches, bool HessianValid)>)(() => {
-            bool has3Rows = hessian.GetLength(0) == 3;
-            bool has3Columns = hessian.GetLength(1) == 3;
-            bool hessianEntriesValid = has3Rows && has3Columns;
-            if (hessianEntriesValid) {
-                for (int row = 0; row < 3 && hessianEntriesValid; row++) {
-                    for (int column = 0; column < 3 && hessianEntriesValid; column++) {
-                        double[] entry = hessian[row, column];
-                        hessianEntriesValid = entry is not null && entry.Length == gridPoints.Length;
-                    }
-                }
-            }
-            return (
-                ScalarLengthMatches: scalarField.Length == gridPoints.Length,
-                GradientLengthMatches: gradientField.Length == gridPoints.Length,
-                HessianValid: hessianEntriesValid);
-        }))() switch {
-            (false, _, _) => ResultFactory.Create<CriticalPoint[]>(
-                error: E.Geometry.InvalidCriticalPointDetection.WithContext("Scalar field length must match grid points")),
-            (_, false, _) => ResultFactory.Create<CriticalPoint[]>(
-                error: E.Geometry.InvalidCriticalPointDetection.WithContext("Gradient field length must match grid points")),
-            (_, _, false) => ResultFactory.Create<CriticalPoint[]>(
+        (hessian.GetLength(0) == 3 && hessian.GetLength(1) == 3 && Enumerable.Range(0, 3).All(row => Enumerable.Range(0, 3).All(col => hessian[row, col] is not null && hessian[row, col].Length == gridPoints.Length))) switch {
+            false => ResultFactory.Create<CriticalPoint[]>(
                 error: E.Geometry.InvalidCriticalPointDetection.WithContext("Hessian must be a 3x3 tensor with entries per grid sample")),
-            (true, true, true) => FieldsCompute.DetectCriticalPoints(
+            true => FieldsCompute.DetectCriticalPoints(
                 scalarField: scalarField,
                 gradientField: gradientField,
                 hessian: hessian,
