@@ -3,17 +3,20 @@ using Rhino;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants, byte operation codes, and unified dispatch registry for fields operations.</summary>
+/// <summary>Configuration constants and metadata for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    internal const byte OperationDistance = 0;
-    internal const byte IntegrationRK4 = 2;
-    internal const byte InterpolationNearest = 0;
-    internal const byte InterpolationTrilinear = 1;
+    // =============================================================================
+    // Resolution and Grid Configuration
+    // =============================================================================
 
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
     internal const int MaxResolution = 256;
+
+    // =============================================================================
+    // Step Size and Integration Configuration
+    // =============================================================================
 
     internal const double DefaultStepSize = 0.01;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
@@ -21,19 +24,32 @@ internal static class FieldsConfig {
     internal const double MaxStepSize = 1.0;
     internal const int MaxStreamlineSteps = 10000;
     internal const double MinFieldMagnitude = 1e-10;
+
+    // =============================================================================
+    // Vector Potential Solver Configuration
+    // =============================================================================
+
     internal const int VectorPotentialIterations = 512;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
+
+    // =============================================================================
+    // Runge-Kutta Integration Coefficients
+    // =============================================================================
 
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
     internal const double RK2HalfStep = 0.5;
 
+    // =============================================================================
+    // Interpolation and Search Configuration
+    // =============================================================================
+
     internal const int FieldRTreeThreshold = 100;
 
-    internal const byte CriticalPointMinimum = 0;
-    internal const byte CriticalPointMaximum = 1;
-    internal const byte CriticalPointSaddle = 2;
+    // =============================================================================
+    // Marching Cubes Configuration
+    // =============================================================================
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
@@ -196,7 +212,15 @@ internal static class FieldsConfig {
         return table;
     }
 
+    // =============================================================================
+    // Distance Field Configuration
+    // =============================================================================
+
     internal const double InsideOutsideToleranceMultiplier = 10.0;
+
+    // =============================================================================
+    // Critical Point Detection Configuration
+    // =============================================================================
 
     /// <summary>Critical point detection: eigenvalue threshold for classification.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
