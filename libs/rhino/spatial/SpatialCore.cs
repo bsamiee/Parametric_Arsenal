@@ -43,7 +43,7 @@ internal static class SpatialCore {
         }.ToFrozenDictionary(static entry => (entry.Input, entry.Query), static entry => (entry.Factory, entry.Mode, entry.BufferSize, entry.Execute));
 
     /// <summary>Orchestrate clustering operation via algebraic request dispatch.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusteringRequest request, IGeometryContext context) where T : GeometryBase =>
         request switch {
             Spatial.KMeansClusteringRequest { K: <= 0 } => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
@@ -59,7 +59,7 @@ internal static class SpatialCore {
         };
 
     /// <summary>Orchestrate proximity field operation via algebraic request dispatch.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Spatial.ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) =>
         SpatialCompute.ProximityField(geometry: geometry, direction: request.Direction, maxDist: request.MaxDistance, angleWeight: request.AngleWeight, context: context)
             .Map(static tuples => tuples.Select(static t => new Spatial.ProximityFieldResult(t.Index, t.Distance, t.Angle)).ToArray());
@@ -105,18 +105,12 @@ internal static class SpatialCore {
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
             try {
-                void Collect(object? sender, RTreeEventArgs args) {
-                    if (count >= buffer.Length) {
-                        return;
-                    }
-                    buffer[count++] = args.Id;
-                }
                 _ = queryShape switch {
-                    Sphere sphere => tree.Search(sphere, Collect),
-                    BoundingBox box => tree.Search(box, Collect),
+                    Sphere sphere => tree.Search(sphere, (_, args) => { _ = count < buffer.Length ? buffer[count++] = args.Id : 0; }),
+                    BoundingBox box => tree.Search(box, (_, args) => { _ = count < buffer.Length ? buffer[count++] = args.Id : 0; }),
                     _ => false,
                 };
-                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count],] : []);
             } finally {
                 ArrayPool<int>.Shared.Return(buffer, clearArray: true);
             }
@@ -145,12 +139,9 @@ internal static class SpatialCore {
             int count = 0;
             try {
                 return RTree.SearchOverlaps(tree1, tree2, tolerance, (_, args) => {
-                    if (count + 1 < buffer.Length) {
-                        buffer[count++] = args.Id;
-                        buffer[count++] = args.IdB;
-                    }
+                    _ = count + 1 < buffer.Length ? (buffer[count++] = args.Id, buffer[count++] = args.IdB) : (0, 0);
                 })
-                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
+                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count],] : [])
                     : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
             } finally {
                 ArrayPool<int>.Shared.Return(buffer, clearArray: true);

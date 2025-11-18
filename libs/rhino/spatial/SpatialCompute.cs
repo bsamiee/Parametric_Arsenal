@@ -190,11 +190,7 @@ internal static class SpatialCompute {
         int[] GetNeighbors(int idx) => tree is not null
             ? ((Func<int[]>)(() => {
                 List<int> buffer = [];
-                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
-                    if (args.Id != idx) {
-                        buffer.Add(args.Id);
-                    }
-                });
+                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => { _ = args.Id != idx ? (buffer.Add(args.Id), 0) : (0, 0); });
                 return [.. buffer,];
             }))()
             : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];

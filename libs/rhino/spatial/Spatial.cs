@@ -12,8 +12,6 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial indexing via RTree and polymorphic dispatch.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Spatial is the primary API entry point for the Spatial namespace")]
 public static class Spatial {
-    #region Algebraic Domain Types
-
     /// <summary>Base type for clustering algorithm requests.</summary>
     public abstract record ClusteringRequest;
 
@@ -34,8 +32,6 @@ public static class Spatial {
 
     /// <summary>Result of proximity field query: geometry index, distance, and angle from direction.</summary>
     public sealed record ProximityFieldResult(int Index, double Distance, double Angle);
-
-    #endregion
 
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
