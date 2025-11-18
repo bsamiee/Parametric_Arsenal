@@ -44,15 +44,10 @@ internal static class SpatialCompute {
                             ? ResultFactory.Create<(Point3d, double[])[]>(value: [.. Enumerable.Range(0, clusterCount).Select(c => {
                                 int[] members = [.. Enumerable.Range(0, pts.Length).Where(i => assigns[i] == c),];
                                 return members.Length is 0
-                                    ? (Point3d.Origin, [])
-                                    : ((Func<(Point3d, double[])>)(() => {
-                                        Point3d sum = Point3d.Origin;
-                                        for (int m = 0; m < members.Length; m++) {
-                                            sum += pts[members[m]];
-                                        }
-                                        Point3d centroid = sum / members.Length;
-                                        return (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),]);
-                                    }))();
+                                    ? (Point3d.Origin, Array.Empty<double>())
+                                    : (members.Aggregate(Point3d.Origin, (sum, idx) => sum + pts[idx]) / members.Length) is Point3d centroid
+                                        ? (centroid, [.. members.Select(i => pts[i].DistanceTo(centroid)),])
+                                        : (Point3d.Origin, Array.Empty<double>());
                             }),
                             ])
                             : ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.ClusteringFailed)
@@ -224,7 +219,7 @@ internal static class SpatialCompute {
                         if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
                             continue;
                         }
-                        double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
+                        double dist = pts[cluster1].DistanceTo(pts[cluster2]);
                         (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
                     }
                 }
@@ -285,7 +280,7 @@ internal static class SpatialCompute {
     internal static Result<(int, double, double)[]> ProximityField(GeometryBase[] geometry, Vector3d direction, double maxDist, double angleWeight, IGeometryContext context) =>
         (geometry.Length, direction.Length <= context.AbsoluteTolerance, maxDist <= context.AbsoluteTolerance) switch {
             (0, _, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
-            (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDirection),
+            (_, true, _) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.ZeroLengthDirection),
             (_, _, true) => ResultFactory.Create<(int, double, double)[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must exceed tolerance")),
             _ => ((Func<Result<(int, double, double)[]>>)(() => {
                 using RTree tree = new();
@@ -492,16 +487,10 @@ internal static class SpatialCompute {
                 return ResultFactory.Create(value: cells);
             }))());
 
-    private static Func<object, object> ResolveCentroidExtractor(Type geometryType) {
-        int match = Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(geometryType));
-        return SpatialConfig.TypeExtractors.TryGetValue(("Centroid", geometryType), out Func<object, object>? exact) switch {
-            true => exact!,
-            _ => match switch {
-                >= 0 => _centroidFallbacks[match].Extractor,
-                _ => static geometry => geometry is GeometryBase baseGeometry
-                    ? baseGeometry.GetBoundingBox(accurate: false).Center
-                    : Point3d.Origin,
-            },
-        };
-    }
+    private static Func<object, object> ResolveCentroidExtractor(Type geometryType) =>
+        SpatialConfig.TypeExtractors.TryGetValue(("Centroid", geometryType), out Func<object, object>? exact)
+            ? exact!
+            : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(geometryType)) is int match and >= 0
+                ? _centroidFallbacks[match].Extractor
+                : static geometry => geometry is GeometryBase baseGeometry ? baseGeometry.GetBoundingBox(accurate: false).Center : Point3d.Origin;
 }
