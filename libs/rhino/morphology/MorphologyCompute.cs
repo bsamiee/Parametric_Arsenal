@@ -501,7 +501,9 @@ internal static class MorphologyCompute {
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
                 for (int i = 0; i < 5; i++) {
                     byte flag = (byte)(1 << i);
-                    (flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string _, Func<Mesh, double, bool> action) entry) && entry.action(repaired, tol);
+                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
+                        bool success = entry.action(repaired, tol);
+                    }
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -511,8 +513,7 @@ internal static class MorphologyCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
-        mesh switch {
-            { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
+        mesh switch { { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
             Mesh m => ((Func<Result<Mesh[]>>)(() => {
                 Mesh[] components = m.SplitDisjointPieces();
                 return (components is not { Length: > 0 })
@@ -535,7 +536,7 @@ internal static class MorphologyCompute {
                 return !welded.IsValid
                     ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed"))
                     : ((Func<Result<Mesh>>)(() => {
-                        _ = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                        bool combined = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
                         return weldNormals && !welded.Normals.ComputeNormals()
                             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed"))
                             : ResultFactory.Create(value: welded);

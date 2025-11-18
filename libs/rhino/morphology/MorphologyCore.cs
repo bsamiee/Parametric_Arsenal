@@ -127,7 +127,7 @@ internal static class MorphologyCore {
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteEvolveMeanCurvature(object input, object parameters, IGeometryContext context) =>
         Execute<Mesh, (double, int)>(input, parameters, context, (mesh, p, ctx) => {
             (double timeStep, int iters) = p;
-            return MorphologyCompute.SmoothWithConvergence(mesh, iters, lockBoundary: false, (m, pos, _) => MeanCurvatureFlowUpdate(m, pos, timeStep, _), ctx)
+            return MorphologyCompute.SmoothWithConvergence(mesh, iters, lockBoundary: false, (m, pos, _) => MeanCurvatureFlowUpdate(m, pos, timeStep), ctx)
                 .Bind(evolved => ComputeSmoothingMetrics(mesh, evolved, iters, ctx));
         });
 
@@ -175,7 +175,7 @@ internal static class MorphologyCore {
         ];
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep, IGeometryContext _) =>
+    private static Point3d[] MeanCurvatureFlowUpdate(Mesh mesh, Point3d[] positions, double timeStep) =>
         [.. Enumerable.Range(0, positions.Length).Select(i => {
             int topologyIndex = mesh.TopologyVertices.TopologyVertexIndex(i);
             int[] neighbors = topologyIndex >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(topologyIndex) : [];
@@ -470,7 +470,7 @@ internal static class MorphologyCore {
         bool solidify,
         Vector3d direction,
         IGeometryContext _) {
-        _ = original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
+        Mesh? offsetForWallFaces = original.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces);
         int wallCount = wallFaces?.Count ?? 0;
         BoundingBox originalBounds = original.GetBoundingBox(accurate: false);
         BoundingBox thickenedBounds = thickened.GetBoundingBox(accurate: false);
