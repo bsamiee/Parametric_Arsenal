@@ -166,7 +166,7 @@ internal static class SpatialCompute {
             visited[i] = true;
             int[] neighbors = GetNeighbors(i);
 
-            if (neighbors.Length < minPts) {
+            if ((neighbors.Length + 1) < minPts) {
                 continue;
             }
 
@@ -182,7 +182,7 @@ internal static class SpatialCompute {
                 visited[cur] = true;
                 int[] curNeighbors = GetNeighbors(cur);
 
-                if (curNeighbors.Length >= minPts) {
+                if ((curNeighbors.Length + 1) >= minPts) {
                     for (int ni = 0; ni < curNeighbors.Length; ni++) {
                         int nb = curNeighbors[ni];
                         if (assignments[nb] == -1) {
