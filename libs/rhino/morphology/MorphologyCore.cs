@@ -364,7 +364,7 @@ internal static class MorphologyCore {
             acc.FaceCounts.Add(m.Faces.Count);
             acc.Bounds.Add(m.GetBoundingBox(accurate: false));
             return acc;
-        }) is (List<int> vertCounts, List<int> faceCounts, List<BoundingBox> bounds) metrics
+        }) is (List<int> vertCounts, List<int> faceCounts, List<BoundingBox> bounds)
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                 new Morphology.MeshSeparationResult(
                     components,
