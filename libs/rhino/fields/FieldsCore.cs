@@ -13,13 +13,13 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Fields dispatch registry with unified FrozenDictionary following SpatialCore pattern.</summary>
 [Pure]
 internal static class FieldsCore {
-    /// <summary>Unified operation dispatch table: (operation, geometry type) → (execute function, validation mode, buffer size, integration method).</summary>
-    internal static readonly FrozenDictionary<(byte Operation, Type GeometryType), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod)> OperationRegistry =
-        new Dictionary<(byte, Type), (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>, V, int, byte)> {
-            [(FieldsConfig.OperationDistance, typeof(Mesh))] = (ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Brep))] = (ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Curve))] = (ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048, FieldsConfig.IntegrationRK4),
-            [(FieldsConfig.OperationDistance, typeof(Surface))] = (ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096, FieldsConfig.IntegrationRK4),
+    /// <summary>Unified operation dispatch table: geometry type → (execute function, validation mode, buffer size).</summary>
+    internal static readonly FrozenDictionary<Type, (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize)> DistanceFieldRegistry =
+        new Dictionary<Type, (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>>, V, int)> {
+            [typeof(Mesh)] = (ExecuteDistanceField<Mesh>, V.Standard | V.MeshSpecific, 4096),
+            [typeof(Brep)] = (ExecuteDistanceField<Brep>, V.Standard | V.Topology, 8192),
+            [typeof(Curve)] = (ExecuteDistanceField<Curve>, V.Standard | V.Degeneracy, 2048),
+            [typeof(Surface)] = (ExecuteDistanceField<Surface>, V.Standard | V.BoundingBox, 4096),
         }.ToFrozenDictionary();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -35,7 +35,7 @@ internal static class FieldsCore {
             }
             int resolution = spec.Resolution;
             int totalSamples = resolution * resolution * resolution;
-            int bufferSize = OperationRegistry.TryGetValue((FieldsConfig.OperationDistance, typeof(T)), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize, byte IntegrationMethod) config)
+            int bufferSize = DistanceFieldRegistry.TryGetValue(typeof(T), out (Func<object, Fields.FieldSpec, IGeometryContext, Result<(Point3d[], double[])>> Execute, V ValidationMode, int BufferSize) config)
                 ? Math.Max(totalSamples, config.BufferSize)
                 : totalSamples;
             Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(bufferSize);
