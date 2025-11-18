@@ -187,26 +187,37 @@ internal static class TopologyCore {
                     ]);
                 }))(),
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
-                (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => mesh.TopologyEdges.GetConnectedFaces(idx) switch {
-                    int[] { Length: 2 } af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                        new Topology.AdjacencyData(
-                            EdgeIndex: idx,
-                            AdjacentFaceIndices: af,
-                            FaceNormals: [mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]],],
-                            DihedralAngle: Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]]),
-                            IsManifold: true,
-                            IsBoundary: false),
-                    ]),
-                    int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                        new Topology.AdjacencyData(
-                            EdgeIndex: idx,
-                            AdjacentFaceIndices: af,
-                            FaceNormals: [.. af.Select(i => mesh.FaceNormals[i]),],
-                            DihedralAngle: 0.0,
-                            IsManifold: af.Length == 2,
-                            IsBoundary: af.Length == 1),
-                    ]),
-                },
+                (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
+                    _ = mesh.FaceNormals.Count == mesh.Faces.Count || mesh.FaceNormals.ComputeFaceNormals();
+                    int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(idx);
+                    return connectedFaces switch {
+                        int[] { Length: 2 } af => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
+                            Vector3d normalA = mesh.FaceNormals.Count > af[0] ? mesh.FaceNormals[af[0]] : Vector3d.Unset;
+                            Vector3d normalB = mesh.FaceNormals.Count > af[1] ? mesh.FaceNormals[af[1]] : Vector3d.Unset;
+                            double dihedral = normalA.IsValid && normalB.IsValid
+                                ? Vector3d.VectorAngle(normalA, normalB)
+                                : 0.0;
+                            return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                new Topology.AdjacencyData(
+                                    EdgeIndex: idx,
+                                    AdjacentFaceIndices: af,
+                                    FaceNormals: [normalA, normalB,],
+                                    DihedralAngle: dihedral,
+                                    IsManifold: true,
+                                    IsBoundary: false),
+                            ]);
+                        }))(),
+                        int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                            new Topology.AdjacencyData(
+                                EdgeIndex: idx,
+                                AdjacentFaceIndices: af,
+                                FaceNormals: [.. af.Select(faceIndex => mesh.FaceNormals.Count > faceIndex ? mesh.FaceNormals[faceIndex] : Vector3d.Unset),],
+                                DihedralAngle: 0.0,
+                                IsManifold: af.Length == 2,
+                                IsBoundary: af.Length == 1),
+                        ]),
+                    };
+                }))(),
                 (Mesh mesh, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(mesh.TopologyEdges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
@@ -273,16 +284,22 @@ internal static class TopologyCore {
     }
 
     private static Result<IReadOnlyList<Topology.EdgeClassificationData>> ClassifyMeshEdges(Mesh mesh, double angleThreshold) {
+        _ = mesh.FaceNormals.Count == mesh.Faces.Count || mesh.FaceNormals.ComputeFaceNormals();
         double curvatureThreshold = angleThreshold * TopologyConfig.CurvatureThresholdRatio;
         IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
         IReadOnlyList<Topology.EdgeContinuityType> classifications = [.. edgeIndices.Select(i => mesh.TopologyEdges.GetConnectedFaces(i) switch {
             int[] cf when cf.Length == 1 => Topology.EdgeContinuityType.Boundary,
             int[] cf when cf.Length > 2 => Topology.EdgeContinuityType.NonManifold,
-            int[] cf when cf.Length == 2 => (mesh.FaceNormals[cf[0]].IsValid && mesh.FaceNormals[cf[1]].IsValid ? Vector3d.VectorAngle(mesh.FaceNormals[cf[0]], mesh.FaceNormals[cf[1]]) : Math.PI) switch {
-                double angle when Math.Abs(angle) < curvatureThreshold => Topology.EdgeContinuityType.Curvature,
-                double angle when Math.Abs(angle) < angleThreshold => Topology.EdgeContinuityType.Smooth,
-                _ => Topology.EdgeContinuityType.Sharp,
-            },
+            int[] cf when cf.Length == 2 => ((Func<Topology.EdgeContinuityType>)(() => {
+                Vector3d normalA = mesh.FaceNormals.Count > cf[0] ? mesh.FaceNormals[cf[0]] : Vector3d.Unset;
+                Vector3d normalB = mesh.FaceNormals.Count > cf[1] ? mesh.FaceNormals[cf[1]] : Vector3d.Unset;
+                double angle = normalA.IsValid && normalB.IsValid ? Vector3d.VectorAngle(normalA, normalB) : Math.PI;
+                return Math.Abs(angle) < curvatureThreshold
+                    ? Topology.EdgeContinuityType.Curvature
+                    : Math.Abs(angle) < angleThreshold
+                        ? Topology.EdgeContinuityType.Smooth
+                        : Topology.EdgeContinuityType.Sharp;
+            }))(),
             _ => Topology.EdgeContinuityType.Sharp,
         }),
         ];
