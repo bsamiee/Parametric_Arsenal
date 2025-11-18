@@ -12,15 +12,15 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Topology diagnosis, progressive healing, and topological feature extraction.</summary>
 [Pure]
 internal static class TopologyCompute {
-    internal static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> Diagnose(
+    internal static Result<TopologyHealingStrategy.Diagnosis> Diagnose(
         Brep brep,
         IGeometryContext context) =>
         !brep.IsValidTopology(out string topologyLog)
-            ? ResultFactory.Create<(double[], (int, int, double)[], byte[])>(
+            ? ResultFactory.Create<TopologyHealingStrategy.Diagnosis>(
                 error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
-                .Bind(validBrep => ((Func<Result<(double[], (int, int, double)[], byte[])>>)(() => {
+                .Bind(validBrep => ((Func<Result<TopologyHealingStrategy.Diagnosis>>)(() => {
                     (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, validBrep.Edges.Count)
                         .Where(i => validBrep.Edges[i].Valence == EdgeAdjacency.Naked && validBrep.Edges[i].EdgeCurve is not null)
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
@@ -50,44 +50,43 @@ internal static class TopologyCompute {
                         ]
                         : [];
 
-                    byte[] repairs = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Length) switch {
-                        ( > 0, > 0, > 0) => [TopologyConfig.StrategyConservativeRepair, TopologyConfig.StrategyModerateJoin, TopologyConfig.StrategyAggressiveJoin, TopologyConfig.StrategyCombined,],
-                        ( > 0, > 0, _) => [TopologyConfig.StrategyConservativeRepair, TopologyConfig.StrategyModerateJoin, TopologyConfig.StrategyAggressiveJoin,],
-                        ( > 0, _, > 0) => [TopologyConfig.StrategyConservativeRepair, TopologyConfig.StrategyModerateJoin, TopologyConfig.StrategyCombined,],
-                        (_, > 0, > 0) => [TopologyConfig.StrategyAggressiveJoin, TopologyConfig.StrategyCombined,],
-                        ( > 0, _, _) => [TopologyConfig.StrategyConservativeRepair, TopologyConfig.StrategyModerateJoin,],
-                        (_, > 0, _) => [TopologyConfig.StrategyAggressiveJoin,],
-                        (_, _, > 0) => [TopologyConfig.StrategyCombined,],
+                    TopologyHealingStrategy[] strategies = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Length) switch {
+                        ( > 0, > 0, > 0) => [new TopologyHealingStrategy.ConservativeRepair(), new TopologyHealingStrategy.ModerateJoin(), new TopologyHealingStrategy.AggressiveJoin(), new TopologyHealingStrategy.CombinedRepairAndJoin(),],
+                        ( > 0, > 0, _) => [new TopologyHealingStrategy.ConservativeRepair(), new TopologyHealingStrategy.ModerateJoin(), new TopologyHealingStrategy.AggressiveJoin(),],
+                        ( > 0, _, > 0) => [new TopologyHealingStrategy.ConservativeRepair(), new TopologyHealingStrategy.ModerateJoin(), new TopologyHealingStrategy.CombinedRepairAndJoin(),],
+                        (_, > 0, > 0) => [new TopologyHealingStrategy.AggressiveJoin(), new TopologyHealingStrategy.CombinedRepairAndJoin(),],
+                        ( > 0, _, _) => [new TopologyHealingStrategy.ConservativeRepair(), new TopologyHealingStrategy.ModerateJoin(),],
+                        (_, > 0, _) => [new TopologyHealingStrategy.AggressiveJoin(),],
+                        (_, _, > 0) => [new TopologyHealingStrategy.CombinedRepairAndJoin(),],
                         _ => [],
                     };
 
-                    return ResultFactory.Create<(double[], (int, int, double)[], byte[])>(value: (gaps, nearMisses, repairs));
+                    return ResultFactory.Create(value: new TopologyHealingStrategy.Diagnosis(EdgeGaps: gaps, NearMisses: nearMisses, SuggestedStrategies: strategies));
                 }))());
 
-    internal static Result<(Brep Healed, byte Strategy, bool Success)> Heal(
+    internal static Result<(Brep Healed, TopologyHealingStrategy Strategy, bool Success)> Heal(
         Brep brep,
-        byte maxStrategy,
+        IReadOnlyList<TopologyHealingStrategy> strategies,
         IGeometryContext context) =>
         !brep.IsValidTopology(out string _)
-            ? ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid before healing"))
+            ? ResultFactory.Create<(Brep, TopologyHealingStrategy, bool)>(error: E.Topology.DiagnosisFailed.WithContext("Topology invalid before healing"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology,])
-                .Bind(validBrep => ((Func<Result<(Brep, byte, bool)>>)(() => {
+                .Bind(validBrep => ((Func<Result<(Brep, TopologyHealingStrategy, bool)>>)(() => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
-                    int strategyCount = RhinoMath.Clamp(maxStrategy + 1, 0, TopologyConfig.MaxHealingStrategies);
                     Brep? bestHealed = null;
-                    byte bestStrategy = 0;
+                    TopologyHealingStrategy? bestStrategy = null;
                     int bestNakedEdges = int.MaxValue;
 
-                    for (int index = 0; index < strategyCount; index++) {
-                        byte currentStrategy = (byte)index;
+                    for (int index = 0; index < strategies.Count; index++) {
+                        TopologyHealingStrategy strategy = strategies[index];
                         Brep copy = validBrep.DuplicateBrep();
-                        bool success = currentStrategy switch {
-                            TopologyConfig.StrategyConservativeRepair => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
-                            TopologyConfig.StrategyModerateJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                            TopologyConfig.StrategyAggressiveJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
-                            TopologyConfig.StrategyCombined => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
-                            TopologyConfig.StrategyTargetedJoin => ((Func<bool>)(() => {
+                        bool success = strategy switch {
+                            TopologyHealingStrategy.ConservativeRepair => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance),
+                            TopologyHealingStrategy.ModerateJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            TopologyHealingStrategy.AggressiveJoin => copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[2] * context.AbsoluteTolerance) > 0,
+                            TopologyHealingStrategy.CombinedRepairAndJoin => copy.Repair(TopologyConfig.HealingToleranceMultipliers[0] * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.HealingToleranceMultipliers[1] * context.AbsoluteTolerance) > 0,
+                            TopologyHealingStrategy.TargetedJoin => ((Func<bool>)(() => {
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;
                                 for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
@@ -111,7 +110,7 @@ internal static class TopologyCompute {
                                 copy.Compact();
                                 return joinedAny;
                             }))(),
-                            _ => ((Func<bool>)(() => {
+                            TopologyHealingStrategy.ComponentJoin => ((Func<bool>)(() => {
                                 Brep[] components = copy.GetConnectedComponents() ?? [];
                                 return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: context.AbsoluteTolerance) switch {
                                     null or { Length: 0 } => false,
@@ -119,6 +118,7 @@ internal static class TopologyCompute {
                                     Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
                                 };
                             }))(),
+                            _ => false,
                         };
                         (bool isValid, int nakedEdges) = success && copy.IsValidTopology(out string _)
                             ? (true, copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked))
@@ -128,13 +128,13 @@ internal static class TopologyCompute {
                         Brep? toDispose = isImprovement ? bestHealed : copy;
                         toDispose?.Dispose();
                         (bestHealed, bestStrategy, bestNakedEdges) = isImprovement
-                            ? (copy, currentStrategy, nakedEdges)
+                            ? (copy, strategy, nakedEdges)
                             : (bestHealed, bestStrategy, bestNakedEdges);
                     }
 
-                    return bestHealed is Brep healed
-                        ? ResultFactory.Create<(Brep, byte, bool)>(value: (healed, bestStrategy, bestNakedEdges < originalNakedEdges))
-                        : ResultFactory.Create<(Brep, byte, bool)>(error: E.Topology.HealingFailed.WithContext($"All {strategyCount.ToString(CultureInfo.InvariantCulture)} strategies failed"));
+                    return bestHealed is Brep healed && bestStrategy is not null
+                        ? ResultFactory.Create(value: (healed, bestStrategy, bestNakedEdges < originalNakedEdges))
+                        : ResultFactory.Create<(Brep, TopologyHealingStrategy, bool)>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
                 }))());
 
     internal static Result<(int Genus, (int LoopIndex, bool IsHole)[] Loops, bool IsSolid, int HandleCount)> ExtractFeatures(

@@ -43,13 +43,4 @@ internal static class TopologyConfig {
     internal const double NearMissMultiplier = 100.0;
     /// <summary>Maximum edges analyzed for near-miss detection to prevent O(n²) performance degradation on large models.</remarks>
     internal const int MaxEdgesForNearMissAnalysis = 100;
-
-    /// <summary>Healing strategy identifiers for progressive topology repair.</summary>
-    internal const byte StrategyConservativeRepair = 0;
-    internal const byte StrategyModerateJoin = 1;
-    internal const byte StrategyAggressiveJoin = 2;
-    internal const byte StrategyCombined = 3;
-    internal const byte StrategyTargetedJoin = 4;
-    internal const byte StrategyComponentJoin = 5;
-    internal const int MaxHealingStrategies = 6;
 }

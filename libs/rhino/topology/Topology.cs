@@ -228,20 +228,20 @@ public static class Topology {
         IGeometryContext context) where T : notnull =>
         TopologyCore.ExecuteNgonTopology(input: geometry, context: context);
 
-    /// <summary>Diagnose topology with edge gaps, near-misses, and repair strategy suggestions.</summary>
+    /// <summary>Diagnose topology with edge gaps, near-misses, and typed repair strategy suggestions.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double[] EdgeGaps, (int EdgeA, int EdgeB, double Distance)[] NearMisses, byte[] SuggestedRepairs)> DiagnoseTopology(
+    public static Result<TopologyHealingStrategy.Diagnosis> DiagnoseTopology(
         Brep brep,
         IGeometryContext context) =>
         TopologyCompute.Diagnose(brep: brep, context: context);
 
-    /// <summary>Progressive healing with automatic rollback and strategy selection.</summary>
+    /// <summary>Progressive healing with ordered strategy list and automatic rollback.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Brep Healed, byte Strategy, bool Success)> HealTopology(
+    public static Result<(Brep Healed, TopologyHealingStrategy Strategy, bool Success)> HealTopology(
         Brep brep,
-        byte maxStrategy,
+        IReadOnlyList<TopologyHealingStrategy> strategies,
         IGeometryContext context) =>
-        TopologyCompute.Heal(brep: brep, maxStrategy: maxStrategy, context: context);
+        TopologyCompute.Heal(brep: brep, strategies: strategies, context: context);
 
     /// <summary>Extract genus, holes, handles, and solid classification via Euler.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
