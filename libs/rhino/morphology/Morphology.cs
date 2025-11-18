@@ -116,6 +116,116 @@ public static class Morphology {
             $"Remesh | Target={this.TargetEdgeLength:F3} | Mean={this.MeanEdgeLength:F3} | StdDev={this.EdgeLengthStdDev:F3} | Uniformity={this.UniformityScore:F3} | Iter={this.IterationsPerformed} | {(this.Converged ? "✓" : "diverged")}");
     }
 
+    /// <summary>Mesh repair result with before/after metrics and quality score.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshRepairResult(
+        Mesh Repaired,
+        int OriginalVertexCount,
+        int RepairedVertexCount,
+        int OriginalFaceCount,
+        int RepairedFaceCount,
+        byte OperationsPerformed,
+        double QualityScore,
+        bool HadHoles,
+        bool HadBadNormals) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
+    }
+
+    /// <summary>Mesh separation result with per-component statistics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshSeparationResult(
+        Mesh[] Components,
+        int ComponentCount,
+        int TotalVertexCount,
+        int TotalFaceCount,
+        int[] VertexCountPerComponent,
+        int[] FaceCountPerComponent,
+        BoundingBox[] BoundsPerComponent) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshSeparate | Components={this.ComponentCount} | TotalV={this.TotalVertexCount} | TotalF={this.TotalFaceCount}");
+    }
+
+    /// <summary>Mesh welding result with vertex reduction and displacement metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshWeldResult(
+        Mesh Welded,
+        int OriginalVertexCount,
+        int WeldedVertexCount,
+        int VerticesRemoved,
+        double WeldTolerance,
+        double MeanVertexDisplacement,
+        double MaxVertexDisplacement,
+        bool NormalsRecalculated) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshWeld | V: {this.OriginalVertexCount}→{this.WeldedVertexCount} (-{this.VerticesRemoved}) | Tol={this.WeldTolerance:E2} | MaxDisp={this.MaxVertexDisplacement:F3}");
+    }
+
+    /// <summary>Brep to mesh conversion result with quality metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record BrepToMeshResult(
+        Mesh Mesh,
+        int BrepFaceCount,
+        int MeshFaceCount,
+        double MinEdgeLength,
+        double MaxEdgeLength,
+        double MeanEdgeLength,
+        double EdgeLengthStdDev,
+        double MeanAspectRatio,
+        double MaxAspectRatio,
+        double MinTriangleAngleRadians,
+        double MeanTriangleAngleRadians,
+        int DegenerateFaceCount,
+        double QualityScore) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"BrepToMesh | BrepFaces={this.BrepFaceCount} | MeshFaces={this.MeshFaceCount} | MeanEdge={this.MeanEdgeLength:F3} | AspectRatio={this.MeanAspectRatio:F2} | Quality={this.QualityScore:F3}");
+    }
+
+    /// <summary>Mesh thickening result with solid shell metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshThickenResult(
+        Mesh Thickened,
+        double OffsetDistance,
+        bool IsSolid,
+        int OriginalVertexCount,
+        int ThickenedVertexCount,
+        int OriginalFaceCount,
+        int ThickenedFaceCount,
+        int WallFaceCount,
+        BoundingBox OriginalBounds,
+        BoundingBox ThickenedBounds) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshThicken | Dist={this.OffsetDistance:F3} | Solid={this.IsSolid} | V: {this.OriginalVertexCount}→{this.ThickenedVertexCount} | F: {this.OriginalFaceCount}→{this.ThickenedFaceCount} | WallFaces={this.WallFaceCount}");
+    }
+
+    /// <summary>Mesh UV unwrapping result with texture coordinate metrics.</summary>
+    [DebuggerDisplay("{DebuggerDisplay}")]
+    public sealed record MeshUnwrapResult(
+        Mesh Unwrapped,
+        bool HasTextureCoordinates,
+        int OriginalFaceCount,
+        int TextureCoordinateCount,
+        double MinU,
+        double MaxU,
+        double MinV,
+        double MaxV,
+        double UVCoverage) : IMorphologyResult {
+        [Pure]
+        private string DebuggerDisplay => string.Create(
+            CultureInfo.InvariantCulture,
+            $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
+    }
+
     /// <summary>Unified morphology operation entry with polymorphic dispatch.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IMorphologyResult>> Apply<T>(
