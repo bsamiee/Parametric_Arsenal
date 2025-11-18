@@ -17,7 +17,8 @@ public static class Solid {
     public readonly record struct SolidOptions(
         double? ToleranceOverride = null,
         bool ManifoldOnly = false,
-        bool ValidateResult = true);
+        bool ValidateResult = true,
+        bool CombineCoplanarFaces = true);
 
     /// <summary>Boolean operation result containing geometry arrays and tolerance metadata.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
