@@ -191,19 +191,22 @@ internal static class TopologyCore {
                     bool computed = EnsureMeshNormals(mesh);
                     int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(idx);
                     return connectedFaces switch {
-                        int[] { Length: 2 } af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
-                            new Topology.AdjacencyData(
-                                EdgeIndex: idx,
-                                AdjacentFaceIndices: af,
-                                FaceNormals: computed && mesh.FaceNormals.Count > Math.Max(af[0], af[1])
-                                    ? [mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]],]
-                                    : [Vector3d.Unset, Vector3d.Unset,],
-                                DihedralAngle: computed && mesh.FaceNormals.Count > Math.Max(af[0], af[1])
-                                    ? Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]])
-                                    : 0.0,
-                                IsManifold: true,
-                                IsBoundary: false),
-                        ]),
+                        int[] { Length: 2 } af => {
+                            bool hasValidNormals = computed && mesh.FaceNormals.Count > Math.Max(af[0], af[1]);
+                            return ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
+                                new Topology.AdjacencyData(
+                                    EdgeIndex: idx,
+                                    AdjacentFaceIndices: af,
+                                    FaceNormals: hasValidNormals
+                                        ? [mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]],]
+                                        : [Vector3d.Unset, Vector3d.Unset,],
+                                    DihedralAngle: hasValidNormals
+                                        ? Vector3d.VectorAngle(mesh.FaceNormals[af[0]], mesh.FaceNormals[af[1]])
+                                        : 0.0,
+                                    IsManifold: true,
+                                    IsBoundary: false),
+                            ]);
+                        },
                         int[] af => ResultFactory.Create(value: (IReadOnlyList<Topology.AdjacencyData>)[
                             new Topology.AdjacencyData(
                                 EdgeIndex: idx,
