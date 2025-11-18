@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
