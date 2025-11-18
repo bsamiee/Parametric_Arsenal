@@ -13,6 +13,16 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>RTree spatial indexing with ArrayPool buffers for zero-allocation queries.</summary>
 [Pure]
 internal static class SpatialCore {
+    /// <summary>Execute clustering operation with algebraic request type.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<(Point3d Centroid, double[] Radii)[]> ExecuteCluster<T>(T[] geometry, Spatial.ClusteringRequest request, IGeometryContext context) where T : GeometryBase =>
+        request switch {
+            Spatial.KMeansRequest kmeans => SpatialCompute.ClusterKMeans(geometry: geometry, k: kmeans.K, context: context),
+            Spatial.DBSCANRequest dbscan => SpatialCompute.ClusterDBSCAN(geometry: geometry, epsilon: dbscan.Epsilon, minPoints: dbscan.MinPoints, _: context),
+            Spatial.HierarchicalRequest hierarchical => SpatialCompute.ClusterHierarchical(geometry: geometry, k: hierarchical.K, _: context),
+            _ => ResultFactory.Create<(Point3d Centroid, double[] Radii)[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unknown clustering request type: {request.GetType().Name}")),
+        };
+
     private static readonly Func<object, RTree> _pointArrayFactory = static s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(Point3d[]))](s);
     private static readonly Func<object, RTree> _pointCloudFactory = static s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(PointCloud))](s);
     private static readonly Func<object, RTree> _meshFactory = static s => (RTree)SpatialConfig.TypeExtractors[("RTreeFactory", typeof(Mesh))](s);
