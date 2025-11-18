@@ -399,12 +399,13 @@ internal static class SpatialCompute {
     internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points"))
-            : ((Func<Result<int[][]>>)(() => {
-                (double minX, double minY, double maxX, double maxY) = (points.Min(p => p.X), points.Min(p => p.Y), points.Max(p => p.X), points.Max(p => p.Y));
-                double dx = (maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale;
-                double dy = (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale;
-                Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, 0), new Point3d(maxX + dx, minY - dy, 0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, 0),];
-                HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
+            : points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) <= context.AbsoluteTolerance)
+                ? ((Func<Result<int[][]>>)(() => {
+                    (double minX, double minY, double maxX, double maxY) = (points.Min(p => p.X), points.Min(p => p.Y), points.Max(p => p.X), points.Max(p => p.Y));
+                    double dx = (maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale;
+                    double dy = (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale;
+                    Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, 0), new Point3d(maxX + dx, minY - dy, 0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, 0),];
+                    HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
                 Point3d[] allPoints = [.. points, .. superTriangle,];
                 for (int i = 0; i < points.Length; i++) {
                     (int, int, int)[] badTriangles = [.. triangles.Where(t => IsInCircumcircle(allPoints[t.Item1], allPoints[t.Item2], allPoints[t.Item3], points[i], context)),];
@@ -421,7 +422,8 @@ internal static class SpatialCompute {
                     }
                 }
                 return ResultFactory.Create<int[][]>(value: [.. triangles.Where(t => t.Item1 < points.Length && t.Item2 < points.Length && t.Item3 < points.Length).Select(t => new int[] { t.Item1, t.Item2, t.Item3 }),]);
-            }))();
+            }))()
+                : ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
