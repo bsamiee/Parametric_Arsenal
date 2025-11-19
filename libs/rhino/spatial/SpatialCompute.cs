@@ -115,9 +115,10 @@ internal static class SpatialCompute {
                     double cumulative = 0.0;
                     for (int j = 0; j < pts.Length; j++) {
                         cumulative += distSq[j];
-                        if (cumulative >= target) {
-                            return pts[j];
-                        }
+                        pts[Array.FindIndex(distSq, cumSum => {
+                            cumulative += cumSum;
+                            return cumulative >= target;
+                        }) is int idx and >= 0 ? idx : ^1]
                     }
                     return pts[^1];
                 }))();
