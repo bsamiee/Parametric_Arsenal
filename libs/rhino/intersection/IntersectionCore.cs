@@ -150,7 +150,7 @@ internal static class IntersectionCore {
                 error: E.Geometry.InvalidMaxHits.WithContext(maxHits.ToString(CultureInfo.InvariantCulture)));
 
     /// <summary>Builds intersection result from bool/arrays tuple using pattern matching discrimination.</summary>
-    private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersection.IntersectionOutput>> ArrayResultBuilder = tuple => tuple switch {
+    private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersection.IntersectionOutput>> ArrayResultBuilder = static tuple => tuple switch {
         (true, { Length: > 0 } curves, { Length: > 0 } points) => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, curves, [], [], [], [])),
         (true, { Length: > 0 } curves, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], curves, [], [], [], [])),
         (true, _, { Length: > 0 } points) => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], [], [])),
@@ -158,49 +158,44 @@ internal static class IntersectionCore {
     };
 
     /// <summary>Processes CurveIntersections into output with points, overlap curves, and parameters.</summary>
-    private static readonly Func<CurveIntersections?, Curve, Result<Intersection.IntersectionOutput>> IntersectionProcessor = (results, source) => results switch { { Count: > 0 } =>
+    private static readonly Func<CurveIntersections?, Curve, Result<Intersection.IntersectionOutput>> IntersectionProcessor = static (results, source) => results switch { { Count: > 0 } =>
         ResultFactory.Create(value: new Intersection.IntersectionOutput(
-            [.. results.Select(entry => entry.PointA)],
-            [.. results.Where(entry => entry.IsOverlap).Select(entry => source.Trim(entry.OverlapA)).Where(trimmed => trimmed is not null)],
-            [.. results.Select(entry => entry.ParameterA)],
-            [.. results.Select(entry => entry.ParameterB)],
+            [.. results.Select(static entry => entry.PointA)],
+            [.. results.Where(static entry => entry.IsOverlap).Select(entry => source.Trim(entry.OverlapA)).Where(static trimmed => trimmed is not null)],
+            [.. results.Select(static entry => entry.ParameterA)],
+            [.. results.Select(static entry => entry.ParameterB)],
             [], [])),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Handles two-point intersection results with distance threshold validation and deduplication.</summary>
-    private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersection.IntersectionOutput>> TwoPointHandler = (count, first, second, tolerance, parameters) =>
+    private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersection.IntersectionOutput>> TwoPointHandler = static (count, first, second, tolerance, parameters) =>
         (count, first.DistanceTo(second) > tolerance) switch {
-            ( > 1, true) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first, second], [], parameters ?? [], [], [], [])),
-            ( > 0, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])),
+            ( > 1, true) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first, second,], [], parameters ?? [], [], [], [])),
+            ( > 0, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first,], [], parameters is { Length: > 0 } ? [parameters[0],] : [], [], [], [])),
             _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
         };
 
     /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
     /// <remarks>ArcCurve instances in result are IDisposable and must be disposed by consumer.</remarks>
-    private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
-        (1, Circle arc) => {
-            ArcCurve arcCurve = new(arc);
-            Curve nurbs = arcCurve.ToNurbsCurve();
-            arcCurve.Dispose();
-            return ResultFactory.Create(value: new Intersection.IntersectionOutput([], [nurbs,], [], [], [], []));
-        },
+    private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = static (type, circle) => (type, circle) switch {
+        (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc),], [], [], [], [])),
         (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center,], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Processes polyline arrays flattening points while preserving original polyline structures.</summary>
-    private static readonly Func<Polyline[]?, Result<Intersection.IntersectionOutput>> PolylineProcessor = polylines
+    private static readonly Func<Polyline[]?, Result<Intersection.IntersectionOutput>> PolylineProcessor = static polylines
     => polylines switch { { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersection.IntersectionOutput(
-                              [.. nonNullPolylines.SelectMany(polyline => polyline)],
-                              [], [], [], [], [.. nonNullPolylines])),
+                              [.. nonNullPolylines.SelectMany(static polyline => polyline)],
+                              [], [], [], [], [.. nonNullPolylines,])),
         null => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Handles mesh intersections dispatching between sorted and unsorted RhinoCommon methods.</summary>
     private static readonly Func<Mesh, object, bool, (Func<Point3d[]?, int[]?, Result<Intersection.IntersectionOutput>>, Func<Point3d[]?, Result<Intersection.IntersectionOutput>>), Result<Intersection.IntersectionOutput>> MeshIntersectionHandler =
-        (mesh, target, sorted, handlers) => sorted switch {
+        static (mesh, target, sorted, handlers) => sorted switch {
             true => target switch {
                 Line line => handlers.Item1(RhinoIntersect.MeshLineSorted(mesh, line, out int[] ids), ids),
                 PolylineCurve polyline => handlers.Item1(RhinoIntersect.MeshPolylineSorted(mesh, polyline, out int[] ids), ids),
@@ -286,15 +281,7 @@ internal static class IntersectionCore {
                 return TwoPointHandler(count, pointA, pointB, tolerance, count > 1 ? [parameterA, parameterB] : count > 0 ? [parameterA] : null);
             }),
             ((typeof(Plane), typeof(Plane)), (first, second, _, _, _) => RhinoIntersect.PlanePlane((Plane)first, (Plane)second, out Line line)
-                ? (
-                    // Ensure LineCurve is disposed after use
-                    // Create a copy of the curve to pass to the output
-                    // If IntersectionOutput expects to own/dispose the curve, this should be refactored
-                    // For now, create a LineCurve, duplicate it, dispose the original, and pass the duplicate
-                    // This avoids leaking the disposable
-                    using LineCurve curve = new(line);
-                    ResultFactory.Create(value: new Intersection.IntersectionOutput([], [curve.DuplicateCurve(),], [], [], [], []))
-                )
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new LineCurve(line),], [], [], [], []))
                 : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(ValueTuple<Plane, Plane>), typeof(Plane)), (first, second, _, _, _) => {
                 (Plane planeA, Plane planeB) = (ValueTuple<Plane, Plane>)first;
