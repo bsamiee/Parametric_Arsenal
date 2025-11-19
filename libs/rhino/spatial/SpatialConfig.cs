@@ -5,79 +5,35 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
 
-/// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
+/// <summary>Spatial configuration: algorithmic constants and unified polymorphic dispatch table.</summary>
 [Pure]
 internal static class SpatialConfig {
-    /// <summary>Range operation metadata: validation mode, operation name, buffer size.</summary>
-    internal sealed record RangeOperationMetadata(
+    /// <summary>Unified spatial operation metadata with discriminators for tree building and operation type.</summary>
+    internal sealed record SpatialOperationMetadata(
         V ValidationMode,
         string OperationName,
-        int BufferSize);
+        int BufferSize,
+        Func<GeometryBase, Point3d>? CentroidExtractor = null);
 
-    /// <summary>Proximity operation metadata: validation mode, operation name.</summary>
-    internal sealed record ProximityOperationMetadata(
-        V ValidationMode,
-        string OperationName);
-
-    /// <summary>Unified range operation configuration by geometry type.</summary>
-    internal static readonly FrozenDictionary<Type, RangeOperationMetadata> RangeOperations =
-        new Dictionary<Type, RangeOperationMetadata> {
-            [typeof(Point3d[])] = new(
-                ValidationMode: V.None,
-                OperationName: "Spatial.PointArray.Range",
-                BufferSize: 2048),
-            [typeof(PointCloud)] = new(
-                ValidationMode: V.Standard,
-                OperationName: "Spatial.PointCloud.Range",
-                BufferSize: 2048),
-            [typeof(Mesh)] = new(
-                ValidationMode: V.MeshSpecific,
-                OperationName: "Spatial.Mesh.Range",
-                BufferSize: 2048),
-            [typeof(Curve[])] = new(
-                ValidationMode: V.Degeneracy,
-                OperationName: "Spatial.CurveArray.Range",
-                BufferSize: 2048),
-            [typeof(Surface[])] = new(
-                ValidationMode: V.BoundingBox,
-                OperationName: "Spatial.SurfaceArray.Range",
-                BufferSize: 2048),
-            [typeof(Brep[])] = new(
-                ValidationMode: V.Topology,
-                OperationName: "Spatial.BrepArray.Range",
-                BufferSize: 2048),
-        }.ToFrozenDictionary();
-
-    /// <summary>Unified proximity operation configuration by geometry type.</summary>
-    internal static readonly FrozenDictionary<Type, ProximityOperationMetadata> ProximityOperations =
-        new Dictionary<Type, ProximityOperationMetadata> {
-            [typeof(Point3d[])] = new(
-                ValidationMode: V.None,
-                OperationName: "Spatial.PointArray.Proximity"),
-            [typeof(PointCloud)] = new(
-                ValidationMode: V.Standard,
-                OperationName: "Spatial.PointCloud.Proximity"),
-        }.ToFrozenDictionary();
-
-    /// <summary>Mesh overlap operation configuration.</summary>
-    internal const string MeshOverlapOperationName = "Spatial.Mesh.Overlap";
-    internal static readonly V MeshOverlapValidationMode = V.MeshSpecific;
-    internal const int LargeBufferSize = 4096;
-
-    /// <summary>Clustering operation configuration.</summary>
-    internal const string ClusteringOperationName = "Spatial.Clustering";
-
-    /// <summary>Proximity field operation configuration.</summary>
-    internal const string ProximityFieldOperationName = "Spatial.ProximityField";
-
-    /// <summary>Polymorphic centroid extractors for clustering operations.</summary>
-    internal static readonly FrozenDictionary<Type, Func<GeometryBase, Point3d>> CentroidExtractors =
-        new Dictionary<Type, Func<GeometryBase, Point3d>> {
-            [typeof(Curve)] = static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [typeof(Surface)] = static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [typeof(Brep)] = static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [typeof(Mesh)] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
-            [typeof(GeometryBase)] = static g => g.GetBoundingBox(accurate: false).Center,
+    /// <summary>Singular unified operation dispatch table: (InputType, OperationType) → metadata.</summary>
+    internal static readonly FrozenDictionary<(Type InputType, string OperationType), SpatialOperationMetadata> Operations =
+        new Dictionary<(Type, string), SpatialOperationMetadata> {
+            [(typeof(Point3d[]), "Range")] = new(V.None, "Spatial.PointArray.Range", 2048),
+            [(typeof(PointCloud), "Range")] = new(V.Standard, "Spatial.PointCloud.Range", 2048),
+            [(typeof(Mesh), "Range")] = new(V.MeshSpecific, "Spatial.Mesh.Range", 2048),
+            [(typeof(Curve[]), "Range")] = new(V.Degeneracy, "Spatial.CurveArray.Range", 2048),
+            [(typeof(Surface[]), "Range")] = new(V.BoundingBox, "Spatial.SurfaceArray.Range", 2048),
+            [(typeof(Brep[]), "Range")] = new(V.Topology, "Spatial.BrepArray.Range", 2048),
+            [(typeof(Point3d[]), "Proximity")] = new(V.None, "Spatial.PointArray.Proximity", 2048),
+            [(typeof(PointCloud), "Proximity")] = new(V.Standard, "Spatial.PointCloud.Proximity", 2048),
+            [(typeof(Mesh), "Overlap")] = new(V.MeshSpecific, "Spatial.Mesh.Overlap", 4096),
+            [(typeof(GeometryBase[]), "Clustering")] = new(V.Standard, "Spatial.Clustering", 2048),
+            [(typeof(GeometryBase[]), "ProximityField")] = new(V.Standard, "Spatial.ProximityField", 2048),
+            [(typeof(Curve), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
+            [(typeof(Surface), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
+            [(typeof(Brep), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
+            [(typeof(Mesh), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
+            [(typeof(GeometryBase), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g.GetBoundingBox(accurate: false).Center),
         }.ToFrozenDictionary();
 
     /// <summary>K-means clustering algorithm parameters.</summary>

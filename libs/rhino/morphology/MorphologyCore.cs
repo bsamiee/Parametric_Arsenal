@@ -93,13 +93,13 @@ internal static class MorphologyCore {
                     ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                         error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(
                             string.Create(CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}"))),
-                _ => MorphologyConfig.SubdivisionStrategies.TryGetValue(strategy.GetType(), out MorphologyConfig.SubdivisionMetadata? meta)
+                _ => MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is not null
                     ? UnifiedOperation.Apply(
                         input: mesh,
                         operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                             MorphologyCompute.SubdivideIterative(
                                 m,
-                                meta.AlgorithmCode,
+                                meta.AlgorithmCode.Value,
                                 strategy.Levels,
                                 context).Bind(subdivided => {
                                 (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
@@ -117,8 +117,8 @@ internal static class MorphologyCore {
                             })),
                         config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                             Context = context,
-                            ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
-                            OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{strategy.GetType().Name}"),
+                            ValidationMode = meta.ValidationMode,
+                            OperationName = meta.OperationName,
                             EnableDiagnostics = false,
                         })
                     : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
@@ -392,13 +392,13 @@ internal static class MorphologyCore {
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                 error: E.Geometry.InvalidGeometryType.WithContext($"MeshRepair requires Mesh, got: {typeof(T).Name}"))
             : strategy switch {
-                Morphology.CompositeRepair composite => UnifiedOperation.Apply(
+                Morphology.CompositeRepair composite when MorphologyConfig.Operations.TryGetValue(typeof(Morphology.CompositeRepair), out MorphologyConfig.MorphologyOperationMetadata? compositeMeta) => UnifiedOperation.Apply(
                     input: mesh,
                     operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m => {
                         byte flags = composite.Strategies.Aggregate(
                             MorphologyConfig.RepairNone,
-                            (acc, s) => MorphologyConfig.RepairStrategies.TryGetValue(s.GetType(), out (byte Flags, double Tolerance) meta)
-                                ? (byte)(acc | meta.Flags)
+                            (acc, s) => MorphologyConfig.Operations.TryGetValue(s.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.RepairFlags is not null
+                                ? (byte)(acc | meta.RepairFlags.Value)
                                 : acc);
                         return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
                             .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
@@ -416,14 +416,14 @@ internal static class MorphologyCore {
                     }),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
-                        ValidationMode = V.Standard | V.MeshSpecific,
-                        OperationName = "Morphology.CompositeRepair",
+                        ValidationMode = compositeMeta.ValidationMode,
+                        OperationName = compositeMeta.OperationName,
                         EnableDiagnostics = false,
                     }),
-                _ when MorphologyConfig.RepairStrategies.TryGetValue(strategy.GetType(), out (byte Flags, double Tolerance) meta) => UnifiedOperation.Apply(
+                _ when MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.RepairFlags is not null && meta.DefaultTolerance is not null => UnifiedOperation.Apply(
                     input: mesh,
                     operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
-                        MorphologyCompute.RepairMesh(m, meta.Flags, meta.Tolerance, context)
+                        MorphologyCompute.RepairMesh(m, meta.RepairFlags.Value, meta.DefaultTolerance.Value, context)
                             .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                                 new Morphology.MeshRepairResult(
                                     repaired,
@@ -431,15 +431,15 @@ internal static class MorphologyCore {
                                     repaired.Vertices.Count,
                                     m.Faces.Count,
                                     repaired.Faces.Count,
-                                    meta.Flags,
+                                    meta.RepairFlags.Value,
                                     MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
                                     m.DisjointMeshCount > 1,
                                     m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
                             ]))),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
-                        ValidationMode = V.Standard | V.Topology | V.MeshSpecific,
-                        OperationName = "Morphology.MeshRepair",
+                        ValidationMode = meta.ValidationMode,
+                        OperationName = meta.OperationName,
                         EnableDiagnostics = false,
                     }),
                 _ => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
@@ -616,11 +616,11 @@ internal static class MorphologyCore {
         input is not Mesh mesh
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                 error: E.Geometry.InvalidGeometryType.WithContext($"MeshUnwrap requires Mesh, got: {typeof(T).Name}"))
-            : MorphologyConfig.UnwrapStrategies.TryGetValue(strategy.GetType(), out MorphologyConfig.UnwrapMetadata? unwrapMeta)
+            : MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is not null
                 ? UnifiedOperation.Apply(
                     input: mesh,
                     operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
-                        MorphologyCompute.UnwrapMesh(m, unwrapMeta.MethodCode, context)
+                        MorphologyCompute.UnwrapMesh(m, meta.AlgorithmCode.Value, context)
                         .Bind(unwrapped => {
                             bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
                             double minU = double.MaxValue;
@@ -654,8 +654,8 @@ internal static class MorphologyCore {
                         })),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
-                        ValidationMode = V.Standard | V.MeshSpecific,
-                        OperationName = "Morphology.MeshUnwrap",
+                        ValidationMode = meta.ValidationMode,
+                        OperationName = meta.OperationName,
                         EnableDiagnostics = false,
                     })
                 : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(

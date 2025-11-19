@@ -16,9 +16,10 @@ internal static class SpatialCompute {
         left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
 
     private static readonly (Type GeometryType, Func<GeometryBase, Point3d> Extractor)[] _centroidFallbacks =
-        [.. SpatialConfig.CentroidExtractors
-            .OrderByDescending(static kv => kv.Key, _typeSpecificity)
-            .Select(static kv => (kv.Key, kv.Value)),
+        [.. SpatialConfig.Operations
+            .Where(static kv => string.Equals(kv.Key.OperationType, "Centroid", StringComparison.Ordinal) && kv.Value.CentroidExtractor is not null)
+            .OrderByDescending(static kv => kv.Key.InputType, _typeSpecificity)
+            .Select(static kv => (kv.Key.InputType, kv.Value.CentroidExtractor!)),
         ];
 
     private static readonly ConcurrentDictionary<Type, Func<GeometryBase, Point3d>> _centroidExtractorCache = new();
@@ -56,8 +57,8 @@ internal static class SpatialCompute {
             GeometryBase current = geometry[i];
             Type geometryType = current.GetType();
             Func<GeometryBase, Point3d> extractor = _centroidExtractorCache.GetOrAdd(key: geometryType, valueFactory: t =>
-                SpatialConfig.CentroidExtractors.TryGetValue(key: t, out Func<GeometryBase, Point3d>? exact)
-                    ? exact
+                SpatialConfig.Operations.TryGetValue((t, "Centroid"), out SpatialConfig.SpatialOperationMetadata? exact) && exact.CentroidExtractor is not null
+                    ? exact.CentroidExtractor
                     : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(t)) is int match and >= 0
                         ? _centroidFallbacks[match].Extractor
                         : static geometry => geometry.GetBoundingBox(accurate: false).Center);
