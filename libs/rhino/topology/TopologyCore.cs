@@ -38,7 +38,7 @@ internal static class TopologyCore {
                     ]),
                 },
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
-                    (int Index, LineCurve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
+                    (int Index, Curve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
                         .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1)
                         .Select(i => {
                             IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
@@ -48,7 +48,7 @@ internal static class TopologyCore {
                     ];
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
                         new Topology.NakedEdgeData(
-                            EdgeCurves: [.. edges.Select(static e => (Curve)e.Curve),],
+                            EdgeCurves: [.. edges.Select(static e => e.Curve),],
                             EdgeIndices: [.. edges.Select(static e => e.Index),],
                             Valences: [.. edges.Select(static _ => 1),],
                             IsOrdered: orderLoops,
