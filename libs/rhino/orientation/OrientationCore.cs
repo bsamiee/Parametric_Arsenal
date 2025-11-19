@@ -156,9 +156,7 @@ internal static class OrientationCore {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
-        OrientationConfig.RelativeMetadata is OrientationConfig.OrientationOperationMetadata meta
-                ? OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians)
-                : ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.UnsupportedOrientationType);
+        OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.PatternDetectionResult> ExecutePatternDetection(GeometryBase[] geometries, IGeometryContext context) =>

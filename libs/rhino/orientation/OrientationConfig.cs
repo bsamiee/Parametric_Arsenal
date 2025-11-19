@@ -110,15 +110,15 @@ internal static class OrientationConfig {
     internal const int PatternMinInstances = 3;
 
     /// <summary>Pattern anomaly detection threshold multiplier.</summary>
-    internal const double PatternAnomalyThreshold = 2.0;
+    internal const double PatternAnomalyThreshold = 0.5;
 
     /// <summary>Optimization test plane configurations.</summary>
     internal const int MaxDegeneracyDimensions = 3;
 
     /// <summary>Canonical orientation scoring weights.</summary>
     internal const double OrientationScoreWeight1 = 0.4;
-    internal const double OrientationScoreWeight2 = 0.3;
-    internal const double OrientationScoreWeight3 = 0.3;
+    internal const double OrientationScoreWeight2 = 0.4;
+    internal const double OrientationScoreWeight3 = 0.2;
 
     /// <summary>Low-profile aspect ratio threshold for canonical scoring.</summary>
     internal const double LowProfileAspectRatio = 0.25;

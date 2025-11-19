@@ -259,18 +259,17 @@ internal static class OrientationCompute {
         Plane mirror = (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
             ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin)
             : new Plane(pa.Origin, pa.ZAxis);
-        if (!mirror.IsValid) {
-            return new Orientation.NoSymmetry();
-        }
         Point3d[] reflectedA = [.. ba.Vertices.Select(va => {
             Point3d r = va.Location;
             r.Transform(Transform.Mirror(mirrorPlane: mirror));
             return r;
         }),];
-        return reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
+        return !mirror.IsValid
+            ? new Orientation.NoSymmetry()
+            : reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
                && bb.Vertices.All(vb => reflectedA.Any(ra => ra.DistanceTo(vb.Location) < tolerance))
-            ? new Orientation.MirrorSymmetry()
-            : new Orientation.NoSymmetry();
+                ? new Orientation.MirrorSymmetry()
+                : new Orientation.NoSymmetry();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
