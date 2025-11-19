@@ -41,7 +41,6 @@ internal static class SpatialConfig {
     internal const int KMeansSeed = 42;
 
     /// <summary>DBSCAN clustering algorithm parameters.</summary>
-    internal const int DBSCANMinPoints = 4;
     internal const int DBSCANRTreeThreshold = 100;
 
     /// <summary>Medial axis sampling bounds for planar boundary analysis.</summary>

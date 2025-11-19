@@ -11,9 +11,9 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Scalar and vector field operations for computational field analysis.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Fields is the primary API entry point")]
 public static class Fields {
-    /// <summary>Field sampling specification with grid resolution, bounds, and step size; constructor clamps resolution to [8, 256] and stepSize to [√ε, 1.0].</summary>
+    /// <summary>Field sampling specification with grid resolution, bounds, and step size.</summary>
     public sealed record FieldSampling {
-        /// <summary>Initializes field sampling with automatic clamping: resolution [8, 256], stepSize [√ε, 1.0], null values use defaults.</summary>
+        /// <summary>Initializes field sampling with automatic clamping of resolution and step size.</summary>
         public FieldSampling(int? resolution = null, BoundingBox? bounds = null, double? stepSize = null) {
             this.Resolution = RhinoMath.Clamp(
                 resolution ?? FieldsConfig.DefaultResolution,

@@ -23,20 +23,18 @@ internal static class MorphologyCompute {
             ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}"))
             : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
                 ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))
-                : ((Func<Result<GeometryBase>>)(() => {
-                    BoundingBox cageBounds = new(originalControlPoints);
-                    return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
-                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
-                        : geometry switch {
-                            Mesh m => (GeometryBase?)m.DuplicateMesh(),
-                            Brep b => (GeometryBase?)b.DuplicateBrep(),
-                            _ => null,
-                        } is not GeometryBase deformed
-                            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext($"Type: {geometry.GetType().Name}"))
-                            : ApplyCageDeformation(deformed, cageBounds, deformedControlPoints)
-                                ? ResultFactory.Create(value: deformed)
-                                : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
-                }))();
+                : new BoundingBox(originalControlPoints) is BoundingBox cageBounds
+                    && (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance)
+                    ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
+                    : geometry switch {
+                        Mesh m => (GeometryBase?)m.DuplicateMesh(),
+                        Brep b => (GeometryBase?)b.DuplicateBrep(),
+                        _ => null,
+                    } is not GeometryBase deformed
+                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext($"Type: {geometry.GetType().Name}"))
+                        : ApplyCageDeformation(deformed, cageBounds, deformedControlPoints)
+                            ? ResultFactory.Create(value: deformed)
+                            : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ApplyCageDeformation(GeometryBase geometry, BoundingBox cageBounds, Point3d[] deformedControlPoints) {
@@ -79,7 +77,7 @@ internal static class MorphologyCompute {
         };
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
@@ -250,7 +248,7 @@ internal static class MorphologyCompute {
                     : state;
             });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> SmoothWithConvergence(
         Mesh mesh,
         int maxIterations,
@@ -317,7 +315,7 @@ internal static class MorphologyCompute {
                 }
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> OffsetMesh(
         Mesh mesh,
         double distance,
@@ -338,7 +336,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ReduceMesh(
         Mesh mesh,
         int targetFaceCount,
@@ -373,7 +371,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropic(
         Mesh mesh,
         double targetEdgeLength,
@@ -467,7 +465,7 @@ internal static class MorphologyCompute {
             };
         }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         int aspectCount = aspectRatios.Length;
@@ -486,7 +484,7 @@ internal static class MorphologyCompute {
                 : ResultFactory.Create(value: mesh);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
         byte flags,
@@ -527,7 +525,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
         mesh switch { { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
             Mesh m => ((Func<Result<Mesh[]>>)(() => {
@@ -538,7 +536,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> WeldMeshVertices(
         Mesh mesh,
         double tolerance,
@@ -560,7 +558,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> BrepToMesh(
         Brep brep,
         MeshingParameters? meshParams,
@@ -592,7 +590,7 @@ internal static class MorphologyCompute {
                 };
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ThickenMesh(
         Mesh mesh,
         double thickness,
@@ -610,21 +608,71 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
         byte unwrapMethod,
+        Vector3d? axis,
+        Point3d? origin,
+        double? radius,
         IGeometryContext _) =>
         unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
-                Mesh unwrapped = mesh.DuplicateMesh();
-                using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
-                return success && unwrapped.TextureCoordinates.Count > 0
-                    ? ResultFactory.Create(value: unwrapped)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
-            }))(),
+            0 => mesh.GetBoundingBox(accurate: false) is BoundingBox bounds && bounds.IsValid
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    using MeshUnwrapper unwrapper = new(unwrapped);
+                    bool success = unwrapper.Unwrap(method: default(MeshUnwrapMethod));
+                    return success && unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Planar unwrap failed"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Mesh bounds invalid")),
+            1 => axis is Vector3d axisVal && origin is Point3d originVal && axisVal.Length > RhinoMath.ZeroTolerance
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    unwrapped.TextureCoordinates.Clear();
+                    Vector3d axisUnit = axisVal / axisVal.Length;
+                    Vector3d perpVec = axisUnit.X * axisUnit.X > 0.5 ? Vector3d.YAxis : Vector3d.XAxis;
+                    Vector3d uBasis = Vector3d.CrossProduct(axisUnit, perpVec);
+                    bool __ = uBasis.Unitize();
+                    Vector3d vBasis = Vector3d.CrossProduct(axisUnit, uBasis);
+                    for (int i = 0; i < unwrapped.Vertices.Count; i++) {
+                        Point3d vertex = unwrapped.Vertices[i];
+                        Vector3d toVertex = vertex - originVal;
+                        double axisDistance = toVertex * axisUnit;
+                        Vector3d radialVec = toVertex - (axisDistance * axisUnit);
+                        double angle = Math.Atan2(radialVec * vBasis, radialVec * uBasis);
+                        double u = (angle + Math.PI) / RhinoMath.TwoPI;
+                        double v = axisDistance;
+                        int _ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
+                    }
+                    return unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Cylindrical unwrap produced no UVs"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Cylindrical unwrap requires valid axis and origin")),
+            2 => origin is Point3d centerVal && radius is double radiusVal && radiusVal > RhinoMath.ZeroTolerance
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    unwrapped.TextureCoordinates.Clear();
+                    for (int i = 0; i < unwrapped.Vertices.Count; i++) {
+                        Vector3d toVertex = unwrapped.Vertices[i] - centerVal;
+                        double length = toVertex.Length;
+                        Point3d projected = length > RhinoMath.ZeroTolerance
+                            ? centerVal + (radiusVal * (toVertex / length))
+                            : centerVal + (radiusVal * Vector3d.ZAxis);
+                        Vector3d sphereVec = projected - centerVal;
+                        double theta = Math.Atan2(sphereVec.Y, sphereVec.X);
+                        double phi = Math.Acos(RhinoMath.Clamp(sphereVec.Z / radiusVal, -1.0, 1.0));
+                        double u = (theta + Math.PI) / RhinoMath.TwoPI;
+                        double v = phi / Math.PI;
+                        int _ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
+                    }
+                    return unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Spherical unwrap produced no UVs"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Spherical unwrap requires valid center and radius > 0")),
             _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
         };
