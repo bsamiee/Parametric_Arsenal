@@ -666,7 +666,7 @@ internal static class MorphologyCompute {
                         double phi = Math.Acos(RhinoMath.Clamp(sphereVec.Z / radiusVal, -1.0, 1.0));
                         double u = (theta + Math.PI) / RhinoMath.TwoPI;
                         double v = phi / Math.PI;
-                        int __ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
+                        int _ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
                     }
                     return unwrapped.TextureCoordinates.Count > 0
                         ? ResultFactory.Create(value: unwrapped)
