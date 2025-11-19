@@ -46,7 +46,21 @@ internal static class TransformCore {
     internal static Result<Transform> BuildTransform(
         Transforms.TransformSpec spec,
         IGeometryContext context) =>
-        ((byte)(spec switch { { Matrix: not null } => 1, { UniformScale: not null } => 2, { NonUniformScale: not null } => 3, { Rotation: not null } => 4, { RotationVectors: not null } => 5, { MirrorPlane: not null } => 6, { Translation: not null } => 7, { Shear: not null } => 8, { ProjectionPlane: not null } => 9, { ChangeBasis: not null } => 10, { PlaneToPlane: not null } => 11, _ => 0 })) is byte mode and > 0 && _builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)
+        byte mode = (byte)(spec switch {
+            { Matrix: not null } => 1,
+            { UniformScale: not null } => 2,
+            { NonUniformScale: not null } => 3,
+            { Rotation: not null } => 4,
+            { RotationVectors: not null } => 5,
+            { MirrorPlane: not null } => 6,
+            { Translation: not null } => 7,
+            { Shear: not null } => 8,
+            { ProjectionPlane: not null } => 9,
+            { ChangeBasis: not null } => 10,
+            { PlaneToPlane: not null } => 11,
+            _ => 0,
+        });
+        return mode is > 0 && _builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)
             ? entry.validate(spec, context) switch {
                 (true, _) => ResultFactory.Create(value: entry.build(spec)),
                 (false, string ctx) => ResultFactory.Create<Transform>(error: entry.error.WithContext(ctx)),
