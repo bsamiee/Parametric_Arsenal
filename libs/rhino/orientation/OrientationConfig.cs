@@ -3,7 +3,6 @@ using System.Diagnostics.Contracts;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;

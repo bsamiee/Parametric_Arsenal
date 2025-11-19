@@ -224,7 +224,8 @@ internal static class TransformationCompute {
                         return path.LengthParameter(targetLength, out double tParam)
                             ? tParam
                             : path.Domain.ParameterAt(Math.Clamp(targetLength / curveLength, 0.0, 1.0));
-                    }),];
+                    }),
+                ];
 
         Transform[] transforms = new Transform[count];
         for (int i = 0; i < count; i++) {
