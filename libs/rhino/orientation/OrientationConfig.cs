@@ -101,7 +101,7 @@ internal static class OrientationConfig {
     internal const int BestFitMinPoints = 3;
 
     /// <summary>Best-fit plane RMS residual threshold.</summary>
-    internal const double BestFitResidualThreshold = 1e-6;
+    internal const double BestFitResidualThreshold = 1e-3;
 
     /// <summary>Rotation symmetry sample count for curve analysis.</summary>
     internal const int RotationSymmetrySampleCount = 32;
