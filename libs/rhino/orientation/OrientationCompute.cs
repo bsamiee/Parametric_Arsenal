@@ -95,7 +95,7 @@ internal static class OrientationCompute {
                                     return normalized
                                         ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axisCandidate, pt))
                                         : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
-                                }))(  )
+                                }))()
                                 : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
                         : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
                 }))(),
@@ -199,25 +199,25 @@ internal static class OrientationCompute {
     internal static Result<Orientation.RelativeOrientationResult> ComputeRelative(GeometryBase geometryA, GeometryBase geometryB, double symmetryTolerance, double angleTolerance) =>
         (OrientationConfig.PlaneExtractors.TryGetValue(geometryA.GetType(), out OrientationConfig.PlaneExtractorMetadata? extA),
          OrientationConfig.PlaneExtractors.TryGetValue(geometryB.GetType(), out OrientationConfig.PlaneExtractorMetadata? extB)) switch {
-            (true, true) when extA!.Extractor(geometryA) is Result<Plane> ra && extB!.Extractor(geometryB) is Result<Plane> rb =>
-                (ra, rb) switch {
-                    ({ IsSuccess: true }, { IsSuccess: true }) =>
-                        (ra.Value, rb.Value) is (Plane pa, Plane pb)
-                            ? Transform.PlaneToPlane(pa, pb) is Transform xform
-                              && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist
-                              && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
-                                ? ResultFactory.Create(value: new Orientation.RelativeOrientationResult(
-                                    RelativeTransform: xform,
-                                    Twist: twist,
-                                    Tilt: tilt,
-                                    Symmetry: ClassifySymmetry(geometryA: geometryA, geometryB: geometryB, pa: pa, pb: pb, tolerance: symmetryTolerance, angleTol: angleTolerance),
-                                    Relationship: ClassifyRelationship(pa: pa, pb: pb, angleTolerance: angleTolerance)))
-                                : ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed)
-                            : ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed),
-                    _ => ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed),
-                },
-            _ => ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.UnsupportedOrientationType),
-        };
+             (true, true) when extA!.Extractor(geometryA) is Result<Plane> ra && extB!.Extractor(geometryB) is Result<Plane> rb =>
+                 (ra, rb) switch {
+                     ( { IsSuccess: true }, { IsSuccess: true }) =>
+                         (ra.Value, rb.Value) is (Plane pa, Plane pb)
+                             ? Transform.PlaneToPlane(pa, pb) is Transform xform
+                               && Vector3d.VectorAngle(pa.XAxis, pb.XAxis) is double twist
+                               && Vector3d.VectorAngle(pa.ZAxis, pb.ZAxis) is double tilt
+                                 ? ResultFactory.Create(value: new Orientation.RelativeOrientationResult(
+                                     RelativeTransform: xform,
+                                     Twist: twist,
+                                     Tilt: tilt,
+                                     Symmetry: ClassifySymmetry(geometryA: geometryA, geometryB: geometryB, pa: pa, pb: pb, tolerance: symmetryTolerance, angleTol: angleTolerance),
+                                     Relationship: ClassifyRelationship(pa: pa, pb: pb, angleTolerance: angleTolerance)))
+                                 : ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed)
+                             : ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed),
+                     _ => ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.OrientationFailed),
+                 },
+             _ => ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.UnsupportedOrientationType),
+         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Orientation.SymmetryType ClassifySymmetry(GeometryBase geometryA, GeometryBase geometryB, Plane pa, Plane pb, double tolerance, double angleTol) =>
