@@ -264,8 +264,8 @@ internal static class FieldsCompute {
         Fields.InterpolationMode mode,
         Func<T, T, double, T> lerp) where T : struct =>
         mode switch {
-            Fields.NearestInterpolationMode => InterpolateNearest(query, field, grid),
-            Fields.TrilinearInterpolationMode => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+            Fields.NearestInterpolation => InterpolateNearest(query, field, grid),
+            Fields.TrilinearInterpolation => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {mode.GetType().Name}")),
         };
 
@@ -376,9 +376,9 @@ internal static class FieldsCompute {
                             .OnError(_ => InterpolateNearest(query: current + (stepSize * coeff * k), field: vectorField, grid: gridPoints))
                             .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
                         Vector3d delta = scheme switch {
-                            Fields.EulerIntegrationScheme => stepSize * k1,
-                            Fields.MidpointIntegrationScheme => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
-                            Fields.RungeKutta4IntegrationScheme => ((Func<Vector3d>)(() => {
+                            Fields.EulerIntegration => stepSize * k1,
+                            Fields.MidpointIntegration => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
+                            Fields.RungeKutta4Integration => ((Func<Vector3d>)(() => {
                                 Vector3d k2 = Interpolate(FieldsConfig.RK4HalfSteps[0], k1);
                                 Vector3d k3 = Interpolate(FieldsConfig.RK4HalfSteps[1], k2);
                                 Vector3d k4 = Interpolate(FieldsConfig.RK4HalfSteps[2], k3);

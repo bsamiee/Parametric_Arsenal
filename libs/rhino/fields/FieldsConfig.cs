@@ -6,18 +6,18 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants for fields operations.</summary>
+/// <summary>Configuration constants and unified metadata dispatch tables for field operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
-    internal sealed record DistanceFieldMetadata(
+    /// <summary>Unified operation metadata for all field operations.</summary>
+    internal sealed record FieldOperationMetadata(
         V ValidationMode,
         string OperationName,
         int BufferSize);
 
     /// <summary>Distance field configuration by geometry type.</summary>
-    internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
-        new Dictionary<Type, DistanceFieldMetadata> {
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> DistanceFields =
+        new Dictionary<Type, FieldOperationMetadata> {
             [typeof(Mesh)] = new(
                 ValidationMode: V.Standard | V.MeshSpecific,
                 OperationName: "Fields.MeshDistance",
@@ -36,52 +36,67 @@ internal static class FieldsConfig {
                 BufferSize: 4096),
         }.ToFrozenDictionary();
 
-    /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
+    /// <summary>Field operation metadata by operation type.</summary>
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> Operations =
+        new Dictionary<Type, FieldOperationMetadata> {
+            [typeof(Fields.GradientFieldOp)] = new(V.None, "Fields.Gradient", 4096),
+            [typeof(Fields.CurlFieldOp)] = new(V.None, "Fields.Curl", 4096),
+            [typeof(Fields.DivergenceFieldOp)] = new(V.None, "Fields.Divergence", 4096),
+            [typeof(Fields.LaplacianFieldOp)] = new(V.None, "Fields.Laplacian", 4096),
+            [typeof(Fields.VectorPotentialFieldOp)] = new(V.None, "Fields.VectorPotential", 8192),
+            [typeof(Fields.HessianFieldOp)] = new(V.None, "Fields.Hessian", 8192),
+            [typeof(Fields.DirectionalDerivativeFieldOp)] = new(V.None, "Fields.DirectionalDerivative", 2048),
+            [typeof(Fields.FieldMagnitudeOp)] = new(V.None, "Fields.Magnitude", 2048),
+            [typeof(Fields.NormalizeFieldOp)] = new(V.None, "Fields.Normalize", 2048),
+            [typeof(Fields.ScalarVectorProductOp)] = new(V.None, "Fields.ScalarVectorProduct", 2048),
+            [typeof(Fields.VectorDotProductOp)] = new(V.None, "Fields.VectorDotProduct", 2048),
+            [typeof(Fields.InterpolateScalarOp)] = new(V.None, "Fields.InterpolateScalar", 256),
+            [typeof(Fields.InterpolateVectorOp)] = new(V.None, "Fields.InterpolateVector", 256),
+            [typeof(Fields.StreamlinesOp)] = new(V.None, "Fields.Streamlines", 4096),
+            [typeof(Fields.IsosurfacesOp)] = new(V.None, "Fields.Isosurfaces", 8192),
+            [typeof(Fields.CriticalPointsOp)] = new(V.None, "Fields.CriticalPoints", 4096),
+            [typeof(Fields.StatisticsOp)] = new(V.None, "Fields.Statistics", 1024),
+        }.ToFrozenDictionary();
+
+    /// <summary>Field sampling resolution limits.</summary>
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
     internal const int MaxResolution = 256;
 
-    /// <summary>Integration step size parameters: default 0.01, range [√ε, 1.0].</summary>
+    /// <summary>Integration step size parameters.</summary>
     internal const double DefaultStepSize = 0.01;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
     internal const double MaxStepSize = 1.0;
 
-    /// <summary>Streamline integration limits: max 10000 steps, min field magnitude 1e-10.</summary>
+    /// <summary>Streamline integration limits.</summary>
     internal const int MaxStreamlineSteps = 10000;
     internal const double MinFieldMagnitude = 1e-10;
 
-    /// <summary>Runge-Kutta integration weights and step coefficients.</summary>
+    /// <summary>Runge-Kutta integration coefficients.</summary>
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
     internal const double RK2HalfStep = 0.5;
 
-    /// <summary>Vector potential solver: 512 max iterations, √ε convergence tolerance.</summary>
+    /// <summary>Vector potential solver parameters.</summary>
     internal const int VectorPotentialIterations = 512;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
 
-    /// <summary>Detection thresholds for spatial queries and eigenvalue classification.</summary>
+    /// <summary>Detection thresholds.</summary>
     internal const int FieldRTreeThreshold = 100;
     internal const double InsideOutsideToleranceMultiplier = 10.0;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 
+    /// <summary>Marching cubes edge vertex pairs.</summary>
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 0),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 4),
-        (0, 4),
-        (1, 5),
-        (2, 6),
-        (3, 7),
+        (0, 1), (1, 2), (2, 3), (3, 0),
+        (4, 5), (5, 6), (6, 7), (7, 4),
+        (0, 4), (1, 5), (2, 6), (3, 7),
     ];
 
+    /// <summary>Marching cubes lookup table.</summary>
     internal static readonly int[][] MarchingCubesTable = GenerateMarchingCubesTable();
 
     private static int[][] GenerateMarchingCubesTable() {
