@@ -29,9 +29,9 @@ internal static class TransformConfig {
             [typeof(PointCloud)] = V.Standard,
         }.ToFrozenDictionary();
 
-    /// <summary>Minimum scale factor to prevent singularity (1e-6).</summary>
+    /// <summary>Minimum scale factor to prevent singularity.</summary>
     internal const double MinScaleFactor = 1e-6;
-    /// <summary>Maximum scale factor to prevent overflow (1e6).</summary>
+    /// <summary>Maximum scale factor to prevent overflow.</summary>
     internal const double MaxScaleFactor = 1e6;
 
     /// <summary>Maximum array count to prevent memory exhaustion.</summary>
@@ -40,9 +40,9 @@ internal static class TransformConfig {
     /// <summary>Angular tolerance multiplier for vector parallelism checks.</summary>
     internal const double AngleToleranceMultiplier = 10.0;
 
-    /// <summary>Maximum twist angle in radians (10 full rotations).</summary>
+    /// <summary>Maximum twist angle in radians.</summary>
     internal const double MaxTwistAngle = RhinoMath.TwoPI * 10.0;
-    /// <summary>Maximum bend angle in radians (full circle).</summary>
+    /// <summary>Maximum bend angle in radians.</summary>
     internal const double MaxBendAngle = RhinoMath.TwoPI;
 
     /// <summary>Default tolerance for morph operations.</summary>
