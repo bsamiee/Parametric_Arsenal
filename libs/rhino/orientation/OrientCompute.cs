@@ -197,13 +197,12 @@ internal static class OrientCompute {
             return metadata.Extractor(geometry);
         }
 
-        foreach (KeyValuePair<Type, OrientConfig.PlaneExtractorMetadata> entry in OrientConfig.PlaneExtractors) {
-            if (entry.Key.IsAssignableFrom(runtimeType)) {
-                return entry.Value.Extractor(geometry);
-            }
-        }
+        Result<Plane>? result = OrientConfig.PlaneExtractors
+            .Where(entry => entry.Key.IsAssignableFrom(runtimeType))
+            .Select(entry => entry.Value.Extractor(geometry))
+            .FirstOrDefault();
 
-        return ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(runtimeType.Name));
+        return result ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(runtimeType.Name));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
