@@ -22,28 +22,20 @@ internal static class ExtractionCompute {
             .Bind(validBrep => ExtractFeaturesInternal(brep: validBrep, context: context));
 
     [Pure]
-    private static Result<Extraction.FeatureResult> ExtractFeaturesInternal(Brep brep, IGeometryContext context) {
-        BrepEdge[] validEdges = [.. brep.Edges.Where(e => e.EdgeCurve is not null),];
-        Extraction.Feature[] edgeFeatures = new Extraction.Feature[validEdges.Length];
-
-        for (int i = 0; i < validEdges.Length; i++) {
-            edgeFeatures[i] = ClassifyEdge(edge: validEdges[i], brep: brep);
-        }
-
-        Extraction.Feature[] holeFeatures = [.. brep.Loops
-            .Where(l => l.LoopType == BrepLoopType.Inner)
+    private static Result<Extraction.FeatureResult> ExtractFeaturesInternal(Brep brep, IGeometryContext context) =>
+        ([.. brep.Edges.Where(static e => e.EdgeCurve is not null).Select(edge => ClassifyEdge(edge: edge, brep: brep)),
+          .. brep.Loops
+            .Where(static l => l.LoopType == BrepLoopType.Inner)
             .Select(l => ClassifyHole(loop: l, context: context))
-            .Where(h => h.IsHole)
-            .Select(h => new Extraction.Feature(Kind: Extraction.FeatureKind.Hole, Parameter: h.Area)),
-        ];
-
-        Extraction.Feature[] allFeatures = [.. edgeFeatures.Concat(holeFeatures),];
-        double confidence = brep.Edges.Count > 0
-            ? 1.0 - (brep.Edges.Count(e => e.EdgeCurve is null) / (double)brep.Edges.Count)
-            : 0.0;
-
-        return ResultFactory.Create(value: new Extraction.FeatureResult(Features: allFeatures, Confidence: confidence));
-    }
+            .Where(static h => h.IsHole)
+            .Select(static h => new Extraction.Feature(Kind: Extraction.FeatureKind.Hole, Parameter: h.Area)),
+        ]) is Extraction.Feature[] allFeatures
+            ? ResultFactory.Create(value: new Extraction.FeatureResult(
+                Features: allFeatures,
+                Confidence: brep.Edges.Count > 0
+                    ? 1.0 - (brep.Edges.Count(static e => e.EdgeCurve is null) / (double)brep.Edges.Count)
+                    : 0.0))
+            : ResultFactory.Create<Extraction.FeatureResult>(error: E.Geometry.FeatureExtractionFailed);
 
     [Pure]
     private static Extraction.Feature ClassifyEdge(BrepEdge edge, Brep brep) =>
@@ -88,20 +80,15 @@ internal static class ExtractionCompute {
         BrepEdge edge,
         Vector3d normal0,
         Vector3d normal1,
-        double mean) {
-        double dihedralAngle = Math.Abs(Vector3d.VectorAngle(normal0, normal1));
-        bool isSmooth = dihedralAngle > ExtractionConfig.SmoothEdgeAngleThreshold;
-        bool isSharp = dihedralAngle < ExtractionConfig.SharpEdgeAngleThreshold;
-        bool isChamfer = !isSmooth && !isSharp;
-        double length = edge.EdgeCurve.GetLength();
-
-        return (isChamfer, isSmooth, isSharp, mean > RhinoMath.ZeroTolerance) switch {
-            (true, _, _, _) => new Extraction.Feature(Kind: Extraction.FeatureKind.Chamfer, Parameter: dihedralAngle),
-            (_, true, _, true) => new Extraction.Feature(Kind: Extraction.FeatureKind.VariableRadiusFillet, Parameter: 1.0 / mean),
-            (_, _, true, _) => new Extraction.Feature(Kind: Extraction.FeatureKind.GenericEdge, Parameter: length),
-            _ => new Extraction.Feature(Kind: Extraction.FeatureKind.GenericEdge, Parameter: length),
-        };
-    }
+        double mean) =>
+        (Math.Abs(Vector3d.VectorAngle(normal0, normal1)), edge.EdgeCurve.GetLength()) is (double dihedralAngle, double length)
+            ? (dihedralAngle > ExtractionConfig.SmoothEdgeAngleThreshold, dihedralAngle < ExtractionConfig.SharpEdgeAngleThreshold, mean > RhinoMath.ZeroTolerance) switch {
+                (false, false, _) => new Extraction.Feature(Kind: Extraction.FeatureKind.Chamfer, Parameter: dihedralAngle),
+                (true, _, true) => new Extraction.Feature(Kind: Extraction.FeatureKind.VariableRadiusFillet, Parameter: 1.0 / mean),
+                (_, true, _) => new Extraction.Feature(Kind: Extraction.FeatureKind.GenericEdge, Parameter: length),
+                _ => new Extraction.Feature(Kind: Extraction.FeatureKind.GenericEdge, Parameter: length),
+            }
+            : new Extraction.Feature(Kind: Extraction.FeatureKind.GenericEdge, Parameter: 0.0);
 
     [Pure]
     private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop, IGeometryContext context) {
@@ -215,86 +202,61 @@ internal static class ExtractionCompute {
                             };
 
     [Pure]
-    private static (bool Success, Extraction.PrimitiveKind Kind, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) {
-        (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
-        int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
-        int maxSamples = sampleCount * sampleCount;
-        SurfaceCurvature[] curvatures = new SurfaceCurvature[maxSamples];
-        int validCount = 0;
-        double sampleDivisor = sampleCount > 1 ? sampleCount - 1.0 : 1.0;
-
-        for (int i = 0; i < sampleCount; i++) {
-            double u = uDomain.ParameterAt(sampleCount > 1 ? i / sampleDivisor : 0.5);
-            for (int j = 0; j < sampleCount; j++) {
-                double v = vDomain.ParameterAt(sampleCount > 1 ? j / sampleDivisor : 0.5);
-                SurfaceCurvature? curv = surface.CurvatureAt(u: u, v: v);
-                if (curv is not null) {
-                    curvatures[validCount++] = curv;
-                }
-            }
-        }
-
-        return validCount < ExtractionConfig.MinCurvatureSamples
-            ? (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, [])
-            : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures.AsSpan(0, validCount).ToArray());
-    }
+    private static (bool Success, Extraction.PrimitiveKind Kind, Plane Frame, double[] Params) ClassifySurfaceByCurvature(Surface surface) =>
+        ((int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount)), surface.Domain(0), surface.Domain(1)) is (int sampleCount, Interval uDomain, Interval vDomain)
+            && (sampleCount > 1 ? sampleCount - 1.0 : 1.0) is double sampleDivisor
+            && (from int i in Enumerable.Range(0, sampleCount)
+                from int j in Enumerable.Range(0, sampleCount)
+                let u = uDomain.ParameterAt(sampleCount > 1 ? i / sampleDivisor : 0.5)
+                let v = vDomain.ParameterAt(sampleCount > 1 ? j / sampleDivisor : 0.5)
+                let curv = surface.CurvatureAt(u: u, v: v)
+                where curv is not null
+                select curv).ToArray() is SurfaceCurvature[] curvatures
+                ? curvatures.Length < ExtractionConfig.MinCurvatureSamples
+                    ? (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, [])
+                    : TestPrincipalCurvatureConstancy(surface: surface, curvatures: curvatures)
+                : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []);
 
     [Pure]
     private static (bool Success, Extraction.PrimitiveKind Kind, Plane Frame, double[] Params) TestPrincipalCurvatureConstancy(
         Surface surface,
-        SurfaceCurvature[] curvatures) {
-        int n = curvatures.Length;
-        double gaussianSum = 0.0;
-        double gaussianSumSq = 0.0;
-        double meanSum = 0.0;
-        double meanSumSq = 0.0;
-        for (int i = 0; i < n; i++) {
-            double g = curvatures[i].Gaussian;
-            double m = curvatures[i].Mean;
-            gaussianSum += g;
-            gaussianSumSq += g * g;
-            meanSum += m;
-            meanSumSq += m * m;
-        }
-        double gaussianMean = gaussianSum / n;
-        double meanMean = meanSum / n;
-        double gaussianVar = (gaussianSumSq / n) - (gaussianMean * gaussianMean);
-        double meanVar = (meanSumSq / n) - (meanMean * meanMean);
-        bool gaussianConstant = Math.Abs(gaussianMean) > RhinoMath.ZeroTolerance
-            ? gaussianVar / (gaussianMean * gaussianMean) < ExtractionConfig.CurvatureVariationThreshold
-            : gaussianVar < RhinoMath.SqrtEpsilon;
-        bool meanConstant = Math.Abs(meanMean) > RhinoMath.ZeroTolerance
-            ? meanVar / (meanMean * meanMean) < ExtractionConfig.CurvatureVariationThreshold
-            : meanVar < RhinoMath.SqrtEpsilon;
-
-        return (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon) switch {
-            (true, _, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
-                ? (true, Extraction.PrimitiveKind.Plane, frame, [frame.OriginX, frame.OriginY, frame.OriginZ,])
-                : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
-            (false, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
-                ? (true, Extraction.PrimitiveKind.Cylinder, frame, [1.0 / (2.0 * meanMean), surface.GetBoundingBox(accurate: false).Diagonal.Length,])
-                : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
-            (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
-                ? (true, Extraction.PrimitiveKind.Sphere, frame, [1.0 / Math.Sqrt(gaussianMean),])
-                : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
-            _ => (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
-        };
-    }
+        SurfaceCurvature[] curvatures) =>
+        curvatures.Aggregate(
+            seed: (GaussianSum: 0.0, GaussianSumSq: 0.0, MeanSum: 0.0, MeanSumSq: 0.0),
+            func: (acc, c) => (acc.GaussianSum + c.Gaussian, acc.GaussianSumSq + (c.Gaussian * c.Gaussian), acc.MeanSum + c.Mean, acc.MeanSumSq + (c.Mean * c.Mean))) is (double gSum, double gSumSq, double mSum, double mSumSq)
+            && curvatures.Length is int n && n > 0
+            && (gSum / n, mSum / n) is (double gaussianMean, double meanMean)
+            && ((gSumSq / n) - (gaussianMean * gaussianMean), (mSumSq / n) - (meanMean * meanMean)) is (double gaussianVar, double meanVar)
+            && (Math.Abs(gaussianMean) > RhinoMath.ZeroTolerance
+                ? gaussianVar / (gaussianMean * gaussianMean) < ExtractionConfig.CurvatureVariationThreshold
+                : gaussianVar < RhinoMath.SqrtEpsilon) is bool gaussianConstant
+            && (Math.Abs(meanMean) > RhinoMath.ZeroTolerance
+                ? meanVar / (meanMean * meanMean) < ExtractionConfig.CurvatureVariationThreshold
+                : meanVar < RhinoMath.SqrtEpsilon) is bool meanConstant
+                ? (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon) switch {
+                    (true, _, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                        ? (true, Extraction.PrimitiveKind.Plane, frame, [frame.OriginX, frame.OriginY, frame.OriginZ,])
+                        : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
+                    (false, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                        ? (true, Extraction.PrimitiveKind.Cylinder, frame, [1.0 / (2.0 * meanMean), surface.GetBoundingBox(accurate: false).Diagonal.Length,])
+                        : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
+                    (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+                        ? (true, Extraction.PrimitiveKind.Sphere, frame, [1.0 / Math.Sqrt(gaussianMean),])
+                        : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
+                    _ => (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []),
+                }
+                : (false, Extraction.PrimitiveKind.Unknown, Plane.WorldXY, []);
 
     [Pure]
-    private static double ComputeSurfaceResidual(Surface surface, Extraction.PrimitiveKind kind, Plane frame, double[] pars) {
-        (Interval uDomain, Interval vDomain) = (surface.Domain(0), surface.Domain(1));
-        int samplesPerDir = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount));
-        int totalSamples = samplesPerDir * samplesPerDir;
-        double sumSquaredDistances = 0.0;
-        double sampleDivisor = samplesPerDir > 1 ? samplesPerDir - 1.0 : 1.0;
-
-        for (int i = 0; i < samplesPerDir; i++) {
-            double u = uDomain.ParameterAt(i / sampleDivisor);
-            for (int j = 0; j < samplesPerDir; j++) {
-                double v = vDomain.ParameterAt(j / sampleDivisor);
-                Point3d surfacePoint = surface.PointAt(u: u, v: v);
-                Point3d primitivePoint = kind switch {
+    private static double ComputeSurfaceResidual(Surface surface, Extraction.PrimitiveKind kind, Plane frame, double[] pars) =>
+        ((int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount)), surface.Domain(0), surface.Domain(1)) is (int samplesPerDir, Interval uDomain, Interval vDomain)
+            && (samplesPerDir > 1 ? samplesPerDir - 1.0 : 1.0) is double sampleDivisor
+            ? Math.Sqrt((from int i in Enumerable.Range(0, samplesPerDir)
+                from int j in Enumerable.Range(0, samplesPerDir)
+                let u = uDomain.ParameterAt(i / sampleDivisor)
+                let v = vDomain.ParameterAt(j / sampleDivisor)
+                let surfacePoint = surface.PointAt(u: u, v: v)
+                let primitivePoint = kind switch {
                     Extraction.PrimitiveKind.Plane when pars.Length >= 3 => frame.ClosestPoint(surfacePoint),
                     Extraction.PrimitiveKind.Cylinder when pars.Length >= 2 => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: frame, radius: pars[0]),
                     Extraction.PrimitiveKind.Sphere when pars.Length >= 1 => ProjectPointToSphere(point: surfacePoint, center: frame.Origin, radius: pars[0]),
@@ -302,57 +264,51 @@ internal static class ExtractionCompute {
                     Extraction.PrimitiveKind.Torus when pars.Length >= 2 => ProjectPointToTorus(point: surfacePoint, torusPlane: frame, majorRadius: pars[0], minorRadius: pars[1]),
                     Extraction.PrimitiveKind.Extrusion when pars.Length >= 1 => frame.ClosestPoint(surfacePoint),
                     _ => surfacePoint,
-                };
-                sumSquaredDistances += surfacePoint.DistanceToSquared(primitivePoint);
-            }
-        }
-
-        return Math.Sqrt(sumSquaredDistances / totalSamples);
-    }
+                }
+                select surfacePoint.DistanceToSquared(primitivePoint)).Sum() / (samplesPerDir * samplesPerDir))
+            : 0.0;
 
     [Pure]
-    private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) {
-        Vector3d toPoint = point - cylinderPlane.Origin;
-        double axisProjection = Vector3d.Multiply(toPoint, cylinderPlane.ZAxis);
-        Point3d axisPoint = cylinderPlane.Origin + (cylinderPlane.ZAxis * axisProjection);
-        Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * radius)
-            : axisPoint + (cylinderPlane.XAxis * radius);
-    }
+    private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) =>
+        (point - cylinderPlane.Origin, Vector3d.Multiply(point - cylinderPlane.Origin, cylinderPlane.ZAxis)) is (Vector3d toPoint, double axisProjection)
+            && (cylinderPlane.Origin + (cylinderPlane.ZAxis * axisProjection)) is Point3d axisPoint
+            && (point - axisPoint) is Vector3d radialDir
+            ? radialDir.Length > RhinoMath.ZeroTolerance
+                ? axisPoint + ((radialDir / radialDir.Length) * radius)
+                : axisPoint + (cylinderPlane.XAxis * radius)
+            : point;
 
     [Pure]
-    private static Point3d ProjectPointToSphere(Point3d point, Point3d center, double radius) {
-        Vector3d dir = point - center;
-        return dir.Length > RhinoMath.ZeroTolerance
-            ? center + ((dir / dir.Length) * radius)
-            : center + new Vector3d(radius, 0, 0);
-    }
+    private static Point3d ProjectPointToSphere(Point3d point, Point3d center, double radius) =>
+        (point - center) is Vector3d dir
+            ? dir.Length > RhinoMath.ZeroTolerance
+                ? center + ((dir / dir.Length) * radius)
+                : center + new Vector3d(radius, 0, 0)
+            : point;
 
     [Pure]
-    private static Point3d ProjectPointToCone(Point3d point, Plane conePlane, double baseRadius, double height) {
-        Vector3d toPoint = point - conePlane.Origin;
-        double axisProjection = Vector3d.Multiply(toPoint, conePlane.ZAxis);
-        double coneRadius = baseRadius * (1.0 - (axisProjection / height));
-        Point3d axisPoint = conePlane.Origin + (conePlane.ZAxis * axisProjection);
-        Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
-            : axisPoint + (conePlane.XAxis * coneRadius);
-    }
+    private static Point3d ProjectPointToCone(Point3d point, Plane conePlane, double baseRadius, double height) =>
+        (point - conePlane.Origin, Vector3d.Multiply(point - conePlane.Origin, conePlane.ZAxis)) is (Vector3d toPoint, double axisProjection)
+            && (baseRadius * (1.0 - (axisProjection / height))) is double coneRadius
+            && (conePlane.Origin + (conePlane.ZAxis * axisProjection)) is Point3d axisPoint
+            && (point - axisPoint) is Vector3d radialDir
+            ? radialDir.Length > RhinoMath.ZeroTolerance
+                ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
+                : axisPoint + (conePlane.XAxis * coneRadius)
+            : point;
 
     [Pure]
-    private static Point3d ProjectPointToTorus(Point3d point, Plane torusPlane, double majorRadius, double minorRadius) {
-        Vector3d toPoint = point - torusPlane.Origin;
-        Vector3d radialInPlane = toPoint - (torusPlane.ZAxis * Vector3d.Multiply(toPoint, torusPlane.ZAxis));
-        Point3d majorCirclePoint = radialInPlane.Length > RhinoMath.ZeroTolerance
-            ? torusPlane.Origin + ((radialInPlane / radialInPlane.Length) * majorRadius)
-            : torusPlane.Origin + (torusPlane.XAxis * majorRadius);
-        Vector3d toMinor = point - majorCirclePoint;
-        return toMinor.Length > RhinoMath.ZeroTolerance
-            ? majorCirclePoint + ((toMinor / toMinor.Length) * minorRadius)
-            : majorCirclePoint + (torusPlane.ZAxis * minorRadius);
-    }
+    private static Point3d ProjectPointToTorus(Point3d point, Plane torusPlane, double majorRadius, double minorRadius) =>
+        (point - torusPlane.Origin) is Vector3d toPoint
+            && (toPoint - (torusPlane.ZAxis * Vector3d.Multiply(toPoint, torusPlane.ZAxis))) is Vector3d radialInPlane
+            && (radialInPlane.Length > RhinoMath.ZeroTolerance
+                ? torusPlane.Origin + ((radialInPlane / radialInPlane.Length) * majorRadius)
+                : torusPlane.Origin + (torusPlane.XAxis * majorRadius)) is Point3d majorCirclePoint
+            && (point - majorCirclePoint) is Vector3d toMinor
+            ? toMinor.Length > RhinoMath.ZeroTolerance
+                ? majorCirclePoint + ((toMinor / toMinor.Length) * minorRadius)
+                : majorCirclePoint + (torusPlane.ZAxis * minorRadius)
+            : point;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // Pattern Extraction
@@ -392,10 +348,11 @@ internal static class ExtractionCompute {
                         ? scaleResult
                         : ResultFactory.Create<Extraction.PatternResult>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
 
-    private static Result<Extraction.PatternResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
-        Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
-        double meanDistance = centers.Average(c => centroid.DistanceTo(c));
-        return meanDistance > context.AbsoluteTolerance
+    [Pure]
+    private static Result<Extraction.PatternResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) =>
+        new Point3d(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z)) is Point3d centroid
+            && centers.Average(c => centroid.DistanceTo(c)) is double meanDistance
+            && meanDistance > context.AbsoluteTolerance
             && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
             && (centers.Select(c => c - centroid).ToArray(), ComputeBestFitPlaneNormal(points: centers, centroid: centroid)) is (Vector3d[] radii, Vector3d normal)
             && Enumerable.Range(0, radii.Length - 1).Select(i => Vector3d.VectorAngle(radii[i], radii[i + 1])).ToArray() is double[] angles
@@ -406,26 +363,20 @@ internal static class ExtractionCompute {
                     SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid),
                     Confidence: 0.9))
                 : ResultFactory.Create<Extraction.PatternResult>(error: E.Geometry.NoPatternDetected);
-    }
 
     [Pure]
     private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) =>
         Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
             : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? ((Func<Vector3d>)(() => {
-                    Vector3d v1n = v1 / v1.Length;
-                    for (int i = 1; i < points.Length; i++) {
-                        Vector3d v2 = points[i] - centroid;
-                        if (v2.Length > RhinoMath.ZeroTolerance) {
-                            Vector3d normal = Vector3d.CrossProduct(v1n, v2);
-                            if (normal.Length > RhinoMath.ZeroTolerance) {
-                                return normal / normal.Length;
-                            }
-                        }
-                    }
-                    return Vector3d.ZAxis;
-                }))()
+                && (v1 / v1.Length) is Vector3d v1n
+                ? points.Skip(1)
+                    .Select(p => p - centroid)
+                    .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
+                    .Select(v2 => Vector3d.CrossProduct(v1n, v2))
+                    .FirstOrDefault(normal => normal.Length > RhinoMath.ZeroTolerance) is Vector3d found && found.Length > RhinoMath.ZeroTolerance
+                        ? found / found.Length
+                        : Vector3d.ZAxis
                 : Vector3d.ZAxis;
 
     private static Result<Extraction.PatternResult> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
@@ -439,45 +390,30 @@ internal static class ExtractionCompute {
                     Confidence: 0.9))
                 : ResultFactory.Create<Extraction.PatternResult>(error: E.Geometry.NoPatternDetected);
 
-    private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) {
-        Vector3d u = candidates.Length > 0 ? candidates[0] : Vector3d.Zero;
-        double minLengthSq = u.SquareLength;
-        for (int i = 1; i < candidates.Length; i++) {
-            double lengthSq = candidates[i].SquareLength;
-            if (lengthSq < minLengthSq) {
-                u = candidates[i];
-                minLengthSq = lengthSq;
-            }
-        }
+    [Pure]
+    private static (Vector3d U, Vector3d V, bool Success) FindGridBasis(Vector3d[] candidates, IGeometryContext context) =>
+        candidates.Length == 0
+            ? (Vector3d.Zero, Vector3d.Zero, false)
+            : candidates.Aggregate(
+                seed: (U: candidates[0], MinSq: candidates[0].SquareLength),
+                func: (acc, c) => c.SquareLength < acc.MinSq ? (c, c.SquareLength) : acc).U is Vector3d u
+                && u.Length is double uLen && uLen > context.AbsoluteTolerance
+                && (u / uLen) is Vector3d uDir
+                && candidates.FirstOrDefault(c => c.Length > context.AbsoluteTolerance
+                    && Math.Abs(Vector3d.Multiply(uDir, c / c.Length)) < ExtractionConfig.GridOrthogonalityThreshold) is Vector3d v
+                && v.Length > context.AbsoluteTolerance
+                    ? (u, v, true)
+                    : (Vector3d.Zero, Vector3d.Zero, false);
 
-        double uLen = u.Length;
-        if (uLen <= context.AbsoluteTolerance) {
-            return (Vector3d.Zero, Vector3d.Zero, false);
-        }
-
-        Vector3d uDir = u / uLen;
-        for (int i = 0; i < candidates.Length; i++) {
-            Vector3d candidate = candidates[i];
-            double candidateLen = candidate.Length;
-            if (candidateLen > context.AbsoluteTolerance
-                && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
-                return (u, candidate, true);
-            }
-        }
-        return (Vector3d.Zero, Vector3d.Zero, false);
-    }
-
-    private static bool IsGridPoint(Vector3d vector, Vector3d u, Vector3d v, IGeometryContext context) {
-        double uLen = u.Length;
-        double vLen = v.Length;
-
-        return uLen > context.AbsoluteTolerance
+    [Pure]
+    private static bool IsGridPoint(Vector3d vector, Vector3d u, Vector3d v, IGeometryContext context) =>
+        u.Length is double uLen && v.Length is double vLen
+            && uLen > context.AbsoluteTolerance
             && vLen > context.AbsoluteTolerance
             && Vector3d.Multiply(vector, u) / (uLen * uLen) is double a
             && Vector3d.Multiply(vector, v) / (vLen * vLen) is double b
             && Math.Abs(a - Math.Round(a)) < ExtractionConfig.GridPointDeviationThreshold
             && Math.Abs(b - Math.Round(b)) < ExtractionConfig.GridPointDeviationThreshold;
-    }
 
     private static Result<Extraction.PatternResult> TryDetectScalingPattern(Point3d[] centers, IGeometryContext context) =>
         new Point3d(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z)) is Point3d centroid

@@ -40,7 +40,6 @@ internal static class ExtractionConfig {
     /// <summary>Geometry-specific validation mode overrides for point operations.</summary>
     internal static readonly FrozenDictionary<(Type Operation, Type Geometry), V> PointValidationOverrides =
         new Dictionary<(Type, Type), V> {
-            // Analytical
             [(typeof(Extraction.Analytical), typeof(Brep))] = V.Standard | V.MassProperties,
             [(typeof(Extraction.Analytical), typeof(Curve))] = V.Standard | V.AreaCentroid,
             [(typeof(Extraction.Analytical), typeof(Surface))] = V.Standard | V.AreaCentroid,

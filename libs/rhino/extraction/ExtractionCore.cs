@@ -392,15 +392,13 @@ internal static class ExtractionCore {
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExtractByContinuity(GeometryBase geometry, Continuity continuity) =>
         geometry is Curve curve
-            ? ResultFactory.Create<IReadOnlyList<Point3d>>(value: [.. ((Func<List<Point3d>>)(() => {
-                List<Point3d> discontinuities = [];
-                double parameter = curve.Domain.Min;
-                while (curve.GetNextDiscontinuity(continuity, parameter, curve.Domain.Max, out double next)) {
-                    discontinuities.Add(curve.PointAt(next));
-                    parameter = next;
-                }
-                return discontinuities;
-            }))(),])
+            ? ResultFactory.Create<IReadOnlyList<Point3d>>(value: [.. Enumerable.Range(0, 1000)
+                .Aggregate(
+                    seed: (Points: new List<Point3d>(), Parameter: curve.Domain.Min),
+                    func: (state, _) => curve.GetNextDiscontinuity(continuity, state.Parameter, curve.Domain.Max, out double next)
+                        ? (Points: [.. state.Points, curve.PointAt(next),], Parameter: next)
+                        : state)
+                .Points,])
             : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("ByContinuity requires curve"));
 
     // ═══════════════════════════════════════════════════════════════════════════════
