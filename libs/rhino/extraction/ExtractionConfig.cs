@@ -1,94 +1,111 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Consolidated configuration with FrozenDictionary validation metadata and threshold constants.</summary>
+/// <summary>Unified extraction configuration with consolidated FrozenDictionary dispatch and thresholds.</summary>
+[Pure]
 internal static class ExtractionConfig {
-    /// <summary>Operation metadata record containing validation modes.</summary>
-    internal readonly record struct OperationMetadata(string OperationName, V ValidationModes);
+    /// <summary>Operation type discriminators for unified dispatch table.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1008:Enums should have zero value", Justification = "Non-zero values align with semantic operation discriminants")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "Byte storage matches Semantic struct pattern and reduces memory")]
+    internal enum OpType : byte {
+        Analytical = 1, Extremal = 2, Greville = 3, Inflection = 4, Quadrant = 5,
+        EdgeMidpoints = 6, FaceCentroids = 7, OsculatingFrames = 8,
+        DivideByCount = 10, DivideByLength = 11, DirectionalExtrema = 12, Discontinuities = 13,
+        Boundary = 20, IsocurveU = 21, IsocurveV = 22, IsocurveUV = 23, FeatureEdges = 24,
+        UniformIsocurves = 30, DirectionalIsocurves = 31, ParameterIsocurves = 32,
+        DirectionalParameterIsocurves = 33, CustomFeatureEdges = 34,
+    }
 
-    /// <summary>Point operation validation metadata registry.</summary>
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> _pointValidationEntries =
-        new Dictionary<(byte, Type), V> {
-            [(1, typeof(Brep))] = V.Standard | V.MassProperties,
-            [(1, typeof(Curve))] = V.Standard | V.AreaCentroid,
-            [(1, typeof(Surface))] = V.Standard | V.AreaCentroid,
-            [(1, typeof(Mesh))] = V.Standard | V.MassProperties,
-            [(1, typeof(Extrusion))] = V.Standard | V.MassProperties,
-            [(1, typeof(SubD))] = V.Standard | V.Topology,
-            [(2, typeof(GeometryBase))] = V.BoundingBox,
-            [(3, typeof(GeometryBase))] = V.Standard,
-            [(4, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(5, typeof(Curve))] = V.Tolerance,
-            [(6, typeof(Brep))] = V.Standard | V.Topology,
-            [(6, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(6, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(7, typeof(Brep))] = V.Standard | V.Topology,
-            [(7, typeof(Mesh))] = V.Standard | V.MeshSpecific,
-            [(8, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(10, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(10, typeof(Surface))] = V.Standard,
-            [(10, typeof(Brep))] = V.Standard | V.Topology,
-            [(10, typeof(Extrusion))] = V.Standard | V.Topology,
-            [(10, typeof(SubD))] = V.Standard | V.Topology,
-            [(11, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(11, typeof(Surface))] = V.Standard | V.AreaCentroid,
-            [(11, typeof(Brep))] = V.Standard | V.Topology,
-            [(12, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(12, typeof(Surface))] = V.Standard | V.AreaCentroid,
-            [(12, typeof(Brep))] = V.Standard | V.Topology,
-            [(13, typeof(Curve))] = V.Standard | V.Degeneracy,
-            [(13, typeof(PolyCurve))] = V.Standard | V.Degeneracy,
+    /// <summary>Unified operation metadata: (Type, OpType) → (ValidationMode, OperationName).</summary>
+    internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), (V ValidationMode, string OpName)> OperationMeta =
+        new Dictionary<(Type, OpType), (V, string)> {
+            [(typeof(Brep), OpType.Analytical)] = (V.Standard | V.MassProperties, "Extract.Points.Analytical.Brep"),
+            [(typeof(Curve), OpType.Analytical)] = (V.Standard | V.AreaCentroid, "Extract.Points.Analytical.Curve"),
+            [(typeof(Surface), OpType.Analytical)] = (V.Standard | V.AreaCentroid, "Extract.Points.Analytical.Surface"),
+            [(typeof(Mesh), OpType.Analytical)] = (V.Standard | V.MassProperties, "Extract.Points.Analytical.Mesh"),
+            [(typeof(Extrusion), OpType.Analytical)] = (V.Standard | V.MassProperties, "Extract.Points.Analytical.Extrusion"),
+            [(typeof(SubD), OpType.Analytical)] = (V.Standard | V.Topology, "Extract.Points.Analytical.SubD"),
+            [(typeof(GeometryBase), OpType.Extremal)] = (V.BoundingBox, "Extract.Points.Extremal"),
+            [(typeof(GeometryBase), OpType.Greville)] = (V.Standard, "Extract.Points.Greville"),
+            [(typeof(Curve), OpType.Inflection)] = (V.Standard | V.Degeneracy, "Extract.Points.Inflection"),
+            [(typeof(Curve), OpType.Quadrant)] = (V.Tolerance, "Extract.Points.Quadrant"),
+            [(typeof(Brep), OpType.EdgeMidpoints)] = (V.Standard | V.Topology, "Extract.Points.EdgeMidpoints.Brep"),
+            [(typeof(Mesh), OpType.EdgeMidpoints)] = (V.Standard | V.MeshSpecific, "Extract.Points.EdgeMidpoints.Mesh"),
+            [(typeof(Curve), OpType.EdgeMidpoints)] = (V.Standard | V.Degeneracy, "Extract.Points.EdgeMidpoints.Curve"),
+            [(typeof(Brep), OpType.FaceCentroids)] = (V.Standard | V.Topology, "Extract.Points.FaceCentroids.Brep"),
+            [(typeof(Mesh), OpType.FaceCentroids)] = (V.Standard | V.MeshSpecific, "Extract.Points.FaceCentroids.Mesh"),
+            [(typeof(Curve), OpType.OsculatingFrames)] = (V.Standard | V.Degeneracy, "Extract.Points.OsculatingFrames"),
+            [(typeof(Curve), OpType.DivideByCount)] = (V.Standard | V.Degeneracy, "Extract.Points.DivideByCount.Curve"),
+            [(typeof(Surface), OpType.DivideByCount)] = (V.Standard, "Extract.Points.DivideByCount.Surface"),
+            [(typeof(Brep), OpType.DivideByCount)] = (V.Standard | V.Topology, "Extract.Points.DivideByCount.Brep"),
+            [(typeof(Extrusion), OpType.DivideByCount)] = (V.Standard | V.Topology, "Extract.Points.DivideByCount.Extrusion"),
+            [(typeof(SubD), OpType.DivideByCount)] = (V.Standard | V.Topology, "Extract.Points.DivideByCount.SubD"),
+            [(typeof(Curve), OpType.DivideByLength)] = (V.Standard | V.Degeneracy, "Extract.Points.DivideByLength.Curve"),
+            [(typeof(Surface), OpType.DivideByLength)] = (V.Standard | V.AreaCentroid, "Extract.Points.DivideByLength.Surface"),
+            [(typeof(Brep), OpType.DivideByLength)] = (V.Standard | V.Topology, "Extract.Points.DivideByLength.Brep"),
+            [(typeof(Curve), OpType.DirectionalExtrema)] = (V.Standard | V.Degeneracy, "Extract.Points.DirectionalExtrema.Curve"),
+            [(typeof(Surface), OpType.DirectionalExtrema)] = (V.Standard | V.AreaCentroid, "Extract.Points.DirectionalExtrema.Surface"),
+            [(typeof(Brep), OpType.DirectionalExtrema)] = (V.Standard | V.Topology, "Extract.Points.DirectionalExtrema.Brep"),
+            [(typeof(Curve), OpType.Discontinuities)] = (V.Standard | V.Degeneracy, "Extract.Points.Discontinuities.Curve"),
+            [(typeof(PolyCurve), OpType.Discontinuities)] = (V.Standard | V.Degeneracy, "Extract.Points.Discontinuities.PolyCurve"),
+            [(typeof(Surface), OpType.Boundary)] = (V.Standard | V.UVDomain, "Extract.Curves.Boundary.Surface"),
+            [(typeof(NurbsSurface), OpType.Boundary)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.Boundary.NurbsSurface"),
+            [(typeof(Brep), OpType.Boundary)] = (V.Standard | V.Topology, "Extract.Curves.Boundary.Brep"),
+            [(typeof(Surface), OpType.IsocurveU)] = (V.Standard | V.UVDomain, "Extract.Curves.IsocurveU.Surface"),
+            [(typeof(NurbsSurface), OpType.IsocurveU)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.IsocurveU.NurbsSurface"),
+            [(typeof(Surface), OpType.IsocurveV)] = (V.Standard | V.UVDomain, "Extract.Curves.IsocurveV.Surface"),
+            [(typeof(NurbsSurface), OpType.IsocurveV)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.IsocurveV.NurbsSurface"),
+            [(typeof(Surface), OpType.IsocurveUV)] = (V.Standard | V.UVDomain, "Extract.Curves.IsocurveUV.Surface"),
+            [(typeof(NurbsSurface), OpType.IsocurveUV)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.IsocurveUV.NurbsSurface"),
+            [(typeof(Brep), OpType.FeatureEdges)] = (V.Standard | V.Topology, "Extract.Curves.FeatureEdges.Brep"),
+            [(typeof(Surface), OpType.UniformIsocurves)] = (V.Standard | V.UVDomain, "Extract.Curves.UniformIsocurves.Surface"),
+            [(typeof(NurbsSurface), OpType.UniformIsocurves)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.UniformIsocurves.NurbsSurface"),
+            [(typeof(Surface), OpType.DirectionalIsocurves)] = (V.Standard | V.UVDomain, "Extract.Curves.DirectionalIsocurves.Surface"),
+            [(typeof(NurbsSurface), OpType.DirectionalIsocurves)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.DirectionalIsocurves.NurbsSurface"),
+            [(typeof(Surface), OpType.ParameterIsocurves)] = (V.Standard | V.UVDomain, "Extract.Curves.ParameterIsocurves.Surface"),
+            [(typeof(NurbsSurface), OpType.ParameterIsocurves)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.ParameterIsocurves.NurbsSurface"),
+            [(typeof(Surface), OpType.DirectionalParameterIsocurves)] = (V.Standard | V.UVDomain, "Extract.Curves.DirectionalParameterIsocurves.Surface"),
+            [(typeof(NurbsSurface), OpType.DirectionalParameterIsocurves)] = (V.Standard | V.NurbsGeometry | V.UVDomain, "Extract.Curves.DirectionalParameterIsocurves.NurbsSurface"),
+            [(typeof(Brep), OpType.CustomFeatureEdges)] = (V.Standard | V.Topology, "Extract.Curves.CustomFeatureEdges.Brep"),
         }.ToFrozenDictionary();
 
-    /// <summary>Curve operation validation metadata registry.</summary>
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> _curveValidationEntries =
-        new Dictionary<(byte, Type), V> {
-            [(20, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(20, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(20, typeof(Brep))] = V.Standard | V.Topology,
-            [(21, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(21, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(22, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(22, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(23, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(23, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(24, typeof(Brep))] = V.Standard | V.Topology,
-            [(30, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(30, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(31, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(31, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(32, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(32, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(33, typeof(Surface))] = V.Standard | V.UVDomain,
-            [(33, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
-            [(34, typeof(Brep))] = V.Standard | V.Topology,
-        }.ToFrozenDictionary();
-
-    /// <summary>Resolve point validation mode with fallback to base type matching.</summary>
-    internal static V ResolvePointValidation(byte kind, Type geometryType) =>
-        _pointValidationEntries.TryGetValue((kind, geometryType), out V exact)
+    /// <summary>Resolve operation metadata with fallback to assignable types.</summary>
+    internal static (V ValidationMode, string OpName) GetOperationMeta(OpType operation, Type geometryType) =>
+        OperationMeta.TryGetValue((geometryType, operation), out (V, string) exact)
             ? exact
-            : _pointValidationEntries
-                .Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
+            : OperationMeta
+                .Where(kv => kv.Key.Operation == operation && kv.Key.GeometryType.IsAssignableFrom(geometryType))
                 .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
                 .Select(kv => kv.Value)
-                .DefaultIfEmpty(V.Standard)
+                .DefaultIfEmpty((V.Standard, $"Extract.{operation}"))
                 .First();
 
-    /// <summary>Resolve curve validation mode with fallback to base type matching.</summary>
-    internal static V ResolveCurveValidation(byte kind, Type geometryType) =>
-        _curveValidationEntries.TryGetValue((kind, geometryType), out V exact)
-            ? exact
-            : _curveValidationEntries
-                .Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
-                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
-                .Select(kv => kv.Value)
-                .DefaultIfEmpty(V.Standard)
-                .First();
+    /// <summary>Feature type identifiers.</summary>
+    internal const byte FeatureTypeFillet = 0;
+    internal const byte FeatureTypeChamfer = 1;
+    internal const byte FeatureTypeHole = 2;
+    internal const byte FeatureTypeGenericEdge = 3;
+    internal const byte FeatureTypeVariableRadiusFillet = 4;
+
+    /// <summary>Primitive type identifiers.</summary>
+    internal const byte PrimitiveTypePlane = 0;
+    internal const byte PrimitiveTypeCylinder = 1;
+    internal const byte PrimitiveTypeSphere = 2;
+    internal const byte PrimitiveTypeUnknown = 3;
+    internal const byte PrimitiveTypeCone = 4;
+    internal const byte PrimitiveTypeTorus = 5;
+    internal const byte PrimitiveTypeExtrusion = 6;
+
+    /// <summary>Pattern type identifiers.</summary>
+    internal const byte PatternTypeLinear = 0;
+    internal const byte PatternTypeRadial = 1;
+    internal const byte PatternTypeGrid = 2;
+    internal const byte PatternTypeScaling = 3;
 
     /// <summary>Fillet detection thresholds.</summary>
     internal const double FilletCurvatureVariationThreshold = 0.15;
@@ -121,26 +138,4 @@ internal static class ExtractionConfig {
     internal const int MaxIsocurveCount = 100;
     internal const int DefaultOsculatingFrameCount = 10;
     internal const int BoundaryIsocurveCount = 5;
-
-    /// <summary>Feature type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
-    internal const byte FeatureTypeFillet = 0;
-    internal const byte FeatureTypeChamfer = 1;
-    internal const byte FeatureTypeHole = 2;
-    internal const byte FeatureTypeGenericEdge = 3;
-    internal const byte FeatureTypeVariableRadiusFillet = 4;
-
-    /// <summary>Primitive type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
-    internal const byte PrimitiveTypePlane = 0;
-    internal const byte PrimitiveTypeCylinder = 1;
-    internal const byte PrimitiveTypeSphere = 2;
-    internal const byte PrimitiveTypeUnknown = 3;
-    internal const byte PrimitiveTypeCone = 4;
-    internal const byte PrimitiveTypeTorus = 5;
-    internal const byte PrimitiveTypeExtrusion = 6;
-
-    /// <summary>Pattern type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
-    internal const byte PatternTypeLinear = 0;
-    internal const byte PatternTypeRadial = 1;
-    internal const byte PatternTypeGrid = 2;
-    internal const byte PatternTypeScaling = 3;
 }
