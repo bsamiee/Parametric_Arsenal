@@ -83,7 +83,32 @@ internal static class SpatialCore {
             (_, null) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDirection.WithContext("Request cannot be null")),
             (_, { Direction.Length: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.ZeroLengthDirection),
             (_, { MaxDistance: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must be positive")),
-            _ => RunProximityFieldComputation(geometry: geometry, request: request, context: context),
+            _ => ((Func<Result<Spatial.ProximityFieldResult[]>>)(() => {
+                using RTree tree = new();
+                BoundingBox bounds = BoundingBox.Empty;
+                Point3d[] centers = new Point3d[geometry.Length];
+                for (int i = 0; i < geometry.Length; i++) {
+                    BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
+                    _ = tree.Insert(bbox, i);
+                    bounds.Union(bbox);
+                    centers[i] = bbox.Center;
+                }
+                Vector3d dir = request.Direction / request.Direction.Length;
+                Point3d origin = bounds.Center;
+                BoundingBox searchBox = new(origin - new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance), origin + new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance));
+                List<Spatial.ProximityFieldResult> results = [];
+                void CollectResults(object? sender, RTreeEventArgs args) {
+                    Vector3d toGeom = centers[args.Id] - origin;
+                    double dist = toGeom.Length;
+                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
+                    double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
+                    if (weightedDist <= request.MaxDistance) {
+                        results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
+                    }
+                }
+                _ = tree.Search(searchBox, CollectResults);
+                return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance),]);
+            }))(),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -96,9 +121,27 @@ internal static class SpatialCore {
                 _ => null,
             };
             int bufferSize = request.BufferSize ?? defaultBuffer;
-            return queryShape is null
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"))
-                : ExecuteRangeSearch(tree: tree, queryShape: queryShape, bufferSize: bufferSize);
+            if (queryShape is null) {
+                return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"));
+            }
+            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+            int count = 0;
+            try {
+                void Collect(object? sender, RTreeEventArgs args) {
+                    if (count >= buffer.Length) {
+                        return;
+                    }
+                    buffer[count++] = args.Id;
+                }
+                _ = queryShape switch {
+                    Sphere sphere => tree.Search(sphere, Collect),
+                    BoundingBox box => tree.Search(box, Collect),
+                    _ => false,
+                };
+                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+            } finally {
+                ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
+            }
         }
 
         return UnifiedOperation.Apply(
@@ -119,8 +162,12 @@ internal static class SpatialCore {
                 null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed.WithContext("Query cannot be null")),
                 Spatial.KNearestProximity { Count: <= 0 } => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
                 Spatial.DistanceLimitedProximity { Distance: <= 0.0 } => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
-                Spatial.KNearestProximity k => ExecuteKNearestSearch(source: input, needles: k.Needles, count: k.Count, kNearest: kNearest),
-                Spatial.DistanceLimitedProximity d => ExecuteDistanceLimitedSearch(source: input, needles: d.Needles, distance: d.Distance, distLimited: distLimited),
+                Spatial.KNearestProximity k => kNearest(input, k.Needles, k.Count).ToArray() is int[][] results
+                    ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
+                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
+                Spatial.DistanceLimitedProximity d => distLimited(input, d.Needles, d.Distance).ToArray() is int[][] results
+                    ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
+                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed.WithContext($"Unsupported query: {request.Query.GetType().Name}")),
             };
         }
@@ -143,7 +190,21 @@ internal static class SpatialCore {
             using RTree tree2 = BuildMeshTree(request.Second);
             double tolerance = context.AbsoluteTolerance + request.AdditionalTolerance;
             int bufferSize = request.BufferSize ?? SpatialConfig.LargeBufferSize;
-            return ExecuteOverlapSearch(tree1: tree1, tree2: tree2, tolerance: tolerance, bufferSize: bufferSize);
+            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+            int count = 0;
+            try {
+                void CollectOverlaps(object? sender, RTreeEventArgs args) {
+                    if (count + 1 < buffer.Length) {
+                        buffer[count++] = args.Id;
+                        buffer[count++] = args.IdB;
+                    }
+                }
+                return RTree.SearchOverlaps(tree1, tree2, tolerance, CollectOverlaps)
+                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
+                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
+            } finally {
+                ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
+            }
         }
 
         return UnifiedOperation.Apply(
@@ -155,37 +216,6 @@ internal static class SpatialCore {
                 OperationName = SpatialConfig.OperationNames.MeshOverlap,
                 EnableDiagnostics = false,
             });
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<Spatial.ProximityFieldResult[]> RunProximityFieldComputation(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) {
-        using RTree tree = new();
-        BoundingBox bounds = BoundingBox.Empty;
-        Point3d[] centers = new Point3d[geometry.Length];
-        for (int i = 0; i < geometry.Length; i++) {
-            BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
-            _ = tree.Insert(bbox, i);
-            bounds.Union(bbox);
-            centers[i] = bbox.Center;
-        }
-
-        Vector3d dir = request.Direction / request.Direction.Length;
-        Point3d origin = bounds.Center;
-        BoundingBox searchBox = new(origin - new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance), origin + new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance));
-        List<Spatial.ProximityFieldResult> results = [];
-
-        void CollectResults(object? sender, RTreeEventArgs args) {
-            Vector3d toGeom = centers[args.Id] - origin;
-            double dist = toGeom.Length;
-            double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-            double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-            if (weightedDist <= request.MaxDistance) {
-                results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
-            }
-        }
-
-        _ = tree.Search(searchBox, CollectResults);
-        return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance),]);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -207,60 +237,5 @@ internal static class SpatialCore {
             _ = tree.Insert(geometries[i].GetBoundingBox(accurate: true), i);
         }
         return tree;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteRangeSearch(RTree tree, object queryShape, int bufferSize) {
-        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-        int count = 0;
-        try {
-            void Collect(object? sender, RTreeEventArgs args) {
-                if (count >= buffer.Length) {
-                    return;
-                }
-                buffer[count++] = args.Id;
-            }
-
-            _ = queryShape switch {
-                Sphere sphere => tree.Search(sphere, Collect),
-                BoundingBox box => tree.Search(box, Collect),
-                _ => false,
-            };
-            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
-        } finally {
-            ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteKNearestSearch<T>(T source, Point3d[] needles, int count, Func<T, Point3d[], int, IEnumerable<int[]>> kNearest) where T : notnull =>
-        kNearest(source, needles, count).ToArray() is int[][] results
-            ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteDistanceLimitedSearch<T>(T source, Point3d[] needles, double distance, Func<T, Point3d[], double, IEnumerable<int[]>> distLimited) where T : notnull =>
-        distLimited(source, needles, distance).ToArray() is int[][] results
-            ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
-            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> ExecuteOverlapSearch(RTree tree1, RTree tree2, double tolerance, int bufferSize) {
-        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-        int count = 0;
-        try {
-            void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                if (count + 1 < buffer.Length) {
-                    buffer[count++] = args.Id;
-                    buffer[count++] = args.IdB;
-                }
-            }
-
-            return RTree.SearchOverlaps(tree1, tree2, tolerance, CollectOverlaps)
-                ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
-        } finally {
-            ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
-        }
     }
 }
