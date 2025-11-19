@@ -54,20 +54,10 @@ public static class Intersection {
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
     }
 
-    /// <summary>Intersection type classification discriminating tangent, transverse, and unknown intersections.</summary>
-    public enum IntersectionType {
-        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
-        Tangent = 0,
-        /// <summary>Transverse intersection with significant angular separation.</summary>
-        Transverse = 1,
-        /// <summary>Unknown classification when insufficient data available.</summary>
-        Unknown = 2,
-    }
-
     /// <summary>Result of intersection classification analysis.</summary>
     [DebuggerDisplay("Type={Type}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
     public sealed record ClassificationResult(
-        IntersectionType Type,
+        byte Type,
         double[] ApproachAngles,
         bool IsGrazing,
         double BlendScore);
