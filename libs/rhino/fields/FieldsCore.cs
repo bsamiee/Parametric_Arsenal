@@ -1,11 +1,13 @@
 using System.Buffers;
 using System.Collections.Frozen;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
@@ -32,16 +34,39 @@ internal static class FieldsCore {
                     Metadata: entry.Value))
             .ToFrozenDictionary();
 
-    [Pure]
-    internal static Result<(Point3d[] Grid, double[] Distances)> DistanceField(
-        GeometryBase geometry,
-        Fields.FieldSampling sampling,
-        IGeometryContext context) =>
-        geometry is null
-            ? ResultFactory.Create<(Point3d[], double[])>(
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<TResult> Execute<TResult>(Fields.FieldOperation operation, IGeometryContext context) =>
+        operation switch {
+            Fields.DistanceFieldRequest req => ExecuteDistanceField(req, context).Map(r => (TResult)(object)r),
+            Fields.GradientFieldRequest req => ExecuteGradientField(req, context).Map(r => (TResult)(object)r),
+            Fields.CurlFieldRequest req => ExecuteCurlField(req).Map(r => (TResult)(object)r),
+            Fields.DivergenceFieldRequest req => ExecuteDivergenceField(req).Map(r => (TResult)(object)r),
+            Fields.LaplacianFieldRequest req => ExecuteLaplacianField(req).Map(r => (TResult)(object)r),
+            Fields.VectorPotentialFieldRequest req => ExecuteVectorPotentialField(req).Map(r => (TResult)(object)r),
+            Fields.InterpolateScalarRequest req => ExecuteInterpolateScalar(req).Map(r => (TResult)(object)r),
+            Fields.InterpolateVectorRequest req => ExecuteInterpolateVector(req).Map(r => (TResult)(object)r),
+            Fields.StreamlinesRequest req => ExecuteStreamlines(req, context).Map(r => (TResult)(object)r),
+            Fields.IsosurfacesRequest req => ExecuteIsosurfaces(req).Map(r => (TResult)(object)r),
+            Fields.HessianFieldRequest req => ExecuteHessianField(req).Map(r => (TResult)(object)r),
+            Fields.DirectionalDerivativeFieldRequest req => ExecuteDirectionalDerivativeField(req).Map(r => (TResult)(object)r),
+            Fields.FieldMagnitudeRequest req => ExecuteFieldMagnitude(req).Map(r => (TResult)(object)r),
+            Fields.NormalizeFieldRequest req => ExecuteNormalizeField(req).Map(r => (TResult)(object)r),
+            Fields.ScalarVectorProductRequest req => ExecuteScalarVectorProduct(req).Map(r => (TResult)(object)r),
+            Fields.VectorDotProductRequest req => ExecuteVectorDotProduct(req).Map(r => (TResult)(object)r),
+            Fields.CriticalPointsRequest req => ExecuteCriticalPoints(req).Map(r => (TResult)(object)r),
+            Fields.ComputeStatisticsRequest req => ExecuteComputeStatistics(req).Map(r => (TResult)(object)r),
+            _ => throw new UnreachableException($"Unhandled field operation: {operation.GetType().Name}"),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteDistanceField(Fields.DistanceFieldRequest request, IGeometryContext context) {
+        GeometryBase geometry = request.Geometry;
+        Fields.FieldSampling sampling = request.Sampling ?? Fields.FieldSampling.Default;
+        return geometry is null
+            ? ResultFactory.Create<Fields.ScalarFieldSamples>(
                 error: E.Geometry.UnsupportedAnalysis.WithContext("Geometry cannot be null"))
             : !DistanceDispatch.TryGetValue(geometry.GetType(), out DistanceOperationMetadata? metadata)
-                ? ResultFactory.Create<(Point3d[], double[])>(
+                ? ResultFactory.Create<Fields.ScalarFieldSamples>(
                     error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometry.GetType().Name}"))
                 : UnifiedOperation.Apply(
                     input: geometry,
@@ -51,7 +76,183 @@ internal static class FieldsCore {
                         ValidationMode = metadata.Metadata.ValidationMode,
                         OperationName = metadata.Metadata.OperationName,
                         EnableDiagnostics = false,
-                    }).Map(results => results[0]);
+                    }).Map(results => new Fields.ScalarFieldSamples(Grid: results[0].Item1, Values: results[0].Item2));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.VectorFieldSamples> ExecuteGradientField(Fields.GradientFieldRequest request, IGeometryContext context) {
+        GeometryBase geometry = request.Geometry;
+        Fields.FieldSampling sampling = request.Sampling ?? Fields.FieldSampling.Default;
+        return ExecuteDistanceField(new Fields.DistanceFieldRequest(Geometry: geometry, Sampling: sampling), context)
+            .Bind(distanceField => {
+                BoundingBox bounds = sampling.Bounds ?? geometry.GetBoundingBox(accurate: true);
+                Vector3d gridDelta = (bounds.Max - bounds.Min) / (sampling.Resolution - 1);
+                return FieldsCompute.ComputeGradient(
+                    distances: distanceField.Values,
+                    grid: distanceField.Grid,
+                    resolution: sampling.Resolution,
+                    gridDelta: gridDelta)
+                .Map(r => new Fields.VectorFieldSamples(Grid: r.Grid, Vectors: r.Gradients));
+            });
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.VectorFieldSamples> ExecuteCurlField(Fields.CurlFieldRequest request) =>
+        ResultFactory.Create(value: (request.VectorField, request.GridPoints))
+            .Ensure(v => v.VectorField.Length == v.GridPoints.Length, error: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeCurl(vectorField: request.VectorField, grid: request.GridPoints, resolution: request.Sampling.Resolution, gridDelta: (request.Bounds.Max - request.Bounds.Min) / (request.Sampling.Resolution - 1)))
+            .Map(r => new Fields.VectorFieldSamples(Grid: r.Grid, Vectors: r.Curl));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteDivergenceField(Fields.DivergenceFieldRequest request) =>
+        ResultFactory.Create(value: (request.VectorField, request.GridPoints))
+            .Ensure(v => v.VectorField.Length == v.GridPoints.Length, error: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeDivergence(vectorField: request.VectorField, grid: request.GridPoints, resolution: request.Sampling.Resolution, gridDelta: (request.Bounds.Max - request.Bounds.Min) / (request.Sampling.Resolution - 1)))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.Divergence));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteLaplacianField(Fields.LaplacianFieldRequest request) =>
+        ResultFactory.Create(value: (request.ScalarField, request.GridPoints))
+            .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeLaplacian(scalarField: request.ScalarField, grid: request.GridPoints, resolution: request.Sampling.Resolution, gridDelta: (request.Bounds.Max - request.Bounds.Min) / (request.Sampling.Resolution - 1)))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.Laplacian));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.VectorFieldSamples> ExecuteVectorPotentialField(Fields.VectorPotentialFieldRequest request) =>
+        (request.MagneticField.Length == request.GridPoints.Length) switch {
+            false => ResultFactory.Create<Fields.VectorFieldSamples>(
+                error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Magnetic field length must match grid points")),
+            true => FieldsCompute.ComputeVectorPotential(
+                vectorField: request.MagneticField,
+                grid: request.GridPoints,
+                resolution: request.Sampling.Resolution,
+                gridDelta: (request.Bounds.Max - request.Bounds.Min) / (request.Sampling.Resolution - 1))
+            .Map(r => new Fields.VectorFieldSamples(Grid: r.Grid, Vectors: r.Potential)),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<double> ExecuteInterpolateScalar(Fields.InterpolateScalarRequest request) {
+        Fields.InterpolationMode mode = (RhinoMath.EpsilonEquals(request.Bounds.Max.X, request.Bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(request.Bounds.Max.Y, request.Bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(request.Bounds.Max.Z, request.Bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon))
+            ? new Fields.NearestInterpolationMode()
+            : request.Mode ?? new Fields.TrilinearInterpolationMode();
+        return ResultFactory.Create(value: (request.ScalarField, request.GridPoints, mode))
+            .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
+            .Bind(state => FieldsCompute.InterpolateScalar(query: request.Query, scalarField: state.ScalarField, grid: state.GridPoints, resolution: request.Sampling.Resolution, bounds: request.Bounds, mode: state.mode));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Vector3d> ExecuteInterpolateVector(Fields.InterpolateVectorRequest request) {
+        Fields.InterpolationMode mode = (RhinoMath.EpsilonEquals(request.Bounds.Max.X, request.Bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(request.Bounds.Max.Y, request.Bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(request.Bounds.Max.Z, request.Bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon))
+            ? new Fields.NearestInterpolationMode()
+            : request.Mode ?? new Fields.TrilinearInterpolationMode();
+        return ResultFactory.Create(value: (request.VectorField, request.GridPoints, mode))
+            .Ensure(state => state.VectorField.Length == state.GridPoints.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
+            .Bind(state => FieldsCompute.InterpolateVector(query: request.Query, vectorField: state.VectorField, grid: state.GridPoints, resolution: request.Sampling.Resolution, bounds: request.Bounds, mode: state.mode));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Curve[]> ExecuteStreamlines(Fields.StreamlinesRequest request, IGeometryContext context) =>
+        ResultFactory.Create(value: (request.VectorField, request.GridPoints, request.Seeds))
+            .Ensure(state => state.VectorField.Length == state.GridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points"))
+            .Ensure(state => state.Seeds.Length > 0, error: E.Geometry.InvalidStreamlineSeeds)
+            .Bind(state => FieldsCompute.IntegrateStreamlines(
+                vectorField: state.VectorField,
+                gridPoints: state.GridPoints,
+                seeds: state.Seeds,
+                stepSize: request.Sampling.StepSize,
+                scheme: request.Scheme ?? new Fields.RungeKutta4IntegrationScheme(),
+                resolution: request.Sampling.Resolution,
+                bounds: request.Bounds,
+                context: context));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Mesh[]> ExecuteIsosurfaces(Fields.IsosurfacesRequest request) =>
+        ResultFactory.Create(value: (request.ScalarField, request.GridPoints, request.Isovalues))
+            .Ensure(state => state.ScalarField.Length == state.GridPoints.Length, error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points"))
+            .Ensure(state => state.Isovalues.Length > 0, error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required"))
+            .Ensure(v => v.Isovalues.All(value => RhinoMath.IsValidDouble(value)), error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles"))
+            .Bind(state => FieldsCompute.ExtractIsosurfaces(
+                scalarField: state.ScalarField,
+                gridPoints: state.GridPoints,
+                resolution: request.Sampling.Resolution,
+                isovalues: state.Isovalues));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.HessianFieldSamples> ExecuteHessianField(Fields.HessianFieldRequest request) =>
+        ResultFactory.Create(value: (request.ScalarField, request.GridPoints))
+            .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points"))
+            .Bind(state => FieldsCompute.ComputeHessian(
+                scalarField: state.ScalarField,
+                grid: state.GridPoints,
+                resolution: request.Sampling.Resolution,
+                gridDelta: (request.Bounds.Max - request.Bounds.Min) / (request.Sampling.Resolution - 1)))
+            .Map(r => new Fields.HessianFieldSamples(Grid: r.Grid, Hessian: r.Hessian));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteDirectionalDerivativeField(Fields.DirectionalDerivativeFieldRequest request) =>
+        ResultFactory.Create(value: (request.GradientField, request.GridPoints))
+            .Ensure(v => v.GradientField.Length == v.GridPoints.Length, error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeDirectionalDerivative(gradientField: request.GradientField, grid: request.GridPoints, direction: request.Direction))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.DirectionalDerivatives));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteFieldMagnitude(Fields.FieldMagnitudeRequest request) =>
+        ResultFactory.Create(value: (request.VectorField, request.GridPoints))
+            .Ensure(v => v.VectorField.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ComputeFieldMagnitude(vectorField: request.VectorField, grid: request.GridPoints))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.Magnitudes));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.VectorFieldSamples> ExecuteNormalizeField(Fields.NormalizeFieldRequest request) =>
+        ResultFactory.Create(value: (request.VectorField, request.GridPoints))
+            .Ensure(v => v.VectorField.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.NormalizeVectorField(vectorField: request.VectorField, grid: request.GridPoints))
+            .Map(r => new Fields.VectorFieldSamples(Grid: r.Grid, Vectors: r.Normalized));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteScalarVectorProduct(Fields.ScalarVectorProductRequest request) =>
+        ResultFactory.Create(value: (request.ScalarField, request.VectorField, request.GridPoints))
+            .Ensure(v => v.ScalarField.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"))
+            .Ensure(v => v.VectorField.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.ScalarVectorProduct(scalarField: request.ScalarField, vectorField: request.VectorField, grid: request.GridPoints, component: request.Component))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.Product));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.ScalarFieldSamples> ExecuteVectorDotProduct(Fields.VectorDotProductRequest request) =>
+        ResultFactory.Create(value: (request.VectorField1, request.VectorField2, request.GridPoints))
+            .Ensure(v => v.VectorField1.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"))
+            .Ensure(v => v.VectorField2.Length == v.GridPoints.Length, error: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"))
+            .Bind(_ => FieldsCompute.VectorDotProduct(vectorField1: request.VectorField1, vectorField2: request.VectorField2, grid: request.GridPoints))
+            .Map(r => new Fields.ScalarFieldSamples(Grid: r.Grid, Values: r.DotProduct));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
+    private static Result<Fields.CriticalPoint[]> ExecuteCriticalPoints(Fields.CriticalPointsRequest request) =>
+        (request.Hessian.GetLength(0) == 3
+            && request.Hessian.GetLength(1) == 3
+            && Enumerable.Range(0, 3).All(row =>
+                Enumerable.Range(0, 3).All(col =>
+                    request.Hessian[row, col] is not null
+                    && request.Hessian[row, col].Length == request.GridPoints.Length))) switch {
+                        false => ResultFactory.Create<Fields.CriticalPoint[]>(
+                            error: E.Geometry.InvalidCriticalPointDetection.WithContext("Hessian must be a 3x3 tensor with entries per grid sample")),
+                        true => FieldsCompute.DetectCriticalPoints(
+                            scalarField: request.ScalarField,
+                            gradientField: request.GradientField,
+                            hessian: request.Hessian,
+                            grid: request.GridPoints,
+                            resolution: request.Sampling.Resolution),
+                    };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Fields.FieldStatistics> ExecuteComputeStatistics(Fields.ComputeStatisticsRequest request) =>
+        (request.ScalarField.Length == request.GridPoints.Length) switch {
+            false => ResultFactory.Create<Fields.FieldStatistics>(
+                error: E.Geometry.InvalidFieldStatistics.WithContext("Scalar field length must match grid points")),
+            true => FieldsCompute.ComputeFieldStatistics(
+                scalarField: request.ScalarField,
+                grid: request.GridPoints),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<(Point3d[], double[])> ExecuteDistanceField<T>(
@@ -85,7 +286,7 @@ internal static class FieldsCore {
                     Brep b => b.ClosestPoint(grid[i]),
                     Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
                     Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
-                    _ => grid[i],
+                    _ => throw new UnreachableException($"Unsupported geometry type: {typeof(T).Name}"),
                 };
                 double unsignedDist = grid[i].DistanceTo(closest);
                 bool inside = typed switch {
