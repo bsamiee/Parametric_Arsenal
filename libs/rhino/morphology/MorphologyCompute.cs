@@ -632,14 +632,19 @@ internal static class MorphologyCompute {
                     Mesh unwrapped = mesh.DuplicateMesh();
                     unwrapped.TextureCoordinates.Clear();
                     Vector3d axisUnit = axisVal / axisVal.Length;
+                    Vector3d perpVec = axisUnit.X * axisUnit.X > 0.5 ? Vector3d.YAxis : Vector3d.XAxis;
+                    Vector3d uBasis = Vector3d.CrossProduct(axisUnit, perpVec);
+                    bool __ = uBasis.Unitize();
+                    Vector3d vBasis = Vector3d.CrossProduct(axisUnit, uBasis);
                     for (int i = 0; i < unwrapped.Vertices.Count; i++) {
                         Point3d vertex = unwrapped.Vertices[i];
                         Vector3d toVertex = vertex - originVal;
                         double axisDistance = toVertex * axisUnit;
                         Vector3d radialVec = toVertex - (axisDistance * axisUnit);
-                        double u = Math.Atan2(radialVec * Vector3d.CrossProduct(axisUnit, Vector3d.XAxis), radialVec * Vector3d.CrossProduct(Vector3d.YAxis, axisUnit));
+                        double angle = Math.Atan2(radialVec * vBasis, radialVec * uBasis);
+                        double u = (angle + Math.PI) / RhinoMath.TwoPI;
                         double v = axisDistance;
-                        int _ = unwrapped.TextureCoordinates.Add((float)(u / RhinoMath.TwoPI), (float)v);
+                        int _ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
                     }
                     return unwrapped.TextureCoordinates.Count > 0
                         ? ResultFactory.Create(value: unwrapped)
