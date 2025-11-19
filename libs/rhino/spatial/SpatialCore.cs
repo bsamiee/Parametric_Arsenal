@@ -122,16 +122,15 @@ internal static class SpatialCore {
                 _ => null,
             };
             int bufferSize = request.BufferSize ?? defaultBuffer;
-            if (queryShape is null) {
-                return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"));
-            }
+            return queryShape is null
+                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"))
+                : ExecuteSearch();
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
             try {
                 void Collect(object? sender, RTreeEventArgs args) {
-                    if (count >= buffer.Length) {
-                        return;
-                    }
+                    _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
+                }
                     buffer[count++] = args.Id;
                 }
                 _ = queryShape switch {
@@ -195,10 +194,9 @@ internal static class SpatialCore {
             int count = 0;
             try {
                 void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                    if (count + 1 < buffer.Length) {
-                        buffer[count++] = args.Id;
-                        buffer[count++] = args.IdB;
-                    }
+                    _ = count + 1 < buffer.Length 
+                        ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
+                        : default;
                 }
                 return RTree.SearchOverlaps(tree1, tree2, tolerance, CollectOverlaps)
                     ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
