@@ -38,23 +38,22 @@ internal static class TopologyCore {
                     ]),
                 },
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
-                    (int Index, Curve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
+                    (int Index, LineCurve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
                         .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1)
                         .Select(i => {
                             IndexPair verts = mesh.TopologyEdges.GetTopologyVertices(i);
-                            Point3d p1 = mesh.TopologyVertices[verts.I];
-                            Point3d p2 = mesh.TopologyVertices[verts.J];
+                            (Point3d p1, Point3d p2) = (mesh.TopologyVertices[verts.I], mesh.TopologyVertices[verts.J]);
                             return (i, new LineCurve(p1, p2), p1.DistanceTo(p2));
                         }),
                     ];
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
                         new Topology.NakedEdgeData(
-                            EdgeCurves: [.. edges.Select(e => e.Curve),],
-                            EdgeIndices: [.. edges.Select(e => e.Index),],
-                            Valences: [.. edges.Select(_ => 1),],
+                            EdgeCurves: [.. edges.Select(static e => (Curve)e.Curve),],
+                            EdgeIndices: [.. edges.Select(static e => e.Index),],
+                            Valences: [.. edges.Select(static _ => 1),],
                             IsOrdered: orderLoops,
                             TotalEdgeCount: mesh.TopologyEdges.Count,
-                            TotalLength: edges.Sum(e => e.Length)),
+                            TotalLength: edges.Sum(static e => e.Length)),
                     ]);
                 }))(),
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
@@ -65,15 +64,15 @@ internal static class TopologyCore {
         return Execute(input: input, context: context, opType: TopologyConfig.OpType.BoundaryLoops,
             operation: g => ((Curve[])((object)g switch {
                 Brep brep => [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked).Select(i => brep.Edges[i].DuplicateCurve()),],
-                Mesh mesh => [.. (mesh.GetNakedEdges() is Polyline[] naked ? naked : []).Select(pl => pl.ToNurbsCurve()),],
+                Mesh mesh => [.. (mesh.GetNakedEdges() ?? []).Select(pl => pl.ToNurbsCurve()),],
                 _ => [],
             })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] nakedCurves => ((Func<Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(() => {
                     try {
-                        Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) is Curve[] j ? j : [];
+                        Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
                         return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
-                            Loops: [.. joined,],
+                            Loops: joined,
                             EdgeIndicesPerLoop: [.. joined.Select(static _ => (IReadOnlyList<int>)[]),],
                             LoopLengths: [.. joined.Select(static c => c.GetLength()),],
                             IsClosedPerLoop: [.. joined.Select(static c => c.IsClosed),],

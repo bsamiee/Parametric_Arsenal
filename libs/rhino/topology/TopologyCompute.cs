@@ -35,9 +35,7 @@ internal static class TopologyCompute {
                         ]
                         : [];
 
-                    int nakedEdgeCount = nakedEdges.Length;
                     int nonManifoldEdgeCount = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
-
                     IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = nakedEdges.Length < TopologyConfig.MaxEdgesForNearMissAnalysis
                         ? [.. (from i in Enumerable.Range(0, nakedEdges.Length)
                                from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
@@ -49,7 +47,7 @@ internal static class TopologyCompute {
                         ]
                         : [];
 
-                    IReadOnlyList<Topology.Strategy> repairs = (nakedEdgeCount, nonManifoldEdgeCount, nearMisses.Count) switch {
+                    IReadOnlyList<Topology.Strategy> repairs = (nakedEdges.Length, nonManifoldEdgeCount, nearMisses.Count) switch {
                         ( > 0, > 0, > 0) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.AggressiveJoin, Topology.Strategy.Combined,],
                         ( > 0, > 0, _) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.AggressiveJoin,],
                         ( > 0, _, > 0) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.Combined,],
@@ -87,33 +85,24 @@ internal static class TopologyCompute {
                             Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;
-                                const int maxIterations = TopologyConfig.MaxEdgesForNearMissAnalysis;
-                                for (int iteration = 0; iteration < maxIterations; iteration++) {
+                                for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
                                     int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
                                     bool joinedThisPass = false;
-                                    foreach (int i in Enumerable.Range(0, nakedEdgeIndices.Length)) {
-                                        foreach (int j in Enumerable.Range(i + 1, nakedEdgeIndices.Length - i - 1)) {
-                                            int idxA = nakedEdgeIndices[i];
-                                            int idxB = nakedEdgeIndices[j];
-                                            bool validIndices = idxA < copy.Edges.Count && idxB < copy.Edges.Count;
-                                            BrepEdge? eA = validIndices ? copy.Edges[idxA] : null;
-                                            BrepEdge? eB = validIndices ? copy.Edges[idxB] : null;
-                                            bool bothNaked = validIndices
-                                                && eA is not null && eB is not null
-                                                && eA.Valence == EdgeAdjacency.Naked
-                                                && eB.Valence == EdgeAdjacency.Naked;
+                                    for (int i = 0; i < nakedEdgeIndices.Length; i++) {
+                                        for (int j = i + 1; j < nakedEdgeIndices.Length; j++) {
+                                            (int idxA, int idxB) = (nakedEdgeIndices[i], nakedEdgeIndices[j]);
+                                            (bool validIndices, BrepEdge? eA, BrepEdge? eB) = idxA < copy.Edges.Count && idxB < copy.Edges.Count
+                                                ? (true, copy.Edges[idxA], copy.Edges[idxB])
+                                                : (false, null, null);
+                                            bool bothNaked = validIndices && eA is not null && eB is not null && eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked;
                                             double minDist = bothNaked
-                                                ? Math.Min(
-                                                    Math.Min(eA!.PointAtStart.DistanceTo(eB!.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
-                                                    Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd)))
+                                                ? new[] { eA!.PointAtStart.DistanceTo(eB!.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd), eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd), }.Min()
                                                 : double.MaxValue;
-                                            bool shouldJoin = bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false);
-                                            joinedThisPass = joinedThisPass || shouldJoin;
+                                            joinedThisPass = (bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)) || joinedThisPass;
                                         }
                                     }
                                     joinedAny = joinedAny || joinedThisPass;
-                                    bool shouldContinue = joinedThisPass;
-                                    if (!shouldContinue) { break; }
+                                    if (!joinedThisPass) { break; }
                                 }
                                 copy.Compact();
                                 return joinedAny;
