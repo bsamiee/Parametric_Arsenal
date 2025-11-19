@@ -286,7 +286,7 @@ internal static class FieldsCore {
                     Brep b => b.ClosestPoint(grid[i]),
                     Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
                     Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
-                    _ => throw new UnreachableException($"Unsupported geometry type: {typeof(T).Name}"),
+                    _ => throw new UnreachableException($"Unsupported geometry type: {typed.GetType().Name}"),
                 };
                 double unsignedDist = grid[i].DistanceTo(closest);
                 bool inside = typed switch {
