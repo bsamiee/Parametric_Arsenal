@@ -499,13 +499,25 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [
-                    (flags & MorphologyConfig.RepairFillHoles) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairFillHoles) : null,
-                    (flags & MorphologyConfig.RepairUnifyNormals) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairUnifyNormals) : null,
-                    (flags & MorphologyConfig.RepairCullDegenerateFaces) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairCullDegenerateFaces) : null,
-                    (flags & MorphologyConfig.RepairCompact) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairCompact) : null,
-                    (flags & MorphologyConfig.RepairWeld) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairWeld) : null,
+                List<MorphologyConfig.MorphologyOperationMetadata?> repairMetasList = [];
+                byte[] repairFlags = [
+                    MorphologyConfig.RepairFillHoles,
+                    MorphologyConfig.RepairUnifyNormals,
+                    MorphologyConfig.RepairCullDegenerateFaces,
+                    MorphologyConfig.RepairCompact,
+                    MorphologyConfig.RepairWeld,
                 ];
+                for (int i = 0; i < repairFlags.Length; i++) {
+                    byte flag = repairFlags[i];
+                    MorphologyConfig.MorphologyOperationMetadata? meta =
+                        (flags & flag) != 0
+                            ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)
+                            : null;
+                    if (meta is not null) {
+                        repairMetasList.Add(meta);
+                    }
+                }
+                MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [.. repairMetasList];
                 for (int i = 0; i < repairMetas.Length; i++) {
                     bool executed = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
                 }
