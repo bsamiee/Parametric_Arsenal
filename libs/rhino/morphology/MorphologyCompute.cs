@@ -23,20 +23,18 @@ internal static class MorphologyCompute {
             ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageControlPointMismatch.WithContext($"Original: {originalControlPoints.Length}, Deformed: {deformedControlPoints.Length}"))
             : originalControlPoints.Length < MorphologyConfig.MinCageControlPoints
                 ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.InsufficientCagePoints.WithContext($"Count: {originalControlPoints.Length}, Required: {MorphologyConfig.MinCageControlPoints}"))
-                : ((Func<Result<GeometryBase>>)(() => {
-                    BoundingBox cageBounds = new(originalControlPoints);
-                    return !RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance
-                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
-                        : geometry switch {
-                            Mesh m => (GeometryBase?)m.DuplicateMesh(),
-                            Brep b => (GeometryBase?)b.DuplicateBrep(),
-                            _ => null,
-                        } is not GeometryBase deformed
-                            ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext($"Type: {geometry.GetType().Name}"))
-                            : ApplyCageDeformation(deformed, cageBounds, deformedControlPoints)
-                                ? ResultFactory.Create(value: deformed)
-                                : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
-                }))();
+                : new BoundingBox(originalControlPoints) is BoundingBox cageBounds
+                    && (!RhinoMath.IsValidDouble(cageBounds.Volume) || cageBounds.Volume <= RhinoMath.ZeroTolerance)
+                    ? ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Cage bounding box has zero volume"))
+                    : geometry switch {
+                        Mesh m => (GeometryBase?)m.DuplicateMesh(),
+                        Brep b => (GeometryBase?)b.DuplicateBrep(),
+                        _ => null,
+                    } is not GeometryBase deformed
+                        ? ResultFactory.Create<GeometryBase>(error: E.Geometry.InvalidGeometryType.WithContext($"Type: {geometry.GetType().Name}"))
+                        : ApplyCageDeformation(deformed, cageBounds, deformedControlPoints)
+                            ? ResultFactory.Create(value: deformed)
+                            : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ApplyCageDeformation(GeometryBase geometry, BoundingBox cageBounds, Point3d[] deformedControlPoints) {

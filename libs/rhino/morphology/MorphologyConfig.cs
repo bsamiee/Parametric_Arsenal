@@ -114,7 +114,6 @@ internal static class MorphologyConfig {
     internal const double DefaultWeldTolerance = 0.01;
 
     /// <summary>Brep to mesh conversion configuration.</summary>
-    internal const double MaxAcceptableAspectRatio = 10.0;
     internal static readonly double IdealTriangleAngleRadians = RhinoMath.ToRadians(60.0);
 
     /// <summary>Mesh thickening configuration.</summary>

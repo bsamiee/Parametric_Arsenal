@@ -12,11 +12,11 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Mesh morphology operations: cage deformation, subdivision, smoothing, evolution.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
-    /// <summary>Polymorphic morphology result dispatch marker.</summary>
+    /// <summary>Marker for polymorphic morphology result dispatch.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
-    /// <summary>Morphology operation base type.</summary>
+    /// <summary>Base type for morphology operations.</summary>
     public abstract record Operation;
 
     /// <summary>Cage deformation with control point displacement.</summary>
@@ -25,7 +25,7 @@ public static class Morphology {
         Point3d[] OriginalControlPoints,
         Point3d[] DeformedControlPoints) : Operation;
 
-    /// <summary>Subdivision strategy base type.</summary>
+    /// <summary>Base type for subdivision strategies.</summary>
     public abstract record SubdivisionStrategy(int Levels) : Operation;
 
     /// <summary>Catmull-Clark subdivision for quad-dominant meshes.</summary>
@@ -37,7 +37,7 @@ public static class Morphology {
     /// <summary>Butterfly subdivision for triangulated meshes.</summary>
     public sealed record ButterflySubdivision(int Levels) : SubdivisionStrategy(Levels);
 
-    /// <summary>Smoothing strategy base type.</summary>
+    /// <summary>Base type for smoothing strategies.</summary>
     public abstract record SmoothingStrategy(int Iterations, bool LockBoundary) : Operation;
 
     /// <summary>Laplacian smoothing with optional cotangent weighting.</summary>
@@ -61,7 +61,7 @@ public static class Morphology {
     /// <summary>Brep to mesh conversion.</summary>
     public sealed record BrepToMeshOperation(MeshingParameters? Parameters, bool JoinMeshes) : Operation;
 
-    /// <summary>Mesh repair strategy base type.</summary>
+    /// <summary>Base type for mesh repair strategies.</summary>
     public abstract record MeshRepairStrategy : Operation;
 
     /// <summary>Fill holes in mesh.</summary>
@@ -85,7 +85,7 @@ public static class Morphology {
     /// <summary>Mesh thickening to create solid shell.</summary>
     public sealed record MeshThickenOperation(double OffsetDistance, bool Solidify, Vector3d Direction) : Operation;
 
-    /// <summary>Mesh unwrapping strategy base type.</summary>
+    /// <summary>Base type for mesh unwrapping strategies.</summary>
     public abstract record UnwrapStrategy : Operation;
 
     /// <summary>Planar unwrap projection.</summary>
