@@ -39,6 +39,17 @@ public static class Intersection {
         double? Tolerance = null,
         bool Sorted = false);
 
+    /// <summary>Intersection type classification: tangent, transverse, or unknown.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct IntersectionType(byte Value) {
+        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
+        public static readonly IntersectionType Tangent = new(0);
+        /// <summary>Transverse intersection with significant angular separation.</summary>
+        public static readonly IntersectionType Transverse = new(1);
+        /// <summary>Unknown classification when insufficient data available.</summary>
+        public static readonly IntersectionType Unknown = new(2);
+    }
+
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
     /// <remarks>Consumers must dispose Curves collection elements as they implement IDisposable.</remarks>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
@@ -54,18 +65,8 @@ public static class Intersection {
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
     }
 
-    /// <summary>Intersection type classification discriminating tangent, transverse, and unknown intersections.</summary>
-    public enum IntersectionType {
-        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
-        Tangent = 0,
-        /// <summary>Transverse intersection with significant angular separation.</summary>
-        Transverse = 1,
-        /// <summary>Unknown classification when insufficient data available.</summary>
-        Unknown = 2,
-    }
-
     /// <summary>Result of intersection classification analysis.</summary>
-    [DebuggerDisplay("Type={Type}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
+    [DebuggerDisplay("Type={Type.Value}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
     public sealed record ClassificationResult(
         IntersectionType Type,
         double[] ApproachAngles,
