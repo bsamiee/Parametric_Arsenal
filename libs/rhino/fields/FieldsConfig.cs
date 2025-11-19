@@ -15,6 +15,11 @@ internal static class FieldsConfig {
         string OperationName,
         int BufferSize);
 
+    /// <summary>General field operation metadata containing validation mode and operation name.</summary>
+    internal sealed record OperationMetadata(
+        V ValidationMode,
+        string OperationName);
+
     /// <summary>Distance field configuration by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
         new Dictionary<Type, DistanceFieldMetadata> {
@@ -34,6 +39,62 @@ internal static class FieldsConfig {
                 ValidationMode: V.Standard | V.BoundingBox,
                 OperationName: "Fields.SurfaceDistance",
                 BufferSize: 4096),
+        }.ToFrozenDictionary();
+
+    /// <summary>Field operation metadata registry keyed by request type.</summary>
+    internal static readonly FrozenDictionary<Type, OperationMetadata> Operations =
+        new Dictionary<Type, OperationMetadata> {
+            [typeof(Fields.GradientFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Gradient"),
+            [typeof(Fields.CurlFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Curl"),
+            [typeof(Fields.DivergenceFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Divergence"),
+            [typeof(Fields.LaplacianFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Laplacian"),
+            [typeof(Fields.VectorPotentialFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.VectorPotential"),
+            [typeof(Fields.ScalarInterpolationOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.InterpolateScalar"),
+            [typeof(Fields.VectorInterpolationOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.InterpolateVector"),
+            [typeof(Fields.StreamlineIntegrationOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Streamlines"),
+            [typeof(Fields.IsosurfaceExtractionOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Isosurfaces"),
+            [typeof(Fields.HessianFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Hessian"),
+            [typeof(Fields.DirectionalDerivativeOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.DirectionalDerivative"),
+            [typeof(Fields.FieldMagnitudeOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Magnitude"),
+            [typeof(Fields.NormalizeFieldOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Normalize"),
+            [typeof(Fields.ScalarVectorProductOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.ScalarVectorProduct"),
+            [typeof(Fields.VectorDotProductOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.VectorDotProduct"),
+            [typeof(Fields.CriticalPointDetectionOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.CriticalPoints"),
+            [typeof(Fields.FieldStatisticsOperation)] = new(
+                ValidationMode: V.None,
+                OperationName: "Fields.Statistics"),
         }.ToFrozenDictionary();
 
     /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
