@@ -93,13 +93,13 @@ internal static class MorphologyCore {
                     ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                         error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(
                             string.Create(CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}"))),
-                _ => MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is not null
+                _ => MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is int algorithmCode
                     ? UnifiedOperation.Apply(
                         input: mesh,
                         operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                             MorphologyCompute.SubdivideIterative(
                                 m,
-                                meta.AlgorithmCode.Value,
+                                algorithmCode,
                                 strategy.Levels,
                                 context).Bind(subdivided => {
                                 (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
