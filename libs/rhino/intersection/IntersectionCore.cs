@@ -286,7 +286,15 @@ internal static class IntersectionCore {
                 return TwoPointHandler(count, pointA, pointB, tolerance, count > 1 ? [parameterA, parameterB] : count > 0 ? [parameterA] : null);
             }),
             ((typeof(Plane), typeof(Plane)), (first, second, _, _, _) => RhinoIntersect.PlanePlane((Plane)first, (Plane)second, out Line line)
-                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new LineCurve(line),], [], [], [], []))
+                ? (
+                    // Ensure LineCurve is disposed after use
+                    // Create a copy of the curve to pass to the output
+                    // If IntersectionOutput expects to own/dispose the curve, this should be refactored
+                    // For now, create a LineCurve, duplicate it, dispose the original, and pass the duplicate
+                    // This avoids leaking the disposable
+                    using LineCurve curve = new(line);
+                    ResultFactory.Create(value: new Intersection.IntersectionOutput([], [curve.DuplicateCurve(),], [], [], [], []))
+                )
                 : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(ValueTuple<Plane, Plane>), typeof(Plane)), (first, second, _, _, _) => {
                 (Plane planeA, Plane planeB) = (ValueTuple<Plane, Plane>)first;
