@@ -15,38 +15,23 @@ namespace Arsenal.Rhino.Fields;
 [Pure]
 internal static class FieldsCore {
     private sealed record DistanceOperationMetadata(
-        Func<GeometryBase, Fields.FieldSampling, int, IGeometryContext, Result<(Point3d[], double[])>> Executor,
-        V ValidationMode,
-        string OperationName,
-        int BufferSize);
+        Func<GeometryBase, Fields.FieldSampling, int, IGeometryContext, Result<IReadOnlyList<(Point3d[], double[])>>> Executor,
+        FieldsConfig.DistanceFieldMetadata Metadata);
 
     private static readonly FrozenDictionary<Type, DistanceOperationMetadata> DistanceDispatch =
-        new Dictionary<Type, DistanceOperationMetadata> {
-            [typeof(Mesh)] = new(
-                Executor: static (geometry, sampling, bufferSize, context) =>
-                    ExecuteDistanceField<Mesh>(geometry, sampling, bufferSize, context),
-                ValidationMode: V.Standard | V.MeshSpecific,
-                OperationName: FieldsConfig.OperationNames.MeshDistance,
-                BufferSize: FieldsConfig.MeshDistanceBuffer),
-            [typeof(Brep)] = new(
-                Executor: static (geometry, sampling, bufferSize, context) =>
-                    ExecuteDistanceField<Brep>(geometry, sampling, bufferSize, context),
-                ValidationMode: V.Standard | V.Topology,
-                OperationName: FieldsConfig.OperationNames.BrepDistance,
-                BufferSize: FieldsConfig.BrepDistanceBuffer),
-            [typeof(Curve)] = new(
-                Executor: static (geometry, sampling, bufferSize, context) =>
-                    ExecuteDistanceField<Curve>(geometry, sampling, bufferSize, context),
-                ValidationMode: V.Standard | V.Degeneracy,
-                OperationName: FieldsConfig.OperationNames.CurveDistance,
-                BufferSize: FieldsConfig.CurveDistanceBuffer),
-            [typeof(Surface)] = new(
-                Executor: static (geometry, sampling, bufferSize, context) =>
-                    ExecuteDistanceField<Surface>(geometry, sampling, bufferSize, context),
-                ValidationMode: V.Standard | V.BoundingBox,
-                OperationName: FieldsConfig.OperationNames.SurfaceDistance,
-                BufferSize: FieldsConfig.SurfaceDistanceBuffer),
-        }.ToFrozenDictionary();
+        FieldsConfig.DistanceFields
+            .ToDictionary(
+                keySelector: static entry => entry.Key,
+                elementSelector: static entry => new DistanceOperationMetadata(
+                    Executor: entry.Key == typeof(Mesh)
+                        ? static (geometry, sampling, bufferSize, context) => ExecuteDistanceField<Mesh>(geometry, sampling, bufferSize, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,])
+                        : entry.Key == typeof(Brep)
+                            ? static (geometry, sampling, bufferSize, context) => ExecuteDistanceField<Brep>(geometry, sampling, bufferSize, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,])
+                            : entry.Key == typeof(Curve)
+                                ? static (geometry, sampling, bufferSize, context) => ExecuteDistanceField<Curve>(geometry, sampling, bufferSize, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,])
+                                : static (geometry, sampling, bufferSize, context) => ExecuteDistanceField<Surface>(geometry, sampling, bufferSize, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,]),
+                    Metadata: entry.Value))
+            .ToFrozenDictionary();
 
     [Pure]
     internal static Result<(Point3d[] Grid, double[] Distances)> DistanceField(
@@ -61,13 +46,11 @@ internal static class FieldsCore {
                     error: E.Geometry.UnsupportedAnalysis.WithContext($"Distance field not supported for {geometry.GetType().Name}"))
                 : UnifiedOperation.Apply(
                     input: geometry,
-                    operation: (Func<GeometryBase, Result<IReadOnlyList<(Point3d[], double[])>>>)(item =>
-                        metadata.Executor(item, sampling, metadata.BufferSize, context)
-                            .Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,])),
+                    operation: (Func<GeometryBase, Result<IReadOnlyList<(Point3d[], double[])>>>)(item => metadata.Executor(item, sampling, metadata.Metadata.BufferSize, context)),
                     config: new OperationConfig<GeometryBase, (Point3d[], double[])> {
                         Context = context,
-                        ValidationMode = metadata.ValidationMode,
-                        OperationName = metadata.OperationName,
+                        ValidationMode = metadata.Metadata.ValidationMode,
+                        OperationName = metadata.Metadata.OperationName,
                         EnableDiagnostics = false,
                     }).Map(results => results[0]);
 

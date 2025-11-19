@@ -1,42 +1,71 @@
+using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using Arsenal.Core.Validation;
 using Rhino;
+using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
 /// <summary>Configuration constants for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
+    /// <summary>Distance field metadata: validation mode, operation name, buffer size.</summary>
+    internal sealed record DistanceFieldMetadata(
+        V ValidationMode,
+        string OperationName,
+        int BufferSize);
+
+    /// <summary>Unified distance field configuration by geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
+        new Dictionary<Type, DistanceFieldMetadata> {
+            [typeof(Mesh)] = new(
+                ValidationMode: V.Standard | V.MeshSpecific,
+                OperationName: "Fields.MeshDistance",
+                BufferSize: 4096),
+            [typeof(Brep)] = new(
+                ValidationMode: V.Standard | V.Topology,
+                OperationName: "Fields.BrepDistance",
+                BufferSize: 8192),
+            [typeof(Curve)] = new(
+                ValidationMode: V.Standard | V.Degeneracy,
+                OperationName: "Fields.CurveDistance",
+                BufferSize: 2048),
+            [typeof(Surface)] = new(
+                ValidationMode: V.Standard | V.BoundingBox,
+                OperationName: "Fields.SurfaceDistance",
+                BufferSize: 4096),
+        }.ToFrozenDictionary();
+
+    /// <summary>Resolution limits for field sampling.</summary>
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
     internal const int MaxResolution = 256;
 
+    /// <summary>Step size parameters for field integration.</summary>
     internal const double DefaultStepSize = 0.01;
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
     internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
     internal const double MaxStepSize = 1.0;
+
+    /// <summary>Streamline parameters.</summary>
     internal const int MaxStreamlineSteps = 10000;
     internal const double MinFieldMagnitude = 1e-10;
-    internal const int VectorPotentialIterations = 512;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
 
+    /// <summary>Integration parameters.</summary>
     internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
     internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
     internal const double RK2HalfStep = 0.5;
 
+    /// <summary>Vector potential parameters.</summary>
+    internal const int VectorPotentialIterations = 512;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
+
+    /// <summary>Spatial/detection thresholds.</summary>
     internal const int FieldRTreeThreshold = 100;
-
-    internal const int MeshDistanceBuffer = 4096;
-    internal const int BrepDistanceBuffer = 8192;
-    internal const int CurveDistanceBuffer = 2048;
-    internal const int SurfaceDistanceBuffer = 4096;
-
-    internal static class OperationNames {
-        internal const string MeshDistance = "Fields.MeshDistance";
-        internal const string BrepDistance = "Fields.BrepDistance";
-        internal const string CurveDistance = "Fields.CurveDistance";
-        internal const string SurfaceDistance = "Fields.SurfaceDistance";
-    }
+    internal const double InsideOutsideToleranceMultiplier = 10.0;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
@@ -198,10 +227,4 @@ internal static class FieldsConfig {
 
         return table;
     }
-
-    internal const double InsideOutsideToleranceMultiplier = 10.0;
-
-    /// <summary>Critical point detection: eigenvalue threshold for classification.</summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 }
