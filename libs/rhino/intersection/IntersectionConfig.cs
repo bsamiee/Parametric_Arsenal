@@ -7,6 +7,48 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Validation modes and parameters for intersection operations using RhinoDoc tolerances via GeometryContext.FromDocument(doc).</summary>
 internal static class IntersectionConfig {
+    /// <summary>Classification analysis metadata containing angle thresholds and blend quality scores.</summary>
+    internal sealed record ClassificationMetadata(
+        double TangentAngleThreshold,
+        double GrazingAngleThreshold,
+        double TangentBlendScore,
+        double PerpendicularBlendScore,
+        double CurveSurfaceTangentBlendScore,
+        double CurveSurfacePerpendicularBlendScore);
+
+    /// <summary>Near-miss analysis metadata containing tolerance multiplier and sample count parameters.</summary>
+    internal sealed record NearMissMetadata(
+        double ToleranceMultiplier,
+        int MaxVertexSamples,
+        int MinCurveSamples,
+        int MinBrepSamples);
+
+    /// <summary>Stability analysis metadata containing perturbation factor and spherical sample count.</summary>
+    internal sealed record StabilityMetadata(
+        double PerturbationFactor,
+        int SampleCount);
+
+    /// <summary>Classification analysis configuration with angle thresholds in radians and blend scores.</summary>
+    internal static readonly ClassificationMetadata Classification = new(
+        TangentAngleThreshold: RhinoMath.ToRadians(5.0),
+        GrazingAngleThreshold: RhinoMath.ToRadians(15.0),
+        TangentBlendScore: 1.0,
+        PerpendicularBlendScore: 0.5,
+        CurveSurfaceTangentBlendScore: 0.8,
+        CurveSurfacePerpendicularBlendScore: 0.4);
+
+    /// <summary>Near-miss analysis configuration with tolerance multiplier and sample count limits.</summary>
+    internal static readonly NearMissMetadata NearMiss = new(
+        ToleranceMultiplier: 10.0,
+        MaxVertexSamples: 1000,
+        MinCurveSamples: 3,
+        MinBrepSamples: 8);
+
+    /// <summary>Stability analysis configuration with perturbation factor and spherical sample count.</summary>
+    internal static readonly StabilityMetadata Stability = new(
+        PerturbationFactor: 0.001,
+        SampleCount: 8);
+
     /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
     internal static readonly FrozenDictionary<(Type, Type), (V ModeA, V ModeB)> ValidationModes =
         new (Type TypeA, Type TypeB, V ModeA, V ModeB)[] {
@@ -53,30 +95,4 @@ internal static class IntersectionConfig {
             ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
             : [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)), KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),])
         .ToFrozenDictionary();
-
-    /// <summary>Angle thresholds for intersection classification.</summary>
-    internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
-    internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
-
-    /// <summary>Tolerance multiplier for near-miss detection threshold.</summary>
-    internal const double NearMissToleranceMultiplier = 10.0;
-
-    /// <summary>Stability analysis parameters.</summary>
-    internal const double StabilityPerturbationFactor = 0.001;
-    internal const int StabilitySampleCount = 8;
-
-    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
-    internal const int MaxNearMissSamples = 1000;
-
-    /// <summary>Minimum sample count for curve near-miss detection.</summary>
-    internal const int MinCurveNearMissSamples = 3;
-
-    /// <summary>Minimum sample count for Brep near-miss detection.</summary>
-    internal const int MinBrepNearMissSamples = 8;
-
-    /// <summary>Blend quality scores for intersection types.</summary>
-    internal const double TangentBlendScore = 1.0;
-    internal const double PerpendicularBlendScore = 0.5;
-    internal const double CurveSurfaceTangentBlendScore = 0.8;
-    internal const double CurveSurfacePerpendicularBlendScore = 0.4;
 }

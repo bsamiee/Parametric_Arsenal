@@ -10,6 +10,16 @@ namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Polymorphic intersection with automatic type-based dispatch.</summary>
 public static class Intersect {
+    /// <summary>Intersection classification type discriminating tangent, transverse, and unknown intersections.</summary>
+    public enum ClassificationType : byte {
+        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
+        Tangent = 0,
+        /// <summary>Transverse intersection with significant angular separation.</summary>
+        Transverse = 1,
+        /// <summary>Unknown classification when insufficient data available.</summary>
+        Unknown = 2,
+    }
+
     /// <summary>Intersection operation options controlling tolerance, projection, and output formatting.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionOptions(
@@ -31,6 +41,35 @@ public static class Intersect {
         /// <summary>Empty result with zero-length collections for non-intersecting geometries.</summary>
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
     }
+
+    /// <summary>Classification result containing type discrimination, approach angles, and blend quality score.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct ClassificationResult(
+        ClassificationType Type,
+        IReadOnlyList<double> ApproachAngles,
+        bool IsGrazing,
+        double BlendScore);
+
+    /// <summary>Near-miss result containing paired locations and distances within search radius.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct NearMissResult(
+        IReadOnlyList<Point3d> LocationsOnGeometryA,
+        IReadOnlyList<Point3d> LocationsOnGeometryB,
+        IReadOnlyList<double> Distances) {
+        /// <summary>Empty result with zero-length collections for geometries with no near-misses.</summary>
+        public static readonly NearMissResult Empty = new([], [], []);
+    }
+
+    /// <summary>Stability result containing score, sensitivity, and per-point instability flags.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct StabilityResult(
+        double Score,
+        double Sensitivity,
+        IReadOnlyList<bool> UnstableFlags) {
+        /// <summary>Stable result with maximum score and zero sensitivity for empty intersections.</summary>
+        public static readonly StabilityResult Stable = new(Score: 1.0, Sensitivity: 0.0, UnstableFlags: []);
+    }
+
     /// <summary>Executes type-detected intersection with automatic validation and collection aggregation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IntersectionOutput> Execute<T1, T2>(
@@ -49,7 +88,7 @@ public static class Intersect {
                         geometryB,
                         context,
                         normalized)
-                    .Map(output => (IReadOnlyList<IntersectionOutput>)[output])),
+                    .Map(output => (IReadOnlyList<IntersectionOutput>)[output,])),
                 new OperationConfig<object, IntersectionOutput> {
                     Context = context,
                     ValidationMode = V.None,
@@ -60,17 +99,17 @@ public static class Intersect {
         .Map(outputs => outputs.Count == 0
             ? IntersectionOutput.Empty
             : new IntersectionOutput(
-                [.. outputs.SelectMany(static output => output.Points)],
-                [.. outputs.SelectMany(static output => output.Curves)],
-                [.. outputs.SelectMany(static output => output.ParametersA)],
-                [.. outputs.SelectMany(static output => output.ParametersB)],
-                [.. outputs.SelectMany(static output => output.FaceIndices)],
-                [.. outputs.SelectMany(static output => output.Sections)]));
+                [.. outputs.SelectMany(static output => output.Points),],
+                [.. outputs.SelectMany(static output => output.Curves),],
+                [.. outputs.SelectMany(static output => output.ParametersA),],
+                [.. outputs.SelectMany(static output => output.ParametersB),],
+                [.. outputs.SelectMany(static output => output.FaceIndices),],
+                [.. outputs.SelectMany(static output => output.Sections),]));
     }
 
     /// <summary>Classifies intersection type (tangent/transverse/unknown) via approach angle analysis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> ClassifyIntersection(
+    public static Result<ClassificationResult> ClassifyIntersection(
         IntersectionOutput output,
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -79,7 +118,7 @@ public static class Intersect {
 
     /// <summary>Finds near-miss locations within tolerance band via closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Point3d[] LocationsA, Point3d[] LocationsB, double[] Distances)> FindNearMisses(
+    public static Result<NearMissResult> FindNearMisses(
         GeometryBase geometryA,
         GeometryBase geometryB,
         double searchRadius,
@@ -88,7 +127,7 @@ public static class Intersect {
 
     /// <summary>Analyzes intersection stability via spherical perturbation sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double StabilityScore, double PerturbationSensitivity, bool[] UnstableFlags)> AnalyzeStability(
+    public static Result<StabilityResult> AnalyzeStability(
         IntersectionOutput baseIntersection,
         GeometryBase geometryA,
         GeometryBase geometryB,
