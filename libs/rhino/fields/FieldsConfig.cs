@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
@@ -12,28 +13,57 @@ internal static class FieldsConfig {
     /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
     internal sealed record DistanceFieldMetadata(
         V ValidationMode,
-        string OperationName,
+        string DistanceOperationName,
+        string GradientOperationName,
         int BufferSize);
+
+    internal sealed record FieldOperationMetadata(
+        V ValidationMode,
+        string OperationName);
 
     /// <summary>Distance field configuration by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
         new Dictionary<Type, DistanceFieldMetadata> {
             [typeof(Mesh)] = new(
                 ValidationMode: V.Standard | V.MeshSpecific,
-                OperationName: "Fields.MeshDistance",
+                DistanceOperationName: "Fields.MeshDistance",
+                GradientOperationName: "Fields.MeshDistanceGradient",
                 BufferSize: 4096),
             [typeof(Brep)] = new(
                 ValidationMode: V.Standard | V.Topology,
-                OperationName: "Fields.BrepDistance",
+                DistanceOperationName: "Fields.BrepDistance",
+                GradientOperationName: "Fields.BrepDistanceGradient",
                 BufferSize: 8192),
             [typeof(Curve)] = new(
                 ValidationMode: V.Standard | V.Degeneracy,
-                OperationName: "Fields.CurveDistance",
+                DistanceOperationName: "Fields.CurveDistance",
+                GradientOperationName: "Fields.CurveDistanceGradient",
                 BufferSize: 2048),
             [typeof(Surface)] = new(
                 ValidationMode: V.Standard | V.BoundingBox,
-                OperationName: "Fields.SurfaceDistance",
+                DistanceOperationName: "Fields.SurfaceDistance",
+                GradientOperationName: "Fields.SurfaceDistanceGradient",
                 BufferSize: 4096),
+        }.ToFrozenDictionary();
+
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> Operations =
+        new Dictionary<Type, FieldOperationMetadata> {
+            [typeof(Fields.CurlFieldRequest)] = new(V.None, "Fields.VectorField.Curl"),
+            [typeof(Fields.DivergenceFieldRequest)] = new(V.None, "Fields.VectorField.Divergence"),
+            [typeof(Fields.LaplacianFieldRequest)] = new(V.None, "Fields.ScalarField.Laplacian"),
+            [typeof(Fields.VectorPotentialFieldRequest)] = new(V.None, "Fields.VectorField.VectorPotential"),
+            [typeof(Fields.ScalarInterpolationRequest)] = new(V.None, "Fields.Interpolation.Scalar"),
+            [typeof(Fields.VectorInterpolationRequest)] = new(V.None, "Fields.Interpolation.Vector"),
+            [typeof(Fields.StreamlineRequest)] = new(V.None, "Fields.Streamlines"),
+            [typeof(Fields.IsosurfaceRequest)] = new(V.None, "Fields.Isosurfaces"),
+            [typeof(Fields.HessianFieldRequest)] = new(V.None, "Fields.ScalarField.Hessian"),
+            [typeof(Fields.DirectionalDerivativeRequest)] = new(V.None, "Fields.VectorField.DirectionalDerivative"),
+            [typeof(Fields.FieldMagnitudeRequest)] = new(V.None, "Fields.VectorField.Magnitude"),
+            [typeof(Fields.NormalizeFieldRequest)] = new(V.None, "Fields.VectorField.Normalize"),
+            [typeof(Fields.ScalarVectorProductRequest)] = new(V.None, "Fields.FieldComposition.ScalarVectorProduct"),
+            [typeof(Fields.VectorDotProductRequest)] = new(V.None, "Fields.FieldComposition.VectorDotProduct"),
+            [typeof(Fields.CriticalPointsRequest)] = new(V.None, "Fields.CriticalPoints"),
+            [typeof(Fields.FieldStatisticsRequest)] = new(V.None, "Fields.FieldStatistics"),
         }.ToFrozenDictionary();
 
     /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
