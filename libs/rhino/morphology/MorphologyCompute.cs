@@ -10,7 +10,7 @@ using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Morphology;
 
-/// <summary>Morphology algorithm implementations with convergence tracking.</summary>
+/// <summary>Morphology algorithm implementations.</summary>
 internal static class MorphologyCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<GeometryBase> CageDeform(

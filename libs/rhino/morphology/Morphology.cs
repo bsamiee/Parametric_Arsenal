@@ -12,11 +12,11 @@ namespace Arsenal.Rhino.Morphology;
 /// <summary>Mesh morphology operations: cage deformation, subdivision, smoothing, evolution.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Morphology is the primary API entry point for Arsenal.Rhino.Morphology namespace")]
 public static class Morphology {
-    /// <summary>Marker interface for polymorphic morphology result dispatch.</summary>
+    /// <summary>Polymorphic morphology result dispatch marker.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface")]
     public interface IMorphologyResult;
 
-    /// <summary>Base type for all morphology operation requests.</summary>
+    /// <summary>Morphology operation base type.</summary>
     public abstract record Operation;
 
     /// <summary>Cage deformation with control point displacement.</summary>
@@ -25,7 +25,7 @@ public static class Morphology {
         Point3d[] OriginalControlPoints,
         Point3d[] DeformedControlPoints) : Operation;
 
-    /// <summary>Base type for subdivision strategies.</summary>
+    /// <summary>Subdivision strategy base type.</summary>
     public abstract record SubdivisionStrategy(int Levels) : Operation;
 
     /// <summary>Catmull-Clark subdivision for quad-dominant meshes.</summary>
@@ -37,7 +37,7 @@ public static class Morphology {
     /// <summary>Butterfly subdivision for triangulated meshes.</summary>
     public sealed record ButterflySubdivision(int Levels) : SubdivisionStrategy(Levels);
 
-    /// <summary>Base type for smoothing strategies.</summary>
+    /// <summary>Smoothing strategy base type.</summary>
     public abstract record SmoothingStrategy(int Iterations, bool LockBoundary) : Operation;
 
     /// <summary>Laplacian smoothing with optional cotangent weighting.</summary>
@@ -61,7 +61,7 @@ public static class Morphology {
     /// <summary>Brep to mesh conversion.</summary>
     public sealed record BrepToMeshOperation(MeshingParameters? Parameters, bool JoinMeshes) : Operation;
 
-    /// <summary>Base type for mesh repair strategies.</summary>
+    /// <summary>Mesh repair strategy base type.</summary>
     public abstract record MeshRepairStrategy : Operation;
 
     /// <summary>Fill holes in mesh.</summary>
@@ -79,13 +79,13 @@ public static class Morphology {
     /// <summary>Weld coincident vertices.</summary>
     public sealed record WeldRepair : MeshRepairStrategy;
 
-    /// <summary>Composite repair operation with tolerance.</summary>
+    /// <summary>Composite repair with multiple strategies.</summary>
     public sealed record CompositeRepair(IReadOnlyList<MeshRepairStrategy> Strategies, double WeldTolerance) : MeshRepairStrategy;
 
     /// <summary>Mesh thickening to create solid shell.</summary>
     public sealed record MeshThickenOperation(double OffsetDistance, bool Solidify, Vector3d Direction) : Operation;
 
-    /// <summary>Base type for mesh unwrapping strategies.</summary>
+    /// <summary>Mesh unwrapping strategy base type.</summary>
     public abstract record UnwrapStrategy : Operation;
 
     /// <summary>Planar unwrap projection.</summary>
@@ -103,7 +103,7 @@ public static class Morphology {
     /// <summary>Weld mesh vertices within tolerance.</summary>
     public sealed record MeshWeldOperation(double Tolerance, bool RecalculateNormals) : Operation;
 
-    /// <summary>Cage deformation result with displacement and volume metrics.</summary>
+    /// <summary>Cage deformation with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record CageDeformResult(
         GeometryBase Deformed,
@@ -118,7 +118,7 @@ public static class Morphology {
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
 
-    /// <summary>Smoothing result with convergence and displacement metrics.</summary>
+    /// <summary>Smoothing with convergence and displacement metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SmoothingResult(
         Mesh Smoothed,
@@ -133,7 +133,7 @@ public static class Morphology {
             $"Smoothing | Iterations={this.IterationsPerformed} | RMS={this.RMSDisplacement:E2} | Quality={this.QualityScore:F3} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Mesh offset result with distance and degeneracy metrics.</summary>
+    /// <summary>Mesh offset with distance and degeneracy metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record OffsetResult(
         Mesh Offset,
@@ -149,7 +149,7 @@ public static class Morphology {
             $"MeshOffset | Dist={this.ActualDistance:F3} | V: {this.OriginalVertexCount}→{this.OffsetVertexCount} | F: {this.OriginalFaceCount}→{this.OffsetFaceCount}{(this.HasDegeneracies ? " [degenerate]" : "")}");
     }
 
-    /// <summary>Subdivision result with edge and triangle quality metrics.</summary>
+    /// <summary>Subdivision with edge and triangle quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record SubdivisionResult(
         Mesh Subdivided,
@@ -166,7 +166,7 @@ public static class Morphology {
             $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
 
-    /// <summary>Mesh reduction result with ratio and quality metrics.</summary>
+    /// <summary>Mesh reduction with ratio and quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record ReductionResult(
         Mesh Reduced,
@@ -183,7 +183,7 @@ public static class Morphology {
             $"MeshReduce | Faces: {this.OriginalFaceCount}→{this.ReducedFaceCount} ({this.ReductionRatio * 100.0:F1}%) | Quality={this.QualityScore:F3} | AspectRatio={this.MeanAspectRatio:F2}");
     }
 
-    /// <summary>Isotropic remeshing result with uniformity and convergence metrics.</summary>
+    /// <summary>Isotropic remeshing with uniformity and convergence metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record RemeshResult(
         Mesh Remeshed,
@@ -201,7 +201,7 @@ public static class Morphology {
             $"Remesh | Target={this.TargetEdgeLength:F3} | Mean={this.MeanEdgeLength:F3} | StdDev={this.EdgeLengthStdDev:F3} | Uniformity={this.UniformityScore:F3} | Iter={this.IterationsPerformed} | {(this.Converged ? "✓" : "diverged")}");
     }
 
-    /// <summary>Mesh repair result with before/after metrics and quality score.</summary>
+    /// <summary>Mesh repair with before/after metrics and quality score.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshRepairResult(
         Mesh Repaired,
@@ -219,7 +219,7 @@ public static class Morphology {
             $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
     }
 
-    /// <summary>Mesh separation result with per-component statistics.</summary>
+    /// <summary>Mesh separation with per-component statistics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshSeparationResult(
         Mesh[] Components,
@@ -235,7 +235,7 @@ public static class Morphology {
             $"MeshSeparate | Components={this.ComponentCount} | TotalV={this.TotalVertexCount} | TotalF={this.TotalFaceCount}");
     }
 
-    /// <summary>Mesh welding result with vertex reduction and displacement metrics.</summary>
+    /// <summary>Mesh welding with vertex reduction and displacement metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshWeldResult(
         Mesh Welded,
@@ -252,7 +252,7 @@ public static class Morphology {
             $"MeshWeld | V: {this.OriginalVertexCount}→{this.WeldedVertexCount} (-{this.VerticesRemoved}) | Tol={this.WeldTolerance:E2} | MaxDisp={this.MaxVertexDisplacement:F3}");
     }
 
-    /// <summary>Brep to mesh conversion result with quality metrics.</summary>
+    /// <summary>Brep to mesh conversion with quality metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record BrepToMeshResult(
         Mesh Mesh,
@@ -274,7 +274,7 @@ public static class Morphology {
             $"BrepToMesh | BrepFaces={this.BrepFaceCount} | MeshFaces={this.MeshFaceCount} | MeanEdge={this.MeanEdgeLength:F3} | AspectRatio={this.MeanAspectRatio:F2} | Quality={this.QualityScore:F3}");
     }
 
-    /// <summary>Mesh thickening result with solid shell metrics.</summary>
+    /// <summary>Mesh thickening with solid shell metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshThickenResult(
         Mesh Thickened,
@@ -293,7 +293,7 @@ public static class Morphology {
             $"MeshThicken | Dist={this.OffsetDistance:F3} | Solid={this.IsSolid} | V: {this.OriginalVertexCount}→{this.ThickenedVertexCount} | F: {this.OriginalFaceCount}→{this.ThickenedFaceCount} | WallFaces={this.WallFaceCount}");
     }
 
-    /// <summary>Mesh UV unwrapping result with texture coordinate metrics.</summary>
+    /// <summary>Mesh UV unwrapping with texture coordinate metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]
     public sealed record MeshUnwrapResult(
         Mesh Unwrapped,
