@@ -77,6 +77,15 @@ internal static class OrientationConfig {
         ValidationMode: V.Standard | V.Topology | V.BoundingBox | V.MassProperties,
         OperationName: "Orientation.Optimize");
 
+    /// <summary>Unified operation metadata for all orientation transforms.</summary>
+    internal sealed record OrientationOperationMetadata(
+        V ValidationMode,
+        string OperationName);
+
+    /// <summary>Plane extractor metadata with validation and extraction function.</summary>
+    internal sealed record PlaneExtractorMetadata(
+        Func<GeometryBase, Result<Plane>> Extractor);
+
     /// <summary>Best-fit plane minimum point count.</summary>
     internal const int BestFitMinPoints = 3;
 
@@ -102,15 +111,6 @@ internal static class OrientationConfig {
     internal const double OrientationScoreWeight1 = 0.4;
     internal const double OrientationScoreWeight2 = 0.4;
     internal const double OrientationScoreWeight3 = 0.2;
-
-    /// <summary>Unified operation metadata for all orientation transforms.</summary>
-    internal sealed record OrientationOperationMetadata(
-        V ValidationMode,
-        string OperationName);
-
-    /// <summary>Plane extractor metadata with validation and extraction function.</summary>
-    internal sealed record PlaneExtractorMetadata(
-        Func<GeometryBase, Result<Plane>> Extractor);
 
     private static Result<Plane> ExtractBrepPlane(GeometryBase geometry) {
         Brep brep = (Brep)geometry;
