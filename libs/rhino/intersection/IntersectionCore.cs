@@ -179,7 +179,12 @@ internal static class IntersectionCore {
     /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
     /// <remarks>ArcCurve instances in result are IDisposable and must be disposed by consumer.</remarks>
     private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
-        (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc),], [], [], [], [])),
+        (1, Circle arc) => {
+            ArcCurve arcCurve = new(arc);
+            Curve nurbs = arcCurve.ToNurbsCurve();
+            arcCurve.Dispose();
+            return ResultFactory.Create(value: new Intersection.IntersectionOutput([], [nurbs,], [], [], [], []));
+        },
         (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center,], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
