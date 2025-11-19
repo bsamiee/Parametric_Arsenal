@@ -277,7 +277,7 @@ internal static class FieldsCompute {
         int resolution,
         BoundingBox bounds,
         Fields.InterpolationMode mode) =>
-        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: (a, b, t) => a + (t * (b - a)));
+        InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: static (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Vector3d> InterpolateVector(
@@ -287,7 +287,7 @@ internal static class FieldsCompute {
         int resolution,
         BoundingBox bounds,
         Fields.InterpolationMode mode) =>
-        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: (a, b, t) => a + (t * (b - a)));
+        InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: static (a, b, t) => a + (t * (b - a)));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
@@ -369,12 +369,12 @@ internal static class FieldsCompute {
                     int stepCount = 0;
                     pathBuffer[stepCount++] = current;
                     for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
-                        Vector3d k1 = InterpolateTrilinear(query: current, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
-                            .OnError(_ => InterpolateNearest(query: current, field: vectorField, grid: gridPoints))
-                            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
-                        Vector3d Interpolate(double coeff, Vector3d k) => InterpolateTrilinear(query: current + (stepSize * coeff * k), field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
-                            .OnError(_ => InterpolateNearest(query: current + (stepSize * coeff * k), field: vectorField, grid: gridPoints))
-                            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
+                        Vector3d k1 = InterpolateTrilinear(query: current, field: vectorField, resolution: resolution, bounds: bounds, lerp: static (a, b, t) => a + (t * (b - a)))
+                            .OnError(static _ => Vector3d.Zero)
+                            .Match(onSuccess: static value => value, onFailure: static _ => Vector3d.Zero);
+                        Vector3d Interpolate(double coeff, Vector3d k) => InterpolateTrilinear(query: current + (stepSize * coeff * k), field: vectorField, resolution: resolution, bounds: bounds, lerp: static (a, b, t) => a + (t * (b - a)))
+                            .OnError(static _ => Vector3d.Zero)
+                            .Match(onSuccess: static value => value, onFailure: static _ => Vector3d.Zero);
                         Vector3d delta = scheme switch {
                             Fields.EulerIntegration => stepSize * k1,
                             Fields.MidpointIntegration => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
@@ -609,7 +609,7 @@ internal static class FieldsCompute {
                 return ApplyFieldOperation(
                     inputField: gradientField,
                     grid: grid,
-                    operation: (gradient, _) => Vector3d.Multiply(gradient, unitDirection),
+                    operation: (Vector3d gradient, int _) => Vector3d.Multiply(gradient, unitDirection),
                     error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"));
             }))(),
         };
@@ -621,7 +621,7 @@ internal static class FieldsCompute {
         ApplyFieldOperation(
             inputField: vectorField,
             grid: grid,
-            operation: (vector, _) => vector.Length,
+            operation: static (vector, _) => vector.Length,
             error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -631,7 +631,7 @@ internal static class FieldsCompute {
         ApplyFieldOperation(
             inputField: vectorField,
             grid: grid,
-            operation: (vector, _) => (vector.Length > FieldsConfig.MinFieldMagnitude) switch {
+            operation: static (vector, _) => (vector.Length > FieldsConfig.MinFieldMagnitude) switch {
                 true => vector / vector.Length,
                 false => Vector3d.Zero,
             },
@@ -668,7 +668,7 @@ internal static class FieldsCompute {
             inputField1: vectorField1,
             inputField2: vectorField2,
             grid: grid,
-            operation: (v1, v2, _) => Vector3d.Multiply(v1, v2),
+            operation: static (v1, v2, _) => Vector3d.Multiply(v1, v2),
             error1: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"),
             error2: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"));
 
