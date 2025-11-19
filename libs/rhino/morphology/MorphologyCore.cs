@@ -399,9 +399,14 @@ internal static class MorphologyCore {
                         return unknown is not null
                             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown repair strategy in composite: {unknown.GetType().Name}"))
                             : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
-                                byte flags = composite.Strategies.Aggregate(
+                                MorphologyConfig.MorphologyOperationMetadata[] metadatas =
+                                    composite.Strategies
+                                        .Select(s => MorphologyConfig.Operations[s.GetType()])
+                                        .ToArray();
+                                byte flags = metadatas.Aggregate(
                                     MorphologyConfig.RepairNone,
-                                    (acc, s) => (byte)(acc | (MorphologyConfig.Operations.TryGetValue(s.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.RepairFlags is not null ? meta.RepairFlags.Value : 0)));
+                                    (acc, meta) => (byte)(acc | meta.RepairFlags!.Value),
+                                );
                                 return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
                                     .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                                         new Morphology.MeshRepairResult(
