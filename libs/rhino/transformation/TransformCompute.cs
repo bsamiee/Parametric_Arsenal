@@ -57,7 +57,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {TransformCore.Fmt(angleRadians)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Bend geometry along spine.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -80,7 +80,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {TransformCore.Fmt(angle)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -107,7 +107,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {TransformCore.Fmt(startWidth)}, End: {TransformCore.Fmt(endWidth)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Stretch geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -192,7 +192,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {TransformCore.Fmt(radius)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -215,7 +215,7 @@ internal static class TransformCompute {
             ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")))
+                    $"Count: {count}, PathLength: {curveLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")))
             : ((Func<Result<IReadOnlyList<T>>>)(() => {
                 double[] parameters = count == 1
                     ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
