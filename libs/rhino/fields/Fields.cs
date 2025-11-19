@@ -31,9 +31,13 @@ public static class Fields {
                 FieldsConfig.MinStepSize,
                 FieldsConfig.MaxStepSize);
         }
+        /// <summary>Default sampling instance (resolution: 32, step size: 0.01).</summary>
         public static FieldSampling Default { get; } = new();
+        /// <summary>Grid resolution (cube root of sample count), clamped to [8, 256].</summary>
         public int Resolution { get; }
+        /// <summary>Sample region bounding box (null uses geometry bounds).</summary>
         public BoundingBox? Bounds { get; }
+        /// <summary>Integration/sampling step size, clamped to [√ε, 1.0].</summary>
         public double StepSize { get; }
     }
 
@@ -55,14 +59,20 @@ public static class Fields {
 
     /// <summary>Vector component selector for field composition.</summary>
     public abstract record VectorComponent;
+    /// <summary>X-component selector.</summary>
     public sealed record XComponent : VectorComponent;
+    /// <summary>Y-component selector.</summary>
     public sealed record YComponent : VectorComponent;
+    /// <summary>Z-component selector.</summary>
     public sealed record ZComponent : VectorComponent;
 
     /// <summary>Critical point classification.</summary>
     public abstract record CriticalPointKind;
+    /// <summary>Local minimum point.</summary>
     public sealed record MinimumCriticalPoint : CriticalPointKind;
+    /// <summary>Local maximum point.</summary>
     public sealed record MaximumCriticalPoint : CriticalPointKind;
+    /// <summary>Saddle point.</summary>
     public sealed record SaddleCriticalPoint : CriticalPointKind;
 
     /// <summary>Critical point classification result with location, type (minimum/maximum/saddle), value, and eigendecomposition.</summary>
