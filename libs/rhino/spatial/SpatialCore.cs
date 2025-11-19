@@ -13,34 +13,19 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Internal orchestration with UnifiedOperation for algebraic spatial operations.</summary>
 [Pure]
 internal static class SpatialCore {
-    /// <summary>Legacy Analyze dispatcher for backward compatibility with type-based API.</summary>
+    /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(TInput input, TQuery query, IGeometryContext context, int? bufferSize) where TInput : notnull where TQuery : notnull =>
-        (input, query) switch {
-            (Point3d[] points, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Point3d[]>(Input: points, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (Point3d[] points, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Point3d[]>(Input: points, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            (PointCloud cloud, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<PointCloud>(Input: cloud, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (PointCloud cloud, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<PointCloud>(Input: cloud, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            (Mesh mesh, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Mesh>(Input: mesh, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (Mesh mesh, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Mesh>(Input: mesh, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            (Curve[] curves, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Curve[]>(Input: curves, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (Curve[] curves, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Curve[]>(Input: curves, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            (Surface[] surfaces, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Surface[]>(Input: surfaces, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (Surface[] surfaces, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Surface[]>(Input: surfaces, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            (Brep[] breps, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Brep[]>(Input: breps, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
-            (Brep[] breps, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Brep[]>(Input: breps, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
-            _ => HandleTupleQueryTypes(input: input, query: query, bufferSize: bufferSize, context: context),
-        };
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> HandleTupleQueryTypes<TInput, TQuery>(TInput input, TQuery query, int? bufferSize, IGeometryContext context) where TInput : notnull where TQuery : notnull =>
-        query switch {
-            ValueTuple<Point3d[], int> kNearest when input is Point3d[] points => Analyze(request: new Spatial.ProximityAnalysis<Point3d[]>(Input: points, Query: new Spatial.KNearestProximity(Needles: kNearest.Item1, Count: kNearest.Item2)), context: context),
-            ValueTuple<Point3d[], double> distLimited when input is Point3d[] points => Analyze(request: new Spatial.ProximityAnalysis<Point3d[]>(Input: points, Query: new Spatial.DistanceLimitedProximity(Needles: distLimited.Item1, Distance: distLimited.Item2)), context: context),
-            ValueTuple<Point3d[], int> kNearest when input is PointCloud cloud => Analyze(request: new Spatial.ProximityAnalysis<PointCloud>(Input: cloud, Query: new Spatial.KNearestProximity(Needles: kNearest.Item1, Count: kNearest.Item2)), context: context),
-            ValueTuple<Point3d[], double> distLimited when input is PointCloud cloud => Analyze(request: new Spatial.ProximityAnalysis<PointCloud>(Input: cloud, Query: new Spatial.DistanceLimitedProximity(Needles: distLimited.Item1, Distance: distLimited.Item2)), context: context),
-            double tolerance when input is ValueTuple<Mesh, Mesh> meshes => Analyze(request: new Spatial.MeshOverlapAnalysis(First: meshes.Item1, Second: meshes.Item2, AdditionalTolerance: tolerance, BufferSize: bufferSize), context: context),
-            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
+    internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
+        (geometry.Length, request) switch {
+            (0, _) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
+            (_, null) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.ClusteringFailed.WithContext("Request cannot be null")),
+            (_, Spatial.KMeansRequest { K: <= 0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
+            (_, Spatial.DBSCANRequest { Epsilon: <= 0.0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidEpsilon),
+            (_, Spatial.HierarchicalRequest { K: <= 0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
+            (_, Spatial.KMeansRequest r) => SpatialCompute.ClusterKMeans(geometry: geometry, k: r.K, context: context).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
+            (_, Spatial.DBSCANRequest r) => SpatialCompute.ClusterDBSCAN(geometry: geometry, epsilon: r.Epsilon, minPoints: r.MinPoints).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
+            (_, Spatial.HierarchicalRequest r) => SpatialCompute.ClusterHierarchical(geometry: geometry, k: r.K).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
+            _ => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unsupported cluster request: {request.GetType().Name}")),
         };
 
     /// <summary>Algebraic Analyze dispatcher routing to specific implementations via unified table lookup.</summary>
@@ -60,31 +45,23 @@ internal static class SpatialCore {
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported analysis request: {request.GetType().Name}")),
         };
 
+    /// <summary>Legacy Analyze dispatcher for backward compatibility with type-based API.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
-        SpatialConfig.Operations.TryGetValue((inputType, "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-            ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
-        SpatialConfig.Operations.TryGetValue((inputType, "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
-            ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
-            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
-
-    /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
-        (geometry.Length, request) switch {
-            (0, _) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
-            (_, null) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.ClusteringFailed.WithContext("Request cannot be null")),
-            (_, Spatial.KMeansRequest { K: <= 0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
-            (_, Spatial.DBSCANRequest { Epsilon: <= 0.0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidEpsilon),
-            (_, Spatial.HierarchicalRequest { K: <= 0 }) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.InvalidClusterK),
-            (_, Spatial.KMeansRequest r) => SpatialCompute.ClusterKMeans(geometry: geometry, k: r.K, context: context).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
-            (_, Spatial.DBSCANRequest r) => SpatialCompute.ClusterDBSCAN(geometry: geometry, epsilon: r.Epsilon, minPoints: r.MinPoints).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
-            (_, Spatial.HierarchicalRequest r) => SpatialCompute.ClusterHierarchical(geometry: geometry, k: r.K).Map<Spatial.ClusteringResult[]>(results => [.. results.Select(static r => new Spatial.ClusteringResult(Centroid: r.Centroid, Radii: r.Radii)),]),
-            _ => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Spatial.ClusteringFailed.WithContext($"Unsupported cluster request: {request.GetType().Name}")),
+    internal static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(TInput input, TQuery query, IGeometryContext context, int? bufferSize) where TInput : notnull where TQuery : notnull =>
+        (input, query) switch {
+            (Point3d[] points, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Point3d[]>(Input: points, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (Point3d[] points, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Point3d[]>(Input: points, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            (PointCloud cloud, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<PointCloud>(Input: cloud, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (PointCloud cloud, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<PointCloud>(Input: cloud, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            (Mesh mesh, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Mesh>(Input: mesh, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (Mesh mesh, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Mesh>(Input: mesh, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            (Curve[] curves, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Curve[]>(Input: curves, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (Curve[] curves, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Curve[]>(Input: curves, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            (Surface[] surfaces, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Surface[]>(Input: surfaces, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (Surface[] surfaces, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Surface[]>(Input: surfaces, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            (Brep[] breps, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Brep[]>(Input: breps, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
+            (Brep[] breps, BoundingBox box) => Analyze(request: new Spatial.RangeAnalysis<Brep[]>(Input: breps, Shape: new Spatial.BoundingBoxRange(Box: box), BufferSize: bufferSize), context: context),
+            _ => HandleTupleQueryTypes(input: input, query: query, bufferSize: bufferSize, context: context),
         };
 
     /// <summary>Algebraic ProximityField dispatcher.</summary>
@@ -236,6 +213,18 @@ internal static class SpatialCore {
         RTree.CreateMeshFaceTree(mesh) ?? new RTree();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
         for (int i = 0; i < geometries.Length; i++) {
@@ -243,4 +232,15 @@ internal static class SpatialCore {
         }
         return tree;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> HandleTupleQueryTypes<TInput, TQuery>(TInput input, TQuery query, int? bufferSize, IGeometryContext context) where TInput : notnull where TQuery : notnull =>
+        query switch {
+            ValueTuple<Point3d[], int> kNearest when input is Point3d[] points => Analyze(request: new Spatial.ProximityAnalysis<Point3d[]>(Input: points, Query: new Spatial.KNearestProximity(Needles: kNearest.Item1, Count: kNearest.Item2)), context: context),
+            ValueTuple<Point3d[], double> distLimited when input is Point3d[] points => Analyze(request: new Spatial.ProximityAnalysis<Point3d[]>(Input: points, Query: new Spatial.DistanceLimitedProximity(Needles: distLimited.Item1, Distance: distLimited.Item2)), context: context),
+            ValueTuple<Point3d[], int> kNearest when input is PointCloud cloud => Analyze(request: new Spatial.ProximityAnalysis<PointCloud>(Input: cloud, Query: new Spatial.KNearestProximity(Needles: kNearest.Item1, Count: kNearest.Item2)), context: context),
+            ValueTuple<Point3d[], double> distLimited when input is PointCloud cloud => Analyze(request: new Spatial.ProximityAnalysis<PointCloud>(Input: cloud, Query: new Spatial.DistanceLimitedProximity(Needles: distLimited.Item1, Distance: distLimited.Item2)), context: context),
+            double tolerance when input is ValueTuple<Mesh, Mesh> meshes => Analyze(request: new Spatial.MeshOverlapAnalysis(First: meshes.Item1, Second: meshes.Item2, AdditionalTolerance: tolerance, BufferSize: bufferSize), context: context),
+            _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
+        };
 }

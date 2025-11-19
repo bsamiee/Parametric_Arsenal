@@ -60,15 +60,6 @@ public static class Spatial {
     /// <summary>Proximity field result entry.</summary>
     public sealed record ProximityFieldResult(int Index, double Distance, double Angle);
 
-    /// <summary>Spatial query via type-based dispatch and RTree.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
-        TInput input,
-        TQuery query,
-        IGeometryContext context,
-        int? bufferSize = null) where TInput : notnull where TQuery : notnull =>
-        SpatialCore.Analyze(input: input, query: query, context: context, bufferSize: bufferSize);
-
     /// <summary>Cluster geometry by proximity using algebraic clustering request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<ClusteringResult[]> Cluster<T>(
@@ -113,4 +104,13 @@ public static class Spatial {
         Point3d[] points,
         IGeometryContext context) =>
         SpatialCompute.VoronoiDiagram2D(points: points, context: context);
+
+    /// <summary>Spatial query via type-based dispatch and RTree.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
+        TInput input,
+        TQuery query,
+        IGeometryContext context,
+        int? bufferSize = null) where TInput : notnull where TQuery : notnull =>
+        SpatialCore.Analyze(input: input, query: query, context: context, bufferSize: bufferSize);
 }

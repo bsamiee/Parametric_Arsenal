@@ -11,6 +11,32 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Topology diagnosis, progressive healing, and topological feature extraction.</summary>
 [Pure]
 internal static class TopologyCompute {
+    internal static Result<Topology.TopologicalFeatures> ExtractFeatures(
+        Brep brep,
+        IGeometryContext context) =>
+        !brep.IsValidTopology(out string topologyLog)
+            ? ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
+            : ResultFactory.Create(value: brep)
+                .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
+                .Map<(int V, int E, int F, bool Solid, IReadOnlyList<(int LoopIndex, bool IsHole)> Loops)>(validBrep => (
+                    V: validBrep.Vertices.Count,
+                    E: validBrep.Edges.Count,
+                    F: validBrep.Faces.Count,
+                    Solid: validBrep.IsSolid && validBrep.IsManifold,
+                    Loops: [.. validBrep.Loops.Select((l, i) => {
+                        using Curve? loopCurve = l.To3dCurve();
+                        return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
+                    }),
+                    ]))
+                .Bind(data => data switch {
+                    (int v, int e, int f, bool solid, IReadOnlyList<(int LoopIndex, bool IsHole)> loops) when v > 0 && e > 0 && f > 0 => (solid, Numerator: e - v - f + 2) switch {
+                        (true, int numerator) when numerator >= 0 && (numerator & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: numerator / 2, Loops: loops, IsSolid: solid, HandleCount: numerator / 2)),
+                        (true, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
+                        (false, _) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: solid, HandleCount: 0)),
+                    },
+                    _ => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
+                });
+
     internal static Result<Topology.TopologyDiagnosis> Diagnose(
         Brep brep,
         IGeometryContext context) =>
@@ -138,30 +164,4 @@ internal static class TopologyCompute {
                         ? ResultFactory.Create(value: new Topology.HealingResult(Healed: healed, AppliedStrategy: strategy, Success: bestNakedEdges < originalNakedEdges))
                         : ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
                 }))());
-
-    internal static Result<Topology.TopologicalFeatures> ExtractFeatures(
-        Brep brep,
-        IGeometryContext context) =>
-        !brep.IsValidTopology(out string topologyLog)
-            ? ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
-            : ResultFactory.Create(value: brep)
-                .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
-                .Map<(int V, int E, int F, bool Solid, IReadOnlyList<(int LoopIndex, bool IsHole)> Loops)>(validBrep => (
-                    V: validBrep.Vertices.Count,
-                    E: validBrep.Edges.Count,
-                    F: validBrep.Faces.Count,
-                    Solid: validBrep.IsSolid && validBrep.IsManifold,
-                    Loops: [.. validBrep.Loops.Select((l, i) => {
-                        using Curve? loopCurve = l.To3dCurve();
-                        return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
-                    }),
-                    ]))
-                .Bind(data => data switch {
-                    (int v, int e, int f, bool solid, IReadOnlyList<(int LoopIndex, bool IsHole)> loops) when v > 0 && e > 0 && f > 0 => (solid, Numerator: e - v - f + 2) switch {
-                        (true, int numerator) when numerator >= 0 && (numerator & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: numerator / 2, Loops: loops, IsSolid: solid, HandleCount: numerator / 2)),
-                        (true, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
-                        (false, _) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: solid, HandleCount: 0)),
-                    },
-                    _ => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
-                });
 }

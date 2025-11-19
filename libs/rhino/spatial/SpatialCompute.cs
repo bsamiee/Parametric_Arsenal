@@ -12,6 +12,8 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
+    private static readonly ConcurrentDictionary<Type, Func<GeometryBase, Point3d>> _centroidExtractorCache = new();
+
     private static readonly IComparer<Type> _typeSpecificity = Comparer<Type>.Create(static (left, right) =>
         left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
 
@@ -21,8 +23,6 @@ internal static class SpatialCompute {
             .OrderByDescending(static kv => kv.Key.InputType, _typeSpecificity)
             .Select(static kv => (kv.Key.InputType, kv.Value.CentroidExtractor!)),
         ];
-
-    private static readonly ConcurrentDictionary<Type, Func<GeometryBase, Point3d>> _centroidExtractorCache = new();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterKMeans<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase {

@@ -8,6 +8,17 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Operation types, validation dispatch, and healing configuration for topology.</summary>
 [Pure]
 internal static class TopologyConfig {
+    /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
+    internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
+        new Dictionary<Type, double> {
+            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
+            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
+            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
+            [typeof(Topology.CombinedStrategy)] = 1.0,
+            [typeof(Topology.TargetedJoinStrategy)] = 100.0,
+            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
+        }.ToFrozenDictionary();
+
     /// <summary>Operation metadata: (Type, OpType) to (ValidationMode, Name) mapping.</summary>
     internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), (V ValidationMode, string OpName)> OperationMeta =
         new Dictionary<(Type, OpType), (V, string)> {
@@ -28,22 +39,11 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
-    internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
-        new Dictionary<Type, double> {
-            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
-            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
-            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
-            [typeof(Topology.CombinedStrategy)] = 1.0,
-            [typeof(Topology.TargetedJoinStrategy)] = 100.0,
-            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
-        }.ToFrozenDictionary();
-
-    /// <summary>Topology operation types for dispatch lookup.</summary>
-    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
-
     internal const double CurvatureThresholdRatio = 0.1;
     internal const double MinLoopLength = 1e-6;
     internal const double NearMissMultiplier = 100.0;
     internal const int MaxEdgesForNearMissAnalysis = 100;
+
+    /// <summary>Topology operation types for dispatch lookup.</summary>
+    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
 }
