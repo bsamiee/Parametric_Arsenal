@@ -4,7 +4,6 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Collections;
 using Rhino.Geometry;
@@ -19,19 +18,21 @@ internal static class ExtractionCore {
     internal static Result<IReadOnlyList<Point3d>> ExecutePoints<T>(T geometry, Extraction.PointOperation operation, IGeometryContext context) where T : GeometryBase =>
         !ExtractionConfig.PointOperations.TryGetValue(operation.GetType(), out ExtractionConfig.ExtractionOperationMetadata? opMeta)
             ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext($"Unknown point operation: {operation.GetType().Name}"))
-            : NormalizeGeometry(geometry: geometry, _: operation) switch {
-                (GeometryBase normalized, bool shouldDispose) => {
-                    Result<IReadOnlyList<Point3d>> result = UnifiedOperation.Apply(
-                        input: normalized,
-                        operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
-                        config: new OperationConfig<GeometryBase, Point3d> {
-                            Context = context,
-                            ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
-                            OperationName = opMeta.OperationName,
-                        });
-                    _ = shouldDispose ? (normalized as IDisposable)?.Dispose() : null;
-                    return result;
-                },
+            : ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                (GeometryBase normalized, bool shouldDispose) = NormalizeGeometry(geometry: geometry, _: operation);
+                Result<IReadOnlyList<Point3d>> result = UnifiedOperation.Apply(
+                    input: normalized,
+                    operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
+                    config: new OperationConfig<GeometryBase, Point3d> {
+                        Context = context,
+                        ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
+                        OperationName = opMeta.OperationName,
+                    });
+                if (shouldDispose) {
+                    (normalized as IDisposable)?.Dispose();
+                }
+                return result;
+            }))();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Curve>> ExecuteCurves<T>(T geometry, Extraction.CurveOperation operation, IGeometryContext context) where T : GeometryBase =>

@@ -621,7 +621,7 @@ internal static class MorphologyCompute {
                 ? ((Func<Result<Mesh>>)(() => {
                     Mesh unwrapped = mesh.DuplicateMesh();
                     using MeshUnwrapper unwrapper = new(unwrapped);
-                    bool success = unwrapper.Unwrap(method: default(MeshUnwrapMethod));
+                    bool success = unwrapper.Unwrap(method: default);
                     return success && unwrapped.TextureCoordinates.Count > 0
                         ? ResultFactory.Create(value: unwrapped)
                         : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Planar unwrap failed"));

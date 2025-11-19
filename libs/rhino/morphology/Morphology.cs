@@ -88,12 +88,6 @@ public static class Morphology {
     /// <summary>Taubin smoothing with λ-μ filtering to prevent shrinkage.</summary>
     public sealed record TaubinSmoothing(int Iterations, double Lambda, double Mu) : SmoothingStrategy(Iterations, LockBoundary: false);
 
-    /// <summary>Cage deformation with control point displacement.</summary>
-    public sealed record CageDeformOperation(
-        GeometryBase Cage,
-        Point3d[] OriginalControlPoints,
-        Point3d[] DeformedControlPoints) : Operation;
-
     /// <summary>Mesh reduction with quality preservation.</summary>
     public sealed record MeshReductionOperation(int TargetFaceCount, bool PreserveBoundary, double Accuracy) : Operation;
 
@@ -102,6 +96,12 @@ public static class Morphology {
 
     /// <summary>Mesh thickening to create solid shell.</summary>
     public sealed record MeshThickenOperation(double OffsetDistance, bool Solidify, Vector3d Direction) : Operation;
+
+    /// <summary>Cage deformation with control point displacement.</summary>
+    public sealed record CageDeformOperation(
+        GeometryBase Cage,
+        Point3d[] OriginalControlPoints,
+        Point3d[] DeformedControlPoints) : Operation;
 
     /// <summary>Cage deformation with displacement and volume metrics.</summary>
     [DebuggerDisplay("{DebuggerDisplay}")]

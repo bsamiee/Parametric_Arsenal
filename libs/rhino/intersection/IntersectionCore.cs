@@ -387,7 +387,8 @@ internal static class IntersectionCore {
                         Type: new Intersection.IntersectionType(tuple.Type),
                         ApproachAngles: tuple.ApproachAngles,
                         IsGrazing: tuple.IsGrazing,
-                        BlendScore: tuple.BlendScore),])),
+                        BlendScore: tuple.BlendScore),
+                    ])),
             config: new OperationConfig<GeometryBase, Intersection.ClassificationResult> {
                 Context = context,
                 ValidationMode = IntersectionConfig.ClassificationOperation.ValidationModeA,
@@ -407,7 +408,8 @@ internal static class IntersectionCore {
                     .Map(tuple => (IReadOnlyList<Intersection.NearMissResult>)[new Intersection.NearMissResult(
                         LocationsA: tuple.Item1,
                         LocationsB: tuple.Item2,
-                        Distances: tuple.Item3),])),
+                        Distances: tuple.Item3),
+                    ])),
             config: new OperationConfig<GeometryBase, Intersection.NearMissResult> {
                 Context = context,
                 ValidationMode = IntersectionConfig.NearMissOperation.ValidationModeA,
@@ -427,7 +429,8 @@ internal static class IntersectionCore {
                     .Map(tuple => (IReadOnlyList<Intersection.StabilityResult>)[new Intersection.StabilityResult(
                         StabilityScore: tuple.Score,
                         PerturbationSensitivity: tuple.Sensitivity,
-                        UnstableFlags: tuple.UnstableFlags),])),
+                        UnstableFlags: tuple.UnstableFlags),
+                    ])),
             config: new OperationConfig<GeometryBase, Intersection.StabilityResult> {
                 Context = context,
                 ValidationMode = IntersectionConfig.StabilityOperation.ValidationModeA,
