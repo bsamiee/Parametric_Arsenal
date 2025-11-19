@@ -43,22 +43,34 @@ internal static class SpatialCore {
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Input: {typeof(TInput).Name}, Query: {typeof(TQuery).Name}")),
         };
 
-    /// <summary>Algebraic Analyze dispatcher routing to specific implementations.</summary>
+    /// <summary>Algebraic Analyze dispatcher routing to specific implementations via unified table lookup.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<int>> Analyze(Spatial.AnalysisRequest request, IGeometryContext context) =>
         request switch {
             null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Request cannot be null")),
-            Spatial.RangeAnalysis<Point3d[]> r => RunRangeAnalysis(request: r, factory: BuildPointArrayTree, validationMode: V.None, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.PointArrayRange, context: context),
-            Spatial.RangeAnalysis<PointCloud> r => RunRangeAnalysis(request: r, factory: BuildPointCloudTree, validationMode: V.Standard, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.PointCloudRange, context: context),
-            Spatial.RangeAnalysis<Mesh> r => RunRangeAnalysis(request: r, factory: BuildMeshTree, validationMode: V.MeshSpecific, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.MeshRange, context: context),
-            Spatial.RangeAnalysis<Curve[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.Degeneracy, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.CurveArrayRange, context: context),
-            Spatial.RangeAnalysis<Surface[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.BoundingBox, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.SurfaceArrayRange, context: context),
-            Spatial.RangeAnalysis<Brep[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.Topology, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.BrepArrayRange, context: context),
-            Spatial.ProximityAnalysis<Point3d[]> r => RunProximityAnalysis(request: r, kNearest: RTree.Point3dKNeighbors, distLimited: RTree.Point3dClosestPoints, validationMode: V.None, operationName: SpatialConfig.OperationNames.PointArrayProximity, context: context),
-            Spatial.ProximityAnalysis<PointCloud> r => RunProximityAnalysis(request: r, kNearest: RTree.PointCloudKNeighbors, distLimited: RTree.PointCloudClosestPoints, validationMode: V.Standard, operationName: SpatialConfig.OperationNames.PointCloudProximity, context: context),
+            Spatial.RangeAnalysis<Point3d[]> r => RunRangeWithLookup(r, typeof(Point3d[]), BuildPointArrayTree, context),
+            Spatial.RangeAnalysis<PointCloud> r => RunRangeWithLookup(r, typeof(PointCloud), BuildPointCloudTree, context),
+            Spatial.RangeAnalysis<Mesh> r => RunRangeWithLookup(r, typeof(Mesh), BuildMeshTree, context),
+            Spatial.RangeAnalysis<Curve[]> r => RunRangeWithLookup(r, typeof(Curve[]), BuildGeometryArrayTree, context),
+            Spatial.RangeAnalysis<Surface[]> r => RunRangeWithLookup(r, typeof(Surface[]), BuildGeometryArrayTree, context),
+            Spatial.RangeAnalysis<Brep[]> r => RunRangeWithLookup(r, typeof(Brep[]), BuildGeometryArrayTree, context),
+            Spatial.ProximityAnalysis<Point3d[]> r => RunProximityWithLookup(r, typeof(Point3d[]), RTree.Point3dKNeighbors, RTree.Point3dClosestPoints, context),
+            Spatial.ProximityAnalysis<PointCloud> r => RunProximityWithLookup(r, typeof(PointCloud), RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints, context),
             Spatial.MeshOverlapAnalysis r => RunMeshOverlapAnalysis(request: r, context: context),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported analysis request: {request.GetType().Name}")),
         };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
 
     /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -179,38 +191,37 @@ internal static class SpatialCore {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<int>> RunMeshOverlapAnalysis(Spatial.MeshOverlapAnalysis request, IGeometryContext context) {
-        Result<IReadOnlyList<int>> Operation(Mesh first) {
-            using RTree tree1 = BuildMeshTree(first);
-            using RTree tree2 = BuildMeshTree(request.Second);
-            double tolerance = context.AbsoluteTolerance + request.AdditionalTolerance;
-            int bufferSize = request.BufferSize ?? SpatialConfig.LargeBufferSize;
-            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-            int count = 0;
-            try {
-                void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                    _ = count + 1 < buffer.Length
-                        ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
-                        : default;
-                }
-                return RTree.SearchOverlaps(tree1, tree2, tolerance, CollectOverlaps)
-                    ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
-                    : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
-            } finally {
-                ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
-            }
-        }
-
-        return UnifiedOperation.Apply(
-            input: request.First,
-            operation: (Func<Mesh, Result<IReadOnlyList<int>>>)Operation,
-            config: new OperationConfig<Mesh, int> {
-                Context = context,
-                ValidationMode = V.MeshSpecific,
-                OperationName = SpatialConfig.OperationNames.MeshOverlap,
-                EnableDiagnostics = false,
-            });
-    }
+    private static Result<IReadOnlyList<int>> RunMeshOverlapAnalysis(Spatial.MeshOverlapAnalysis request, IGeometryContext context) =>
+        SpatialConfig.Operations.TryGetValue((typeof(Mesh), "Overlap"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? UnifiedOperation.Apply(
+                input: request.First,
+                operation: (Func<Mesh, Result<IReadOnlyList<int>>>)(first => {
+                    using RTree tree1 = BuildMeshTree(first);
+                    using RTree tree2 = BuildMeshTree(request.Second);
+                    double tolerance = context.AbsoluteTolerance + request.AdditionalTolerance;
+                    int bufferSize = request.BufferSize ?? meta.BufferSize;
+                    int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+                    int count = 0;
+                    try {
+                        void CollectOverlaps(object? sender, RTreeEventArgs args) {
+                            _ = count + 1 < buffer.Length
+                                ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
+                                : default;
+                        }
+                        return RTree.SearchOverlaps(tree1, tree2, tolerance, CollectOverlaps)
+                            ? ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : [])
+                            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed);
+                    } finally {
+                        ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
+                    }
+                }),
+                config: new OperationConfig<Mesh, int> {
+                    Context = context,
+                    ValidationMode = meta.ValidationMode,
+                    OperationName = meta.OperationName,
+                    EnableDiagnostics = false,
+                })
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Mesh overlap operation not configured"));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildPointArrayTree(Point3d[] points) =>

@@ -77,11 +77,12 @@ internal static class TopologyCompute {
 
                     foreach (Topology.Strategy currentStrategy in strategies) {
                         Brep copy = validBrep.DuplicateBrep();
+                        double toleranceMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(currentStrategy.GetType(), out double mult) ? mult : 1.0;
                         bool success = currentStrategy switch {
-                            Topology.ConservativeRepairStrategy => copy.Repair(TopologyConfig.ConservativeRepairMultiplier * context.AbsoluteTolerance),
-                            Topology.ModerateJoinStrategy => copy.JoinNakedEdges(TopologyConfig.ModerateJoinMultiplier * context.AbsoluteTolerance) > 0,
-                            Topology.AggressiveJoinStrategy => copy.JoinNakedEdges(TopologyConfig.AggressiveJoinMultiplier * context.AbsoluteTolerance) > 0,
-                            Topology.CombinedStrategy => copy.Repair(TopologyConfig.ConservativeRepairMultiplier * context.AbsoluteTolerance) && copy.JoinNakedEdges(TopologyConfig.ModerateJoinMultiplier * context.AbsoluteTolerance) > 0,
+                            Topology.ConservativeRepairStrategy => copy.Repair(toleranceMultiplier * context.AbsoluteTolerance),
+                            Topology.ModerateJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
+                            Topology.AggressiveJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
+                            Topology.CombinedStrategy => copy.Repair((TopologyConfig.StrategyToleranceMultipliers.GetValueOrDefault(typeof(Topology.ConservativeRepairStrategy), 0.1)) * context.AbsoluteTolerance) && copy.JoinNakedEdges((TopologyConfig.StrategyToleranceMultipliers.GetValueOrDefault(typeof(Topology.ModerateJoinStrategy), 1.0)) * context.AbsoluteTolerance) > 0,
                             Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
                                 double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;

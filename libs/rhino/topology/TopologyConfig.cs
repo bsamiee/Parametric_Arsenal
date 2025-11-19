@@ -28,20 +28,15 @@ internal static class TopologyConfig {
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
-    /// <summary>Healing strategy tolerance multipliers for progressive topology repair.</summary>
-    internal const double ConservativeRepairMultiplier = 0.1;
-    internal const double ModerateJoinMultiplier = 1.0;
-    internal const double AggressiveJoinMultiplier = 10.0;
-
     /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
     internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
         new Dictionary<Type, double> {
-            [typeof(Topology.ConservativeRepairStrategy)] = ConservativeRepairMultiplier,
-            [typeof(Topology.ModerateJoinStrategy)] = ModerateJoinMultiplier,
-            [typeof(Topology.AggressiveJoinStrategy)] = AggressiveJoinMultiplier,
-            [typeof(Topology.CombinedStrategy)] = ModerateJoinMultiplier,
-            [typeof(Topology.TargetedJoinStrategy)] = NearMissMultiplier,
-            [typeof(Topology.ComponentJoinStrategy)] = ModerateJoinMultiplier,
+            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
+            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
+            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
+            [typeof(Topology.CombinedStrategy)] = 1.0,
+            [typeof(Topology.TargetedJoinStrategy)] = 100.0,
+            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
         }.ToFrozenDictionary();
 
     /// <summary>Topology operation types for dispatch lookup.</summary>

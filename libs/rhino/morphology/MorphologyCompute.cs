@@ -499,11 +499,27 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                for (int i = 0; i < 5; i++) {
-                    byte flag = (byte)(1 << i);
-                    if ((flag & flags) != 0 && MorphologyConfig.RepairOperations.TryGetValue(flag, out (string discard, Func<Mesh, double, bool> action) entry)) {
-                        bool success = entry.action(repaired, tol);
+                List<MorphologyConfig.MorphologyOperationMetadata?> repairMetasList = [];
+                byte[] repairFlags = [
+                    MorphologyConfig.RepairFillHoles,
+                    MorphologyConfig.RepairUnifyNormals,
+                    MorphologyConfig.RepairCullDegenerateFaces,
+                    MorphologyConfig.RepairCompact,
+                    MorphologyConfig.RepairWeld,
+                ];
+                for (int i = 0; i < repairFlags.Length; i++) {
+                    byte flag = repairFlags[i];
+                    MorphologyConfig.MorphologyOperationMetadata? meta =
+                        (flags & flag) != 0
+                            ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)
+                            : null;
+                    if (meta is not null) {
+                        repairMetasList.Add(meta);
                     }
+                }
+                MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [.. repairMetasList];
+                for (int i = 0; i < repairMetas.Length; i++) {
+                    _ = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)

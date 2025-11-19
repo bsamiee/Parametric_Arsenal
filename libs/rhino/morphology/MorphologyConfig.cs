@@ -1,51 +1,63 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Morphology;
 
-/// <summary>Morphology operation configuration constants and dispatch tables.</summary>
+/// <summary>Morphology operation configuration constants and unified singular dispatch table.</summary>
 internal static class MorphologyConfig {
-    /// <summary>Map subdivision strategy to internal algorithm code.</summary>
-    [Pure]
-    internal static byte GetSubdivisionAlgorithm(Morphology.SubdivisionStrategy strategy) =>
-        strategy switch {
-            Morphology.CatmullClarkSubdivision => OpSubdivideCatmullClark,
-            Morphology.LoopSubdivision => OpSubdivideLoop,
-            Morphology.ButterflySubdivision => OpSubdivideButterfly,
-            _ => 0,
-        };
+    /// <summary>Unified morphology operation metadata with discriminators for algorithm codes and repair actions.</summary>
+    internal sealed record MorphologyOperationMetadata(
+        V ValidationMode,
+        string OperationName,
+        byte? AlgorithmCode = null,
+        byte? RepairFlags = null,
+        double? DefaultTolerance = null,
+        Func<Mesh, double, bool>? RepairAction = null);
 
-    /// <summary>Map repair strategy to internal flags and tolerance.</summary>
-    [Pure]
-    internal static (byte Flags, double Tolerance) GetRepairFlags(Morphology.MeshRepairStrategy strategy) =>
-        strategy switch {
-            Morphology.FillHolesRepair => (RepairFillHoles, DefaultWeldTolerance),
-            Morphology.UnifyNormalsRepair => (RepairUnifyNormals, DefaultWeldTolerance),
-            Morphology.CullDegenerateFacesRepair => (RepairCullDegenerateFaces, DefaultWeldTolerance),
-            Morphology.CompactRepair => (RepairCompact, DefaultWeldTolerance),
-            Morphology.WeldRepair => (RepairWeld, DefaultWeldTolerance),
-            Morphology.CompositeRepair composite => (
-                composite.Strategies.Aggregate(RepairNone, (acc, s) => (byte)(acc | GetRepairFlags(s).Flags)),
-                composite.WeldTolerance),
-            _ => (RepairNone, DefaultWeldTolerance),
-        };
+    /// <summary>Singular unified operation dispatch table: operation type → metadata.</summary>
+    internal static readonly FrozenDictionary<Type, MorphologyOperationMetadata> Operations =
+        new Dictionary<Type, MorphologyOperationMetadata> {
+            [typeof(Morphology.CatmullClarkSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.CatmullClark", AlgorithmCode: OpSubdivideCatmullClark),
+            [typeof(Morphology.LoopSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Loop", AlgorithmCode: OpSubdivideLoop),
+            [typeof(Morphology.ButterflySubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Butterfly", AlgorithmCode: OpSubdivideButterfly),
+            [typeof(Morphology.PlanarUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Planar", AlgorithmCode: OpUnwrapPlanar),
+            [typeof(Morphology.CylindricalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Cylindrical", AlgorithmCode: OpUnwrapCylindrical),
+            [typeof(Morphology.SphericalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Spherical", AlgorithmCode: OpUnwrapSpherical),
+            [typeof(Morphology.FillHolesRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.FillHoles", RepairFlags: RepairFillHoles, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.FillHoles()),
+            [typeof(Morphology.UnifyNormalsRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.UnifyNormals", RepairFlags: RepairUnifyNormals, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.UnifyNormals() >= 0),
+            [typeof(Morphology.CullDegenerateFacesRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.CullDegenerateFaces", RepairFlags: RepairCullDegenerateFaces, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
+            [typeof(Morphology.CompactRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.Compact", RepairFlags: RepairCompact, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.Compact()),
+            [typeof(Morphology.WeldRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.Weld", RepairFlags: RepairWeld, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true)),
+            [typeof(Morphology.CageDeformOperation)] = new(V.Standard | V.Topology, "Morphology.CageDeform"),
+            [typeof(Morphology.LaplacianSmoothing)] = new(V.Standard | V.MeshSpecific, "Morphology.LaplacianSmoothing"),
+            [typeof(Morphology.TaubinSmoothing)] = new(V.Standard | V.MeshSpecific, "Morphology.TaubinSmoothing"),
+            [typeof(Morphology.MeanCurvatureFlowSmoothing)] = new(V.Standard | V.MeshSpecific, "Morphology.MeanCurvatureFlow"),
+            [typeof(Morphology.MeshOffsetOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshOffset"),
+            [typeof(Morphology.MeshReductionOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshReduction"),
+            [typeof(Morphology.IsotropicRemeshOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshRemesh"),
+            [typeof(Morphology.BrepToMeshOperation)] = new(V.Standard | V.Topology, "Morphology.BrepToMesh"),
+            [typeof(Morphology.MeshThickenOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshThicken"),
+            [typeof(Morphology.MeshSeparateOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshSeparate"),
+            [typeof(Morphology.MeshWeldOperation)] = new(V.Standard | V.MeshSpecific, "Morphology.MeshWeld"),
+            [typeof(Morphology.CompositeRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.CompositeRepair"),
+        }.ToFrozenDictionary();
 
-    /// <summary>Map unwrap strategy to internal method code.</summary>
-    [Pure]
-    internal static byte GetUnwrapMethod(Morphology.UnwrapStrategy strategy) =>
-        strategy switch {
-            Morphology.PlanarUnwrap => 0,
-            Morphology.CylindricalUnwrap => 1,
-            Morphology.SphericalUnwrap => 2,
-            _ => 0,
-        };
+    /// <summary>Reverse lookup: repair flags → metadata for O(1) access from MorphologyCompute.</summary>
+    internal static readonly FrozenDictionary<byte, MorphologyOperationMetadata> RepairFlagToMetadata =
+        Operations.Values
+            .Where(m => m.RepairFlags.HasValue)
+            .ToFrozenDictionary(m => m.RepairFlags!.Value);
 
-    /// <summary>Internal operation ID constants for compute layer.</summary>
+    /// <summary>Internal operation ID constants for compute layer (used by MorphologyCompute).</summary>
     internal const byte OpSubdivideCatmullClark = 2;
     internal const byte OpSubdivideLoop = 3;
     internal const byte OpSubdivideButterfly = 4;
+    internal const byte OpUnwrapPlanar = 0;
+    internal const byte OpUnwrapCylindrical = 1;
+    internal const byte OpUnwrapSpherical = 2;
 
     /// <summary>Cage deformation configuration.</summary>
     internal const int MinCageControlPoints = 8;
@@ -118,14 +130,4 @@ internal static class MorphologyConfig {
     internal const byte RepairCompact = 8;
     internal const byte RepairWeld = 16;
     internal const byte RepairAll = RepairFillHoles | RepairUnifyNormals | RepairCullDegenerateFaces | RepairCompact | RepairWeld;
-
-    /// <summary>Mesh repair operation dispatch: flag → (operation name, mesh action).</summary>
-    internal static readonly FrozenDictionary<byte, (string Name, Func<Mesh, double, bool> Action)> RepairOperations =
-        new Dictionary<byte, (string, Func<Mesh, double, bool>)> {
-            [RepairFillHoles] = ("FillHoles", static (m, _) => m.FillHoles()),
-            [RepairUnifyNormals] = ("UnifyNormals", static (m, _) => m.UnifyNormals() >= 0),
-            [RepairCullDegenerateFaces] = ("CullDegenerateFaces", static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
-            [RepairCompact] = ("Compact", static (m, _) => m.Compact()),
-            [RepairWeld] = ("Weld", static (m, _) => m.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true)),
-        }.ToFrozenDictionary();
 }
