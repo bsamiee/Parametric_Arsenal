@@ -8,13 +8,6 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and unified polymorphic dispatch table.</summary>
 [Pure]
 internal static class SpatialConfig {
-    /// <summary>Unified spatial operation metadata with discriminators for tree building and operation type.</summary>
-    internal sealed record SpatialOperationMetadata(
-        V ValidationMode,
-        string OperationName,
-        int BufferSize,
-        Func<GeometryBase, Point3d>? CentroidExtractor = null);
-
     /// <summary>Singular unified operation dispatch table: (InputType, OperationType) → metadata.</summary>
     internal static readonly FrozenDictionary<(Type InputType, string OperationType), SpatialOperationMetadata> Operations =
         new Dictionary<(Type, string), SpatialOperationMetadata> {
@@ -36,12 +29,19 @@ internal static class SpatialConfig {
             [(typeof(GeometryBase), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g.GetBoundingBox(accurate: false).Center),
         }.ToFrozenDictionary();
 
-    /// <summary>K-means clustering algorithm parameters.</summary>
-    internal const int KMeansMaxIterations = 100;
-    internal const int KMeansSeed = 42;
+    /// <summary>Unified spatial operation metadata with discriminators for tree building and operation type.</summary>
+    internal sealed record SpatialOperationMetadata(
+        V ValidationMode,
+        string OperationName,
+        int BufferSize,
+        Func<GeometryBase, Point3d>? CentroidExtractor = null);
 
     /// <summary>DBSCAN clustering algorithm parameters.</summary>
     internal const int DBSCANRTreeThreshold = 100;
+
+    /// <summary>K-means clustering algorithm parameters.</summary>
+    internal const int KMeansMaxIterations = 100;
+    internal const int KMeansSeed = 42;
 
     /// <summary>Medial axis sampling bounds for planar boundary analysis.</summary>
     internal const int MedialAxisMinSampleCount = 50;
