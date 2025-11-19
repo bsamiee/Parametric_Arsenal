@@ -56,7 +56,7 @@ public static class Intersection {
     /// <summary>Result of intersection classification analysis.</summary>
     [DebuggerDisplay("Type={Type}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
     public sealed record ClassificationResult(
-        byte Type,
+        IntersectionType Type,
         double[] ApproachAngles,
         bool IsGrazing,
         double BlendScore);
