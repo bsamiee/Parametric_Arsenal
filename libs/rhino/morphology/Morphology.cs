@@ -91,12 +91,6 @@ public static class Morphology {
     /// <summary>Planar unwrap projection.</summary>
     public sealed record PlanarUnwrap : UnwrapStrategy;
 
-    /// <summary>Cylindrical unwrap projection.</summary>
-    public sealed record CylindricalUnwrap : UnwrapStrategy;
-
-    /// <summary>Spherical unwrap projection.</summary>
-    public sealed record SphericalUnwrap : UnwrapStrategy;
-
     /// <summary>Separate mesh into disconnected components.</summary>
     public sealed record MeshSeparateOperation : Operation;
 

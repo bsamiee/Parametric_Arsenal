@@ -77,7 +77,7 @@ internal static class MorphologyCompute {
         };
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
@@ -248,7 +248,7 @@ internal static class MorphologyCompute {
                     : state;
             });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> SmoothWithConvergence(
         Mesh mesh,
         int maxIterations,
@@ -315,7 +315,7 @@ internal static class MorphologyCompute {
                 }
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> OffsetMesh(
         Mesh mesh,
         double distance,
@@ -336,7 +336,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ReduceMesh(
         Mesh mesh,
         int targetFaceCount,
@@ -371,7 +371,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropic(
         Mesh mesh,
         double targetEdgeLength,
@@ -465,7 +465,7 @@ internal static class MorphologyCompute {
             };
         }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
         (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
         int aspectCount = aspectRatios.Length;
@@ -484,7 +484,7 @@ internal static class MorphologyCompute {
                 : ResultFactory.Create(value: mesh);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
         byte flags,
@@ -525,7 +525,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
         mesh switch { { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
             Mesh m => ((Func<Result<Mesh[]>>)(() => {
@@ -536,7 +536,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> WeldMeshVertices(
         Mesh mesh,
         double tolerance,
@@ -558,7 +558,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> BrepToMesh(
         Brep brep,
         MeshingParameters? meshParams,
@@ -590,7 +590,7 @@ internal static class MorphologyCompute {
                 };
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> ThickenMesh(
         Mesh mesh,
         double thickness,
@@ -608,7 +608,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
         byte unwrapMethod,
