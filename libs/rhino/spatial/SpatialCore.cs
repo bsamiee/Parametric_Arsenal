@@ -48,14 +48,14 @@ internal static class SpatialCore {
     internal static Result<IReadOnlyList<int>> Analyze(Spatial.AnalysisRequest request, IGeometryContext context) =>
         request switch {
             null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Request cannot be null")),
-            Spatial.RangeAnalysis<Point3d[]> r => RunRangeAnalysis(request: r, factory: BuildPointArrayTree, validationMode: V.None, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.PointArrayRange, context: context),
-            Spatial.RangeAnalysis<PointCloud> r => RunRangeAnalysis(request: r, factory: BuildPointCloudTree, validationMode: V.Standard, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.PointCloudRange, context: context),
-            Spatial.RangeAnalysis<Mesh> r => RunRangeAnalysis(request: r, factory: BuildMeshTree, validationMode: V.MeshSpecific, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.MeshRange, context: context),
-            Spatial.RangeAnalysis<Curve[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.Degeneracy, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.CurveArrayRange, context: context),
-            Spatial.RangeAnalysis<Surface[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.BoundingBox, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.SurfaceArrayRange, context: context),
-            Spatial.RangeAnalysis<Brep[]> r => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: V.Topology, defaultBuffer: SpatialConfig.DefaultBufferSize, operationName: SpatialConfig.OperationNames.BrepArrayRange, context: context),
-            Spatial.ProximityAnalysis<Point3d[]> r => RunProximityAnalysis(request: r, kNearest: RTree.Point3dKNeighbors, distLimited: RTree.Point3dClosestPoints, validationMode: V.None, operationName: SpatialConfig.OperationNames.PointArrayProximity, context: context),
-            Spatial.ProximityAnalysis<PointCloud> r => RunProximityAnalysis(request: r, kNearest: RTree.PointCloudKNeighbors, distLimited: RTree.PointCloudClosestPoints, validationMode: V.Standard, operationName: SpatialConfig.OperationNames.PointCloudProximity, context: context),
+            Spatial.RangeAnalysis<Point3d[]> r when SpatialConfig.RangeOperations.TryGetValue(typeof(Point3d[]), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildPointArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.RangeAnalysis<PointCloud> r when SpatialConfig.RangeOperations.TryGetValue(typeof(PointCloud), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildPointCloudTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.RangeAnalysis<Mesh> r when SpatialConfig.RangeOperations.TryGetValue(typeof(Mesh), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildMeshTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.RangeAnalysis<Curve[]> r when SpatialConfig.RangeOperations.TryGetValue(typeof(Curve[]), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.RangeAnalysis<Surface[]> r when SpatialConfig.RangeOperations.TryGetValue(typeof(Surface[]), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.RangeAnalysis<Brep[]> r when SpatialConfig.RangeOperations.TryGetValue(typeof(Brep[]), out SpatialConfig.RangeOperationMetadata? meta) => RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context),
+            Spatial.ProximityAnalysis<Point3d[]> r when SpatialConfig.ProximityOperations.TryGetValue(typeof(Point3d[]), out SpatialConfig.ProximityOperationMetadata? meta) => RunProximityAnalysis(request: r, kNearest: RTree.Point3dKNeighbors, distLimited: RTree.Point3dClosestPoints, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context),
+            Spatial.ProximityAnalysis<PointCloud> r when SpatialConfig.ProximityOperations.TryGetValue(typeof(PointCloud), out SpatialConfig.ProximityOperationMetadata? meta) => RunProximityAnalysis(request: r, kNearest: RTree.PointCloudKNeighbors, distLimited: RTree.PointCloudClosestPoints, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context),
             Spatial.MeshOverlapAnalysis r => RunMeshOverlapAnalysis(request: r, context: context),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported analysis request: {request.GetType().Name}")),
         };
@@ -206,8 +206,8 @@ internal static class SpatialCore {
             operation: (Func<Mesh, Result<IReadOnlyList<int>>>)Operation,
             config: new OperationConfig<Mesh, int> {
                 Context = context,
-                ValidationMode = V.MeshSpecific,
-                OperationName = SpatialConfig.OperationNames.MeshOverlap,
+                ValidationMode = SpatialConfig.MeshOverlapValidationMode,
+                OperationName = SpatialConfig.MeshOverlapOperationName,
                 EnableDiagnostics = false,
             });
     }

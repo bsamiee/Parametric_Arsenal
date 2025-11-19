@@ -93,14 +93,15 @@ internal static class MorphologyCore {
                     ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                         error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(
                             string.Create(CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}"))),
-                _ => UnifiedOperation.Apply(
-                    input: mesh,
-                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
-                        MorphologyCompute.SubdivideIterative(
-                            m,
-                            MorphologyConfig.GetSubdivisionAlgorithm(strategy),
-                            strategy.Levels,
-                            context).Bind(subdivided => {
+                _ => MorphologyConfig.SubdivisionStrategies.TryGetValue(strategy.GetType(), out MorphologyConfig.SubdivisionMetadata? meta)
+                    ? UnifiedOperation.Apply(
+                        input: mesh,
+                        operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
+                            MorphologyCompute.SubdivideIterative(
+                                m,
+                                meta.AlgorithmCode,
+                                strategy.Levels,
+                                context).Bind(subdivided => {
                                 (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
                                 return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                                     new Morphology.SubdivisionResult(
@@ -114,12 +115,14 @@ internal static class MorphologyCore {
                                         minAngles.Length > 0 ? minAngles.Min() : 0.0),
                                 ]);
                             })),
-                    config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
-                        Context = context,
-                        ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
-                        OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{strategy.GetType().Name}"),
-                        EnableDiagnostics = false,
-                    }),
+                        config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
+                            Context = context,
+                            ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
+                            OperationName = string.Create(CultureInfo.InvariantCulture, $"Morphology.{strategy.GetType().Name}"),
+                            EnableDiagnostics = false,
+                        })
+                    : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                        error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown subdivision strategy: {strategy.GetType().Name}")),
             };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -388,30 +391,60 @@ internal static class MorphologyCore {
         input is not Mesh mesh
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                 error: E.Geometry.InvalidGeometryType.WithContext($"MeshRepair requires Mesh, got: {typeof(T).Name}"))
-            : UnifiedOperation.Apply(
-                input: mesh,
-                operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m => {
-                    (byte flags, double weldTol) = MorphologyConfig.GetRepairFlags(strategy);
-                    return MorphologyCompute.RepairMesh(m, flags, weldTol, context)
-                        .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-                            new Morphology.MeshRepairResult(
-                                repaired,
-                                m.Vertices.Count,
-                                repaired.Vertices.Count,
-                                m.Faces.Count,
-                                repaired.Faces.Count,
-                                flags,
-                                MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
-                                m.DisjointMeshCount > 1,
-                                m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
-                        ]));
-                }),
-                config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = V.Standard | V.Topology | V.MeshSpecific,
-                    OperationName = "Morphology.MeshRepair",
-                    EnableDiagnostics = false,
-                });
+            : strategy switch {
+                Morphology.CompositeRepair composite => UnifiedOperation.Apply(
+                    input: mesh,
+                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m => {
+                        byte flags = composite.Strategies.Aggregate(
+                            MorphologyConfig.RepairNone,
+                            (acc, s) => MorphologyConfig.RepairStrategies.TryGetValue(s.GetType(), out (byte Flags, double Tolerance) meta)
+                                ? (byte)(acc | meta.Flags)
+                                : acc);
+                        return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
+                            .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                new Morphology.MeshRepairResult(
+                                    repaired,
+                                    m.Vertices.Count,
+                                    repaired.Vertices.Count,
+                                    m.Faces.Count,
+                                    repaired.Faces.Count,
+                                    flags,
+                                    MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
+                                    m.DisjointMeshCount > 1,
+                                    m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
+                            ]));
+                    }),
+                    config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
+                        Context = context,
+                        ValidationMode = V.Standard | V.MeshSpecific,
+                        OperationName = "Morphology.CompositeRepair",
+                        EnableDiagnostics = false,
+                    }),
+                _ when MorphologyConfig.RepairStrategies.TryGetValue(strategy.GetType(), out (byte Flags, double Tolerance) meta) => UnifiedOperation.Apply(
+                    input: mesh,
+                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
+                        MorphologyCompute.RepairMesh(m, meta.Flags, meta.Tolerance, context)
+                            .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                new Morphology.MeshRepairResult(
+                                    repaired,
+                                    m.Vertices.Count,
+                                    repaired.Vertices.Count,
+                                    m.Faces.Count,
+                                    repaired.Faces.Count,
+                                    meta.Flags,
+                                    MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
+                                    m.DisjointMeshCount > 1,
+                                    m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
+                            ]))),
+                    config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
+                        Context = context,
+                        ValidationMode = V.Standard | V.Topology | V.MeshSpecific,
+                        OperationName = "Morphology.MeshRepair",
+                        EnableDiagnostics = false,
+                    }),
+                _ => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                    error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown repair strategy: {strategy.GetType().Name}")),
+            };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSeparate<T>(
@@ -583,10 +616,11 @@ internal static class MorphologyCore {
         input is not Mesh mesh
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                 error: E.Geometry.InvalidGeometryType.WithContext($"MeshUnwrap requires Mesh, got: {typeof(T).Name}"))
-            : UnifiedOperation.Apply(
-                input: mesh,
-                operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
-                    MorphologyCompute.UnwrapMesh(m, MorphologyConfig.GetUnwrapMethod(strategy), context)
+            : MorphologyConfig.UnwrapStrategies.TryGetValue(strategy.GetType(), out MorphologyConfig.UnwrapMetadata? unwrapMeta)
+                ? UnifiedOperation.Apply(
+                    input: mesh,
+                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
+                        MorphologyCompute.UnwrapMesh(m, unwrapMeta.MethodCode, context)
                         .Bind(unwrapped => {
                             bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
                             double minU = double.MaxValue;
@@ -618,10 +652,12 @@ internal static class MorphologyCore {
                                     coverage),
                             ]);
                         })),
-                config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
-                    Context = context,
-                    ValidationMode = V.Standard | V.MeshSpecific,
-                    OperationName = "Morphology.MeshUnwrap",
-                    EnableDiagnostics = false,
-                });
+                    config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
+                        Context = context,
+                        ValidationMode = V.Standard | V.MeshSpecific,
+                        OperationName = "Morphology.MeshUnwrap",
+                        EnableDiagnostics = false,
+                    })
+                : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
+                    error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown unwrap strategy: {strategy.GetType().Name}"));
 }

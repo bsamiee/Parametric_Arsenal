@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Spatial;
@@ -7,6 +8,68 @@ namespace Arsenal.Rhino.Spatial;
 /// <summary>Spatial configuration: algorithmic constants and polymorphic dispatch tables.</summary>
 [Pure]
 internal static class SpatialConfig {
+    /// <summary>Range operation metadata: validation mode, operation name, buffer size.</summary>
+    internal sealed record RangeOperationMetadata(
+        V ValidationMode,
+        string OperationName,
+        int BufferSize);
+
+    /// <summary>Proximity operation metadata: validation mode, operation name.</summary>
+    internal sealed record ProximityOperationMetadata(
+        V ValidationMode,
+        string OperationName);
+
+    /// <summary>Unified range operation configuration by geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, RangeOperationMetadata> RangeOperations =
+        new Dictionary<Type, RangeOperationMetadata> {
+            [typeof(Point3d[])] = new(
+                ValidationMode: V.None,
+                OperationName: "Spatial.PointArray.Range",
+                BufferSize: 2048),
+            [typeof(PointCloud)] = new(
+                ValidationMode: V.Standard,
+                OperationName: "Spatial.PointCloud.Range",
+                BufferSize: 2048),
+            [typeof(Mesh)] = new(
+                ValidationMode: V.MeshSpecific,
+                OperationName: "Spatial.Mesh.Range",
+                BufferSize: 2048),
+            [typeof(Curve[])] = new(
+                ValidationMode: V.Degeneracy,
+                OperationName: "Spatial.CurveArray.Range",
+                BufferSize: 2048),
+            [typeof(Surface[])] = new(
+                ValidationMode: V.BoundingBox,
+                OperationName: "Spatial.SurfaceArray.Range",
+                BufferSize: 2048),
+            [typeof(Brep[])] = new(
+                ValidationMode: V.Topology,
+                OperationName: "Spatial.BrepArray.Range",
+                BufferSize: 2048),
+        }.ToFrozenDictionary();
+
+    /// <summary>Unified proximity operation configuration by geometry type.</summary>
+    internal static readonly FrozenDictionary<Type, ProximityOperationMetadata> ProximityOperations =
+        new Dictionary<Type, ProximityOperationMetadata> {
+            [typeof(Point3d[])] = new(
+                ValidationMode: V.None,
+                OperationName: "Spatial.PointArray.Proximity"),
+            [typeof(PointCloud)] = new(
+                ValidationMode: V.Standard,
+                OperationName: "Spatial.PointCloud.Proximity"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Mesh overlap operation configuration.</summary>
+    internal const string MeshOverlapOperationName = "Spatial.Mesh.Overlap";
+    internal static readonly V MeshOverlapValidationMode = V.MeshSpecific;
+    internal const int LargeBufferSize = 4096;
+
+    /// <summary>Clustering operation configuration.</summary>
+    internal const string ClusteringOperationName = "Spatial.Clustering";
+
+    /// <summary>Proximity field operation configuration.</summary>
+    internal const string ProximityFieldOperationName = "Spatial.ProximityField";
+
     /// <summary>Polymorphic centroid extractors for clustering operations.</summary>
     internal static readonly FrozenDictionary<Type, Func<GeometryBase, Point3d>> CentroidExtractors =
         new Dictionary<Type, Func<GeometryBase, Point3d>> {
@@ -16,25 +79,6 @@ internal static class SpatialConfig {
             [typeof(Mesh)] = static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin,
             [typeof(GeometryBase)] = static g => g.GetBoundingBox(accurate: false).Center,
         }.ToFrozenDictionary();
-
-    /// <summary>Operation names for diagnostics and error reporting.</summary>
-    internal static class OperationNames {
-        internal const string PointArrayRange = "Spatial.PointArray.Range";
-        internal const string PointArrayProximity = "Spatial.PointArray.Proximity";
-        internal const string PointCloudRange = "Spatial.PointCloud.Range";
-        internal const string PointCloudProximity = "Spatial.PointCloud.Proximity";
-        internal const string MeshRange = "Spatial.Mesh.Range";
-        internal const string MeshOverlap = "Spatial.Mesh.Overlap";
-        internal const string CurveArrayRange = "Spatial.CurveArray.Range";
-        internal const string SurfaceArrayRange = "Spatial.SurfaceArray.Range";
-        internal const string BrepArrayRange = "Spatial.BrepArray.Range";
-        internal const string Clustering = "Spatial.Clustering";
-        internal const string ProximityField = "Spatial.ProximityField";
-    }
-
-    /// <summary>Buffer sizes for RTree spatial query operations.</summary>
-    internal const int DefaultBufferSize = 2048;
-    internal const int LargeBufferSize = 4096;
 
     /// <summary>K-means clustering algorithm parameters.</summary>
     internal const int KMeansMaxIterations = 100;
