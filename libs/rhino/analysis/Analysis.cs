@@ -171,19 +171,19 @@ public static class Analysis {
     public static Result<(double[] GaussianCurvatures, double[] MeanCurvatures, (double U, double V)[] SingularityLocations, double UniformityScore)> AnalyzeSurfaceQuality(
         Surface surface,
         IGeometryContext context) =>
-        AnalysisCompute.SurfaceQuality(surface: surface, context: context);
+        AnalysisCore.ExecuteSurfaceQuality(surface: surface, context: context);
 
     /// <summary>Analyzes curve fairness via curvature variation and inflection detection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double SmoothnessScore, double[] CurvatureValues, (double Parameter, bool IsSharp)[] InflectionPoints, double BendingEnergy)> AnalyzeCurveFairness(
         Curve curve,
         IGeometryContext context) =>
-        AnalysisCompute.CurveFairness(curve: curve, context: context);
+        AnalysisCore.ExecuteCurveFairness(curve: curve, context: context);
 
     /// <summary>Analyzes mesh quality for FEA via aspect ratio, skewness, and Jacobian metrics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaceIndices, (int WarningCount, int CriticalCount) QualityFlags)> AnalyzeMeshForFEA(
         Mesh mesh,
         IGeometryContext context) =>
-        AnalysisCompute.MeshForFEA(mesh: mesh, context: context);
+        AnalysisCore.ExecuteMeshFEA(mesh: mesh, context: context);
 }
