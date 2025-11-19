@@ -1,5 +1,6 @@
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
@@ -14,12 +15,12 @@ namespace Arsenal.Rhino.Intersection;
 internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
-        static Result<(byte, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
+    internal static Result<Intersect.ClassificationResult> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+        static Result<Intersect.ClassificationResult> curveSurfaceClassifier(double[] angles) {
             double averageDeviation = angles.Sum(angle => Math.Abs(RhinoMath.HalfPI - angle)) / angles.Length;
             bool grazing = angles.Any(angle => Math.Abs(RhinoMath.HalfPI - angle) <= IntersectionConfig.GrazingAngleThreshold);
             bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
-            return ResultFactory.Create(value: (
+            return ResultFactory.Create(value: new Intersect.ClassificationResult(
                 Type: tangent ? (byte)0 : (byte)1,
                 ApproachAngles: angles,
                 IsGrazing: grazing,
@@ -29,7 +30,7 @@ internal static class IntersectionCompute {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        static Result<(byte, double[], bool, double)> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersect.IntersectionOutput output, int count, double[] parameters) =>
+        static Result<Intersect.ClassificationResult> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersect.IntersectionOutput output, int count, double[] parameters) =>
             Enumerable.Range(0, count)
                 .Select(index => (Tangent: curve.TangentAt(parameters[index]), Point: output.Points[index]))
                 .Select(tuple => tuple.Tangent.IsValid && surface.ClosestPoint(tuple.Point, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
@@ -38,18 +39,18 @@ internal static class IntersectionCompute {
                 .Where(angle => RhinoMath.IsValidDouble(angle))
                 .ToArray() is double[] angles && angles.Length > 0
                     ? curveSurfaceClassifier(angles)
-                    : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed);
+                    : ResultFactory.Create<Intersect.ClassificationResult>(error: E.Geometry.ClassificationFailed);
 
         return IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
                     (V modeA, V modeB) = entry.Swapped
-                        ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
-                        : (entry.Strategy.ModeA, entry.Strategy.ModeB);
+                        ? (entry.Strategy.Metadata.ModeB, entry.Strategy.Metadata.ModeA)
+                        : (entry.Strategy.Metadata.ModeA, entry.Strategy.Metadata.ModeB);
 
                     return validate(geomA, context, modeA)
                         .Bind(validA => validate(geomB, context, modeB)
                             .Bind(validB => (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
-                                (0, _, _) => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
+                                (0, _, _) => ResultFactory.Create<Intersect.ClassificationResult>(error: E.Geometry.InsufficientIntersectionData),
                                 (int count, int parametersA, int parametersB) => (validA, validB) switch {
                                     (Curve curveA, Curve curveB) when parametersA >= count && parametersB >= count => Enumerable.Range(0, count)
                                         .Select(index => (curveA.TangentAt(output.ParametersA[index]), curveB.TangentAt(output.ParametersB[index])) is (Vector3d tangentA, Vector3d tangentB) && tangentA.IsValid && tangentB.IsValid
@@ -57,12 +58,16 @@ internal static class IntersectionCompute {
                                             : RhinoMath.UnsetValue)
                                         .Where(angle => RhinoMath.IsValidDouble(angle))
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
-                                            ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
-                                            : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
+                                            ? ResultFactory.Create(value: new Intersect.ClassificationResult(
+                                                Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1,
+                                                ApproachAngles: angles,
+                                                IsGrazing: angles.Any(angle => angle < IntersectionConfig.GrazingAngleThreshold),
+                                                BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
+                                            : ResultFactory.Create<Intersect.ClassificationResult>(error: E.Geometry.ClassificationFailed),
                                     (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA]),
                                     (Surface surface, Curve curve) when parametersB >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersB]),
-                                    _ when parametersA < count || parametersB < count => ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-                                    _ => ResultFactory.Create(value: ((byte)2, Array.Empty<double>(), false, 0.0)),
+                                    _ when parametersA < count || parametersB < count => ResultFactory.Create<Intersect.ClassificationResult>(error: E.Geometry.InsufficientIntersectionData),
+                                    _ => ResultFactory.Create(value: new Intersect.ClassificationResult((byte)2, Array.Empty<double>(), false, 0.0)),
                                 },
                             }));
                 });
@@ -70,11 +75,11 @@ internal static class IntersectionCompute {
 
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
+    internal static Result<Intersect.NearMissResult> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        static (Point3d[], Point3d[], double[]) toArrays((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
+        static Intersect.NearMissResult ToResult((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
             int count = pairs.Length;
             Point3d[] pointsA = new Point3d[count];
             Point3d[] pointsB = new Point3d[count];
@@ -84,17 +89,17 @@ internal static class IntersectionCompute {
                 pointsB[i] = pairs[i].PointB;
                 distances[i] = pairs[i].Distance;
             }
-            return (pointsA, pointsB, distances);
+            return new Intersect.NearMissResult(pointsA, pointsB, distances);
         }
 
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
-                ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance * {IntersectionConfig.NearMissToleranceMultiplier}")))
+                ? ResultFactory.Create<Intersect.NearMissResult>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance * {IntersectionConfig.NearMissToleranceMultiplier}")))
                 : IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                     .Bind(entry => {
                         (V modeA, V modeB) = entry.Swapped
-                            ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
-                            : (entry.Strategy.ModeA, entry.Strategy.ModeB);
+                            ? (entry.Strategy.Metadata.ModeB, entry.Strategy.Metadata.ModeA)
+                            : (entry.Strategy.Metadata.ModeA, entry.Strategy.Metadata.ModeB);
 
                         return validate(geomA, context, modeA)
                             .Bind(validA => validate(geomB, context, modeB)
@@ -120,9 +125,9 @@ internal static class IntersectionCompute {
                                                         : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
                                                     .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance))
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
-                                                ? ResultFactory.Create(value: toArrays(curvePairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                                ? ResultFactory.Create(value: ToResult(curvePairs))
+                                                : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>()))
+                                            : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
                                         (Curve curve, Surface surface) => Math.Max(IntersectionConfig.MinCurveNearMissSamples, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
                                             ? Enumerable.Range(0, samples)
                                                 .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(samples - 1))))
@@ -131,9 +136,9 @@ internal static class IntersectionCompute {
                                                     : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
                                                 .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
-                                                ? ResultFactory.Create(value: toArrays(pairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                                ? ResultFactory.Create(value: ToResult(pairs))
+                                                : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>()))
+                                            : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
                                         (Brep brepA, Brep brepB) => Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samples && brepA.GetBoundingBox(accurate: false) is BoundingBox bbox
                                             ? Enumerable.Range(0, samples * samples)
                                                 .Select(index => new Point3d(
@@ -145,9 +150,9 @@ internal static class IntersectionCompute {
                                                     : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
                                                 .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
-                                                ? ResultFactory.Create(value: toArrays(brepPairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                                ? ResultFactory.Create(value: ToResult(brepPairs))
+                                                : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>()))
+                                            : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
                                         (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0)
                                                 && (meshB.Vertices.Count > 0)
                                                 && Math.Min(meshA.Vertices.Count, IntersectionConfig.MaxNearMissSamples) is int samplesA
@@ -164,10 +169,10 @@ internal static class IntersectionCompute {
                                                         : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue)))
                                                 .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] meshPairs && meshPairs.Length > 0
-                                                ? ResultFactory.Create(value: toArrays(meshPairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                        _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
+                                                ? ResultFactory.Create(value: ToResult(meshPairs))
+                                                : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>()))
+                                            : ResultFactory.Create(value: new Intersect.NearMissResult(Array.Empty<Point3d>(), Array.Empty<Point3d>(), Array.Empty<double>())),
+                                        _ => ResultFactory.Create<Intersect.NearMissResult>(error: E.Geometry.NearMissSearchFailed),
                                     };
                                 }));
                     });
@@ -175,21 +180,21 @@ internal static class IntersectionCompute {
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) {
+    internal static Result<Intersect.StabilityResult> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
         return baseOutput.Points.Count switch {
-            0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
+            0 => ResultFactory.Create(value: new Intersect.StabilityResult(1.0, 0.0, [])),
             int count => IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
                 .Bind(entry => {
                     (V modeA, V modeB) = entry.Swapped
-                        ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
-                        : (entry.Strategy.ModeA, entry.Strategy.ModeB);
+                        ? (entry.Strategy.Metadata.ModeB, entry.Strategy.Metadata.ModeA)
+                        : (entry.Strategy.Metadata.ModeA, entry.Strategy.Metadata.ModeB);
 
                     return validate(geomA, context, modeA)
                         .Bind(validA => validate(geomB, context, modeB)
-                            .Bind(validB => IntersectionCore.NormalizeOptions(new Intersect.IntersectionOptions(), context)
+                            .Bind(validB => IntersectionCore.NormalizeSettings(Intersect.IntersectionSettings.Default, context)
                                 .Bind(normalized => {
                                     int sqrtSamples = (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount));
                                     (int phiSteps, int thetaSteps) = (sqrtSamples, (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / (double)sqrtSamples));
@@ -202,7 +207,7 @@ internal static class IntersectionCompute {
                                         .Take(IntersectionConfig.StabilitySampleCount),
                                     ];
                                     double perturbationDistance = validA.GetBoundingBox(accurate: false).Diagonal.Length * IntersectionConfig.StabilityPerturbationFactor;
-                                    Result<(double Score, double Sensitivity, bool[] UnstableFlags)> defaultResult = ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
+                                    Result<Intersect.StabilityResult> defaultResult = ResultFactory.Create(value: new Intersect.StabilityResult(1.0, 0.0, [.. Enumerable.Repeat(element: false, count: count)]));
 
                                     (double Delta, IDisposable? Resource) perturbAndIntersect(Vector3d direction, GeometryBase original) =>
                                         original switch {
@@ -231,9 +236,9 @@ internal static class IntersectionCompute {
                                     try {
                                         double[] filtered = [.. perturbations.Select(entry => entry.Delta).Where(delta => RhinoMath.IsValidDouble(delta))];
                                         return filtered.Length > 0
-                                            ? ResultFactory.Create<(double Score, double Sensitivity, bool[] UnstableFlags)>(value: (
-                                                Score: 1.0 / (1.0 + filtered.Average()),
-                                                Sensitivity: filtered.Max() / count,
+                                            ? ResultFactory.Create(value: new Intersect.StabilityResult(
+                                                StabilityScore: 1.0 / (1.0 + filtered.Average()),
+                                                PerturbationSensitivity: filtered.Max() / count,
                                                 UnstableFlags: [.. Enumerable.Range(0, count).Select(index => {
                                                     int start = (int)Math.Round((double)index * filtered.Length / count);
                                                     int end = (int)Math.Round((double)(index + 1) * filtered.Length / count);
@@ -246,7 +251,7 @@ internal static class IntersectionCompute {
                                             Resource?.Dispose();
                                         }
                                     }
-                                })));
+                                }))); 
                 }),
         };
     }

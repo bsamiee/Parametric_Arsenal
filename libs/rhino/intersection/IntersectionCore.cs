@@ -1,8 +1,11 @@
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Linq;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
@@ -15,10 +18,9 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>RhinoCommon intersection dispatch with FrozenDictionary resolution.</summary>
 internal static class IntersectionCore {
     /// <summary>Intersection strategy metadata.</summary>
-    internal readonly record struct IntersectionStrategy(
-        Func<object, object, double, Intersect.IntersectionOptions, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor,
-        V ModeA,
-        V ModeB);
+    private sealed record IntersectionStrategy(
+        Func<object, object, double, Intersect.IntersectionSettings, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor,
+        IntersectionConfig.PairStrategyMetadata Metadata);
 
     /// <summary>Builds intersection result from bool/arrays tuple using pattern matching discrimination.</summary>
     private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersect.IntersectionOutput>> ArrayResultBuilder = tuple => tuple switch {
@@ -103,9 +105,20 @@ internal static class IntersectionCore {
             _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection.WithContext("null")),
         };
 
+    private static Intersect.IntersectionOutput AggregateOutputs(IReadOnlyList<Intersect.IntersectionOutput> outputs) =>
+        outputs.Count == 0
+            ? Intersect.IntersectionOutput.Empty
+            : new Intersect.IntersectionOutput(
+                [.. outputs.SelectMany(static output => output.Points)],
+                [.. outputs.SelectMany(static output => output.Curves)],
+                [.. outputs.SelectMany(static output => output.ParametersA)],
+                [.. outputs.SelectMany(static output => output.ParametersB)],
+                [.. outputs.SelectMany(static output => output.FaceIndices)],
+                [.. outputs.SelectMany(static output => output.Sections)]);
+
     /// <summary>FrozenDictionary mapping type pairs to intersection strategies with validation modes.</summary>
     private static readonly FrozenDictionary<(Type, Type), IntersectionStrategy> _strategies =
-        new ((Type, Type) Key, Func<object, object, double, Intersect.IntersectionOptions, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor)[] {
+        new ((Type, Type) Key, Func<object, object, double, Intersect.IntersectionSettings, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor)[] {
             ((typeof(Curve), typeof(Curve)), (first, second, tolerance, _, _) => {
                 Curve curveA = (Curve)first;
                 Curve curveB = (Curve)second;
@@ -138,7 +151,7 @@ internal static class IntersectionCore {
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             }),
             ((typeof(Mesh), typeof(Plane)), (first, second, _, _, _) => PolylineProcessor(RhinoIntersect.MeshPlane((Mesh)first, (Plane)second))),
-            ((typeof(Mesh), typeof(Line)), (first, second, _, options, _) => MeshIntersectionHandler((Mesh)first, second, options.Sorted,
+            ((typeof(Mesh), typeof(Line)), (first, second, _, settings, _) => MeshIntersectionHandler((Mesh)first, second, settings.Sorted,
                 ((points, indices) => points switch {
                     { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], indices ?? [], [])),
                     _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
@@ -148,7 +161,7 @@ internal static class IntersectionCore {
                     null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                     _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
                 }))),
-            ((typeof(Mesh), typeof(PolylineCurve)), (first, second, _, options, _) => MeshIntersectionHandler((Mesh)first, second, options.Sorted,
+            ((typeof(Mesh), typeof(PolylineCurve)), (first, second, _, settings, _) => MeshIntersectionHandler((Mesh)first, second, settings.Sorted,
                 ((points, indices) => points switch {
                     { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], indices ?? [], [])),
                     _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
@@ -203,9 +216,9 @@ internal static class IntersectionCore {
                 int count = (int)RhinoIntersect.ArcArc((Arc)first, (Arc)second, out Point3d pointA, out Point3d pointB);
                 return TwoPointHandler(count, pointA, pointB, tolerance, null);
             }),
-            ((typeof(Point3d[]), typeof(Brep[])), (first, second, tolerance, options, context) => ProjectionHandler((Point3d[])first, second, options.ProjectionDirection, options.WithIndices, tolerance, context, V.Standard | V.Topology)),
-            ((typeof(Point3d[]), typeof(Mesh[])), (first, second, tolerance, options, context) => ProjectionHandler((Point3d[])first, second, options.ProjectionDirection, options.WithIndices, tolerance, context, V.MeshSpecific)),
-            ((typeof(Ray3d), typeof(GeometryBase[])), (first, second, _, options, context) => options.MaxHits switch {
+            ((typeof(Point3d[]), typeof(Brep[])), (first, second, tolerance, settings, context) => ProjectionHandler((Point3d[])first, second, settings.ProjectionDirection, settings.IncludeIndices, tolerance, context, V.Standard | V.Topology)),
+            ((typeof(Point3d[]), typeof(Mesh[])), (first, second, tolerance, settings, context) => ProjectionHandler((Point3d[])first, second, settings.ProjectionDirection, settings.IncludeIndices, tolerance, context, V.MeshSpecific)),
+            ((typeof(Ray3d), typeof(GeometryBase[])), (first, second, _, settings, context) => settings.MaxHits switch {
                 int hits when hits > 0 => ResultFactory.Create<IEnumerable<GeometryBase>>(value: (GeometryBase[])second)
                     .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, V.None,]))
                     .Map<GeometryBase[]>(valid => [.. valid])
@@ -213,12 +226,9 @@ internal static class IntersectionCore {
                 int hits => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits.WithContext(hits.ToString(CultureInfo.InvariantCulture))),
                 _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits),
             }),
-        }.ToFrozenDictionary(static entry => entry.Key, entry => {
-            (V ModeA, V ModeB) = IntersectionConfig.ValidationModes.TryGetValue(entry.Key, out (V ModeA, V ModeB) found)
-                ? found
-                : (V.None, V.None);
-            return new IntersectionStrategy(entry.Executor, ModeA, ModeB);
-        });
+        }.ToFrozenDictionary(static entry => entry.Key, entry => new IntersectionStrategy(
+            entry.Executor,
+            IntersectionConfig.PairStrategies[entry.Key]));
 
     /// <summary>Resolves intersection strategy for type pair using inheritance chain and interface traversal.</summary>
     [Pure]
@@ -242,43 +252,106 @@ internal static class IntersectionCore {
             };
     }
 
-    /// <summary>Normalizes intersection options validating tolerance and MaxHits with context defaults.</summary>
+    /// <summary>Normalizes intersection settings validating tolerance and MaxHits with context defaults.</summary>
     [Pure]
-    internal static Result<(double Tolerance, Intersect.IntersectionOptions Options)> NormalizeOptions(Intersect.IntersectionOptions options, IGeometryContext context) =>
-        ResultFactory.Create(value: options)
+    internal static Result<(double Tolerance, Intersect.IntersectionSettings Settings)> NormalizeSettings(Intersect.IntersectionSettings settings, IGeometryContext context) =>
+        ResultFactory.Create(value: settings)
             .Ensure(opt => !opt.Tolerance.HasValue || (RhinoMath.IsValidDouble(opt.Tolerance.Value) && opt.Tolerance.Value > RhinoMath.ZeroTolerance), E.Validation.ToleranceAbsoluteInvalid)
             .Ensure(opt => !opt.MaxHits.HasValue || opt.MaxHits.Value > 0, E.Geometry.InvalidMaxHits)
             .Map(opt => {
                 double tolerance = opt.Tolerance ?? context.AbsoluteTolerance;
-                return (tolerance, new Intersect.IntersectionOptions(tolerance, opt.ProjectionDirection, opt.MaxHits, opt.WithIndices, opt.Sorted));
+                return (tolerance, new Intersect.IntersectionSettings(tolerance, opt.ProjectionDirection, opt.MaxHits, opt.IncludeIndices, opt.Sorted));
             });
 
     /// <summary>Executes intersection with normalized options resolving strategy and validating inputs.</summary>
     [Pure]
-    internal static Result<Intersect.IntersectionOutput> ExecuteWithOptions(object geometryA, object geometryB, IGeometryContext context, (double Tolerance, Intersect.IntersectionOptions Options) normalized) {
+    internal static Result<Intersect.IntersectionOutput> ExecuteWithOptions(object geometryA, object geometryB, IGeometryContext context, (double Tolerance, Intersect.IntersectionSettings Settings) normalized) {
         static Result<object> validate(object geometry, IGeometryContext ctx, V mode) =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
         return ResolveStrategy(geometryA.GetType(), geometryB.GetType())
             .Bind(entry => {
+                IntersectionConfig.PairStrategyMetadata metadata = entry.Strategy.Metadata;
                 (V modeA, V modeB) = entry.Swapped
-                    ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
-                    : (entry.Strategy.ModeA, entry.Strategy.ModeB);
+                    ? (metadata.ModeB, metadata.ModeA)
+                    : (metadata.ModeA, metadata.ModeB);
 
                 return validate(geometryA, context, modeA)
                     .Bind(validA => validate(geometryB, context, modeB)
                         .Bind(validB => (entry.Swapped
-                            ? entry.Strategy.Executor(validB, validA, normalized.Tolerance, normalized.Options, context)
-                            : entry.Strategy.Executor(validA, validB, normalized.Tolerance, normalized.Options, context))
+                            ? entry.Strategy.Executor(validB, validA, normalized.Tolerance, normalized.Settings, context)
+                            : entry.Strategy.Executor(validA, validB, normalized.Tolerance, normalized.Settings, context))
                             .Map(output => entry.Swapped
                                 ? new Intersect.IntersectionOutput(output.Points, output.Curves, output.ParametersB, output.ParametersA, output.FaceIndices, output.Sections)
                                 : output)));
             });
     }
 
-    /// <summary>Executes intersection for typed geometry pair normalizing options before execution.</summary>
+    /// <summary>Executes metadata-driven intersection for arbitrary request operands.</summary>
     [Pure]
-    internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 geometryA, T2 geometryB, IGeometryContext context, Intersect.IntersectionOptions options) where T1 : notnull where T2 : notnull =>
-        NormalizeOptions(options, context)
-            .Bind(normalized => ExecuteWithOptions(geometryA, geometryB, context, normalized));
+    internal static Result<Intersect.IntersectionOutput> Execute(Intersect.GeometryIntersectionRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Intersect.GeometryIntersectionRequest, Result<IReadOnlyList<Intersect.IntersectionOutput>>>)(item =>
+                (item.GeometryA, item.GeometryB) switch {
+                    (null, _) or (_, null) => ResultFactory.Create<IReadOnlyList<Intersect.IntersectionOutput>>(error: E.Geometry.UnsupportedIntersection.WithContext("Null operand")),
+                    _ => NormalizeSettings(item.Settings ?? Intersect.IntersectionSettings.Default, context)
+                        .Bind(normalized => ExecuteWithOptions(item.GeometryA, item.GeometryB, context, normalized))
+                        .Map(output => (IReadOnlyList<Intersect.IntersectionOutput>)[output,]),
+                }),
+            config: new OperationConfig<Intersect.GeometryIntersectionRequest, Intersect.IntersectionOutput> {
+                Context = context,
+                ValidationMode = IntersectionConfig.IntersectionOperation.ValidationMode,
+                OperationName = IntersectionConfig.IntersectionOperation.OperationName,
+                EnableDiagnostics = false,
+            })
+        .Map(AggregateOutputs);
+
+    /// <summary>Classifies existing intersection outputs via UnifiedOperation orchestration.</summary>
+    [Pure]
+    internal static Result<Intersect.ClassificationResult> Classify(Intersect.ClassificationRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Intersect.ClassificationRequest, Result<IReadOnlyList<Intersect.ClassificationResult>>>)(item =>
+                IntersectionCompute.Classify(item.Output, item.GeometryA, item.GeometryB, context)
+                    .Map(result => (IReadOnlyList<Intersect.ClassificationResult>)[result,])),
+            config: new OperationConfig<Intersect.ClassificationRequest, Intersect.ClassificationResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.ClassificationOperation.ValidationMode,
+                OperationName = IntersectionConfig.ClassificationOperation.OperationName,
+                EnableDiagnostics = false,
+            })
+        .Map(results => results[0]);
+
+    /// <summary>Computes near-miss statistics using metadata-driven UnifiedOperation configuration.</summary>
+    [Pure]
+    internal static Result<Intersect.NearMissResult> NearMisses(Intersect.NearMissRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Intersect.NearMissRequest, Result<IReadOnlyList<Intersect.NearMissResult>>>)(item =>
+                IntersectionCompute.FindNearMisses(item.GeometryA, item.GeometryB, item.SearchRadius, context)
+                    .Map(result => (IReadOnlyList<Intersect.NearMissResult>)[result,])),
+            config: new OperationConfig<Intersect.NearMissRequest, Intersect.NearMissResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.NearMissOperation.ValidationMode,
+                OperationName = IntersectionConfig.NearMissOperation.OperationName,
+                EnableDiagnostics = false,
+            })
+        .Map(results => results[0]);
+
+    /// <summary>Analyzes intersection stability via perturbation sampling.</summary>
+    [Pure]
+    internal static Result<Intersect.StabilityResult> Stability(Intersect.StabilityRequest request, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: request,
+            operation: (Func<Intersect.StabilityRequest, Result<IReadOnlyList<Intersect.StabilityResult>>>)(item =>
+                IntersectionCompute.AnalyzeStability(item.GeometryA, item.GeometryB, item.BaseIntersection, context)
+                    .Map(result => (IReadOnlyList<Intersect.StabilityResult>)[result,])),
+            config: new OperationConfig<Intersect.StabilityRequest, Intersect.StabilityResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.StabilityOperation.ValidationMode,
+                OperationName = IntersectionConfig.StabilityOperation.OperationName,
+                EnableDiagnostics = false,
+            })
+        .Map(results => results[0]);
 }
