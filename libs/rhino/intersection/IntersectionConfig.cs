@@ -1,58 +1,152 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Validation modes and parameters for intersection operations using RhinoDoc tolerances via GeometryContext.FromDocument(doc).</summary>
+/// <summary>Validation metadata and constants for intersection operations.</summary>
+[Pure]
 internal static class IntersectionConfig {
-    /// <summary>(TypeA, TypeB) tuple to validation mode mapping.</summary>
-    internal static readonly FrozenDictionary<(Type, Type), (V ModeA, V ModeB)> ValidationModes =
-        new (Type TypeA, Type TypeB, V ModeA, V ModeB)[] {
-            (typeof(Curve), typeof(Curve), V.Standard | V.Degeneracy, V.Standard | V.Degeneracy),
-            (typeof(NurbsCurve), typeof(NurbsCurve), V.Standard | V.Degeneracy | V.NurbsGeometry, V.Standard | V.Degeneracy | V.NurbsGeometry),
-            (typeof(PolyCurve), typeof(Curve), V.Standard | V.Degeneracy | V.PolycurveStructure, V.Standard | V.Degeneracy),
-            (typeof(Curve), typeof(Surface), V.Standard | V.Degeneracy, V.Standard | V.UVDomain),
-            (typeof(Curve), typeof(NurbsSurface), V.Standard | V.Degeneracy, V.Standard | V.NurbsGeometry | V.UVDomain),
-            (typeof(Curve), typeof(Brep), V.Standard | V.Degeneracy, V.Standard | V.Topology),
-            (typeof(Curve), typeof(Extrusion), V.Standard | V.Degeneracy, V.Standard | V.ExtrusionGeometry),
-            (typeof(Curve), typeof(BrepFace), V.Standard | V.Degeneracy, V.Standard | V.Topology),
-            (typeof(Curve), typeof(Plane), V.Standard | V.Degeneracy, V.Standard),
-            (typeof(Curve), typeof(Line), V.Standard | V.Degeneracy, V.Standard),
-            (typeof(Brep), typeof(Brep), V.Standard | V.Topology, V.Standard | V.Topology),
-            (typeof(Brep), typeof(Plane), V.Standard | V.Topology, V.Standard),
-            (typeof(Brep), typeof(Surface), V.Standard | V.Topology, V.Standard | V.UVDomain),
-            (typeof(Extrusion), typeof(Extrusion), V.Standard | V.ExtrusionGeometry, V.Standard | V.ExtrusionGeometry),
-            (typeof(Surface), typeof(Surface), V.Standard | V.UVDomain, V.Standard | V.UVDomain),
-            (typeof(NurbsSurface), typeof(NurbsSurface), V.Standard | V.NurbsGeometry | V.UVDomain, V.Standard | V.NurbsGeometry | V.UVDomain),
-            (typeof(Mesh), typeof(Mesh), V.MeshSpecific, V.MeshSpecific),
-            (typeof(Mesh), typeof(Ray3d), V.MeshSpecific, V.None),
-            (typeof(Mesh), typeof(Plane), V.MeshSpecific, V.Standard),
-            (typeof(Mesh), typeof(Line), V.MeshSpecific, V.Standard),
-            (typeof(Mesh), typeof(PolylineCurve), V.MeshSpecific, V.Standard | V.Degeneracy),
-            (typeof(Line), typeof(Line), V.Standard, V.Standard),
-            (typeof(Line), typeof(BoundingBox), V.Standard, V.None),
-            (typeof(Line), typeof(Plane), V.Standard, V.Standard),
-            (typeof(Line), typeof(Sphere), V.Standard, V.Standard),
-            (typeof(Line), typeof(Cylinder), V.Standard, V.Standard),
-            (typeof(Line), typeof(Circle), V.Standard, V.Standard),
-            (typeof(Plane), typeof(Plane), V.Standard, V.Standard),
-            (typeof(ValueTuple<Plane, Plane>), typeof(Plane), V.Standard, V.Standard),
-            (typeof(Plane), typeof(Circle), V.Standard, V.Standard),
-            (typeof(Plane), typeof(Sphere), V.Standard, V.Standard),
-            (typeof(Plane), typeof(BoundingBox), V.Standard, V.None),
-            (typeof(Sphere), typeof(Sphere), V.Standard, V.Standard),
-            (typeof(Circle), typeof(Circle), V.Standard, V.Standard),
-            (typeof(Arc), typeof(Arc), V.Standard, V.Standard),
-            (typeof(Point3d[]), typeof(Brep[]), V.None, V.None),
-            (typeof(Point3d[]), typeof(Mesh[]), V.None, V.None),
-            (typeof(Ray3d), typeof(GeometryBase[]), V.None, V.None),
-        }
-        .SelectMany<(Type TypeA, Type TypeB, V ModeA, V ModeB), KeyValuePair<(Type, Type), (V ModeA, V ModeB)>>(static p => p.TypeA == p.TypeB
-            ? [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)),]
-            : [KeyValuePair.Create((p.TypeA, p.TypeB), (p.ModeA, p.ModeB)), KeyValuePair.Create((p.TypeB, p.TypeA), (p.ModeB, p.ModeA)),])
-        .ToFrozenDictionary();
+    /// <summary>Metadata describing validation and operation naming for a geometry pair.</summary>
+    internal sealed record IntersectionPairMetadata(
+        V FirstValidation,
+        V SecondValidation,
+        string OperationName);
+
+    /// <summary>Validation metadata table keyed by canonical geometry type pairs.</summary>
+    internal static readonly FrozenDictionary<(Type, Type), IntersectionPairMetadata> PairMetadata =
+        new Dictionary<(Type, Type), IntersectionPairMetadata> {
+            [(typeof(Curve), typeof(Curve))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard | V.Degeneracy,
+                OperationName: "Intersection.CurveCurve"),
+            [(typeof(Curve), typeof(BrepFace))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard | V.Topology,
+                OperationName: "Intersection.CurveBrepFace"),
+            [(typeof(Curve), typeof(Surface))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard | V.UVDomain,
+                OperationName: "Intersection.CurveSurface"),
+            [(typeof(Curve), typeof(Plane))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.CurvePlane"),
+            [(typeof(Curve), typeof(Line))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.CurveLine"),
+            [(typeof(Curve), typeof(Brep))] = new(
+                FirstValidation: V.Standard | V.Degeneracy,
+                SecondValidation: V.Standard | V.Topology,
+                OperationName: "Intersection.CurveBrep"),
+            [(typeof(Brep), typeof(Brep))] = new(
+                FirstValidation: V.Standard | V.Topology,
+                SecondValidation: V.Standard | V.Topology,
+                OperationName: "Intersection.BrepBrep"),
+            [(typeof(Brep), typeof(Plane))] = new(
+                FirstValidation: V.Standard | V.Topology,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.BrepPlane"),
+            [(typeof(Brep), typeof(Surface))] = new(
+                FirstValidation: V.Standard | V.Topology,
+                SecondValidation: V.Standard | V.UVDomain,
+                OperationName: "Intersection.BrepSurface"),
+            [(typeof(Surface), typeof(Surface))] = new(
+                FirstValidation: V.Standard | V.UVDomain,
+                SecondValidation: V.Standard | V.UVDomain,
+                OperationName: "Intersection.SurfaceSurface"),
+            [(typeof(Mesh), typeof(Mesh))] = new(
+                FirstValidation: V.MeshSpecific,
+                SecondValidation: V.MeshSpecific,
+                OperationName: "Intersection.MeshMesh"),
+            [(typeof(Mesh), typeof(Ray3d))] = new(
+                FirstValidation: V.MeshSpecific,
+                SecondValidation: V.None,
+                OperationName: "Intersection.MeshRay"),
+            [(typeof(Mesh), typeof(Plane))] = new(
+                FirstValidation: V.MeshSpecific,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.MeshPlane"),
+            [(typeof(Mesh), typeof(Line))] = new(
+                FirstValidation: V.MeshSpecific,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.MeshLine"),
+            [(typeof(Mesh), typeof(PolylineCurve))] = new(
+                FirstValidation: V.MeshSpecific,
+                SecondValidation: V.Standard | V.Degeneracy,
+                OperationName: "Intersection.MeshPolyline"),
+            [(typeof(Line), typeof(Line))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.LineLine"),
+            [(typeof(Line), typeof(BoundingBox))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.None,
+                OperationName: "Intersection.LineBoundingBox"),
+            [(typeof(Line), typeof(Plane))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.LinePlane"),
+            [(typeof(Line), typeof(Sphere))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.LineSphere"),
+            [(typeof(Line), typeof(Cylinder))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.LineCylinder"),
+            [(typeof(Line), typeof(Circle))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.LineCircle"),
+            [(typeof(Plane), typeof(Plane))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.PlanePlane"),
+            [(typeof(ValueTuple<Plane, Plane>), typeof(Plane))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.PlaneTriple"),
+            [(typeof(Plane), typeof(Circle))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.PlaneCircle"),
+            [(typeof(Plane), typeof(Sphere))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.PlaneSphere"),
+            [(typeof(Plane), typeof(BoundingBox))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.None,
+                OperationName: "Intersection.PlaneBoundingBox"),
+            [(typeof(Sphere), typeof(Sphere))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.SphereSphere"),
+            [(typeof(Circle), typeof(Circle))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.CircleCircle"),
+            [(typeof(Arc), typeof(Arc))] = new(
+                FirstValidation: V.Standard,
+                SecondValidation: V.Standard,
+                OperationName: "Intersection.ArcArc"),
+            [(typeof(Point3d[]), typeof(Brep[]))] = new(
+                FirstValidation: V.None,
+                SecondValidation: V.None,
+                OperationName: "Intersection.ProjectPointsBrep"),
+            [(typeof(Point3d[]), typeof(Mesh[]))] = new(
+                FirstValidation: V.None,
+                SecondValidation: V.None,
+                OperationName: "Intersection.ProjectPointsMesh"),
+            [(typeof(Ray3d), typeof(GeometryBase[]))] = new(
+                FirstValidation: V.None,
+                SecondValidation: V.None,
+                OperationName: "Intersection.RayShoot"),
+        }.ToFrozenDictionary();
 
     /// <summary>Angle thresholds for intersection classification.</summary>
     internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
