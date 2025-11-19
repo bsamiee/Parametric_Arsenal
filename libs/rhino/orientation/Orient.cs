@@ -1,234 +1,212 @@
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Errors;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Polymorphic geometry orientation and canonical alignment.</summary>
 public static class Orient {
-    /// <summary>Canonical orientation modes for world plane alignment operations.</summary>
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // CANONICAL MODES - Algebraic hierarchy for world plane alignment
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for canonical orientation modes.</summary>
+    public abstract record CanonicalMode;
+    /// <summary>Align bounding box center to world XY plane.</summary>
+    public sealed record WorldXYMode : CanonicalMode;
+    /// <summary>Align bounding box center to world YZ plane.</summary>
+    public sealed record WorldYZMode : CanonicalMode;
+    /// <summary>Align bounding box center to world XZ plane.</summary>
+    public sealed record WorldXZMode : CanonicalMode;
+    /// <summary>Translate bounding box center to world origin.</summary>
+    public sealed record AreaCentroidMode : CanonicalMode;
+    /// <summary>Translate volume centroid to world origin.</summary>
+    public sealed record VolumeCentroidMode : CanonicalMode;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ORIENTATION TARGETS - Algebraic hierarchy for orientation destinations
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for orientation targets.</summary>
+    public abstract record OrientationTarget;
+    /// <summary>Plane-to-plane alignment target.</summary>
+    public sealed record PlaneTarget(Plane Target) : OrientationTarget;
+    /// <summary>Point-to-point translation using bounding box centroid.</summary>
+    public sealed record PointTarget(Point3d Target) : OrientationTarget;
+    /// <summary>Point-to-point translation using mass properties centroid.</summary>
+    public sealed record MassPointTarget(Point3d Target) : OrientationTarget;
+    /// <summary>Vector-to-vector rotation alignment.</summary>
+    public sealed record VectorTarget(Vector3d Target, Vector3d Source, Point3d? Anchor) : OrientationTarget;
+    /// <summary>Curve frame alignment at parameter t.</summary>
+    public sealed record CurveFrameTarget(Curve Curve, double Parameter) : OrientationTarget;
+    /// <summary>Surface frame alignment at UV coordinates.</summary>
+    public sealed record SurfaceFrameTarget(Surface Surface, double U, double V) : OrientationTarget;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // OPTIMIZATION CRITERIA - Algebraic hierarchy for optimization objectives
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for optimization criteria.</summary>
+    public abstract record OptimizationCriteria;
+    /// <summary>Minimize bounding box diagonal length.</summary>
+    public sealed record CompactCriteria : OptimizationCriteria;
+    /// <summary>Minimize centroid Z-displacement from XY plane.</summary>
+    public sealed record CentroidCriteria : OptimizationCriteria;
+    /// <summary>Maximize dimensional degeneracy (flatness).</summary>
+    public sealed record FlatnessCriteria : OptimizationCriteria;
+    /// <summary>Multi-objective: above XY, centered, low profile.</summary>
+    public sealed record CanonicalCriteria : OptimizationCriteria;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SYMMETRY AND RELATIONSHIP KINDS - Algebraic classification types
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for symmetry classification.</summary>
+    public abstract record SymmetryKind;
+    /// <summary>No detected symmetry.</summary>
+    public sealed record NoSymmetry : SymmetryKind;
+    /// <summary>Mirror symmetry detected.</summary>
+    public sealed record MirrorSymmetry : SymmetryKind;
+    /// <summary>Rotational symmetry detected.</summary>
+    public sealed record RotationalSymmetry : SymmetryKind;
+
+    /// <summary>Base type for spatial relationship classification.</summary>
+    public abstract record RelationshipKind;
+    /// <summary>Parallel orientation (Z-axes aligned).</summary>
+    public sealed record ParallelRelationship : RelationshipKind;
+    /// <summary>Perpendicular orientation (Z-axes orthogonal).</summary>
+    public sealed record PerpendicularRelationship : RelationshipKind;
+    /// <summary>Oblique orientation (neither parallel nor perpendicular).</summary>
+    public sealed record ObliqueRelationship : RelationshipKind;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PATTERN KINDS - Algebraic hierarchy for detected patterns
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for pattern classification.</summary>
+    public abstract record PatternKind;
+    /// <summary>Linear pattern with uniform spacing.</summary>
+    public sealed record LinearPattern : PatternKind;
+    /// <summary>Radial pattern with uniform angular distribution.</summary>
+    public sealed record RadialPattern : PatternKind;
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // RESULT TYPES - Strongly-typed results for complex operations
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Result of orientation optimization.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly struct Canonical(byte mode) {
-        internal readonly byte Mode = mode;
-        /// <summary>Align bounding box center to world XY plane.</summary>
-        public static readonly Canonical WorldXY = new(1);
-        /// <summary>Align bounding box center to world YZ plane.</summary>
-        public static readonly Canonical WorldYZ = new(2);
-        /// <summary>Align bounding box center to world XZ plane.</summary>
-        public static readonly Canonical WorldXZ = new(3);
-        /// <summary>Translate area centroid to world origin.</summary>
-        public static readonly Canonical AreaCentroid = new(4);
-        /// <summary>Translate volume centroid to world origin.</summary>
-        public static readonly Canonical VolumeCentroid = new(5);
-    }
+    public readonly record struct OptimizationResult(
+        Transform OptimalTransform,
+        double Score,
+        OptimizationCriteria CriteriaMet);
 
-    /// <summary>Orientation specification for plane, point, vector, or curve/surface frame targets.</summary>
+    /// <summary>Result of relative orientation computation.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct OrientSpec {
-        /// <summary>Target plane for plane-to-plane alignment.</summary>
-        public Plane? TargetPlane { get; init; }
-        /// <summary>Target point for translation operations.</summary>
-        public Point3d? TargetPoint { get; init; }
-        /// <summary>Target vector for rotation alignment.</summary>
-        public Vector3d? TargetVector { get; init; }
-        /// <summary>Target curve for frame-based orientation.</summary>
-        public Curve? TargetCurve { get; init; }
-        /// <summary>Target surface for frame-based orientation.</summary>
-        public Surface? TargetSurface { get; init; }
-        /// <summary>Curve parameter for frame evaluation at specific location.</summary>
-        public double CurveParameter { get; init; }
-        /// <summary>Surface UV coordinates for frame evaluation.</summary>
-        public (double u, double v) SurfaceUV { get; init; }
+    public readonly record struct RelativeOrientationResult(
+        Transform RelativeTransform,
+        double Twist,
+        double Tilt,
+        SymmetryKind Symmetry,
+        RelationshipKind Relationship);
 
-        /// <summary>Create plane-to-plane orientation specification.</summary>
-        public static OrientSpec Plane(Plane p) => new() { TargetPlane = p };
-        /// <summary>Create point-to-point translation specification.</summary>
-        public static OrientSpec Point(Point3d p) => new() { TargetPoint = p };
-        /// <summary>Create vector-to-vector rotation specification.</summary>
-        public static OrientSpec Vector(Vector3d v) => new() { TargetVector = v };
-        /// <summary>Create curve frame orientation at parameter t.</summary>
-        public static OrientSpec Curve(Curve c, double t) => new() { TargetCurve = c, CurveParameter = t };
-        /// <summary>Create surface frame orientation at UV coordinates.</summary>
-        public static OrientSpec Surface(Surface s, double u, double v) => new() { TargetSurface = s, SurfaceUV = (u, v) };
-    }
+    /// <summary>Result of pattern detection and alignment.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    public readonly record struct PatternResult(
+        PatternKind Pattern,
+        Transform[] IdealTransforms,
+        int[] Anomalies,
+        double Deviation);
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PUBLIC API - Orientation operations
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Orient geometry to a canonical world plane alignment.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToCanonical<T>(T geometry, CanonicalMode mode, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToCanonical(geometry: geometry, mode: mode, context: context);
+
+    /// <summary>Orient geometry to a target plane, point, vector, or frame.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToTarget<T>(T geometry, OrientationTarget target, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(geometry: geometry, target: target, context: context);
+
+    /// <summary>Orient geometry to a target plane using plane-to-plane transformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> ToPlane<T>(T geometry, Plane target, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                (OrientCore.PlaneExtractors.TryGetValue(item.GetType(), out Func<object, Result<Plane>>? extractor) ? extractor(item)
-                    : OrientCore.PlaneExtractors.FirstOrDefault(kv => kv.Key.IsInstanceOfType(item)).Value?.Invoke(item)
-                    ?? ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)))
-                .Bind(src => !target.IsValid
-                    ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)
-                    : OrientCore.ApplyTransform(item, Transform.PlaneToPlane(src, target)))),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+        OrientCore.OrientToTarget(geometry: geometry, target: new PlaneTarget(Target: target), context: context);
 
+    /// <summary>Orient geometry to a target point using bounding box centroid.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToCanonical<T>(T geometry, Canonical mode, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                ((mode.Mode, item.GetBoundingBox(accurate: true)) switch {
-                    (_, BoundingBox box) when !box.IsValid && mode.Mode != 5 => ResultFactory.Create<Transform>(error: E.Validation.BoundingBoxInvalid),
-                    (1, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis), Plane.WorldXY)),
-                    (2, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis), Plane.WorldYZ)),
-                    (3, BoundingBox box) => ResultFactory.Create(value: Transform.PlaneToPlane(new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis), new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis))),
-                    (4, BoundingBox box) => ResultFactory.Create(value: Transform.Translation(Point3d.Origin - box.Center)),
-                    (5, _) => OrientCore.ExtractCentroid(item, useMassProperties: true).Map(c => Transform.Translation(Point3d.Origin - c)),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationMode),
-                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = mode.Mode is (>= 1 and <= 4) ? V.Standard | V.BoundingBox : mode.Mode is 5 ? V.Standard | V.MassProperties : V.Standard,
-            }).Map(r => r[0]);
+    public static Result<T> ToPoint<T>(T geometry, Point3d target, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(geometry: geometry, target: new PointTarget(Target: target), context: context);
 
+    /// <summary>Orient geometry to a target point using mass properties centroid.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToPoint<T>(T geometry, Point3d target, bool useMass, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                OrientCore.ExtractCentroid(item, useMassProperties: useMass)
-                    .Map(c => Transform.Translation(target - c))
-                    .Bind(x => OrientCore.ApplyTransform(item, x))),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = useMass ? V.Standard | V.MassProperties : V.Standard | V.BoundingBox,
-            }).Map(r => r[0]);
+    public static Result<T> ToMassPoint<T>(T geometry, Point3d target, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(geometry: geometry, target: new MassPointTarget(Target: target), context: context);
 
+    /// <summary>Orient geometry by rotating from source to target vector around anchor point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ToVector<T>(T geometry, Vector3d target, Vector3d? source, Point3d? anchor, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                ((item.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
-                    (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
-                        ((Func<Result<Transform>>)(() => {
-                            Vector3d su = new(s);
-                            Vector3d tu = new(t);
-                            // The outer 'when' clause guarantees Unitize will succeed.
-                            _ = su.Unitize();
-                            _ = tu.Unitize();
-                            Point3d pt = anchor ?? box.Center;
+    public static Result<T> ToVector<T>(
+        T geometry,
+        Vector3d target,
+        Vector3d? source,
+        Point3d? anchor,
+        IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(
+            geometry: geometry,
+            target: new VectorTarget(Target: target, Source: source ?? Vector3d.ZAxis, Anchor: anchor),
+            context: context);
 
-                            return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
-                                ? Math.Abs((su * tu) - 1.0) < RhinoMath.SqrtEpsilon
-                                    ? ResultFactory.Create(value: Transform.Identity)
-                                    : Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
-                                        ? ((Func<Result<Transform>>)(() => {
-                                            Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(su, Vector3d.XAxis) : Vector3d.CrossProduct(su, Vector3d.YAxis);
-                                            bool normalized = axisCandidate.Unitize();
-                                            return normalized
-                                                ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axisCandidate, pt))
-                                                : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
-                                        }))()
-                                        : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
-                                : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
-                        }))(),
-                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
-                }).Bind(xform => OrientCore.ApplyTransform(item, xform))),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = V.Standard,
-            }).Map(r => r[0]);
+    /// <summary>Orient geometry to a curve frame at parameter t.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToCurveFrame<T>(T geometry, Curve curve, double parameter, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(geometry: geometry, target: new CurveFrameTarget(Curve: curve, Parameter: parameter), context: context);
 
+    /// <summary>Orient geometry to a surface frame at UV coordinates.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> ToSurfaceFrame<T>(T geometry, Surface surface, double u, double v, IGeometryContext context) where T : GeometryBase =>
+        OrientCore.OrientToTarget(geometry: geometry, target: new SurfaceFrameTarget(Surface: surface, U: u, V: v), context: context);
+
+    /// <summary>Orient geometry to best-fit plane (point cloud or mesh only).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> ToBestFit<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                OrientCore.ExtractBestFitPlane(item)
-                    .Bind(plane => OrientCore.ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = V.Standard,
-            }).Map(r => r[0]);
+        OrientCore.OrientToBestFit(geometry: geometry, context: context);
 
+    /// <summary>Mirror geometry across a plane.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                plane.IsValid
-                    ? OrientCore.ApplyTransform(item, Transform.Mirror(plane))
-                    : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+        OrientCore.Mirror(geometry: geometry, plane: plane, context: context);
 
+    /// <summary>Flip direction of curves, Breps, or meshes.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> FlipDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
-        UnifiedOperation.Apply(
-            input: geometry,
-            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                item.Duplicate() switch {
-                    Curve c when c.Reverse() => ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)c,]),
-                    Brep b => ((Func<Result<IReadOnlyList<T>>>)(() => { b.Flip(); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)b,]); }))(),
-                    Extrusion e => e.ToBrep() switch {
-                        Brep br => ((Func<Result<IReadOnlyList<T>>>)(() => { br.Flip(); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)br,]); }))(),
-                        _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                    },
-                    Mesh m => ((Func<Result<IReadOnlyList<T>>>)(() => { m.Flip(vertexNormals: true, faceNormals: true, faceOrientation: true); return ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)m,]); }))(),
-                    null => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
-                    _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.UnsupportedOrientationType.WithContext(item.GetType().Name)),
-                }),
-            config: new OperationConfig<T, T> {
-                Context = context,
-                ValidationMode = OrientConfig.ValidationModes.GetValueOrDefault(typeof(T), V.Standard),
-            }).Map(r => r[0]);
+        OrientCore.FlipDirection(geometry: geometry, context: context);
 
+    /// <summary>Optimize orientation based on algebraic criteria.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Apply<T>(T geometry, OrientSpec spec, IGeometryContext context) where T : GeometryBase =>
-        (spec.TargetPlane, spec.TargetPoint, spec.TargetVector, spec.TargetCurve, spec.TargetSurface) switch {
-            (null, null, null, null, null) => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
-            (Plane p, null, null, null, null) when p != default => ToPlane(geometry, p, context),
-            (null, Point3d pt, null, null, null) when pt != default => ToPoint(geometry, pt, useMass: false, context),
-            (null, null, Vector3d v, null, null) when v != default => ToVector(geometry, v, source: null, anchor: null, context),
-            (null, null, null, Curve c, null) => c.FrameAt(spec.CurveParameter, out Plane f) && f.IsValid
-                ? ToPlane(geometry, f, context)
-                : ResultFactory.Create<T>(error: E.Geometry.InvalidCurveParameter),
-            (null, null, null, null, Surface s) => s.FrameAt(spec.SurfaceUV.u, spec.SurfaceUV.v, out Plane f) && f.IsValid
-                ? ToPlane(geometry, f, context)
-                : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV),
-            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode),
-        };
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Transform OptimalTransform, double Score, byte[] CriteriaMet)> OptimizeOrientation(
+    public static Result<OptimizationResult> OptimizeOrientation(
         Brep brep,
-        byte criteria,
+        OptimizationCriteria criteria,
         IGeometryContext context) =>
-        UnifiedOperation.Apply(
-            input: brep,
-            operation: (Func<Brep, Result<IReadOnlyList<(Transform, double, byte[])>>>)(item =>
-                OrientCompute.OptimizeOrientation(item, criteria, context.AbsoluteTolerance, context)
-                    .Map(r => (IReadOnlyList<(Transform, double, byte[])>)[r,])),
-            config: new OperationConfig<Brep, (Transform, double, byte[])> {
-                Context = context,
-                ValidationMode = V.Standard | V.Topology,
-            }).Map(r => r[0]);
+        OrientCore.OptimizeOrientation(brep: brep, criteria: criteria, context: context);
 
+    /// <summary>Compute relative orientation between two geometries.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Transform RelativeTransform, double Twist, double Tilt, byte SymmetryType, byte Relationship)> ComputeRelativeOrientation(
+    public static Result<RelativeOrientationResult> ComputeRelativeOrientation(
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        OrientCompute.ComputeRelative(geometryA, geometryB, context);
+        OrientCore.ComputeRelative(geometryA: geometryA, geometryB: geometryB, context: context);
 
+    /// <summary>Detect and align patterns in geometry arrays.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(byte PatternType, Transform[] IdealTransforms, int[] Anomalies, double Deviation)> DetectAndAlign(
+    public static Result<PatternResult> DetectAndAlign(
         GeometryBase[] geometries,
         IGeometryContext context) =>
-        OrientCompute.DetectPattern(geometries, context);
+        OrientCore.DetectPattern(geometries: geometries, context: context);
 }
