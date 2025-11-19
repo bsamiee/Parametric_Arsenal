@@ -9,12 +9,6 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Configuration constants for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
-    internal sealed record DistanceFieldMetadata(
-        V ValidationMode,
-        string OperationName,
-        int BufferSize);
-
     /// <summary>Distance field configuration by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
         new Dictionary<Type, DistanceFieldMetadata> {
@@ -227,4 +221,10 @@ internal static class FieldsConfig {
 
         return table;
     }
+
+    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
+    internal sealed record DistanceFieldMetadata(
+        V ValidationMode,
+        string OperationName,
+        int BufferSize);
 }
