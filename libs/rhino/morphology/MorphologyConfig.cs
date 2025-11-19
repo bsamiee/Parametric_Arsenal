@@ -20,12 +20,12 @@ internal static class MorphologyConfig {
     /// <summary>Singular unified operation dispatch table: operation type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, MorphologyOperationMetadata> Operations =
         new Dictionary<Type, MorphologyOperationMetadata> {
-            [typeof(Morphology.CatmullClarkSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.CatmullClark", AlgorithmCode: 2),
-            [typeof(Morphology.LoopSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Loop", AlgorithmCode: 3),
-            [typeof(Morphology.ButterflySubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Butterfly", AlgorithmCode: 4),
-            [typeof(Morphology.PlanarUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Planar", AlgorithmCode: 0),
-            [typeof(Morphology.CylindricalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Cylindrical", AlgorithmCode: 1),
-            [typeof(Morphology.SphericalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Spherical", AlgorithmCode: 2),
+            [typeof(Morphology.CatmullClarkSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.CatmullClark", AlgorithmCode: OpSubdivideCatmullClark),
+            [typeof(Morphology.LoopSubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Loop", AlgorithmCode: OpSubdivideLoop),
+            [typeof(Morphology.ButterflySubdivision)] = new(V.Standard | V.MeshSpecific | V.Topology, "Morphology.Subdivision.Butterfly", AlgorithmCode: OpSubdivideButterfly),
+            [typeof(Morphology.PlanarUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Planar", AlgorithmCode: OpUnwrapPlanar),
+            [typeof(Morphology.CylindricalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Cylindrical", AlgorithmCode: OpUnwrapCylindrical),
+            [typeof(Morphology.SphericalUnwrap)] = new(V.Standard | V.MeshSpecific, "Morphology.Unwrap.Spherical", AlgorithmCode: OpUnwrapSpherical),
             [typeof(Morphology.FillHolesRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.FillHoles", RepairFlags: RepairFillHoles, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.FillHoles()),
             [typeof(Morphology.UnifyNormalsRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.UnifyNormals", RepairFlags: RepairUnifyNormals, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.UnifyNormals() >= 0),
             [typeof(Morphology.CullDegenerateFacesRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.Repair.CullDegenerateFaces", RepairFlags: RepairCullDegenerateFaces, DefaultTolerance: DefaultWeldTolerance, RepairAction: static (m, _) => m.Faces.CullDegenerateFaces() >= 0),
@@ -45,10 +45,19 @@ internal static class MorphologyConfig {
             [typeof(Morphology.CompositeRepair)] = new(V.Standard | V.MeshSpecific, "Morphology.CompositeRepair"),
         }.ToFrozenDictionary();
 
+    /// <summary>Reverse lookup: repair flags → metadata for O(1) access from MorphologyCompute.</summary>
+    internal static readonly FrozenDictionary<byte, MorphologyOperationMetadata> RepairFlagToMetadata =
+        Operations.Values
+            .Where(m => m.RepairFlags.HasValue)
+            .ToFrozenDictionary(m => m.RepairFlags!.Value);
+
     /// <summary>Internal operation ID constants for compute layer (used by MorphologyCompute).</summary>
     internal const byte OpSubdivideCatmullClark = 2;
     internal const byte OpSubdivideLoop = 3;
     internal const byte OpSubdivideButterfly = 4;
+    internal const byte OpUnwrapPlanar = 0;
+    internal const byte OpUnwrapCylindrical = 1;
+    internal const byte OpUnwrapSpherical = 2;
 
     /// <summary>Cage deformation configuration.</summary>
     internal const int MinCageControlPoints = 8;

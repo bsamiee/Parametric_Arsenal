@@ -395,24 +395,27 @@ internal static class MorphologyCore {
                 Morphology.CompositeRepair composite when MorphologyConfig.Operations.TryGetValue(typeof(Morphology.CompositeRepair), out MorphologyConfig.MorphologyOperationMetadata? compositeMeta) => UnifiedOperation.Apply(
                     input: mesh,
                     operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m => {
-                        byte flags = composite.Strategies.Aggregate(
-                            MorphologyConfig.RepairNone,
-                            (acc, s) => MorphologyConfig.Operations.TryGetValue(s.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.RepairFlags is not null
-                                ? (byte)(acc | meta.RepairFlags.Value)
-                                : acc);
-                        return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
-                            .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-                                new Morphology.MeshRepairResult(
-                                    repaired,
-                                    m.Vertices.Count,
-                                    repaired.Vertices.Count,
-                                    m.Faces.Count,
-                                    repaired.Faces.Count,
-                                    flags,
-                                    MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
-                                    m.DisjointMeshCount > 1,
-                                    m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
-                            ]));
+                        Morphology.MeshRepairStrategy? unknown = composite.Strategies.FirstOrDefault(s => !MorphologyConfig.Operations.TryGetValue(s.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) || meta.RepairFlags is null);
+                        return unknown is not null
+                            ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown repair strategy in composite: {unknown.GetType().Name}"))
+                            : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
+                                byte flags = composite.Strategies.Aggregate(
+                                    MorphologyConfig.RepairNone,
+                                    (acc, s) => (byte)(acc | (MorphologyConfig.Operations.TryGetValue(s.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.RepairFlags is not null ? meta.RepairFlags.Value : 0)));
+                                return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
+                                    .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                        new Morphology.MeshRepairResult(
+                                            repaired,
+                                            m.Vertices.Count,
+                                            repaired.Vertices.Count,
+                                            m.Faces.Count,
+                                            repaired.Faces.Count,
+                                            flags,
+                                            MorphologyCompute.ValidateMeshQuality(repaired, context).IsSuccess ? 1.0 : 0.0,
+                                            m.DisjointMeshCount > 1,
+                                            m.Normals.Count != m.Vertices.Count || m.Normals.Any(n => n.IsZero)),
+                                    ]));
+                            }))();
                     }),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,

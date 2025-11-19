@@ -48,33 +48,29 @@ internal static class SpatialCore {
     internal static Result<IReadOnlyList<int>> Analyze(Spatial.AnalysisRequest request, IGeometryContext context) =>
         request switch {
             null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Request cannot be null")),
-            Spatial.RangeAnalysis<Point3d[]> r => SpatialConfig.Operations.TryGetValue((typeof(Point3d[]), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildPointArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Point3d[] Range operation not configured")),
-            Spatial.RangeAnalysis<PointCloud> r => SpatialConfig.Operations.TryGetValue((typeof(PointCloud), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildPointCloudTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("PointCloud Range operation not configured")),
-            Spatial.RangeAnalysis<Mesh> r => SpatialConfig.Operations.TryGetValue((typeof(Mesh), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildMeshTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Mesh Range operation not configured")),
-            Spatial.RangeAnalysis<Curve[]> r => SpatialConfig.Operations.TryGetValue((typeof(Curve[]), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Curve[] Range operation not configured")),
-            Spatial.RangeAnalysis<Surface[]> r => SpatialConfig.Operations.TryGetValue((typeof(Surface[]), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Surface[] Range operation not configured")),
-            Spatial.RangeAnalysis<Brep[]> r => SpatialConfig.Operations.TryGetValue((typeof(Brep[]), "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunRangeAnalysis(request: r, factory: BuildGeometryArrayTree, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Brep[] Range operation not configured")),
-            Spatial.ProximityAnalysis<Point3d[]> r => SpatialConfig.Operations.TryGetValue((typeof(Point3d[]), "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunProximityAnalysis(request: r, kNearest: RTree.Point3dKNeighbors, distLimited: RTree.Point3dClosestPoints, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Point3d[] Proximity operation not configured")),
-            Spatial.ProximityAnalysis<PointCloud> r => SpatialConfig.Operations.TryGetValue((typeof(PointCloud), "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
-                ? RunProximityAnalysis(request: r, kNearest: RTree.PointCloudKNeighbors, distLimited: RTree.PointCloudClosestPoints, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
-                : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("PointCloud Proximity operation not configured")),
+            Spatial.RangeAnalysis<Point3d[]> r => RunRangeWithLookup(r, typeof(Point3d[]), BuildPointArrayTree, context),
+            Spatial.RangeAnalysis<PointCloud> r => RunRangeWithLookup(r, typeof(PointCloud), BuildPointCloudTree, context),
+            Spatial.RangeAnalysis<Mesh> r => RunRangeWithLookup(r, typeof(Mesh), BuildMeshTree, context),
+            Spatial.RangeAnalysis<Curve[]> r => RunRangeWithLookup(r, typeof(Curve[]), BuildGeometryArrayTree, context),
+            Spatial.RangeAnalysis<Surface[]> r => RunRangeWithLookup(r, typeof(Surface[]), BuildGeometryArrayTree, context),
+            Spatial.RangeAnalysis<Brep[]> r => RunRangeWithLookup(r, typeof(Brep[]), BuildGeometryArrayTree, context),
+            Spatial.ProximityAnalysis<Point3d[]> r => RunProximityWithLookup(r, typeof(Point3d[]), RTree.Point3dKNeighbors, RTree.Point3dClosestPoints, context),
+            Spatial.ProximityAnalysis<PointCloud> r => RunProximityWithLookup(r, typeof(PointCloud), RTree.PointCloudKNeighbors, RTree.PointCloudClosestPoints, context),
             Spatial.MeshOverlapAnalysis r => RunMeshOverlapAnalysis(request: r, context: context),
             _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported analysis request: {request.GetType().Name}")),
         };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
+        SpatialConfig.Operations.TryGetValue((inputType, "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
+            ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
+            : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
 
     /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

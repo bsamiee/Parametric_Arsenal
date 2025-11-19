@@ -500,15 +500,14 @@ internal static class MorphologyCompute {
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
                 MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [
-                    (flags & MorphologyConfig.RepairFillHoles) != 0 ? MorphologyConfig.Operations.Values.FirstOrDefault(m => m.RepairFlags == MorphologyConfig.RepairFillHoles) : null,
-                    (flags & MorphologyConfig.RepairUnifyNormals) != 0 ? MorphologyConfig.Operations.Values.FirstOrDefault(m => m.RepairFlags == MorphologyConfig.RepairUnifyNormals) : null,
-                    (flags & MorphologyConfig.RepairCullDegenerateFaces) != 0 ? MorphologyConfig.Operations.Values.FirstOrDefault(m => m.RepairFlags == MorphologyConfig.RepairCullDegenerateFaces) : null,
-                    (flags & MorphologyConfig.RepairCompact) != 0 ? MorphologyConfig.Operations.Values.FirstOrDefault(m => m.RepairFlags == MorphologyConfig.RepairCompact) : null,
-                    (flags & MorphologyConfig.RepairWeld) != 0 ? MorphologyConfig.Operations.Values.FirstOrDefault(m => m.RepairFlags == MorphologyConfig.RepairWeld) : null,
+                    (flags & MorphologyConfig.RepairFillHoles) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairFillHoles) : null,
+                    (flags & MorphologyConfig.RepairUnifyNormals) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairUnifyNormals) : null,
+                    (flags & MorphologyConfig.RepairCullDegenerateFaces) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairCullDegenerateFaces) : null,
+                    (flags & MorphologyConfig.RepairCompact) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairCompact) : null,
+                    (flags & MorphologyConfig.RepairWeld) != 0 ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(MorphologyConfig.RepairWeld) : null,
                 ];
                 for (int i = 0; i < repairMetas.Length; i++) {
-                    MorphologyConfig.MorphologyOperationMetadata? meta = repairMetas[i];
-                    bool _ = meta?.RepairAction is not null && meta.RepairAction(repaired, tol);
+                    bool executed = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
