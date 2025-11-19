@@ -10,7 +10,8 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Affine transforms, arrays, and deformations with unified polymorphic dispatch.</summary>
-public static class Transforms {
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "MA0049:Type name should not match containing namespace", Justification = "Transformation is the primary API entry point for the Transformation namespace")]
+public static class Transformation {
     /// <summary>Transform specification discriminated union.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct TransformSpec {
@@ -203,15 +204,15 @@ public static class Transforms {
         TransformSpec spec,
         IGeometryContext context,
         bool enableDiagnostics = false) where T : GeometryBase =>
-        TransformCore.BuildTransform(spec: spec, context: context)
+        TransformationCore.BuildTransform(spec: spec, context: context)
             .Bind(xform => UnifiedOperation.Apply(
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                    TransformCore.ApplyTransform(item: item, transform: xform)),
+                    TransformationCore.ApplyTransform(item: item, transform: xform)),
                 config: new OperationConfig<T, T> {
                     Context = context,
-                    ValidationMode = TransformConfig.GetValidationMode(typeof(T)),
-                    OperationName = "Transform.Apply",
+                    ValidationMode = TransformationConfig.GetValidationMode(typeof(T)),
+                    OperationName = "Transformation.Apply",
                     EnableDiagnostics = enableDiagnostics,
                 }))
             .Map(r => r[0]);
@@ -224,7 +225,7 @@ public static class Transforms {
         IGeometryContext context,
         bool enableDiagnostics = false) where T : GeometryBase =>
         spec.Mode switch {
-            1 => TransformCore.RectangularArray(
+            1 => TransformationCore.RectangularArray(
                 geometry: geometry,
                 xCount: spec.XCount,
                 yCount: spec.YCount,
@@ -234,7 +235,7 @@ public static class Transforms {
                 zSpacing: spec.ZSpacing ?? 0.0,
                 context: context,
                 enableDiagnostics: enableDiagnostics),
-            2 => TransformCore.PolarArray(
+            2 => TransformationCore.PolarArray(
                 geometry: geometry,
                 center: spec.Center!.Value,
                 axis: spec.Axis!.Value,
@@ -242,14 +243,14 @@ public static class Transforms {
                 totalAngle: spec.TotalAngle ?? RhinoMath.TwoPI,
                 context: context,
                 enableDiagnostics: enableDiagnostics),
-            3 => TransformCore.LinearArray(
+            3 => TransformationCore.LinearArray(
                 geometry: geometry,
                 direction: spec.Direction!.Value,
                 count: spec.Count,
                 spacing: spec.Spacing,
                 context: context,
                 enableDiagnostics: enableDiagnostics),
-            4 => TransformCompute.PathArray(
+            4 => TransformationCompute.PathArray(
                 geometry: geometry,
                 path: spec.PathCurve!,
                 count: spec.Count,
@@ -266,46 +267,46 @@ public static class Transforms {
         MorphSpec spec,
         IGeometryContext context) where T : GeometryBase =>
         spec.Operation switch {
-            1 => TransformCompute.Flow(
+            1 => TransformationCompute.Flow(
                 geometry: geometry,
                 baseCurve: spec.BaseCurve!,
                 targetCurve: spec.TargetCurve!,
                 preserveStructure: spec.PreserveStructure,
                 context: context),
-            2 => TransformCompute.Twist(
+            2 => TransformationCompute.Twist(
                 geometry: geometry,
                 axis: spec.Axis!.Value,
                 angleRadians: spec.Angle,
                 infinite: spec.Infinite,
                 context: context),
-            3 => TransformCompute.Bend(
+            3 => TransformationCompute.Bend(
                 geometry: geometry,
                 spine: spec.Axis!.Value,
                 angle: spec.Angle,
                 context: context),
-            4 => TransformCompute.Taper(
+            4 => TransformationCompute.Taper(
                 geometry: geometry,
                 axis: spec.Axis!.Value,
                 startWidth: spec.StartWidth!.Value,
                 endWidth: spec.EndWidth!.Value,
                 context: context),
-            5 => TransformCompute.Stretch(
+            5 => TransformationCompute.Stretch(
                 geometry: geometry,
                 axis: spec.Axis!.Value,
                 context: context),
-            6 => TransformCompute.Splop(
+            6 => TransformationCompute.Splop(
                 geometry: geometry,
                 basePlane: spec.BasePlane!.Value,
                 targetSurface: spec.TargetSurface!,
                 targetPoint: spec.TargetPoint!.Value,
                 context: context),
-            7 => TransformCompute.Sporph(
+            7 => TransformationCompute.Sporph(
                 geometry: geometry,
                 sourceSurface: spec.SourceSurface!,
                 targetSurface: spec.TargetSurface!,
                 preserveStructure: spec.PreserveStructure,
                 context: context),
-            8 => TransformCompute.Maelstrom(
+            8 => TransformationCompute.Maelstrom(
                 geometry: geometry,
                 center: spec.Center!.Value,
                 axis: spec.Axis!.Value,

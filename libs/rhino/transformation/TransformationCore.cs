@@ -12,14 +12,14 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform matrix construction, validation, and application.</summary>
-internal static class TransformCore {
-    private static readonly FrozenDictionary<byte, (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> Validate, Func<Transforms.TransformSpec, Transform> Build, SystemError Error)> _builders =
-        new Dictionary<byte, (Func<Transforms.TransformSpec, IGeometryContext, (bool, string)>, Func<Transforms.TransformSpec, Transform>, SystemError)> {
+internal static class TransformationCore {
+    private static readonly FrozenDictionary<byte, (Func<Transformation.TransformSpec, IGeometryContext, (bool Valid, string Context)> Validate, Func<Transformation.TransformSpec, Transform> Build, SystemError Error)> _builders =
+        new Dictionary<byte, (Func<Transformation.TransformSpec, IGeometryContext, (bool, string)>, Func<Transformation.TransformSpec, Transform>, SystemError)> {
             [1] = ((s, c) => (s.Matrix is Transform m && m.IsValid && Math.Abs(m.Determinant) > c.AbsoluteTolerance, $"Valid: {s.Matrix?.IsValid ?? false}, Det: {(s.Matrix?.Determinant ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
                 s => s.Matrix!.Value, E.Geometry.Transformation.InvalidTransformMatrix),
-            [2] = ((s, _) => (s.UniformScale is (Point3d anchor, double f) && f is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Factor: {(s.UniformScale?.Factor ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
+            [2] = ((s, _) => (s.UniformScale is (Point3d anchor, double f) && f is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor, $"Factor: {(s.UniformScale?.Factor ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
                 s => Transform.Scale(s.UniformScale!.Value.Anchor, s.UniformScale.Value.Factor), E.Geometry.Transformation.InvalidScaleFactor),
-            [3] = ((s, _) => (s.NonUniformScale is (Plane p, double x, double y, double z) && p.IsValid && x is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && y is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor && z is >= TransformConfig.MinScaleFactor and <= TransformConfig.MaxScaleFactor, $"Plane: {s.NonUniformScale?.Plane.IsValid ?? false}, X: {(s.NonUniformScale?.X ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {(s.NonUniformScale?.Y ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {(s.NonUniformScale?.Z ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
+            [3] = ((s, _) => (s.NonUniformScale is (Plane p, double x, double y, double z) && p.IsValid && x is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor && y is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor && z is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor, $"Plane: {s.NonUniformScale?.Plane.IsValid ?? false}, X: {(s.NonUniformScale?.X ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {(s.NonUniformScale?.Y ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {(s.NonUniformScale?.Z ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
                 s => Transform.Scale(s.NonUniformScale!.Value.Plane, s.NonUniformScale.Value.X, s.NonUniformScale.Value.Y, s.NonUniformScale.Value.Z), E.Geometry.Transformation.InvalidScaleFactor),
             [4] = ((s, c) => (s.Rotation is (double angle, Vector3d a, Point3d center) && a.Length > c.AbsoluteTolerance, $"Axis: {(s.Rotation?.Axis.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
                 s => s.Rotation is { } rot
@@ -31,7 +31,7 @@ internal static class TransformCore {
                 s => Transform.Mirror(s.MirrorPlane!.Value), E.Geometry.Transformation.InvalidMirrorPlane),
             [7] = ((s, _) => (s.Translation is Vector3d, string.Empty),
                 s => Transform.Translation(s.Translation!.Value), E.Geometry.Transformation.InvalidTransformSpec),
-            [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double angle) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {(s.Shear?.Direction.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
+            [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double angle) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformationConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {(s.Shear?.Direction.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
                 s => Transform.Shear(s.Shear!.Value.Plane, s.Shear.Value.Direction * Math.Tan(s.Shear.Value.Angle), Vector3d.Zero, Vector3d.Zero), E.Geometry.Transformation.InvalidShearParameters),
             [9] = ((s, _) => (s.ProjectionPlane is Plane p && p.IsValid, string.Empty),
                 s => Transform.PlanarProjection(s.ProjectionPlane!.Value), E.Geometry.Transformation.InvalidProjectionPlane),
@@ -44,12 +44,12 @@ internal static class TransformCore {
     /// <summary>Build transform matrix from specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> BuildTransform(
-        Transforms.TransformSpec spec,
+        Transformation.TransformSpec spec,
         IGeometryContext context) {
         byte mode = spec switch { { Matrix: not null } => 1, { UniformScale: not null } => 2, { NonUniformScale: not null } => 3, { Rotation: not null } => 4, { RotationVectors: not null } => 5, { MirrorPlane: not null } => 6, { Translation: not null } => 7, { Shear: not null } => 8, { ProjectionPlane: not null } => 9, { ChangeBasis: not null } => 10, { PlaneToPlane: not null } => 11,
             _ => 0,
         };
-        return mode is > 0 && _builders.TryGetValue(mode, out (Func<Transforms.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transforms.TransformSpec, Transform> build, SystemError error) entry)
+        return mode is > 0 && _builders.TryGetValue(mode, out (Func<Transformation.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transformation.TransformSpec, Transform> build, SystemError error) entry)
             ? entry.validate(spec, context) switch {
                 (true, _) => ResultFactory.Create(value: entry.build(spec)),
                 (false, string ctx) => ResultFactory.Create<Transform>(error: entry.error.WithContext(ctx)),
@@ -90,7 +90,7 @@ internal static class TransformCore {
         bool enableDiagnostics) where T : GeometryBase {
         int totalCount = xCount * yCount * zCount;
         if (xCount <= 0 || yCount <= 0 || zCount <= 0
-            || totalCount > TransformConfig.MaxArrayCount
+            || totalCount > TransformationConfig.MaxArrayCount
             || Math.Abs(xSpacing) <= context.AbsoluteTolerance
             || Math.Abs(ySpacing) <= context.AbsoluteTolerance
             || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)) {
@@ -122,7 +122,7 @@ internal static class TransformCore {
                 Context = context,
                 ValidationMode = V.None,
                 AccumulateErrors = false,
-                OperationName = "Transforms.RectangularArray",
+                OperationName = "Transformation.RectangularArray",
                 EnableDiagnostics = enableDiagnostics,
             });
     }
@@ -137,7 +137,7 @@ internal static class TransformCore {
         double totalAngle,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformConfig.MaxArrayCount
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount
             || axis.Length <= context.AbsoluteTolerance
             || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
             return ResultFactory.Create<IReadOnlyList<T>>(
@@ -164,7 +164,7 @@ internal static class TransformCore {
                 Context = context,
                 ValidationMode = V.None,
                 AccumulateErrors = false,
-                OperationName = "Transforms.PolarArray",
+                OperationName = "Transformation.PolarArray",
                 EnableDiagnostics = enableDiagnostics,
             });
     }
@@ -179,7 +179,7 @@ internal static class TransformCore {
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
         double dirLength = direction.Length;
-        if (count <= 0 || count > TransformConfig.MaxArrayCount
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount
             || dirLength <= context.AbsoluteTolerance
             || Math.Abs(spacing) <= context.AbsoluteTolerance) {
             return ResultFactory.Create<IReadOnlyList<T>>(
@@ -203,7 +203,7 @@ internal static class TransformCore {
                 Context = context,
                 ValidationMode = V.None,
                 AccumulateErrors = false,
-                OperationName = "Transforms.LinearArray",
+                OperationName = "Transformation.LinearArray",
                 EnableDiagnostics = enableDiagnostics,
             });
     }

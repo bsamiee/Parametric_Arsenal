@@ -12,7 +12,7 @@ using Rhino.Geometry.Morphs;
 namespace Arsenal.Rhino.Transformation;
 
 /// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
-internal static class TransformCompute {
+internal static class TransformationCompute {
     /// <summary>Flow geometry along base curve to target curve.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Flow<T>(
@@ -28,7 +28,7 @@ internal static class TransformCompute {
                     curve1: targetCurve,
                     preventStretching: !preserveStructure) {
                     PreserveStructure = preserveStructure,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -42,14 +42,14 @@ internal static class TransformCompute {
         double angleRadians,
         bool infinite,
         IGeometryContext context) where T : GeometryBase =>
-        axis.IsValid && Math.Abs(angleRadians) <= TransformConfig.MaxTwistAngle && geometry.IsValid
+        axis.IsValid && Math.Abs(angleRadians) <= TransformationConfig.MaxTwistAngle && geometry.IsValid
             ? ApplyMorph(
                 morph: new TwistSpaceMorph {
                     TwistAxis = axis,
                     TwistAngleRadians = angleRadians,
                     InfiniteTwist = infinite,
                     PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -62,7 +62,7 @@ internal static class TransformCompute {
         Line spine,
         double angle,
         IGeometryContext context) where T : GeometryBase =>
-        spine.IsValid && Math.Abs(angle) <= TransformConfig.MaxBendAngle && geometry.IsValid
+        spine.IsValid && Math.Abs(angle) <= TransformationConfig.MaxBendAngle && geometry.IsValid
             ? ApplyMorph(
                 morph: new BendSpaceMorph(
                     start: spine.From,
@@ -72,7 +72,7 @@ internal static class TransformCompute {
                     straight: false,
                     symmetric: false) {
                     PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -87,8 +87,8 @@ internal static class TransformCompute {
         double endWidth,
         IGeometryContext context) where T : GeometryBase =>
         axis.IsValid
-        && startWidth >= TransformConfig.MinScaleFactor
-        && endWidth >= TransformConfig.MinScaleFactor
+        && startWidth >= TransformationConfig.MinScaleFactor
+        && endWidth >= TransformationConfig.MinScaleFactor
         && geometry.IsValid
             ? ApplyMorph(
                 morph: new TaperSpaceMorph(
@@ -99,7 +99,7 @@ internal static class TransformCompute {
                     bFlat: false,
                     infiniteTaper: false) {
                     PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -118,7 +118,7 @@ internal static class TransformCompute {
                     end: axis.To,
                     length: axis.Length * 2.0) {
                     PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -140,7 +140,7 @@ internal static class TransformCompute {
                         surface: targetSurface,
                         surfaceParam: new Point2d(u, v)) {
                         PreserveStructure = false,
-                        Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                        Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                         QuickPreview = false,
                     },
                     geometry: geometry)
@@ -161,7 +161,7 @@ internal static class TransformCompute {
                     surface0: sourceSurface,
                     surface1: targetSurface) {
                     PreserveStructure = preserveStructure,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -184,7 +184,7 @@ internal static class TransformCompute {
                     radius1: radius,
                     angle: angle) {
                     PreserveStructure = false,
-                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -199,7 +199,7 @@ internal static class TransformCompute {
         bool orientToPath,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -239,12 +239,12 @@ internal static class TransformCompute {
         return UnifiedOperation.Apply(
             input: transforms,
             operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                TransformCore.ApplyTransform(item: geometry, transform: xform)),
+                TransformationCore.ApplyTransform(item: geometry, transform: xform)),
             config: new OperationConfig<IReadOnlyList<Transform>, T> {
                 Context = context,
                 ValidationMode = V.None,
                 AccumulateErrors = false,
-                OperationName = "Transforms.PathArray",
+                OperationName = "Transformation.PathArray",
                 EnableDiagnostics = enableDiagnostics,
             });
     }

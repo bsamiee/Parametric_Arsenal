@@ -8,7 +8,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform validation modes and algorithmic constants.</summary>
-internal static class TransformConfig {
+internal static class TransformationConfig {
     /// <summary>Geometry type validation mode mapping.</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
