@@ -177,9 +177,10 @@ internal static class IntersectionCore {
         };
 
     /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
+    /// <remarks>ArcCurve instances in result are IDisposable and must be disposed by consumer.</remarks>
     private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
-        (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc)], [], [], [], [])),
-        (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center], [], [], [], [], [])),
+        (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc),], [], [], [], [])),
+        (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center,], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
@@ -280,7 +281,7 @@ internal static class IntersectionCore {
                 return TwoPointHandler(count, pointA, pointB, tolerance, count > 1 ? [parameterA, parameterB] : count > 0 ? [parameterA] : null);
             }),
             ((typeof(Plane), typeof(Plane)), (first, second, _, _, _) => RhinoIntersect.PlanePlane((Plane)first, (Plane)second, out Line line)
-                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new LineCurve(line),], [], [], [], []))
                 : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(ValueTuple<Plane, Plane>), typeof(Plane)), (first, second, _, _, _) => {
                 (Plane planeA, Plane planeB) = (ValueTuple<Plane, Plane>)first;
@@ -378,12 +379,20 @@ internal static class IntersectionCore {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB, context: context)
-            .Map(tuple => new Intersection.ClassificationResult(
-                Type: tuple.Type,
-                ApproachAngles: tuple.ApproachAngles,
-                IsGrazing: tuple.IsGrazing,
-                BlendScore: tuple.BlendScore));
+        UnifiedOperation.Apply(
+            input: geometryA,
+            operation: (Func<GeometryBase, Result<IReadOnlyList<Intersection.ClassificationResult>>>)(geomA =>
+                IntersectionCompute.Classify(output: output, geomA: geomA, geomB: geometryB, context: context)
+                    .Map(tuple => (IReadOnlyList<Intersection.ClassificationResult>)[new Intersection.ClassificationResult(
+                        Type: (Intersection.IntersectionType)tuple.Type,
+                        ApproachAngles: tuple.ApproachAngles,
+                        IsGrazing: tuple.IsGrazing,
+                        BlendScore: tuple.BlendScore),])),
+            config: new OperationConfig<GeometryBase, Intersection.ClassificationResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.ClassificationOperation.ValidationModeA,
+                OperationName = IntersectionConfig.ClassificationOperation.OperationName,
+            }).Map(static r => r[0]);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.NearMissResult> ExecuteNearMiss(
@@ -391,11 +400,19 @@ internal static class IntersectionCore {
         GeometryBase geometryB,
         double searchRadius,
         IGeometryContext context) =>
-        IntersectionCompute.FindNearMisses(geomA: geometryA, geomB: geometryB, searchRadius: searchRadius, context: context)
-            .Map(tuple => new Intersection.NearMissResult(
-                LocationsA: tuple.Item1,
-                LocationsB: tuple.Item2,
-                Distances: tuple.Item3));
+        UnifiedOperation.Apply(
+            input: geometryA,
+            operation: (Func<GeometryBase, Result<IReadOnlyList<Intersection.NearMissResult>>>)(geomA =>
+                IntersectionCompute.FindNearMisses(geomA: geomA, geomB: geometryB, searchRadius: searchRadius, context: context)
+                    .Map(tuple => (IReadOnlyList<Intersection.NearMissResult>)[new Intersection.NearMissResult(
+                        LocationsA: tuple.Item1,
+                        LocationsB: tuple.Item2,
+                        Distances: tuple.Item3),])),
+            config: new OperationConfig<GeometryBase, Intersection.NearMissResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.NearMissOperation.ValidationModeA,
+                OperationName = IntersectionConfig.NearMissOperation.OperationName,
+            }).Map(static r => r[0]);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.StabilityResult> ExecuteStability(
@@ -403,9 +420,17 @@ internal static class IntersectionCore {
         GeometryBase geometryA,
         GeometryBase geometryB,
         IGeometryContext context) =>
-        IntersectionCompute.AnalyzeStability(geomA: geometryA, geomB: geometryB, baseOutput: baseIntersection, context: context)
-            .Map(tuple => new Intersection.StabilityResult(
-                StabilityScore: tuple.Score,
-                PerturbationSensitivity: tuple.Sensitivity,
-                UnstableFlags: tuple.UnstableFlags));
+        UnifiedOperation.Apply(
+            input: geometryA,
+            operation: (Func<GeometryBase, Result<IReadOnlyList<Intersection.StabilityResult>>>)(geomA =>
+                IntersectionCompute.AnalyzeStability(geomA: geomA, geomB: geometryB, baseOutput: baseIntersection, context: context)
+                    .Map(tuple => (IReadOnlyList<Intersection.StabilityResult>)[new Intersection.StabilityResult(
+                        StabilityScore: tuple.Score,
+                        PerturbationSensitivity: tuple.Sensitivity,
+                        UnstableFlags: tuple.UnstableFlags),])),
+            config: new OperationConfig<GeometryBase, Intersection.StabilityResult> {
+                Context = context,
+                ValidationMode = IntersectionConfig.StabilityOperation.ValidationModeA,
+                OperationName = IntersectionConfig.StabilityOperation.OperationName,
+            }).Map(static r => r[0]);
 }

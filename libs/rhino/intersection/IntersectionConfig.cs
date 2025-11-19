@@ -9,26 +9,8 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Unified metadata, constants, and dispatch tables for intersection operations.</summary>
 [Pure]
 internal static class IntersectionConfig {
-    /// <summary>Unified operation metadata for intersection pairs.</summary>
+    /// <summary>Unified operation metadata for all intersection operations.</summary>
     internal sealed record IntersectionPairMetadata(
-        V ValidationModeA,
-        V ValidationModeB,
-        string OperationName);
-
-    /// <summary>Classification metadata with validation modes.</summary>
-    internal sealed record ClassificationMetadata(
-        V ValidationModeA,
-        V ValidationModeB,
-        string OperationName);
-
-    /// <summary>Near-miss detection metadata.</summary>
-    internal sealed record NearMissMetadata(
-        V ValidationModeA,
-        V ValidationModeB,
-        string OperationName);
-
-    /// <summary>Stability analysis metadata.</summary>
-    internal sealed record StabilityMetadata(
         V ValidationModeA,
         V ValidationModeB,
         string OperationName);
@@ -85,19 +67,19 @@ internal static class IntersectionConfig {
         .ToFrozenDictionary();
 
     /// <summary>Classification operation metadata.</summary>
-    internal static readonly ClassificationMetadata ClassificationOperation = new(
+    internal static readonly IntersectionPairMetadata ClassificationOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.Classify");
 
     /// <summary>Near-miss operation metadata.</summary>
-    internal static readonly NearMissMetadata NearMissOperation = new(
+    internal static readonly IntersectionPairMetadata NearMissOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.NearMiss");
 
     /// <summary>Stability operation metadata.</summary>
-    internal static readonly StabilityMetadata StabilityOperation = new(
+    internal static readonly IntersectionPairMetadata StabilityOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.Stability");

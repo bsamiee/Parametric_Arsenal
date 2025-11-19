@@ -40,6 +40,7 @@ public static class Intersection {
         bool Sorted = false);
 
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
+    /// <remarks>Consumers must dispose Curves collection elements as they implement IDisposable.</remarks>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     [DebuggerDisplay("Points={Points.Count}, Curves={Curves.Count}")]
     public readonly record struct IntersectionOutput(
@@ -51,6 +52,16 @@ public static class Intersection {
         IReadOnlyList<Polyline> Sections) {
         /// <summary>Empty result with zero-length collections for non-intersecting geometries.</summary>
         public static readonly IntersectionOutput Empty = new([], [], [], [], [], []);
+    }
+
+    /// <summary>Intersection type classification discriminating tangent, transverse, and unknown intersections.</summary>
+    public enum IntersectionType {
+        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
+        Tangent = 0,
+        /// <summary>Transverse intersection with significant angular separation.</summary>
+        Transverse = 1,
+        /// <summary>Unknown classification when insufficient data available.</summary>
+        Unknown = 2,
     }
 
     /// <summary>Result of intersection classification analysis.</summary>
