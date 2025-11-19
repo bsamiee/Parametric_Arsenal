@@ -163,21 +163,10 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSampling sampling,
         BoundingBox bounds,
-        InterpolationMode? mode = null) {
-        bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        InterpolationMode method = hasDegenerateAxis ? new NearestInterpolationMode() : mode ?? new TrilinearInterpolationMode();
-        return ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints))
+        InterpolationMode? mode = null) =>
+        ResultFactory.Create(value: (Field: scalarField, Grid: gridPoints, Mode: (RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) ? new NearestInterpolationMode() : mode ?? new TrilinearInterpolationMode()))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Scalar field length must match grid points"))
-            .Bind(state => FieldsCompute.InterpolateScalar(
-                query: query,
-                scalarField: state.Field,
-                grid: state.Grid,
-                resolution: sampling.Resolution,
-                bounds: bounds,
-                mode: method));
-    }
+            .Bind(state => FieldsCompute.InterpolateScalar(query: query, scalarField: state.Field, grid: state.Grid, resolution: sampling.Resolution, bounds: bounds, mode: state.Mode));
 
     /// <summary>Interpolate vector field at query point: (field, grid, query) → vector value.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -187,21 +176,10 @@ public static class Fields {
         Point3d[] gridPoints,
         FieldSampling sampling,
         BoundingBox bounds,
-        InterpolationMode? mode = null) {
-        bool hasDegenerateAxis = RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon)
-            || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon);
-        InterpolationMode method = hasDegenerateAxis ? new NearestInterpolationMode() : mode ?? new TrilinearInterpolationMode();
-        return ResultFactory.Create(value: (Field: vectorField, Grid: gridPoints))
+        InterpolationMode? mode = null) =>
+        ResultFactory.Create(value: (Field: vectorField, Grid: gridPoints, Mode: (RhinoMath.EpsilonEquals(bounds.Max.X, bounds.Min.X, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Y, bounds.Min.Y, epsilon: RhinoMath.SqrtEpsilon) || RhinoMath.EpsilonEquals(bounds.Max.Z, bounds.Min.Z, epsilon: RhinoMath.SqrtEpsilon)) ? new NearestInterpolationMode() : mode ?? new TrilinearInterpolationMode()))
             .Ensure(state => state.Field.Length == state.Grid.Length, error: E.Geometry.InvalidFieldInterpolation.WithContext("Vector field length must match grid points"))
-            .Bind(state => FieldsCompute.InterpolateVector(
-                query: query,
-                vectorField: state.Field,
-                grid: state.Grid,
-                resolution: sampling.Resolution,
-                bounds: bounds,
-                mode: method));
-    }
+            .Bind(state => FieldsCompute.InterpolateVector(query: query, vectorField: state.Field, grid: state.Grid, resolution: sampling.Resolution, bounds: bounds, mode: state.Mode));
 
     /// <summary>Trace streamlines along vector field: (field, seeds) → curves[].</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
