@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;

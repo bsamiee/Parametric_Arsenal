@@ -93,7 +93,7 @@ internal static class MorphologyCore {
                     ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(
                         error: E.Geometry.Morphology.ButterflyRequiresTriangles.WithContext(
                             string.Create(CultureInfo.InvariantCulture, $"TriangleCount: {mesh.Faces.TriangleCount}, FaceCount: {mesh.Faces.Count}"))),
-                _ => MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is int algorithmCode
+                _ => MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is byte algorithmCode
                     ? UnifiedOperation.Apply(
                         input: mesh,
                         operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
@@ -102,19 +102,19 @@ internal static class MorphologyCore {
                                 algorithmCode,
                                 strategy.Levels,
                                 context).Bind(subdivided => {
-                                (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
-                                return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-                                    new Morphology.SubdivisionResult(
-                                        subdivided,
-                                        m.Faces.Count,
-                                        subdivided.Faces.Count,
-                                        edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
-                                        edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0,
-                                        edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0,
-                                        aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
-                                        minAngles.Length > 0 ? minAngles.Min() : 0.0),
-                                ]);
-                            })),
+                                    (double[] edgeLengths, double[] aspectRatios, double[] minAngles) = ComputeMeshMetrics(subdivided, context);
+                                    return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                        new Morphology.SubdivisionResult(
+                                            subdivided,
+                                            m.Faces.Count,
+                                            subdivided.Faces.Count,
+                                            edgeLengths.Length > 0 ? edgeLengths.Min() : 0.0,
+                                            edgeLengths.Length > 0 ? edgeLengths.Max() : 0.0,
+                                            edgeLengths.Length > 0 ? edgeLengths.Average() : 0.0,
+                                            aspectRatios.Length > 0 ? aspectRatios.Average() : 0.0,
+                                            minAngles.Length > 0 ? minAngles.Min() : 0.0),
+                                    ]);
+                                })),
                         config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                             Context = context,
                             ValidationMode = meta.ValidationMode,
@@ -400,13 +400,10 @@ internal static class MorphologyCore {
                             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown repair strategy in composite: {unknown.GetType().Name}"))
                             : ((Func<Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(() => {
                                 MorphologyConfig.MorphologyOperationMetadata[] metadatas =
-                                    composite.Strategies
-                                        .Select(s => MorphologyConfig.Operations[s.GetType()])
-                                        .ToArray();
+                                    [.. composite.Strategies.Select(s => MorphologyConfig.Operations[s.GetType()])];
                                 byte flags = metadatas.Aggregate(
                                     MorphologyConfig.RepairNone,
-                                    (acc, meta) => (byte)(acc | meta.RepairFlags!.Value),
-                                );
+                                    (acc, meta) => (byte)(acc | meta.RepairFlags!.Value));
                                 return MorphologyCompute.RepairMesh(m, flags, composite.WeldTolerance, context)
                                     .Bind(repaired => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                                         new Morphology.MeshRepairResult(
