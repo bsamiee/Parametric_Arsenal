@@ -147,22 +147,23 @@ internal static class OrientationCompute {
                 ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"))
                 : ExtractCentroid(geometry: brep, useMassProperties: true) is Result<Point3d> centroidResult && criteria is Orientation.CenteredCriteria && !centroidResult.IsSuccess
                     ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.CentroidExtractionFailed)
-                    : ((Func<Result<Orientation.OptimizationResult>>)(() => {
-                        Vector3d diag1 = new(1, 1, 0);
-                        Vector3d diag2 = new(1, 0, 1);
-                        Vector3d diag3 = new(0, 1, 1);
-                        _ = diag1.Unitize();
-                        _ = diag2.Unitize();
-                        _ = diag3.Unitize();
-                        Plane[] testPlanes = [
-                            new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
-                            new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
-                            new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
-                            new Plane(box.Center, diag1, Vector3d.ZAxis),
-                            new Plane(box.Center, diag2, Vector3d.YAxis),
-                            new Plane(box.Center, diag3, Vector3d.XAxis),
-                        ];
-                        (Transform xform, double score, Orientation.OptimizationCriteria[] satisfied)[] results = [.. testPlanes.Select(plane => {
+                    : brep.GetBoundingBox(accurate: true) is BoundingBox validBox
+                        ? ((Func<Result<Orientation.OptimizationResult>>)(() => {
+                            Vector3d diag1 = new(1, 1, 0);
+                            Vector3d diag2 = new(1, 0, 1);
+                            Vector3d diag3 = new(0, 1, 1);
+                            _ = diag1.Unitize();
+                            _ = diag2.Unitize();
+                            _ = diag3.Unitize();
+                            Plane[] testPlanes = [
+                                new Plane(validBox.Center, Vector3d.XAxis, Vector3d.YAxis),
+                                new Plane(validBox.Center, Vector3d.YAxis, Vector3d.ZAxis),
+                                new Plane(validBox.Center, Vector3d.XAxis, Vector3d.ZAxis),
+                                new Plane(validBox.Center, diag1, Vector3d.ZAxis),
+                                new Plane(validBox.Center, diag2, Vector3d.YAxis),
+                                new Plane(validBox.Center, diag3, Vector3d.XAxis),
+                            ];
+                            (Transform xform, double score, Orientation.OptimizationCriteria[] satisfied)[] results = [.. testPlanes.Select(plane => {
                             Transform xf = Transform.PlaneToPlane(plane, Plane.WorldXY);
                             using Brep test = (Brep)brep.Duplicate();
                             return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<Orientation.OptimizationCriteria>())
@@ -191,10 +192,11 @@ internal static class OrientationCompute {
                                     : (Transform.Identity, 0.0, Array.Empty<Orientation.OptimizationCriteria>());
                         }),
                         ];
-                        return results.MaxBy(r => r.score) is (Transform best, double bestScore, Orientation.OptimizationCriteria[] met) && bestScore > 0
-                            ? ResultFactory.Create(value: new Orientation.OptimizationResult(OptimalTransform: best, Score: bestScore, CriteriaSatisfied: met))
-                            : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
-                    }))();
+                            return results.MaxBy(r => r.score) is (Transform best, double bestScore, Orientation.OptimizationCriteria[] met) && bestScore > 0
+                                ? ResultFactory.Create(value: new Orientation.OptimizationResult(OptimalTransform: best, Score: bestScore, CriteriaSatisfied: met))
+                                : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
+                        }))()
+                        : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"));
 
     internal static Result<Orientation.RelativeOrientationResult> ComputeRelative(GeometryBase geometryA, GeometryBase geometryB, double symmetryTolerance, double angleTolerance) =>
         (OrientationConfig.PlaneExtractors.TryGetValue(geometryA.GetType(), out OrientationConfig.PlaneExtractorMetadata? extA),
