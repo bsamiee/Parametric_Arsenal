@@ -88,8 +88,14 @@ public static class Morphology {
     /// <summary>Base type for mesh unwrapping strategies.</summary>
     public abstract record UnwrapStrategy : Operation;
 
-    /// <summary>Planar unwrap projection.</summary>
+    /// <summary>Planar unwrap via angle-based or conformal energy minimization.</summary>
     public sealed record PlanarUnwrap : UnwrapStrategy;
+
+    /// <summary>Cylindrical unwrap projection around axis.</summary>
+    public sealed record CylindricalUnwrap(Vector3d Axis, Point3d Origin) : UnwrapStrategy;
+
+    /// <summary>Spherical unwrap projection from center.</summary>
+    public sealed record SphericalUnwrap(Point3d Center, double Radius) : UnwrapStrategy;
 
     /// <summary>Separate mesh into disconnected components.</summary>
     public sealed record MeshSeparateOperation : Operation;

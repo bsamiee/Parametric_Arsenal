@@ -612,17 +612,62 @@ internal static class MorphologyCompute {
     internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
         byte unwrapMethod,
+        Vector3d? axis,
+        Point3d? origin,
+        double? radius,
         IGeometryContext _) =>
         unwrapMethod switch {
-            0 or 1 => ((Func<Result<Mesh>>)(() => {
-                Mesh unwrapped = mesh.DuplicateMesh();
-                using MeshUnwrapper unwrapper = new(unwrapped);
-                bool success = unwrapper.Unwrap(method: (MeshUnwrapMethod)unwrapMethod);
-                return success && unwrapped.TextureCoordinates.Count > 0
-                    ? ResultFactory.Create(value: unwrapped)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Method: {(unwrapMethod == 0 ? "AngleBased" : "ConformalEnergyMinimization")}, Success: {success}, UVCount: {unwrapped.TextureCoordinates.Count}")));
-            }))(),
+            0 => mesh.GetBoundingBox(accurate: false) is BoundingBox bounds && bounds.IsValid
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    using MeshUnwrapper unwrapper = new(unwrapped);
+                    bool success = unwrapper.Unwrap(method: default(MeshUnwrapMethod));
+                    return success && unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Planar unwrap failed"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Mesh bounds invalid")),
+            1 => axis is Vector3d axisVal && origin is Point3d originVal && axisVal.Length > RhinoMath.ZeroTolerance
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    unwrapped.TextureCoordinates.Clear();
+                    Vector3d axisUnit = axisVal / axisVal.Length;
+                    for (int i = 0; i < unwrapped.Vertices.Count; i++) {
+                        Point3d vertex = unwrapped.Vertices[i];
+                        Vector3d toVertex = vertex - originVal;
+                        double axisDistance = toVertex * axisUnit;
+                        Vector3d radialVec = toVertex - (axisDistance * axisUnit);
+                        double u = Math.Atan2(radialVec * Vector3d.CrossProduct(axisUnit, Vector3d.XAxis), radialVec * Vector3d.CrossProduct(Vector3d.YAxis, axisUnit));
+                        double v = axisDistance;
+                        int _ = unwrapped.TextureCoordinates.Add((float)(u / RhinoMath.TwoPI), (float)v);
+                    }
+                    return unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Cylindrical unwrap produced no UVs"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Cylindrical unwrap requires valid axis and origin")),
+            2 => origin is Point3d centerVal && radius is double radiusVal && radiusVal > RhinoMath.ZeroTolerance
+                ? ((Func<Result<Mesh>>)(() => {
+                    Mesh unwrapped = mesh.DuplicateMesh();
+                    unwrapped.TextureCoordinates.Clear();
+                    for (int i = 0; i < unwrapped.Vertices.Count; i++) {
+                        Vector3d toVertex = unwrapped.Vertices[i] - centerVal;
+                        double length = toVertex.Length;
+                        Point3d projected = length > RhinoMath.ZeroTolerance
+                            ? centerVal + (radiusVal * (toVertex / length))
+                            : centerVal + (radiusVal * Vector3d.ZAxis);
+                        Vector3d sphereVec = projected - centerVal;
+                        double theta = Math.Atan2(sphereVec.Y, sphereVec.X);
+                        double phi = Math.Acos(RhinoMath.Clamp(sphereVec.Z / radiusVal, -1.0, 1.0));
+                        double u = (theta + Math.PI) / RhinoMath.TwoPI;
+                        double v = phi / Math.PI;
+                        int __ = unwrapped.TextureCoordinates.Add((float)u, (float)v);
+                    }
+                    return unwrapped.TextureCoordinates.Count > 0
+                        ? ResultFactory.Create(value: unwrapped)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Spherical unwrap produced no UVs"));
+                }))()
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext("Spherical unwrap requires valid center and radius > 0")),
             _ => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshUnwrapFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Invalid unwrap method: {unwrapMethod}"))),
         };

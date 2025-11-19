@@ -624,39 +624,43 @@ internal static class MorphologyCore {
             : MorphologyConfig.Operations.TryGetValue(strategy.GetType(), out MorphologyConfig.MorphologyOperationMetadata? meta) && meta.AlgorithmCode is not null
                 ? UnifiedOperation.Apply(
                     input: mesh,
-                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
-                        MorphologyCompute.UnwrapMesh(m, meta.AlgorithmCode.Value, context)
-                        .Bind(unwrapped => {
-                            bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
-                            double minU = double.MaxValue;
-                            double maxU = double.MinValue;
-                            double minV = double.MaxValue;
-                            double maxV = double.MinValue;
-                            double coverage = 0.0;
-                            if (hasUVs) {
-                                for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
-                                    Point2f uv = unwrapped.TextureCoordinates[i];
-                                    minU = Math.Min(minU, uv.X);
-                                    maxU = Math.Max(maxU, uv.X);
-                                    minV = Math.Min(minV, uv.Y);
-                                    maxV = Math.Max(maxV, uv.Y);
+                    operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m => (
+                        strategy switch {
+                            Morphology.CylindricalUnwrap cyl => MorphologyCompute.UnwrapMesh(m, meta.AlgorithmCode.Value, axis: cyl.Axis, origin: cyl.Origin, radius: null, context),
+                            Morphology.SphericalUnwrap sph => MorphologyCompute.UnwrapMesh(m, meta.AlgorithmCode.Value, axis: null, origin: sph.Center, radius: sph.Radius, context),
+                            _ => MorphologyCompute.UnwrapMesh(m, meta.AlgorithmCode.Value, axis: null, origin: null, radius: null, context),
+                        })
+                            .Bind(unwrapped => {
+                                bool hasUVs = unwrapped.TextureCoordinates.Count > 0;
+                                double minU = double.MaxValue;
+                                double maxU = double.MinValue;
+                                double minV = double.MaxValue;
+                                double maxV = double.MinValue;
+                                double coverage = 0.0;
+                                if (hasUVs) {
+                                    for (int i = 0; i < unwrapped.TextureCoordinates.Count; i++) {
+                                        Point2f uv = unwrapped.TextureCoordinates[i];
+                                        minU = Math.Min(minU, uv.X);
+                                        maxU = Math.Max(maxU, uv.X);
+                                        minV = Math.Min(minV, uv.Y);
+                                        maxV = Math.Max(maxV, uv.Y);
+                                    }
+                                    double uvArea = (maxU - minU) * (maxV - minV);
+                                    coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
                                 }
-                                double uvArea = (maxU - minU) * (maxV - minV);
-                                coverage = uvArea > RhinoMath.ZeroTolerance ? Math.Min(uvArea, 1.0) : 0.0;
-                            }
-                            return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-                                new Morphology.MeshUnwrapResult(
-                                    unwrapped,
-                                    hasUVs,
-                                    m.Faces.Count,
-                                    unwrapped.TextureCoordinates.Count,
-                                    minU,
-                                    maxU,
-                                    minV,
-                                    maxV,
-                                    coverage),
-                            ]);
-                        })),
+                                return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                                    new Morphology.MeshUnwrapResult(
+                                        unwrapped,
+                                        hasUVs,
+                                        m.Faces.Count,
+                                        unwrapped.TextureCoordinates.Count,
+                                        minU,
+                                        maxU,
+                                        minV,
+                                        maxV,
+                                        coverage),
+                                ]);
+                            })),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,
                         ValidationMode = meta.ValidationMode,
