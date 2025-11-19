@@ -191,7 +191,7 @@ internal static class IntersectionCore {
             }),
             ((typeof(Plane), typeof(Sphere)), (first, second, _, _, _) => CircleHandler((int)RhinoIntersect.PlaneSphere((Plane)first, (Sphere)second, out Circle circle), circle)),
             ((typeof(Plane), typeof(BoundingBox)), (first, second, _, _, _) => (RhinoIntersect.PlaneBoundingBox((Plane)first, (BoundingBox)second, out Polyline polyline), polyline) switch {
-                (true, Polyline { Count: > 0 } pl) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from point in pl select point,], [], [], [], [], [pl,])),
+                (true, Polyline { Count: > 0 } pl) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. pl,], [], [], [], [], [pl,])),
                 _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
             }),
             ((typeof(Sphere), typeof(Sphere)), (first, second, _, _, _) => CircleHandler((int)RhinoIntersect.SphereSphere((Sphere)first, (Sphere)second, out Circle circle), circle)),
@@ -223,19 +223,17 @@ internal static class IntersectionCore {
     /// <summary>Resolves intersection strategy for type pair using inheritance chain and interface traversal.</summary>
     [Pure]
     internal static Result<(IntersectionStrategy Strategy, bool Swapped)> ResolveStrategy(Type typeA, Type typeB) {
-        Type[] chainA = [.. Enumerable.Range(0, 100)
-            .Aggregate(
-                (Chain: new List<Type>(), Current: (Type?)typeA),
-                (state, _) => state.Current is null ? state : (state.Chain, state.Current.BaseType) is var next && state.Chain.Add(state.Current) is var _ ? (state.Chain, next.BaseType) : state)
-            .Chain,
-        .. typeA.GetInterfaces(),];
+        List<Type> listA = [];
+        for (Type? current = typeA; current is not null; current = current.BaseType) {
+            listA.Add(current);
+        }
+        Type[] chainA = [.. listA, .. typeA.GetInterfaces(),];
 
-        Type[] chainB = [.. Enumerable.Range(0, 100)
-            .Aggregate(
-                (Chain: new List<Type>(), Current: (Type?)typeB),
-                (state, _) => state.Current is null ? state : (state.Chain, state.Current.BaseType) is var next && state.Chain.Add(state.Current) is var _ ? (state.Chain, next.BaseType) : state)
-            .Chain,
-        .. typeB.GetInterfaces(),];
+        List<Type> listB = [];
+        for (Type? current = typeB; current is not null; current = current.BaseType) {
+            listB.Add(current);
+        }
+        Type[] chainB = [.. listB, .. typeB.GetInterfaces(),];
 
         return chainA.SelectMany(first => chainB.Select(second => ((first, second), false)))
             .Concat(chainB.SelectMany(first => chainA.Select(second => ((first, second), true))))
