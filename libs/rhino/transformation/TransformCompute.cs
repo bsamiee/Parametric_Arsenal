@@ -13,10 +13,6 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
 internal static class TransformCompute {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double MorphTolerance(IGeometryContext context) =>
-        Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance);
-
     /// <summary>Flow geometry along base curve to target curve.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Flow<T>(
@@ -32,7 +28,7 @@ internal static class TransformCompute {
                     curve1: targetCurve,
                     preventStretching: !preserveStructure) {
                     PreserveStructure = preserveStructure,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -53,7 +49,7 @@ internal static class TransformCompute {
                     TwistAngleRadians = angleRadians,
                     InfiniteTwist = infinite,
                     PreserveStructure = false,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -76,7 +72,7 @@ internal static class TransformCompute {
                     straight: false,
                     symmetric: false) {
                     PreserveStructure = false,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -103,7 +99,7 @@ internal static class TransformCompute {
                     bFlat: false,
                     infiniteTaper: false) {
                     PreserveStructure = false,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -122,7 +118,7 @@ internal static class TransformCompute {
                     end: axis.To,
                     length: axis.Length * 2.0) {
                     PreserveStructure = false,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -144,7 +140,7 @@ internal static class TransformCompute {
                         surface: targetSurface,
                         surfaceParam: new Point2d(u, v)) {
                         PreserveStructure = false,
-                        Tolerance = MorphTolerance(context),
+                        Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                         QuickPreview = false,
                     },
                     geometry: geometry)
@@ -165,7 +161,7 @@ internal static class TransformCompute {
                     surface0: sourceSurface,
                     surface1: targetSurface) {
                     PreserveStructure = preserveStructure,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -188,7 +184,7 @@ internal static class TransformCompute {
                     radius1: radius,
                     angle: angle) {
                     PreserveStructure = false,
-                    Tolerance = MorphTolerance(context),
+                    Tolerance = Math.Max(context.AbsoluteTolerance, TransformConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
@@ -220,24 +216,15 @@ internal static class TransformCompute {
 
         double[] parameters = count == 1
             ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
-            : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
-                ? divideParameters
-                : ((Func<double[]>)(() => {
-                    double[] fallback = new double[count];
-                    double stepLength = curveLength / (count - 1);
-                    for (int index = 0; index < count; index++) {
-                        double targetLength = stepLength * index;
-                        bool resolved = path.LengthParameter(targetLength, out double tParameter);
-                        double normalized = targetLength / curveLength;
-                        // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
-                        double clamped = Math.Clamp(normalized, 0.0, 1.0);
-                        fallback[index] = resolved
-                            ? tParameter
-                            : path.Domain.ParameterAt(clamped);
-                    }
-
-                    return fallback;
-                }))();
+            : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParams && divideParams.Length == count
+                ? divideParams
+                : [.. Enumerable.Range(0, count)
+                    .Select(i => {
+                        double targetLength = curveLength * i / (count - 1);
+                        return path.LengthParameter(targetLength, out double tParam)
+                            ? tParam
+                            : path.Domain.ParameterAt(Math.Clamp(targetLength / curveLength, 0.0, 1.0));
+                    }),];
 
         Transform[] transforms = new Transform[count];
         for (int i = 0; i < count; i++) {
