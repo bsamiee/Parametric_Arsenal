@@ -57,7 +57,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {TransformCore.Fmt(angleRadians)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Bend geometry along spine.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -80,7 +80,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {TransformCore.Fmt(angle)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -107,7 +107,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {TransformCore.Fmt(startWidth)}, End: {TransformCore.Fmt(endWidth)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Stretch geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -192,7 +192,7 @@ internal static class TransformCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {TransformCore.Fmt(radius)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -211,55 +211,55 @@ internal static class TransformCompute {
         }
 
         double curveLength = path.GetLength();
-        return curveLength <= context.AbsoluteTolerance
-            ? ResultFactory.Create<IReadOnlyList<T>>(
+        if (curveLength <= context.AbsoluteTolerance) {
+            return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, PathLength: {TransformCore.Fmt(curveLength)}")))
-            : ((Func<Result<IReadOnlyList<T>>>)(() => {
-                double[] parameters = count == 1
-                    ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
-                    : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
-                        ? divideParameters
-                        : ((Func<double[]>)(() => {
-                            double[] fallback = new double[count];
-                            double stepLength = curveLength / (count - 1);
-                            for (int index = 0; index < count; index++) {
-                                double targetLength = stepLength * index;
-                                bool resolved = path.LengthParameter(targetLength, out double tParameter);
-                                double normalized = targetLength / curveLength;
-                                // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
-                                double clamped = Math.Clamp(normalized, 0.0, 1.0);
-                                fallback[index] = resolved
-                                    ? tParameter
-                                    : path.Domain.ParameterAt(clamped);
-                            }
+                    $"Count: {count}, PathLength: {curveLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
+        }
 
-                            return fallback;
-                        }))();
+        double[] parameters = count == 1
+            ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
+            : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParameters && divideParameters.Length == count
+                ? divideParameters
+                : ((Func<double[]>)(() => {
+                    double[] fallback = new double[count];
+                    double stepLength = curveLength / (count - 1);
+                    for (int index = 0; index < count; index++) {
+                        double targetLength = stepLength * index;
+                        bool resolved = path.LengthParameter(targetLength, out double tParameter);
+                        double normalized = targetLength / curveLength;
+                        // Clamp to [0.0, 1.0] to guard against floating-point precision errors.
+                        double clamped = Math.Clamp(normalized, 0.0, 1.0);
+                        fallback[index] = resolved
+                            ? tParameter
+                            : path.Domain.ParameterAt(clamped);
+                    }
 
-                Transform[] transforms = new Transform[count];
-                for (int i = 0; i < count; i++) {
-                    double t = parameters[i];
-                    Point3d pt = path.PointAt(t);
+                    return fallback;
+                }))();
 
-                    transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
-                        ? Transform.PlaneToPlane(Plane.WorldXY, frame)
-                        : Transform.Translation(pt - Point3d.Origin);
-                }
+        Transform[] transforms = new Transform[count];
+        for (int i = 0; i < count; i++) {
+            double t = parameters[i];
+            Point3d pt = path.PointAt(t);
 
-                return UnifiedOperation.Apply(
-                    input: transforms,
-                    operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                        TransformCore.ApplyTransform(item: geometry, transform: xform)),
-                    config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                        Context = context,
-                        ValidationMode = V.None,
-                        AccumulateErrors = false,
-                        OperationName = "Transforms.PathArray",
-                        EnableDiagnostics = enableDiagnostics,
-                    });
-            }))();
+            transforms[i] = orientToPath && path.FrameAt(t, out Plane frame) && frame.IsValid
+                ? Transform.PlaneToPlane(Plane.WorldXY, frame)
+                : Transform.Translation(pt - Point3d.Origin);
+        }
+
+        return UnifiedOperation.Apply(
+            input: transforms,
+            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                TransformCore.ApplyTransform(item: geometry, transform: xform)),
+            config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                Context = context,
+                ValidationMode = V.None,
+                AccumulateErrors = false,
+                OperationName = "Transforms.PathArray",
+                EnableDiagnostics = enableDiagnostics,
+            });
     }
 
     /// <summary>Apply SpaceMorph to geometry with duplication.</summary>
