@@ -721,7 +721,8 @@ internal static class FieldsCompute {
                                             double r => Math.Acos(r) / 3.0,
                                         };
                                         double sqrtP = Math.Sqrt(p);
-                                        (double lambda1, double lambda2, double lambda3) = ((trace / 3.0) + (2.0 * sqrtP * Math.Cos(phi)), (trace / 3.0) - (sqrtP * (Math.Cos(phi) + (Math.Sqrt(3.0) * Math.Sin(phi)))), (trace / 3.0) - (sqrtP * (Math.Cos(phi) - (Math.Sqrt(3.0) * Math.Sin(phi)))));
+                                        double sqrt3 = Math.Sqrt(3.0);
+                                        (double lambda1, double lambda2, double lambda3) = ((trace / 3.0) + (2.0 * sqrtP * Math.Cos(phi)), (trace / 3.0) - (sqrtP * (Math.Cos(phi) + (sqrt3 * Math.Sin(phi)))), (trace / 3.0) - (sqrtP * (Math.Cos(phi) - (sqrt3 * Math.Sin(phi)))));
                                         Vector3d ComputeEigenvector(double lambda) {
                                             (double aShift, double bVal, double cVal, double dShift, double eVal, double fShift) = (localHessian[0, 0] - lambda, localHessian[0, 1], localHessian[0, 2], localHessian[1, 1] - lambda, localHessian[1, 2], localHessian[2, 2] - lambda);
                                             (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
