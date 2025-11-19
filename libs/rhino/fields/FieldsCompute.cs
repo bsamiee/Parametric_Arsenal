@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using System.Linq;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
@@ -13,12 +14,12 @@ namespace Arsenal.Rhino.Fields;
 [Pure]
 internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
+    internal static Result<Fields.VectorFieldSamples> ComputeGradient(
         double[] distances,
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) =>
-        ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+        ((Func<Result<Fields.VectorFieldSamples>>)(() => {
             int totalSamples = distances.Length;
             Vector3d[] gradients = ArrayPool<Vector3d>.Shared.Rent(totalSamples);
             try {
@@ -62,7 +63,7 @@ internal static class FieldsCompute {
                     }
                 }
                 Vector3d[] finalGradients = [.. gradients[..totalSamples]];
-                return ResultFactory.Create(value: (Grid: grid, Gradients: finalGradients));
+                return ResultFactory.Create(value: new Fields.VectorFieldSamples(grid, finalGradients));
             } finally {
                 ArrayPool<Vector3d>.Shared.Return(gradients, clearArray: true);
             }
@@ -101,7 +102,7 @@ internal static class FieldsCompute {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
+    internal static Result<Fields.VectorFieldSamples> ComputeCurl(
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
@@ -122,11 +123,12 @@ internal static class FieldsCompute {
                 return new Vector3d(dFz_dy - dFy_dz, dFx_dz - dFz_dx, dFy_dx - dFx_dy);
             },
             lengthError: E.Geometry.InvalidCurlComputation.WithContext("Vector field length must match grid points"),
-            resolutionError: E.Geometry.InvalidCurlComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+            resolutionError: E.Geometry.InvalidCurlComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"))
+            .Map(result => new Fields.VectorFieldSamples(result.Grid, result.Output));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
+    internal static Result<Fields.ScalarFieldSamples> ComputeDivergence(
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
@@ -144,11 +146,12 @@ internal static class FieldsCompute {
                 return dFx_dx + dFy_dy + dFz_dz;
             },
             lengthError: E.Geometry.InvalidDivergenceComputation.WithContext("Vector field length must match grid points"),
-            resolutionError: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+            resolutionError: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"))
+            .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
+    internal static Result<Fields.ScalarFieldSamples> ComputeLaplacian(
         double[] scalarField,
         Point3d[] grid,
         int resolution,
@@ -166,33 +169,34 @@ internal static class FieldsCompute {
                 return d2f_dx2 + d2f_dy2 + d2f_dz2;
             },
             lengthError: E.Geometry.InvalidLaplacianComputation.WithContext("Scalar field length must match grid points"),
-            resolutionError: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+            resolutionError: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"))
+            .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Potential)> ComputeVectorPotential(
+    internal static Result<Fields.VectorFieldSamples> ComputeVectorPotential(
         Vector3d[] vectorField,
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) =>
         (vectorField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (false, _) => ResultFactory.Create<Fields.VectorFieldSamples>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Vector field length must match grid points")),
+            (_, false) => ResultFactory.Create<Fields.VectorFieldSamples>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
             (true, true) => ComputeCurl(
                 vectorField: vectorField,
                 grid: grid,
                 resolution: resolution,
-                gridDelta: gridDelta).Bind(curl => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                gridDelta: gridDelta).Bind(curl => ((Func<Result<Fields.VectorFieldSamples>>)(() => {
                     (bool hasDx, bool hasDy, bool hasDz) = (Math.Abs(gridDelta.X) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Y) > RhinoMath.ZeroTolerance, Math.Abs(gridDelta.Z) > RhinoMath.ZeroTolerance);
                     return (hasDx && hasDy && hasDz) switch {
-                        false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Grid bounds must have non-zero extent across X, Y, and Z")),
-                        true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                        false => ResultFactory.Create<Fields.VectorFieldSamples>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Grid bounds must have non-zero extent across X, Y, and Z")),
+                        true => ((Func<Result<Fields.VectorFieldSamples>>)(() => {
                             int totalSamples = vectorField.Length;
                             (double invDx2, double invDy2, double invDz2) = (1.0 / (gridDelta.X * gridDelta.X), 1.0 / (gridDelta.Y * gridDelta.Y), 1.0 / (gridDelta.Z * gridDelta.Z));
                             double diagonal = (2.0 * invDx2) + (2.0 * invDy2) + (2.0 * invDz2);
                             return (diagonal > RhinoMath.ZeroTolerance) switch {
-                                false => ResultFactory.Create<(Point3d[], Vector3d[])>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Degenerate Laplacian diagonal due to invalid spacing")),
-                                true => ((Func<Result<(Point3d[], Vector3d[])>>)(() => {
+                                false => ResultFactory.Create<Fields.VectorFieldSamples>(error: E.Geometry.InvalidVectorPotentialComputation.WithContext("Degenerate Laplacian diagonal due to invalid spacing")),
+                                true => ((Func<Result<Fields.VectorFieldSamples>>)(() => {
                                     double[] ax = ArrayPool<double>.Shared.Rent(totalSamples);
                                     double[] ay = ArrayPool<double>.Shared.Rent(totalSamples);
                                     double[] az = ArrayPool<double>.Shared.Rent(totalSamples);
@@ -202,7 +206,7 @@ internal static class FieldsCompute {
                                         Array.Clear(array: ay, index: 0, length: totalSamples);
                                         Array.Clear(array: az, index: 0, length: totalSamples);
                                         int resSquared = resolution * resolution;
-                                        Vector3d[] curlField = curl.Curl;
+                                        Vector3d[] curlField = curl.Vectors;
                                         for (int iteration = 0; iteration < FieldsConfig.VectorPotentialIterations; iteration++) {
                                             double maxDelta = 0.0;
                                             for (int i = 1; i < resolution - 1; i++) {
@@ -240,7 +244,7 @@ internal static class FieldsCompute {
                                             potential[idx] = new(ax[idx], ay[idx], az[idx]);
                                         }
                                         Vector3d[] finalPotential = [.. potential[..totalSamples]];
-                                        return ResultFactory.Create(value: (Grid: grid, Potential: finalPotential));
+                                        return ResultFactory.Create(value: new Fields.VectorFieldSamples(grid, finalPotential));
                                     } finally {
                                         ArrayPool<double>.Shared.Return(ax, clearArray: true);
                                         ArrayPool<double>.Shared.Return(ay, clearArray: true);
@@ -263,10 +267,13 @@ internal static class FieldsCompute {
         BoundingBox bounds,
         Fields.InterpolationMode mode,
         Func<T, T, double, T> lerp) where T : struct =>
-        mode switch {
-            Fields.NearestInterpolationMode => InterpolateNearest(query, field, grid),
-            Fields.TrilinearInterpolationMode => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
-            _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {mode.GetType().Name}")),
+        (field.Length == grid.Length) switch {
+            false => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Field length must match grid points")),
+            true => mode switch {
+                Fields.NearestInterpolationMode => InterpolateNearest(query, field, grid),
+                Fields.TrilinearInterpolationMode => InterpolateTrilinear(query: query, field: field, resolution: resolution, bounds: bounds, lerp: lerp),
+                _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {mode.GetType().Name}")),
+            },
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -360,7 +367,10 @@ internal static class FieldsCompute {
         int resolution,
         BoundingBox bounds,
         IGeometryContext context) =>
-        ((Func<Result<Curve[]>>)(() => {
+        (vectorField.Length == gridPoints.Length, seeds.Length > 0) switch {
+            (false, _) => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidScalarField.WithContext("Vector field length must match grid points")),
+            (_, false) => ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidStreamlineSeeds),
+            (true, true) => ((Func<Result<Curve[]>>)(() => {
             Curve[] streamlines = new Curve[seeds.Length];
             Point3d[] pathBuffer = ArrayPool<Point3d>.Shared.Rent(FieldsConfig.MaxStreamlineSteps);
             try {
@@ -399,14 +409,19 @@ internal static class FieldsCompute {
             } finally {
                 ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
             }
-        }))();
+        }))(),
+        };
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,
         Point3d[] gridPoints,
         int resolution,
         double[] isovalues) =>
-        ((Func<Result<Mesh[]>>)(() => {
+        (scalarField.Length == gridPoints.Length, isovalues.Length > 0, isovalues.All(value => RhinoMath.IsValidDouble(value))) switch {
+            (false, _, _) => ResultFactory.Create<Mesh[]>(error: E.Geometry.InvalidScalarField.WithContext("Scalar field length must match grid points")),
+            (_, false, _) => ResultFactory.Create<Mesh[]>(error: E.Geometry.InvalidIsovalue.WithContext("At least one isovalue required")),
+            (_, _, false) => ResultFactory.Create<Mesh[]>(error: E.Geometry.InvalidIsovalue.WithContext("All isovalues must be valid doubles")),
+            (true, true, true) => ((Func<Result<Mesh[]>>)(() => {
             Mesh[] meshes = new Mesh[isovalues.Length];
             for (int isoIdx = 0; isoIdx < isovalues.Length; isoIdx++) {
                 double isovalue = isovalues[isoIdx];
@@ -459,19 +474,20 @@ internal static class FieldsCompute {
                 meshes[isoIdx] = mesh;
             }
             return ResultFactory.Create(value: meshes);
-        }))();
+        }))(),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
-    internal static Result<(Point3d[] Grid, double[,][] Hessian)> ComputeHessian(
+    internal static Result<Fields.HessianFieldSamples> ComputeHessian(
         double[] scalarField,
         Point3d[] grid,
         int resolution,
         Vector3d gridDelta) {
         return (scalarField.Length == grid.Length, resolution >= FieldsConfig.MinResolution) switch {
-            (false, _) => ResultFactory.Create<(Point3d[], double[,][])>(error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points")),
-            (_, false) => ResultFactory.Create<(Point3d[], double[,][])>(error: E.Geometry.InvalidHessianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
-            (true, true) => ((Func<Result<(Point3d[], double[,][])>>)(() => {
+            (false, _) => ResultFactory.Create<Fields.HessianFieldSamples>(error: E.Geometry.InvalidHessianComputation.WithContext("Scalar field length must match grid points")),
+            (_, false) => ResultFactory.Create<Fields.HessianFieldSamples>(error: E.Geometry.InvalidHessianComputation.WithContext($"Resolution {resolution.ToString(System.Globalization.CultureInfo.InvariantCulture)} below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}")),
+            (true, true) => ((Func<Result<Fields.HessianFieldSamples>>)(() => {
                 int totalSamples = scalarField.Length;
                 double[,][] hessian = new double[3, 3][];
                 for (int row = 0; row < 3; row++) {
@@ -536,7 +552,7 @@ internal static class FieldsCompute {
                             finalHessian[row, col] = [.. hessian[row, col][..totalSamples]];
                         }
                     }
-                    return ResultFactory.Create(value: (Grid: grid, Hessian: finalHessian));
+                    return ResultFactory.Create(value: new Fields.HessianFieldSamples(grid, finalHessian));
                 } finally {
                     for (int row = 0; row < 3; row++) {
                         for (int col = 0; col < 3; col++) {
@@ -598,34 +614,36 @@ internal static class FieldsCompute {
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> ComputeDirectionalDerivative(
+    internal static Result<Fields.ScalarFieldSamples> ComputeDirectionalDerivative(
         Vector3d[] gradientField,
         Point3d[] grid,
         Vector3d direction) =>
         (direction.IsValid && direction.Length > RhinoMath.ZeroTolerance) switch {
-            false => ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
-            true => ((Func<Result<(Point3d[], double[])>>)(() => {
+            false => ResultFactory.Create<Fields.ScalarFieldSamples>(error: E.Geometry.InvalidDirectionalDerivative.WithContext("Direction vector must be valid and non-zero")),
+            true => ((Func<Result<Fields.ScalarFieldSamples>>)(() => {
                 Vector3d unitDirection = direction / direction.Length;
                 return ApplyFieldOperation(
                     inputField: gradientField,
                     grid: grid,
                     operation: (gradient, _) => Vector3d.Multiply(gradient, unitDirection),
-                    error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"));
+                    error: E.Geometry.InvalidDirectionalDerivative.WithContext("Gradient field length must match grid points"))
+                    .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
             }))(),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] Magnitudes)> ComputeFieldMagnitude(
+    internal static Result<Fields.ScalarFieldSamples> ComputeFieldMagnitude(
         Vector3d[] vectorField,
         Point3d[] grid) =>
         ApplyFieldOperation(
             inputField: vectorField,
             grid: grid,
             operation: (vector, _) => vector.Length,
-            error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"));
+            error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"))
+            .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeVectorField(
+    internal static Result<Fields.VectorFieldSamples> NormalizeVectorField(
         Vector3d[] vectorField,
         Point3d[] grid) =>
         ApplyFieldOperation(
@@ -635,32 +653,36 @@ internal static class FieldsCompute {
                 true => vector / vector.Length,
                 false => Vector3d.Zero,
             },
-            error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"));
+            error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"))
+            .Map(result => new Fields.VectorFieldSamples(result.Grid, result.Output));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
+    internal static Result<Fields.ScalarFieldSamples> ScalarVectorProduct(
         double[] scalarField,
         Vector3d[] vectorField,
         Point3d[] grid,
         Fields.VectorComponent component) {
-        Func<Vector3d, double> selector = component switch {
+        Func<Vector3d, double>? selector = component switch {
             Fields.XComponent => v => v.X,
             Fields.YComponent => v => v.Y,
             Fields.ZComponent => v => v.Z,
-            _ => throw new InvalidOperationException($"Unsupported component: {component.GetType().Name}"),
+            _ => null,
         };
 
-        return ApplyBinaryFieldOperation(
-            inputField1: scalarField,
-            inputField2: vectorField,
-            grid: grid,
-            operation: (scalar, vector, _) => scalar * selector(vector),
-            error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
-            error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"));
+        return selector is null
+            ? ResultFactory.Create<Fields.ScalarFieldSamples>(error: E.Geometry.InvalidFieldComposition.WithContext($"Unsupported component: {component.GetType().Name}"))
+            : ApplyBinaryFieldOperation(
+                inputField1: scalarField,
+                inputField2: vectorField,
+                grid: grid,
+                operation: (scalar, vector, _) => scalar * selector!(vector),
+                error1: E.Geometry.InvalidFieldComposition.WithContext("Scalar field length must match grid points"),
+                error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"))
+                .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
+    internal static Result<Fields.ScalarFieldSamples> VectorDotProduct(
         Vector3d[] vectorField1,
         Vector3d[] vectorField2,
         Point3d[] grid) =>
@@ -670,7 +692,8 @@ internal static class FieldsCompute {
             grid: grid,
             operation: (v1, v2, _) => Vector3d.Multiply(v1, v2),
             error1: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"),
-            error2: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"));
+            error2: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"))
+            .Map(result => new Fields.ScalarFieldSamples(result.Grid, result.Output));
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]

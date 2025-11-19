@@ -9,10 +9,11 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Configuration constants for fields operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
+    /// <summary>Distance field metadata containing validation mode and operation names.</summary>
     internal sealed record DistanceFieldMetadata(
         V ValidationMode,
-        string OperationName,
+        string DistanceOperationName,
+        string GradientOperationName,
         int BufferSize);
 
     /// <summary>Distance field configuration by geometry type.</summary>
@@ -20,21 +21,51 @@ internal static class FieldsConfig {
         new Dictionary<Type, DistanceFieldMetadata> {
             [typeof(Mesh)] = new(
                 ValidationMode: V.Standard | V.MeshSpecific,
-                OperationName: "Fields.MeshDistance",
+                DistanceOperationName: "Fields.MeshDistance",
+                GradientOperationName: "Fields.MeshGradient",
                 BufferSize: 4096),
             [typeof(Brep)] = new(
                 ValidationMode: V.Standard | V.Topology,
-                OperationName: "Fields.BrepDistance",
+                DistanceOperationName: "Fields.BrepDistance",
+                GradientOperationName: "Fields.BrepGradient",
                 BufferSize: 8192),
             [typeof(Curve)] = new(
                 ValidationMode: V.Standard | V.Degeneracy,
-                OperationName: "Fields.CurveDistance",
+                DistanceOperationName: "Fields.CurveDistance",
+                GradientOperationName: "Fields.CurveGradient",
                 BufferSize: 2048),
             [typeof(Surface)] = new(
                 ValidationMode: V.Standard | V.BoundingBox,
-                OperationName: "Fields.SurfaceDistance",
+                DistanceOperationName: "Fields.SurfaceDistance",
+                GradientOperationName: "Fields.SurfaceGradient",
                 BufferSize: 4096),
         }.ToFrozenDictionary();
+
+    /// <summary>General field operation metadata keyed by request type.</summary>
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> FieldOperations =
+        new Dictionary<Type, FieldOperationMetadata> {
+            [typeof(Fields.CurlFieldRequest)] = new(V.None, "Fields.Curl"),
+            [typeof(Fields.DivergenceFieldRequest)] = new(V.None, "Fields.Divergence"),
+            [typeof(Fields.LaplacianFieldRequest)] = new(V.None, "Fields.Laplacian"),
+            [typeof(Fields.VectorPotentialFieldRequest)] = new(V.None, "Fields.VectorPotential"),
+            [typeof(Fields.ScalarInterpolationRequest)] = new(V.None, "Fields.ScalarInterpolation"),
+            [typeof(Fields.VectorInterpolationRequest)] = new(V.None, "Fields.VectorInterpolation"),
+            [typeof(Fields.StreamlineRequest)] = new(V.None, "Fields.Streamlines"),
+            [typeof(Fields.IsosurfaceRequest)] = new(V.None, "Fields.Isosurfaces"),
+            [typeof(Fields.HessianFieldRequest)] = new(V.None, "Fields.Hessian"),
+            [typeof(Fields.DirectionalDerivativeRequest)] = new(V.None, "Fields.DirectionalDerivative"),
+            [typeof(Fields.FieldMagnitudeRequest)] = new(V.None, "Fields.Magnitude"),
+            [typeof(Fields.NormalizeFieldRequest)] = new(V.None, "Fields.Normalize"),
+            [typeof(Fields.ScalarVectorProductRequest)] = new(V.None, "Fields.ScalarVectorProduct"),
+            [typeof(Fields.VectorDotProductRequest)] = new(V.None, "Fields.VectorDotProduct"),
+            [typeof(Fields.CriticalPointsRequest)] = new(V.None, "Fields.CriticalPoints"),
+            [typeof(Fields.FieldStatisticsRequest)] = new(V.None, "Fields.Statistics"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Metadata for dataset-driven field operations.</summary>
+    internal sealed record FieldOperationMetadata(
+        V ValidationMode,
+        string OperationName);
 
     /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
     internal const int DefaultResolution = 32;
