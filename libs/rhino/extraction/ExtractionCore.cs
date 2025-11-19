@@ -187,17 +187,23 @@ internal static class ExtractionCore {
 
     private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(GeometryBase geometry) {
         return geometry switch {
-            Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Faces.Select(f => {
-                Brep? dup = f.DuplicateFace(duplicateMeshes: false);
-                if (dup is null) {
-                    return Point3d.Unset;
-                }
-                using (dup) {
-                    using AreaMassProperties? mp = AreaMassProperties.Compute(dup);
-                    return mp?.Centroid is Point3d { IsValid: true } c ? c : Point3d.Unset;
-                }
-            }).Where(static p => p != Point3d.Unset),
-            ]),
+            Brep b => (
+                b.Faces
+                    .Select(f => {
+                        Brep? dup = f.DuplicateFace(duplicateMeshes: false);
+                        if (dup is null) {
+                            return Point3d.Unset;
+                        }
+                        using (dup) {
+                            using AreaMassProperties? mp = AreaMassProperties.Compute(dup);
+                            return mp?.Centroid is Point3d { IsValid: true } c ? c : Point3d.Unset;
+                        }
+                    })
+                    .Where(static p => p != Point3d.Unset)
+                    .ToArray()
+            ) is Point3d[] centroids && centroids.Length > 0
+                ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. centroids,])
+                : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("No valid face centroids found")),
             Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static p => p.IsValid),]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("FaceCentroids requires Brep/Mesh")),
         };
