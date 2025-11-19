@@ -30,6 +30,12 @@ internal static class FieldsConfig {
                 BufferSize: 4096),
         }.ToFrozenDictionary();
 
+    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
+    internal sealed record DistanceFieldMetadata(
+        V ValidationMode,
+        string OperationName,
+        int BufferSize);
+
     /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
     internal const int DefaultResolution = 32;
     internal const int MinResolution = 8;
@@ -221,10 +227,4 @@ internal static class FieldsConfig {
 
         return table;
     }
-
-    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
-    internal sealed record DistanceFieldMetadata(
-        V ValidationMode,
-        string OperationName,
-        int BufferSize);
 }

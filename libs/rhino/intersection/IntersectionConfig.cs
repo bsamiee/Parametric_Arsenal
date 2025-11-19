@@ -60,6 +60,12 @@ internal static class IntersectionConfig {
                 ])
         .ToFrozenDictionary();
 
+    /// <summary>Unified operation metadata for all intersection operations.</summary>
+    internal sealed record IntersectionPairMetadata(
+        V ValidationModeA,
+        V ValidationModeB,
+        string OperationName);
+
     /// <summary>Angle thresholds for intersection classification.</summary>
     internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
     internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
@@ -91,22 +97,16 @@ internal static class IntersectionConfig {
     /// <summary>Minimum sample count for Brep near-miss detection.</summary>
     internal const int MinBrepNearMissSamples = 8;
 
+    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
+    internal const int MaxNearMissSamples = 1000;
+
     /// <summary>Stability analysis parameters.</summary>
     internal const double StabilityPerturbationFactor = 0.001;
     internal const int StabilitySampleCount = 8;
-
-    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
-    internal const int MaxNearMissSamples = 1000;
 
     /// <summary>Blend quality scores for intersection types.</summary>
     internal const double TangentBlendScore = 1.0;
     internal const double PerpendicularBlendScore = 0.5;
     internal const double CurveSurfaceTangentBlendScore = 0.8;
     internal const double CurveSurfacePerpendicularBlendScore = 0.4;
-
-    /// <summary>Unified operation metadata for all intersection operations.</summary>
-    internal sealed record IntersectionPairMetadata(
-        V ValidationModeA,
-        V ValidationModeB,
-        string OperationName);
 }
