@@ -11,6 +11,29 @@ namespace Arsenal.Rhino.Orientation;
 /// <summary>Orchestration layer for orientation operations via UnifiedOperation.</summary>
 [Pure]
 internal static class OrientationCore {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
+        OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Orientation.PatternDetectionResult> ExecutePatternDetection(GeometryBase[] geometries, IGeometryContext context) =>
+        geometries.Length < OrientationConfig.PatternMinInstances
+            ? ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientationConfig.PatternMinInstances} geometries, got {geometries.Length}"))
+            : OrientationCompute.DetectPattern(geometries: geometries, absoluteTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Orientation.OptimizationResult> ExecuteOptimization(Brep brep, Orientation.OptimizationCriteria criteria, IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: brep,
+            operation: (Func<Brep, Result<IReadOnlyList<Orientation.OptimizationResult>>>)(item =>
+                OrientationCompute.OptimizeOrientation(brep: item, criteria: criteria, tolerance: context.AbsoluteTolerance)
+                    .Map(r => (IReadOnlyList<Orientation.OptimizationResult>)[r,])),
+            config: new OperationConfig<Brep, Orientation.OptimizationResult> {
+                Context = context,
+                ValidationMode = OrientationConfig.OptimizationMetadata.ValidationMode,
+                OperationName = OrientationConfig.OptimizationMetadata.OperationName,
+            }).Map(static r => r[0]);
+
     /// <summary>Execute orientation operation on geometry with unified dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Execute<T>(T geometry, Orientation.Operation operation, IGeometryContext context) where T : GeometryBase =>
@@ -137,27 +160,4 @@ internal static class OrientationCore {
         surface.FrameAt(u, v, out Plane frame) && frame.IsValid
             ? ExecuteToPlane(geometry: geometry, target: frame, meta: meta, context: context)
             : ResultFactory.Create<T>(error: E.Geometry.InvalidSurfaceUV);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Orientation.OptimizationResult> ExecuteOptimization(Brep brep, Orientation.OptimizationCriteria criteria, IGeometryContext context) =>
-        UnifiedOperation.Apply(
-            input: brep,
-            operation: (Func<Brep, Result<IReadOnlyList<Orientation.OptimizationResult>>>)(item =>
-                OrientationCompute.OptimizeOrientation(brep: item, criteria: criteria, tolerance: context.AbsoluteTolerance)
-                    .Map(r => (IReadOnlyList<Orientation.OptimizationResult>)[r,])),
-            config: new OperationConfig<Brep, Orientation.OptimizationResult> {
-                Context = context,
-                ValidationMode = OrientationConfig.OptimizationMetadata.ValidationMode,
-                OperationName = OrientationConfig.OptimizationMetadata.OperationName,
-            }).Map(static r => r[0]);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
-        OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Orientation.PatternDetectionResult> ExecutePatternDetection(GeometryBase[] geometries, IGeometryContext context) =>
-        geometries.Length < OrientationConfig.PatternMinInstances
-            ? ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientationConfig.PatternMinInstances} geometries, got {geometries.Length}"))
-            : OrientationCompute.DetectPattern(geometries: geometries, absoluteTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
 }
