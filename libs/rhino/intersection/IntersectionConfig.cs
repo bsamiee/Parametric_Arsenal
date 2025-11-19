@@ -9,16 +9,6 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Unified metadata, constants, and dispatch tables for intersection operations.</summary>
 [Pure]
 internal static class IntersectionConfig {
-    /// <summary>Intersection type classification discriminating tangent, transverse, and unknown intersections.</summary>
-    internal enum IntersectionType {
-        /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
-        Tangent = 0,
-        /// <summary>Transverse intersection with significant angular separation.</summary>
-        Transverse = 1,
-        /// <summary>Unknown classification when insufficient data available.</summary>
-        Unknown = 2,
-    }
-
     /// <summary>Unified operation metadata for all intersection operations.</summary>
     internal sealed record IntersectionPairMetadata(
         V ValidationModeA,
