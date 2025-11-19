@@ -193,7 +193,8 @@ internal static class MorphologyCore {
                                         ((neighbors.Aggregate(Point3d.Origin, (acc, neighborIdx) =>
                                             acc + (pos[mesh.TopologyVertices.MeshVertexIndices(neighborIdx)[0]] - pos[i])) / neighbors.Length) - Point3d.Origin)) *
                                         (mesh.Normals.Count > i ? mesh.Normals[i] : Vector3d.ZAxis));
-                            }),],
+                            }),
+                            ],
                             context).Bind(smoothed => ComputeSmoothingMetrics(m, smoothed, mcf.Iterations, context))),
                     config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                         Context = context,

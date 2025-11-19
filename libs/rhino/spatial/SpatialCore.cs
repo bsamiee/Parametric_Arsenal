@@ -102,10 +102,8 @@ internal static class SpatialCore {
                     double dist = toGeom.Length;
                     double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
                     double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-                    _ = weightedDist <= request.MaxDistance 
-                        ? results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle)) 
-                        : default;
-                }
+                    if (weightedDist > request.MaxDistance) { return; }
+                    results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
                 }
                 _ = tree.Search(searchBox, CollectResults);
                 return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance),]);
@@ -122,17 +120,14 @@ internal static class SpatialCore {
                 _ => null,
             };
             int bufferSize = request.BufferSize ?? defaultBuffer;
-            return queryShape is null
-                ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"))
-                : ExecuteSearch();
+            if (queryShape is null) {
+                return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"));
+            }
             int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
             int count = 0;
             try {
-                void Collect(object? sender, RTreeEventArgs args) {
+                void Collect(object? sender, RTreeEventArgs args) =>
                     _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
-                }
-                    buffer[count++] = args.Id;
-                }
                 _ = queryShape switch {
                     Sphere sphere => tree.Search(sphere, Collect),
                     BoundingBox box => tree.Search(box, Collect),
@@ -194,7 +189,7 @@ internal static class SpatialCore {
             int count = 0;
             try {
                 void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                    _ = count + 1 < buffer.Length 
+                    _ = count + 1 < buffer.Length
                         ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
                         : default;
                 }
