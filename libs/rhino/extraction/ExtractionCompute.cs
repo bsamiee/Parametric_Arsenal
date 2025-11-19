@@ -111,13 +111,10 @@ internal static class ExtractionCompute {
                 => (true, Math.PI * circ.Radius * circ.Radius),
             _ when c.TryGetEllipse(out Ellipse ell, tolerance: context.AbsoluteTolerance)
                 => (true, Math.PI * ell.Radius1 * ell.Radius2),
-            _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => (
-                true,
-                ((Func<double>)(() => {
-                    using AreaMassProperties? mp = AreaMassProperties.Compute(c);
-                    return mp is { Area: double a } ? a : 0.0;
-                }))()
-            ),
+            _ when c.TryGetPolyline(out Polyline pl) && pl.Count >= ExtractionConfig.MinHolePolySides => ((Func<(bool, double)>)(() => {
+                using AreaMassProperties? mp = AreaMassProperties.Compute(c);
+                return (true, mp is { Area: double a } ? a : 0.0);
+            }))(),
             _ => (false, 0.0),
         };
     }
@@ -356,15 +353,12 @@ internal static class ExtractionCompute {
                     .Map(validated => validated.GetBoundingBox(accurate: false).Center))
                 .Bind(centers => DetectPatternType(centers: [.. centers], context: context)));
 
-    private static Result<Extraction.PatternDetectionResult> DetectPatternType(Point3d[] centers, IGeometryContext context) =>
-        ((Func<Vector3d[]>)(() => {
-            Vector3d[] deltas = new Vector3d[centers.Length - 1];
-            for (int i = 0; i < deltas.Length; i++) {
-                deltas[i] = centers[i + 1] - centers[i];
-            }
-            return deltas;
-        }))() is Vector3d[] deltas
-            && deltas.Length > 0
+    private static Result<Extraction.PatternDetectionResult> DetectPatternType(Point3d[] centers, IGeometryContext context) {
+        Vector3d[] deltas = new Vector3d[centers.Length - 1];
+        for (int i = 0; i < deltas.Length; i++) {
+            deltas[i] = centers[i + 1] - centers[i];
+        }
+        return deltas.Length > 0
             && deltas[0].Length > context.AbsoluteTolerance
             && deltas.All(d => (d - deltas[0]).Length < context.AbsoluteTolerance)
             ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.LinearPattern(SymmetryTransform: Transform.Translation(deltas[0])), Confidence: 1.0))
@@ -375,6 +369,7 @@ internal static class ExtractionCompute {
                     : TryDetectScalingPattern(centers: centers, context: context) is Result<Extraction.PatternDetectionResult> scaleResult && scaleResult.IsSuccess
                         ? scaleResult
                         : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
+    }
 
     private static Result<Extraction.PatternDetectionResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
         Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));

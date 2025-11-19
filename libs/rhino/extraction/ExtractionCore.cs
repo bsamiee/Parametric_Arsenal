@@ -28,8 +28,8 @@ internal static class ExtractionCore {
                         ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
                         OperationName = opMeta.OperationName,
                     }).Tap(
-                        onSuccess: _ => ((Action?)(() => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } }))?.Invoke(),
-                        onFailure: _ => ((Action?)(() => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } }))?.Invoke()),
+                        onSuccess: _ => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } },
+                        onFailure: _ => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } }),
             };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,41 +120,41 @@ internal static class ExtractionCore {
             GeometryBase g => ResultFactory.Create(value: (IReadOnlyList<Point3d>)g.GetBoundingBox(accurate: true).GetCorners()),
         };
 
-    private static Result<IReadOnlyList<Point3d>> ExtractGreville(GeometryBase geometry) =>
-        geometry switch {
+    private static Result<IReadOnlyList<Point3d>> ExtractGreville(GeometryBase geometry) {
+        return geometry switch {
             NurbsCurve nc when nc.GrevillePoints() is Point3dList gp => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. gp,]),
             NurbsSurface ns when ns.Points is NurbsSurfacePointList cp =>
                 ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from int u in Enumerable.Range(0, cp.CountU) from int v in Enumerable.Range(0, cp.CountV) let g = cp.GetGrevillePoint(u, v) select ns.PointAt(g.X, g.Y),]),
-            Curve c when c.ToNurbsCurve() is NurbsCurve n => ((Func<NurbsCurve, Result<IReadOnlyList<Point3d>>>)(nurbs => {
-                try {
-                    return nurbs.GrevillePoints() is Point3dList gp ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. gp,]) : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Greville failed"));
-                } finally {
-                    nurbs.Dispose();
+            Curve c when c.ToNurbsCurve() is NurbsCurve n => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                using (n) {
+                    return n.GrevillePoints() is Point3dList gp
+                        ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. gp,])
+                        : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Greville failed"));
                 }
-            }))(n),
-            Surface s when s.ToNurbsSurface() is NurbsSurface n && n.Points is not null => ((Func<NurbsSurface, Result<IReadOnlyList<Point3d>>>)(nurbs => {
-                try {
-                    return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from int u in Enumerable.Range(0, nurbs.Points.CountU) from int v in Enumerable.Range(0, nurbs.Points.CountV) let g = nurbs.Points.GetGrevillePoint(u, v) select nurbs.PointAt(g.X, g.Y),]);
-                } finally {
-                    nurbs.Dispose();
+            }))(),
+            Surface s when s.ToNurbsSurface() is NurbsSurface n && n.Points is not null => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                using (n) {
+                    return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from int u in Enumerable.Range(0, n.Points.CountU) from int v in Enumerable.Range(0, n.Points.CountV) let g = n.Points.GetGrevillePoint(u, v) select n.PointAt(g.X, g.Y),]);
                 }
-            }))(n),
+            }))(),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Greville requires NURBS")),
         };
+    }
 
-    private static Result<IReadOnlyList<Point3d>> ExtractInflection(GeometryBase geometry) =>
-        geometry switch {
+    private static Result<IReadOnlyList<Point3d>> ExtractInflection(GeometryBase geometry) {
+        return geometry switch {
             NurbsCurve nc when nc.InflectionPoints() is Point3d[] inf => ResultFactory.Create(value: (IReadOnlyList<Point3d>)inf),
-            Curve c when c.ToNurbsCurve() is NurbsCurve n => ((Func<NurbsCurve, Result<IReadOnlyList<Point3d>>>)(nurbs => {
-                try {
-                    Point3d[]? inf = nurbs.InflectionPoints();
-                    return inf is not null ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)inf) : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Inflection computation failed"));
-                } finally {
-                    nurbs.Dispose();
+            Curve c when c.ToNurbsCurve() is NurbsCurve n => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                using (n) {
+                    Point3d[]? inf = n.InflectionPoints();
+                    return inf is not null
+                        ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)inf)
+                        : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Inflection computation failed"));
                 }
-            }))(n),
+            }))(),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Inflection requires curve")),
         };
+    }
 
     private static Result<IReadOnlyList<Point3d>> ExtractQuadrant(GeometryBase geometry, double _) =>
         geometry switch {
@@ -167,42 +167,40 @@ internal static class ExtractionCore {
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Quadrant unsupported")),
         };
 
-    private static Result<IReadOnlyList<Point3d>> ExtractEdgeMidpoints(GeometryBase geometry) =>
-        geometry switch {
+    private static Result<IReadOnlyList<Point3d>> ExtractEdgeMidpoints(GeometryBase geometry) {
+        return geometry switch {
             Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(static e => e.PointAtNormalizedLength(0.5)),]),
             Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.TopologyEdges.Count).Select(i => m.TopologyEdges.EdgeLine(i)).Where(static l => l.IsValid).Select(static l => l.PointAt(0.5)),]),
-            Curve c when c.DuplicateSegments() is Curve[] { Length: > 0 } segs => ((Func<Curve[], Result<IReadOnlyList<Point3d>>>)(segments => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. segments.Select(static s => {
-                try {
-                    return s.PointAtNormalizedLength(0.5);
-                } finally {
-                    s.Dispose();
+            Curve c when c.DuplicateSegments() is Curve[] { Length: > 0 } segs => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                List<Point3d> midpoints = new(capacity: segs.Length);
+                for (int i = 0; i < segs.Length; i++) {
+                    using Curve s = segs[i];
+                    midpoints.Add(s.PointAtNormalizedLength(0.5));
                 }
-            }),
-            ])))(segs),
+                return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. midpoints]);
+            }))(),
             Curve c when c.TryGetPolyline(out Polyline pl) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pl.GetSegments().Where(static l => l.IsValid).Select(static l => l.PointAt(0.5)),]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("EdgeMidpoints requires Brep/Mesh/Curve")),
         };
+    }
 
-    private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(GeometryBase geometry) =>
-        geometry switch {
-            Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Faces.Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
-                Brep dup => ((Func<Brep, Point3d>)(d => {
-                    try {
-                        Point3d? c = ((Func<Point3d?>)(() => {
-                            using AreaMassProperties? mp = AreaMassProperties.Compute(d);
-                            return mp?.Centroid;
-                        }))();
-                        return c.HasValue && c.Value.IsValid ? c.Value : Point3d.Unset;
-                    } finally {
-                        d.Dispose();
-                    }
-                }))(dup),
-                _ => Point3d.Unset,
+    private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(GeometryBase geometry) {
+        return geometry switch {
+            Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Faces.Select(f => {
+                Brep? dup = f.DuplicateFace(duplicateMeshes: false);
+                if (dup is null) {
+                    return Point3d.Unset;
+                }
+                using (dup) {
+                    using AreaMassProperties? mp = AreaMassProperties.Compute(dup);
+                    return mp?.Centroid is Point3d { IsValid: true } c ? c : Point3d.Unset;
+                }
             }).Where(static p => p != Point3d.Unset),
             ]),
             Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static p => p.IsValid),]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("FaceCentroids requires Brep/Mesh")),
         };
+    }
 
     private static Result<IReadOnlyList<Point3d>> ExtractOsculatingFrames(GeometryBase geometry, int count) =>
         geometry switch {
@@ -217,7 +215,14 @@ internal static class ExtractionCore {
             Curve c when count > 0 && c.DivideByCount(count, includeEnds) is double[] pars =>
                 ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pars.Select(t => c.PointAt(t)),]),
             Surface s when count > 0 && (s.Domain(0), s.Domain(1)) is (Interval u, Interval v) =>
-                ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. from int ui in Enumerable.Range(0, count) from int vi in Enumerable.Range(0, count) let up = count == 1 ? 0.5 : includeEnds ? ui / (double)(count - 1) : (ui + 0.5) / count let vp = count == 1 ? 0.5 : includeEnds ? vi / (double)(count - 1) : (vi + 0.5) / count select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),]),
+                ResultFactory.Create(
+                    value: (IReadOnlyList<Point3d>)[
+                        .. from int ui in Enumerable.Range(0, count)
+                           from int vi in Enumerable.Range(0, count)
+                           let up = count == 1 ? 0.5 : includeEnds ? ui / (double)(count - 1) : (ui + 0.5) / count
+                           let vp = count == 1 ? 0.5 : includeEnds ? vi / (double)(count - 1) : (vi + 0.5) / count
+                           select s.PointAt(u.ParameterAt(up), v.ParameterAt(vp)),
+                    ]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("ByCount requires Curve/Surface and count > 0")),
         };
 
@@ -235,20 +240,20 @@ internal static class ExtractionCore {
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("ByDirection requires Curve")),
         };
 
-    private static Result<IReadOnlyList<Point3d>> ExtractDiscontinuity(GeometryBase geometry, Continuity continuity) =>
-        geometry switch {
-            Curve c => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. ((Func<List<Point3d>>)(() => {
+    private static Result<IReadOnlyList<Point3d>> ExtractDiscontinuity(GeometryBase geometry, Continuity continuity) {
+        return geometry switch {
+            Curve c => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
                 List<Point3d> discs = [];
                 double param = c.Domain.Min;
                 while (c.GetNextDiscontinuity(continuity, param, c.Domain.Max, out double next)) {
                     discs.Add(c.PointAt(next));
                     param = next;
                 }
-                return discs;
+                return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. discs]);
             }))(),
-            ]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Discontinuity requires Curve")),
         };
+    }
 
     private static Result<IReadOnlyList<Curve>> ExtractBoundary(GeometryBase geometry) =>
         geometry switch {
@@ -284,9 +289,42 @@ internal static class ExtractionCore {
             _ => ResultFactory.Create<IReadOnlyList<Curve>>(error: E.Geometry.InvalidExtraction.WithContext("IsocurvesAt requires Surface")),
         };
 
-    private static Result<IReadOnlyList<Curve>> ExtractFeatureEdges(GeometryBase geometry, double angleThreshold) {
-        return geometry is not Brep b
+    private static Result<IReadOnlyList<Curve>> ExtractFeatureEdges(GeometryBase geometry, double angleThreshold) =>
+        geometry is not Brep b
             ? ResultFactory.Create<IReadOnlyList<Curve>>(error: E.Geometry.InvalidExtraction.WithContext("FeatureEdges requires Brep"))
-            : ResultFactory.Create(value: (IReadOnlyList<Curve>)[.. b.Edges.Where(e => e.AdjacentFaces() is int[] adj && adj.Length == 2 && e.PointAt(e.Domain.ParameterAt(0.5)) is Point3d mid && b.Faces[adj[0]].ClosestPoint(testPoint: mid, u: out double u0, v: out double v0) && b.Faces[adj[1]].ClosestPoint(testPoint: mid, u: out double u1, v: out double v1) && Math.Abs(Vector3d.VectorAngle(b.Faces[adj[0]].NormalAt(u: u0, v: v0), b.Faces[adj[1]].NormalAt(u: u1, v: v1))) >= angleThreshold).Select(e => e.DuplicateCurve()).OfType<Curve>()]);
-    }
+            : ResultFactory.Create(
+                value: (IReadOnlyList<Curve>)[..
+                    b.Edges
+                        .Select(e => new { Edge = e, Adj = e.AdjacentFaces(), Mid = e.PointAt(e.Domain.ParameterAt(0.5)), })
+                        .Where(x => x.Adj is int[] adj && adj.Length == 2)
+                        .Select(x => new {
+                            x.Edge,
+                            x.Adj,
+                            x.Mid,
+                            Face0 = b.Faces[x.Adj[0]],
+                            Face1 = b.Faces[x.Adj[1]],
+                        })
+                        .Select(x => new {
+                            x.Edge,
+                            x.Face0,
+                            x.Face1,
+                            x.Mid,
+                            HasClosest0 = x.Face0.ClosestPoint(testPoint: x.Mid, u: out double u0, v: out double v0),
+                            U0 = u0,
+                            V0 = v0,
+                            HasClosest1 = x.Face1.ClosestPoint(testPoint: x.Mid, u: out double u1, v: out double v1),
+                            U1 = u1,
+                            V1 = v1,
+                        })
+                        .Where(x =>
+                            x.HasClosest0 && x.HasClosest1 &&
+                            Math.Abs(
+                                Vector3d.VectorAngle(
+                                    x.Face0.NormalAt(u: x.U0, v: x.V0),
+                                    x.Face1.NormalAt(u: x.U1, v: x.V1)
+                                )
+                            ) >= angleThreshold)
+                        .Select(x => x.Edge.DuplicateCurve())
+                        .OfType<Curve>(),
+                ]);
 }
