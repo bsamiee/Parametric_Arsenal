@@ -519,7 +519,7 @@ internal static class MorphologyCompute {
                 }
                 MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [.. repairMetasList];
                 for (int i = 0; i < repairMetas.Length; i++) {
-                    bool executed = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
+                    _ = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
