@@ -39,16 +39,6 @@ internal static class OrientationConfig {
         ValidationMode: V.Standard | V.Topology | V.BoundingBox | V.MassProperties,
         OperationName: "Orientation.Optimize");
 
-    /// <summary>Relative orientation operation metadata.</summary>
-    internal static readonly OrientationOperationMetadata RelativeMetadata = new(
-        ValidationMode: V.Standard | V.Topology,
-        OperationName: "Orientation.Relative");
-
-    /// <summary>Pattern detection operation metadata.</summary>
-    internal static readonly OrientationOperationMetadata PatternMetadata = new(
-        ValidationMode: V.None,
-        OperationName: "Orientation.PatternDetection");
-
     /// <summary>Plane extraction dispatch table by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, PlaneExtractorMetadata> PlaneExtractors =
         new Dictionary<Type, PlaneExtractorMetadata> {
@@ -125,21 +115,18 @@ internal static class OrientationConfig {
 
     private static Result<Plane> ExtractBrepPlane(GeometryBase geometry) {
         Brep brep = (Brep)geometry;
+        Vector3d normal = brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis;
         return brep.IsSolid
             ? ((Func<Result<Plane>>)(() => {
                 using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                return vmp is not null
-                    ? ResultFactory.Create(value: new Plane(vmp.Centroid, brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis))
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
             }))()
             : brep.SolidOrientation != BrepSolidOrientation.None
                 ? ((Func<Result<Plane>>)(() => {
                     using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
-                    return amp is not null
-                        ? ResultFactory.Create(value: new Plane(amp.Centroid, brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis))
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                    return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
                 }))()
-                : ResultFactory.Create(value: new Plane(brep.GetBoundingBox(accurate: false).Center, brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis));
+                : ResultFactory.Create(value: new Plane(brep.GetBoundingBox(accurate: false).Center, normal));
     }
 
     private static Result<Plane> ExtractExtrusionPlane(GeometryBase geometry) {
@@ -170,18 +157,15 @@ internal static class OrientationConfig {
 
     private static Result<Plane> ExtractMeshPlane(GeometryBase geometry) {
         Mesh mesh = (Mesh)geometry;
+        Vector3d normal = mesh.Normals.Count > 0 ? mesh.Normals[0] : Vector3d.ZAxis;
         return mesh.IsClosed
             ? ((Func<Result<Plane>>)(() => {
                 using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
-                return vmp is not null
-                    ? ResultFactory.Create(value: new Plane(vmp.Centroid, mesh.Normals.Count > 0 ? mesh.Normals[0] : Vector3d.ZAxis))
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
             }))()
             : ((Func<Result<Plane>>)(() => {
                 using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
-                return amp is not null
-                    ? ResultFactory.Create(value: new Plane(amp.Centroid, mesh.Normals.Count > 0 ? mesh.Normals[0] : Vector3d.ZAxis))
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
             }))();
     }
 }

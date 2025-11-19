@@ -140,19 +140,16 @@ internal static class OrientationCore {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.OptimizationResult> ExecuteOptimization(Brep brep, Orientation.OptimizationCriteria criteria, IGeometryContext context) =>
-        OrientationConfig.OptimizationMetadata is OrientationConfig.OrientationOperationMetadata meta
-            && OrientationConfig.Operations.TryGetValue(typeof(Orientation.ToBestFit), out OrientationConfig.OrientationOperationMetadata? _)
-                ? UnifiedOperation.Apply(
-                    input: brep,
-                    operation: (Func<Brep, Result<IReadOnlyList<Orientation.OptimizationResult>>>)(item =>
-                        OrientationCompute.OptimizeOrientation(brep: item, criteria: criteria, tolerance: context.AbsoluteTolerance)
-                            .Map(r => (IReadOnlyList<Orientation.OptimizationResult>)[r,])),
-                    config: new OperationConfig<Brep, Orientation.OptimizationResult> {
-                        Context = context,
-                        ValidationMode = meta.ValidationMode,
-                        OperationName = meta.OperationName,
-                    }).Map(static r => r[0])
-                : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.InvalidOrientationMode);
+        UnifiedOperation.Apply(
+            input: brep,
+            operation: (Func<Brep, Result<IReadOnlyList<Orientation.OptimizationResult>>>)(item =>
+                OrientationCompute.OptimizeOrientation(brep: item, criteria: criteria, tolerance: context.AbsoluteTolerance)
+                    .Map(r => (IReadOnlyList<Orientation.OptimizationResult>)[r,])),
+            config: new OperationConfig<Brep, Orientation.OptimizationResult> {
+                Context = context,
+                ValidationMode = OrientationConfig.OptimizationMetadata.ValidationMode,
+                OperationName = OrientationConfig.OptimizationMetadata.OperationName,
+            }).Map(static r => r[0]);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
