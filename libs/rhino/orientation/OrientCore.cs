@@ -1,95 +1,138 @@
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
+using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Plane/centroid extraction and transformation via mass properties.</summary>
+/// <summary>Orchestration layer for orientation operations with UnifiedOperation wiring.</summary>
 [Pure]
 internal static class OrientCore {
-    internal static readonly FrozenDictionary<Type, Func<object, Result<Plane>>> PlaneExtractors =
-        new Dictionary<Type, Func<object, Result<Plane>>> {
-            [typeof(Curve)] = g => ((Curve)g).FrameAt(((Curve)g).Domain.Mid, out Plane f) && f.IsValid
-                ? ResultFactory.Create(value: f)
-                : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            [typeof(Surface)] = g => ((Surface)g) switch {
-                Surface s when s.FrameAt(s.Domain(0).Mid, s.Domain(1).Mid, out Plane f) && f.IsValid => ResultFactory.Create(value: f),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-            [typeof(Brep)] = g => ((Brep)g) switch {
-                Brep b when b.IsSolid => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(b); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Brep b when b.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(b); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Brep b => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, b.Faces.Count > 0 ? b.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis)),
-            },
-            [typeof(Extrusion)] = g => ((Extrusion)g) switch {
-                Extrusion e when e.IsSolid => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(e); using LineCurve path = e.PathLineCurve(); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, path.TangentAtStart)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(e); using LineCurve path = e.PathLineCurve(); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, path.TangentAtStart)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Extrusion e => ((Func<Result<Plane>>)(() => { using LineCurve path = e.PathLineCurve(); return ResultFactory.Create(value: new Plane(e.GetBoundingBox(accurate: false).Center, path.TangentAtStart)); }))(),
-            },
-            [typeof(Mesh)] = g => ((Mesh)g) switch {
-                Mesh m when m.IsClosed => ((Func<Result<Plane>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(m); return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, m.Normals.Count > 0 ? m.Normals[0] : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-                Mesh m => ((Func<Result<Plane>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(m); return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, m.Normals.Count > 0 ? m.Normals[0] : Vector3d.ZAxis)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed); }))(),
-            },
-            [typeof(Point3d)] = g => ResultFactory.Create(value: new Plane((Point3d)g, Vector3d.ZAxis)),
-            [typeof(PointCloud)] = g => (PointCloud)g switch {
-                PointCloud pc when pc.Count > 0 => ResultFactory.Create(value: new Plane(pc[0].Location, Vector3d.ZAxis)),
-                _ => ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
-            },
-        }.ToFrozenDictionary();
-
-    /// <summary>Centroid extraction via mass properties or bounding box.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
-        (geometry, useMassProperties) switch {
-            (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(brep); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(ext); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => { using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh); return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(mesh); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (Curve curve, true) => ((Func<Result<Point3d>>)(() => { using AreaMassProperties? amp = AreaMassProperties.Compute(curve); return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed); }))(),
-            (GeometryBase g, false) => g.GetBoundingBox(accurate: true) switch {
-                BoundingBox b when b.IsValid => ResultFactory.Create(value: b.Center),
-                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-            },
-            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+    internal static Result<T> Align<T>(T geometry, Orient.AlignmentRequest request, IGeometryContext context) where T : GeometryBase =>
+        (geometry, request) switch {
+            (null, _) => ResultFactory.Create<T>(error: E.Validation.GeometryInvalid),
+            (_, null) => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode.WithContext("Request cannot be null")),
+            _ when !OrientConfig.AlignmentOperations.TryGetValue(request.GetType(), out OrientConfig.AlignmentOperationMetadata? metadata) =>
+                ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode.WithContext(request.GetType().Name)),
+            _ => UnifiedOperation.Apply(
+                    input: geometry,
+                    operation: (Func<T, Result<IReadOnlyList<T>>>)(item => ExecuteAlignment(item, request, metadata)),
+                    config: new OperationConfig<T, T> {
+                        Context = context,
+                        ValidationMode = ComposeValidation(geometry.GetType(), metadata.ValidationMode),
+                        OperationName = metadata.OperationName,
+                    })
+                .Map(results => results[0]),
         };
 
-    /// <summary>Transform application with duplication and errors.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform xform) where T : GeometryBase =>
-        (T)geometry.Duplicate() switch {
-            T dup when dup.Transform(xform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
-            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
+    internal static Result<Orient.OrientationOptimizationResult> Optimize(
+        Brep brep,
+        Orient.OrientationOptimizationRequest request,
+        IGeometryContext context) =>
+        (brep, request?.Criterion) switch {
+            (null, _) => ResultFactory.Create<Orient.OrientationOptimizationResult>(error: E.Validation.GeometryInvalid),
+            (_, null) => ResultFactory.Create<Orient.OrientationOptimizationResult>(error: E.Geometry.InvalidOrientationMode.WithContext("Criterion cannot be null")),
+            _ => UnifiedOperation.Apply(
+                    input: brep,
+                    operation: (Func<Brep, Result<IReadOnlyList<Orient.OrientationOptimizationResult>>>)(item =>
+                        OrientCompute.OptimizeOrientation(item, request.Criterion, context)
+                            .Map(result => (IReadOnlyList<Orient.OrientationOptimizationResult>)[result,])),
+                    config: new OperationConfig<Brep, Orient.OrientationOptimizationResult> {
+                        Context = context,
+                        ValidationMode = OrientConfig.OptimizationMetadata.ValidationMode,
+                        OperationName = OrientConfig.OptimizationMetadata.OperationName,
+                    })
+                .Map(results => results[0]),
         };
 
-    /// <summary>Best-fit plane from point cloud or mesh via principal component analysis.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
-        geometry switch {
-            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
-                Point3d[] points = pc.GetPoints();
-                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
-                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
-                        ? ResultFactory.Create(value: plane)
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-            }))(),
-            PointCloud pc => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {pc.Count}")),
-            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
-                Point3d[] points = m.Vertices.ToPoint3dArray();
-                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
-                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
-                        ? ResultFactory.Create(value: plane)
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-            }))(),
-            Mesh m => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {m.Vertices.Count}")),
-            _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Orient.RelativeOrientationResult> Relative(
+        Orient.RelativeOrientationRequest request,
+        IGeometryContext context) =>
+        request switch {
+            null => ResultFactory.Create<Orient.RelativeOrientationResult>(error: E.Geometry.InvalidOrientationMode.WithContext("Request cannot be null")),
+            { Primary: null } => ResultFactory.Create<Orient.RelativeOrientationResult>(error: E.Validation.GeometryInvalid.WithContext("Primary geometry cannot be null")),
+            { Secondary: null } => ResultFactory.Create<Orient.RelativeOrientationResult>(error: E.Validation.GeometryInvalid.WithContext("Secondary geometry cannot be null")),
+            _ => ValidateGeometry(request.Secondary, context)
+                .Bind(_ => UnifiedOperation.Apply(
+                    input: request.Primary,
+                    operation: (Func<GeometryBase, Result<IReadOnlyList<Orient.RelativeOrientationResult>>>)(primary =>
+                        OrientCompute.ComputeRelative(primary, request.Secondary, context)
+                            .Map(result => (IReadOnlyList<Orient.RelativeOrientationResult>)[result,])),
+                    config: new OperationConfig<GeometryBase, Orient.RelativeOrientationResult> {
+                        Context = context,
+                        ValidationMode = OrientConfig.RelativeMetadata.ValidationMode,
+                        OperationName = OrientConfig.RelativeMetadata.OperationName,
+                    }))
+                .Map(results => results[0]),
         };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Orient.PatternDetectionResult> Detect(
+        Orient.PatternDetectionRequest request,
+        IGeometryContext context) =>
+        request switch {
+            null => ResultFactory.Create<Orient.PatternDetectionResult>(error: E.Geometry.InvalidOrientationMode.WithContext("Request cannot be null")),
+            { Geometries: null } => ResultFactory.Create<Orient.PatternDetectionResult>(error: E.Geometry.InvalidOrientationMode.WithContext("Geometry collection cannot be null")),
+            _ => UnifiedOperation.Apply(
+                    input: request.Geometries,
+                    operation: (Func<GeometryBase[], Result<IReadOnlyList<Orient.PatternDetectionResult>>>)(items =>
+                        OrientCompute.DetectPattern(items, context)
+                            .Map(result => (IReadOnlyList<Orient.PatternDetectionResult>)[result,])),
+                    config: new OperationConfig<GeometryBase[], Orient.PatternDetectionResult> {
+                        Context = context,
+                        ValidationMode = OrientConfig.PatternMetadata.ValidationMode,
+                        OperationName = OrientConfig.PatternMetadata.OperationName,
+                    })
+                .Map(results => results[0]),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> ExecuteAlignment<T>(
+        T geometry,
+        Orient.AlignmentRequest request,
+        OrientConfig.AlignmentOperationMetadata metadata) where T : GeometryBase =>
+        metadata.Kind switch {
+            OrientConfig.AlignmentOperationKind.Plane => OrientCompute.AlignToPlane(geometry, ((Orient.PlaneAlignment)request).Target),
+            OrientConfig.AlignmentOperationKind.CurveFrame => OrientCompute.AlignToCurveFrame(geometry, ((Orient.CurveFrameAlignment)request).Curve, ((Orient.CurveFrameAlignment)request).Parameter),
+            OrientConfig.AlignmentOperationKind.SurfaceFrame => OrientCompute.AlignToSurfaceFrame(geometry, ((Orient.SurfaceFrameAlignment)request).Surface, ((Orient.SurfaceFrameAlignment)request).U, ((Orient.SurfaceFrameAlignment)request).V),
+            OrientConfig.AlignmentOperationKind.WorldXY => OrientCompute.AlignToWorldPlane(geometry, Plane.WorldXY, Vector3d.XAxis, Vector3d.YAxis),
+            OrientConfig.AlignmentOperationKind.WorldYZ => OrientCompute.AlignToWorldPlane(geometry, Plane.WorldYZ, Vector3d.YAxis, Vector3d.ZAxis),
+            OrientConfig.AlignmentOperationKind.WorldXZ => OrientCompute.AlignToWorldPlane(geometry, new Plane(Point3d.Origin, Vector3d.XAxis, Vector3d.ZAxis), Vector3d.XAxis, Vector3d.ZAxis),
+            OrientConfig.AlignmentOperationKind.BoundingBoxOrigin => OrientCompute.AlignBoundingBoxToOrigin(geometry),
+            OrientConfig.AlignmentOperationKind.VolumeOrigin => OrientCompute.AlignCentroidToOrigin(geometry),
+            OrientConfig.AlignmentOperationKind.BoundingBoxPoint => OrientCompute.AlignBoundingBoxToPoint(geometry, ((Orient.BoundingBoxPointAlignment)request).Target),
+            OrientConfig.AlignmentOperationKind.MassPoint => OrientCompute.AlignCentroidToPoint(geometry, ((Orient.MassPointAlignment)request).Target),
+            OrientConfig.AlignmentOperationKind.Vector => OrientCompute.AlignVector(geometry, ((Orient.VectorAlignment)request).Source, ((Orient.VectorAlignment)request).Target, ((Orient.VectorAlignment)request).Anchor),
+            OrientConfig.AlignmentOperationKind.BestFit => OrientCompute.AlignBestFit(geometry),
+            OrientConfig.AlignmentOperationKind.Mirror => OrientCompute.MirrorGeometry(geometry, ((Orient.MirrorAlignment)request).Plane),
+            OrientConfig.AlignmentOperationKind.Flip => OrientCompute.FlipGeometry(geometry),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationMode.WithContext(metadata.OperationName ?? "Orient.Align")),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static V ComposeValidation(Type geometryType, V operationFlags) =>
+        OrientConfig.GeometryValidation.TryGetValue(geometryType, out V baseFlags)
+            ? baseFlags | operationFlags
+            : V.Standard | operationFlags;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<GeometryBase> ValidateGeometry(GeometryBase geometry, IGeometryContext context) =>
+        geometry is null
+            ? ResultFactory.Create<GeometryBase>(error: E.Validation.GeometryInvalid)
+            : UnifiedOperation.Apply(
+                    input: geometry,
+                    operation: (Func<GeometryBase, Result<IReadOnlyList<GeometryBase>>>)(item => ResultFactory.Create(value: (IReadOnlyList<GeometryBase>)[item,])),
+                    config: new OperationConfig<GeometryBase, GeometryBase> {
+                        Context = context,
+                        ValidationMode = ComposeValidation(geometry.GetType(), V.Standard),
+                        OperationName = "Orient.Validate",
+                    })
+                .Map(results => results[0]);
 }
