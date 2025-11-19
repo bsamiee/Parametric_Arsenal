@@ -20,17 +20,18 @@ internal static class ExtractionCore {
         !ExtractionConfig.PointOperations.TryGetValue(operation.GetType(), out ExtractionConfig.ExtractionOperationMetadata? opMeta)
             ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext($"Unknown point operation: {operation.GetType().Name}"))
             : NormalizeGeometry(geometry: geometry, _: operation) switch {
-                (GeometryBase normalized, bool shouldDispose) => UnifiedOperation.Apply(
-                    input: normalized,
-                    operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
-                    config: new OperationConfig<GeometryBase, Point3d> {
-                        Context = context,
-                        ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
-                        OperationName = opMeta.OperationName,
-                    }).Tap(
-                        onSuccess: _ => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } },
-                        onFailure: _ => { if (shouldDispose) { (normalized as IDisposable)?.Dispose(); } }),
-            };
+                (GeometryBase normalized, bool shouldDispose) => {
+                    Result<IReadOnlyList<Point3d>> result = UnifiedOperation.Apply(
+                        input: normalized,
+                        operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
+                        config: new OperationConfig<GeometryBase, Point3d> {
+                            Context = context,
+                            ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
+                            OperationName = opMeta.OperationName,
+                        });
+                    _ = shouldDispose ? (normalized as IDisposable)?.Dispose() : null;
+                    return result;
+                },
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<Curve>> ExecuteCurves<T>(T geometry, Extraction.CurveOperation operation, IGeometryContext context) where T : GeometryBase =>
