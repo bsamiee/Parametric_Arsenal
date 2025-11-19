@@ -20,17 +20,11 @@ public static class Topology {
     /// <summary>Edge continuity classification: G0/G1/G2, interior, boundary, non-manifold.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct EdgeContinuityType(byte Value) {
-        /// <summary>G0 sharp edge with discontinuous tangent.</summary>
         public static readonly EdgeContinuityType Sharp = new(0);
-        /// <summary>G1 smooth edge with continuous tangent.</summary>
         public static readonly EdgeContinuityType Smooth = new(1);
-        /// <summary>G2 edge with continuous curvature.</summary>
         public static readonly EdgeContinuityType Curvature = new(2);
-        /// <summary>Interior manifold edge with valence 2.</summary>
         public static readonly EdgeContinuityType Interior = new(3);
-        /// <summary>Boundary naked edge with valence 1.</summary>
         public static readonly EdgeContinuityType Boundary = new(4);
-        /// <summary>Non-manifold edge with valence greater than 2.</summary>
         public static readonly EdgeContinuityType NonManifold = new(5);
     }
 
