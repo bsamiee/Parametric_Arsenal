@@ -11,10 +11,11 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Dense intersection analysis algorithms.</summary>
+[Pure]
 internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersect.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+    internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
         static Result<(byte, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
             double averageDeviation = angles.Sum(angle => Math.Abs(RhinoMath.HalfPI - angle)) / angles.Length;
             bool grazing = angles.Any(angle => Math.Abs(RhinoMath.HalfPI - angle) <= IntersectionConfig.GrazingAngleThreshold);
@@ -29,7 +30,7 @@ internal static class IntersectionCompute {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        static Result<(byte, double[], bool, double)> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersect.IntersectionOutput output, int count, double[] parameters) =>
+        static Result<(byte, double[], bool, double)> computeCurveSurfaceAngles(Curve curve, Surface surface, Intersection.IntersectionOutput output, int count, double[] parameters) =>
             Enumerable.Range(0, count)
                 .Select(index => (Tangent: curve.TangentAt(parameters[index]), Point: output.Points[index]))
                 .Select(tuple => tuple.Tangent.IsValid && surface.ClosestPoint(tuple.Point, out double u, out double v) && surface.NormalAt(u, v) is Vector3d normal && normal.IsValid
@@ -175,7 +176,7 @@ internal static class IntersectionCompute {
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersect.IntersectionOutput baseOutput, IGeometryContext context) {
+    internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersection.IntersectionOutput baseOutput, IGeometryContext context) {
         static Result<T> validate<T>(T geometry, IGeometryContext ctx, V mode) where T : notnull =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
@@ -189,7 +190,7 @@ internal static class IntersectionCompute {
 
                     return validate(geomA, context, modeA)
                         .Bind(validA => validate(geomB, context, modeB)
-                            .Bind(validB => IntersectionCore.NormalizeOptions(new Intersect.IntersectionOptions(), context)
+                            .Bind(validB => IntersectionCore.NormalizeSettings(new Intersection.IntersectionSettings(), context)
                                 .Bind(normalized => {
                                     int sqrtSamples = (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount));
                                     (int phiSteps, int thetaSteps) = (sqrtSamples, (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / (double)sqrtSamples));
@@ -207,7 +208,8 @@ internal static class IntersectionCompute {
                                     (double Delta, IDisposable? Resource) perturbAndIntersect(Vector3d direction, GeometryBase original) =>
                                         original switch {
                                             Curve curve when curve.DuplicateCurve() is Curve copy && copy.Translate(direction * perturbationDistance) =>
-                                                IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
+                                                IntersectionCore.ResolveStrategy(copy.GetType(), validB.GetType())
+                                                    .Bind(stratEntry => IntersectionCore.ExecuteWithSettings(copy, validB, context, normalized, stratEntry.Strategy, stratEntry.Swapped))
                                                     .Map(result => {
                                                         foreach (Curve intersection in result.Curves) {
                                                             intersection?.Dispose();
@@ -216,7 +218,8 @@ internal static class IntersectionCompute {
                                                     })
                                                     .Match(onSuccess: tuple => tuple, onFailure: _ => { copy.Dispose(); return (RhinoMath.UnsetValue, null); }),
                                             Surface surface when surface.Duplicate() is Surface copy && copy.Translate(direction * perturbationDistance) =>
-                                                IntersectionCore.ExecuteWithOptions(copy, validB, context, normalized)
+                                                IntersectionCore.ResolveStrategy(copy.GetType(), validB.GetType())
+                                                    .Bind(stratEntry => IntersectionCore.ExecuteWithSettings(copy, validB, context, normalized, stratEntry.Strategy, stratEntry.Swapped))
                                                     .Map(result => {
                                                         foreach (Curve intersection in result.Curves) {
                                                             intersection?.Dispose();

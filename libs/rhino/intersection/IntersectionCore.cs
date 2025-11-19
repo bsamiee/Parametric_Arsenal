@@ -1,8 +1,10 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
+using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Rhino;
@@ -12,100 +14,202 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>RhinoCommon intersection dispatch with FrozenDictionary resolution.</summary>
+/// <summary>Orchestration layer for intersection operations via UnifiedOperation.</summary>
+[Pure]
 internal static class IntersectionCore {
     /// <summary>Intersection strategy metadata.</summary>
     internal readonly record struct IntersectionStrategy(
-        Func<object, object, double, Intersect.IntersectionOptions, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor,
+        Func<object, object, double, Intersection.IntersectionSettings, IGeometryContext, Result<Intersection.IntersectionOutput>> Executor,
         V ModeA,
         V ModeB);
 
+    /// <summary>Execute intersection request with algebraic dispatch.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Intersection.IntersectionOutput> ExecuteRequest(Intersection.Request request, IGeometryContext context) =>
+        request switch {
+            Intersection.General general => ExecuteGeneral(
+                geometryA: general.GeometryA,
+                geometryB: general.GeometryB,
+                settings: general.Settings ?? new Intersection.IntersectionSettings(),
+                context: context),
+            Intersection.PointProjection projection => ExecutePointProjection(
+                points: projection.Points,
+                targets: projection.Targets,
+                direction: projection.Direction,
+                withIndices: projection.WithIndices,
+                context: context),
+            Intersection.RayShoot rayShoot => ExecuteRayShoot(
+                ray: rayShoot.Ray,
+                targets: rayShoot.Targets,
+                maxHits: rayShoot.MaxHits,
+                context: context),
+            _ => ResultFactory.Create<Intersection.IntersectionOutput>(
+                error: E.Geometry.UnsupportedIntersection.WithContext($"Unknown request type: {request.GetType().Name}")),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Intersection.IntersectionOutput> ExecuteGeneral(
+        object geometryA,
+        object geometryB,
+        Intersection.IntersectionSettings settings,
+        IGeometryContext context) =>
+        ResolveStrategy(geometryA.GetType(), geometryB.GetType())
+            .Bind(entry => NormalizeSettings(settings: settings, context: context)
+                .Bind(normalized => ExecuteWithSettings(
+                    geometryA: geometryA,
+                    geometryB: geometryB,
+                    context: context,
+                    normalized: normalized,
+                    strategy: entry.Strategy,
+                    swapped: entry.Swapped)));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Intersection.IntersectionOutput> ExecutePointProjection(
+        Point3d[] points,
+        object targets,
+        Vector3d? direction,
+        bool withIndices,
+        IGeometryContext context) =>
+        direction switch {
+            Vector3d dir when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance => targets switch {
+                Brep[] breps => IntersectionConfig.PairOperations.TryGetValue((typeof(Point3d[]), typeof(Brep[])), out IntersectionConfig.IntersectionPairMetadata? meta)
+                    ? UnifiedOperation.Apply(
+                        input: breps,
+                        operation: (Func<Brep[], Result<IReadOnlyList<Intersection.IntersectionOutput>>>)(items =>
+                            withIndices
+                                ? ResultFactory.Create(value: (IReadOnlyList<Intersection.IntersectionOutput>)[
+                                    new Intersection.IntersectionOutput(
+                                        RhinoIntersect.ProjectPointsToBrepsEx(items, points, dir, context.AbsoluteTolerance, out int[] indices),
+                                        [], [], [], indices, []),
+                                ])
+                                : ResultFactory.Create(value: (IReadOnlyList<Intersection.IntersectionOutput>)[
+                                    new Intersection.IntersectionOutput(
+                                        RhinoIntersect.ProjectPointsToBreps(items, points, dir, context.AbsoluteTolerance),
+                                        [], [], [], [], []),
+                                ])),
+                        config: new OperationConfig<Brep[], Intersection.IntersectionOutput> {
+                            Context = context,
+                            ValidationMode = meta.ValidationModeB,
+                            OperationName = meta.OperationName,
+                        }).Map(static r => r[0])
+                    : ResultFactory.Create<Intersection.IntersectionOutput>(
+                        error: E.Geometry.InvalidProjection.WithContext("Missing metadata for Point3d[]/Brep[] projection")),
+                Mesh[] meshes => IntersectionConfig.PairOperations.TryGetValue((typeof(Point3d[]), typeof(Mesh[])), out IntersectionConfig.IntersectionPairMetadata? meta)
+                    ? UnifiedOperation.Apply(
+                        input: meshes,
+                        operation: (Func<Mesh[], Result<IReadOnlyList<Intersection.IntersectionOutput>>>)(items =>
+                            withIndices
+                                ? ResultFactory.Create(value: (IReadOnlyList<Intersection.IntersectionOutput>)[
+                                    new Intersection.IntersectionOutput(
+                                        RhinoIntersect.ProjectPointsToMeshesEx(items, points, dir, context.AbsoluteTolerance, out int[] indices),
+                                        [], [], [], indices, []),
+                                ])
+                                : ResultFactory.Create(value: (IReadOnlyList<Intersection.IntersectionOutput>)[
+                                    new Intersection.IntersectionOutput(
+                                        RhinoIntersect.ProjectPointsToMeshes(items, points, dir, context.AbsoluteTolerance),
+                                        [], [], [], [], []),
+                                ])),
+                        config: new OperationConfig<Mesh[], Intersection.IntersectionOutput> {
+                            Context = context,
+                            ValidationMode = meta.ValidationModeB,
+                            OperationName = meta.OperationName,
+                        }).Map(static r => r[0])
+                    : ResultFactory.Create<Intersection.IntersectionOutput>(
+                        error: E.Geometry.InvalidProjection.WithContext("Missing metadata for Point3d[]/Mesh[] projection")),
+                _ => ResultFactory.Create<Intersection.IntersectionOutput>(
+                    error: E.Geometry.InvalidProjection.WithContext(targets.GetType().Name)),
+            },
+            _ => ResultFactory.Create<Intersection.IntersectionOutput>(
+                error: E.Geometry.InvalidProjection.WithContext("null or invalid direction")),
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Intersection.IntersectionOutput> ExecuteRayShoot(
+        Ray3d ray,
+        GeometryBase[] targets,
+        int maxHits,
+        IGeometryContext context) =>
+        maxHits > 0
+            ? IntersectionConfig.PairOperations.TryGetValue((typeof(Ray3d), typeof(GeometryBase[])), out IntersectionConfig.IntersectionPairMetadata? meta)
+                ? UnifiedOperation.Apply(
+                    input: targets,
+                    operation: (Func<GeometryBase[], Result<IReadOnlyList<Intersection.IntersectionOutput>>>)(items =>
+                        ResultFactory.Create(value: (IReadOnlyList<Intersection.IntersectionOutput>)[
+                            new Intersection.IntersectionOutput(
+                                RhinoIntersect.RayShoot(ray, items, maxHits),
+                                [], [], [], [], []),
+                        ])),
+                    config: new OperationConfig<GeometryBase[], Intersection.IntersectionOutput> {
+                        Context = context,
+                        ValidationMode = meta.ValidationModeB,
+                        OperationName = meta.OperationName,
+                    }).Map(static r => r[0])
+                : ResultFactory.Create<Intersection.IntersectionOutput>(
+                    error: E.Geometry.InvalidProjection.WithContext("Missing metadata for Ray3d/GeometryBase[] intersection"))
+            : ResultFactory.Create<Intersection.IntersectionOutput>(
+                error: E.Geometry.InvalidMaxHits.WithContext(maxHits.ToString(CultureInfo.InvariantCulture)));
+
     /// <summary>Builds intersection result from bool/arrays tuple using pattern matching discrimination.</summary>
-    private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersect.IntersectionOutput>> ArrayResultBuilder = tuple => tuple switch {
-        (true, { Length: > 0 } curves, { Length: > 0 } points) => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, curves, [], [], [], [])),
-        (true, { Length: > 0 } curves, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], curves, [], [], [], [])),
-        (true, _, { Length: > 0 } points) => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], [], [])),
-        (true, _, _) or (false, _, _) => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+    private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersection.IntersectionOutput>> ArrayResultBuilder = tuple => tuple switch {
+        (true, { Length: > 0 } curves, { Length: > 0 } points) => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, curves, [], [], [], [])),
+        (true, { Length: > 0 } curves, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], curves, [], [], [], [])),
+        (true, _, { Length: > 0 } points) => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], [], [])),
+        (true, _, _) or (false, _, _) => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Processes CurveIntersections into output with points, overlap curves, and parameters.</summary>
-    private static readonly Func<CurveIntersections?, Curve, Result<Intersect.IntersectionOutput>> IntersectionProcessor = (results, source) => results switch { { Count: > 0 } =>
-        ResultFactory.Create(value: new Intersect.IntersectionOutput(
+    private static readonly Func<CurveIntersections?, Curve, Result<Intersection.IntersectionOutput>> IntersectionProcessor = (results, source) => results switch { { Count: > 0 } =>
+        ResultFactory.Create(value: new Intersection.IntersectionOutput(
             [.. results.Select(entry => entry.PointA)],
             [.. results.Where(entry => entry.IsOverlap).Select(entry => source.Trim(entry.OverlapA)).Where(trimmed => trimmed is not null)],
             [.. results.Select(entry => entry.ParameterA)],
             [.. results.Select(entry => entry.ParameterB)],
             [], [])),
-        _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+        _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Handles two-point intersection results with distance threshold validation and deduplication.</summary>
-    private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersect.IntersectionOutput>> TwoPointHandler = (count, first, second, tolerance, parameters) =>
+    private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersection.IntersectionOutput>> TwoPointHandler = (count, first, second, tolerance, parameters) =>
         (count, first.DistanceTo(second) > tolerance) switch {
-            ( > 1, true) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first, second], [], parameters ?? [], [], [], [])),
-            ( > 0, _) => ResultFactory.Create(value: new Intersect.IntersectionOutput([first], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])),
-            _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+            ( > 1, true) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first, second], [], parameters ?? [], [], [], [])),
+            ( > 0, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first], [], parameters is { Length: > 0 } ? [parameters[0]] : [], [], [], [])),
+            _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
         };
 
     /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
-    private static readonly Func<int, Circle, Result<Intersect.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
-        (1, Circle arc) => ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new ArcCurve(arc)], [], [], [], [])),
-        (2, Circle tangent) => ResultFactory.Create(value: new Intersect.IntersectionOutput([tangent.Center], [], [], [], [], [])),
-        _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+    private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = (type, circle) => (type, circle) switch {
+        (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc)], [], [], [], [])),
+        (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center], [], [], [], [], [])),
+        _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Processes polyline arrays flattening points while preserving original polyline structures.</summary>
-    private static readonly Func<Polyline[]?, Result<Intersect.IntersectionOutput>> PolylineProcessor = polylines
-    => polylines switch { { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersect.IntersectionOutput(
+    private static readonly Func<Polyline[]?, Result<Intersection.IntersectionOutput>> PolylineProcessor = polylines
+    => polylines switch { { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersection.IntersectionOutput(
                               [.. nonNullPolylines.SelectMany(polyline => polyline)],
                               [], [], [], [], [.. nonNullPolylines])),
-        null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-        _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+        null => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+        _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
     /// <summary>Handles mesh intersections dispatching between sorted and unsorted RhinoCommon methods.</summary>
-    private static readonly Func<Mesh, object, bool, (Func<Point3d[]?, int[]?, Result<Intersect.IntersectionOutput>>, Func<Point3d[]?, Result<Intersect.IntersectionOutput>>), Result<Intersect.IntersectionOutput>> MeshIntersectionHandler =
+    private static readonly Func<Mesh, object, bool, (Func<Point3d[]?, int[]?, Result<Intersection.IntersectionOutput>>, Func<Point3d[]?, Result<Intersection.IntersectionOutput>>), Result<Intersection.IntersectionOutput>> MeshIntersectionHandler =
         (mesh, target, sorted, handlers) => sorted switch {
             true => target switch {
                 Line line => handlers.Item1(RhinoIntersect.MeshLineSorted(mesh, line, out int[] ids), ids),
                 PolylineCurve polyline => handlers.Item1(RhinoIntersect.MeshPolylineSorted(mesh, polyline, out int[] ids), ids),
-                _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                _ => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
             },
             false => target switch {
                 Line line => handlers.Item2(RhinoIntersect.MeshLine(mesh, line)),
-                PolylineCurve polyline when RhinoIntersect.MeshPolyline(mesh, polyline, out int[] ids) is Point3d[] points => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], ids, [])),
-                _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                PolylineCurve polyline when RhinoIntersect.MeshPolyline(mesh, polyline, out int[] ids) is Point3d[] points => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], ids, [])),
+                _ => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
             },
-        };
-
-    /// <summary>Handles point projection to Breps or Meshes with direction validation and optional indices.</summary>
-    private static readonly Func<Point3d[], object, Vector3d?, bool, double, IGeometryContext, V, Result<Intersect.IntersectionOutput>> ProjectionHandler = (points, targets, direction, withIndices, tolerance, context, validationMode) =>
-        direction switch {
-            Vector3d dir when dir.IsValid && dir.Length > RhinoMath.ZeroTolerance => (targets, withIndices) switch {
-                (Brep[] breps, bool includeIndices) => ResultFactory.Create<IEnumerable<Brep>>(value: breps)
-                    .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, validationMode,]))
-                    .Map<Brep[]>(valid => [.. valid])
-                    .Bind(validBreps => includeIndices
-                        ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                            RhinoIntersect.ProjectPointsToBrepsEx(validBreps, points, dir, tolerance, out int[] indices), [], [], [], indices, []))
-                        : ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                            RhinoIntersect.ProjectPointsToBreps(validBreps, points, dir, tolerance), [], [], [], [], []))),
-                (Mesh[] meshes, bool includeIndices) => ResultFactory.Create<IEnumerable<Mesh>>(value: meshes)
-                    .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, validationMode,]))
-                    .Map<Mesh[]>(valid => [.. valid])
-                    .Bind(validMeshes => includeIndices
-                        ? ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                            RhinoIntersect.ProjectPointsToMeshesEx(validMeshes, points, dir, tolerance, out int[] indices), [], [], [], indices, []))
-                        : ResultFactory.Create(value: new Intersect.IntersectionOutput(
-                            RhinoIntersect.ProjectPointsToMeshes(validMeshes, points, dir, tolerance), [], [], [], [], []))),
-                _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection.WithContext(targets.GetType().Name)),
-            },
-            _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidProjection.WithContext("null")),
         };
 
     /// <summary>FrozenDictionary mapping type pairs to intersection strategies with validation modes.</summary>
     private static readonly FrozenDictionary<(Type, Type), IntersectionStrategy> _strategies =
-        new ((Type, Type) Key, Func<object, object, double, Intersect.IntersectionOptions, IGeometryContext, Result<Intersect.IntersectionOutput>> Executor)[] {
+        new ((Type, Type) Key, Func<object, object, double, Intersection.IntersectionSettings, IGeometryContext, Result<Intersection.IntersectionOutput>> Executor)[] {
             ((typeof(Curve), typeof(Curve)), (first, second, tolerance, _, _) => {
                 Curve curveA = (Curve)first;
                 Curve curveB = (Curve)second;
@@ -134,35 +238,35 @@ internal static class IntersectionCore {
             ((typeof(Surface), typeof(Surface)), (first, second, tolerance, _, _) => ArrayResultBuilder((RhinoIntersect.SurfaceSurface((Surface)first, (Surface)second, tolerance, out Curve[] curves, out Point3d[] points), curves, points))),
             ((typeof(Mesh), typeof(Mesh)), (first, second, tolerance, _, _) => PolylineProcessor(RhinoIntersect.MeshMeshAccurate((Mesh)first, (Mesh)second, tolerance))),
             ((typeof(Mesh), typeof(Ray3d)), (first, second, _, _, _) => RhinoIntersect.MeshRay((Mesh)first, (Ray3d)second) switch {
-                double distance when distance >= 0d => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Ray3d)second).PointAt(distance)], [], [distance], [], [], [])),
-                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                double distance when distance >= 0d => ResultFactory.Create(value: new Intersection.IntersectionOutput([((Ray3d)second).PointAt(distance)], [], [distance], [], [], [])),
+                _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
             }),
             ((typeof(Mesh), typeof(Plane)), (first, second, _, _, _) => PolylineProcessor(RhinoIntersect.MeshPlane((Mesh)first, (Plane)second))),
-            ((typeof(Mesh), typeof(Line)), (first, second, _, options, _) => MeshIntersectionHandler((Mesh)first, second, options.Sorted,
+            ((typeof(Mesh), typeof(Line)), (first, second, _, settings, _) => MeshIntersectionHandler((Mesh)first, second, settings.Sorted,
                 ((points, indices) => points switch {
-                    { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], indices ?? [], [])),
-                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    { Length: > 0 } => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], indices ?? [], [])),
+                    _ => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                 },
                 points => points switch {
-                    { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], [], [])),
-                    null => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
-                    _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                    { Length: > 0 } => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], [], [])),
+                    null => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
                 }))),
-            ((typeof(Mesh), typeof(PolylineCurve)), (first, second, _, options, _) => MeshIntersectionHandler((Mesh)first, second, options.Sorted,
+            ((typeof(Mesh), typeof(PolylineCurve)), (first, second, _, settings, _) => MeshIntersectionHandler((Mesh)first, second, settings.Sorted,
                 ((points, indices) => points switch {
-                    { Length: > 0 } => ResultFactory.Create(value: new Intersect.IntersectionOutput(points, [], [], [], indices ?? [], [])),
-                    _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
+                    { Length: > 0 } => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, [], [], [], indices ?? [], [])),
+                    _ => ResultFactory.Create<Intersection.IntersectionOutput>(error: E.Geometry.IntersectionFailed),
                 },
-                points => ResultFactory.Create(value: new Intersect.IntersectionOutput(points ?? [], [], [], [], [], []))))),
+                points => ResultFactory.Create(value: new Intersection.IntersectionOutput(points ?? [], [], [], [], [], []))))),
             ((typeof(Line), typeof(Line)), (first, second, tolerance, _, _) => RhinoIntersect.LineLine((Line)first, (Line)second, out double parameterA, out double parameterB, tolerance, finiteSegments: false)
-                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)first).PointAt(parameterA)], [], [parameterA], [parameterB], [], []))
-                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty)),
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([((Line)first).PointAt(parameterA)], [], [parameterA], [parameterB], [], []))
+                : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(Line), typeof(BoundingBox)), (first, second, tolerance, _, _) => RhinoIntersect.LineBox((Line)first, (BoundingBox)second, tolerance, out Interval interval)
-                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)first).PointAt(interval.Min), ((Line)first).PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
-                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty)),
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([((Line)first).PointAt(interval.Min), ((Line)first).PointAt(interval.Max)], [], [interval.Min, interval.Max], [], [], []))
+                : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(Line), typeof(Plane)), (first, second, _, _, _) => RhinoIntersect.LinePlane((Line)first, (Plane)second, out double parameter)
-                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([((Line)first).PointAt(parameter)], [], [parameter], [], [], []))
-                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty)),
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([((Line)first).PointAt(parameter)], [], [parameter], [], [], []))
+                : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(Line), typeof(Sphere)), (first, second, tolerance, _, _) => {
                 int count = (int)RhinoIntersect.LineSphere((Line)first, (Sphere)second, out Point3d pointA, out Point3d pointB);
                 return TwoPointHandler(count, pointA, pointB, tolerance, null);
@@ -176,23 +280,23 @@ internal static class IntersectionCore {
                 return TwoPointHandler(count, pointA, pointB, tolerance, count > 1 ? [parameterA, parameterB] : count > 0 ? [parameterA] : null);
             }),
             ((typeof(Plane), typeof(Plane)), (first, second, _, _, _) => RhinoIntersect.PlanePlane((Plane)first, (Plane)second, out Line line)
-                ? ResultFactory.Create(value: new Intersect.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
-                : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty)),
+                ? ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new LineCurve(line)], [], [], [], []))
+                : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty)),
             ((typeof(ValueTuple<Plane, Plane>), typeof(Plane)), (first, second, _, _, _) => {
                 (Plane planeA, Plane planeB) = (ValueTuple<Plane, Plane>)first;
                 return RhinoIntersect.PlanePlanePlane(planeA, planeB, (Plane)second, out Point3d point)
-                    ? ResultFactory.Create(value: new Intersect.IntersectionOutput([point], [], [], [], [], []))
-                    : ResultFactory.Create(value: Intersect.IntersectionOutput.Empty);
+                    ? ResultFactory.Create(value: new Intersection.IntersectionOutput([point], [], [], [], [], []))
+                    : ResultFactory.Create(value: Intersection.IntersectionOutput.Empty);
             }),
             ((typeof(Plane), typeof(Circle)), (first, second, _, _, _) => RhinoIntersect.PlaneCircle((Plane)first, (Circle)second, out double parameterA, out double parameterB) switch {
-                PlaneCircleIntersection.Tangent => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Circle)second).PointAt(parameterA)], [], [], [parameterA], [], [])),
-                PlaneCircleIntersection.Secant => ResultFactory.Create(value: new Intersect.IntersectionOutput([((Circle)second).PointAt(parameterA), ((Circle)second).PointAt(parameterB)], [], [], [parameterA, parameterB], [], [])),
-                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                PlaneCircleIntersection.Tangent => ResultFactory.Create(value: new Intersection.IntersectionOutput([((Circle)second).PointAt(parameterA)], [], [], [parameterA], [], [])),
+                PlaneCircleIntersection.Secant => ResultFactory.Create(value: new Intersection.IntersectionOutput([((Circle)second).PointAt(parameterA), ((Circle)second).PointAt(parameterB)], [], [], [parameterA, parameterB], [], [])),
+                _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
             }),
             ((typeof(Plane), typeof(Sphere)), (first, second, _, _, _) => CircleHandler((int)RhinoIntersect.PlaneSphere((Plane)first, (Sphere)second, out Circle circle), circle)),
             ((typeof(Plane), typeof(BoundingBox)), (first, second, _, _, _) => (RhinoIntersect.PlaneBoundingBox((Plane)first, (BoundingBox)second, out Polyline polyline), polyline) switch {
-                (true, Polyline { Count: > 0 } pl) => ResultFactory.Create(value: new Intersect.IntersectionOutput([.. from point in pl select point], [], [], [], [], [pl])),
-                _ => ResultFactory.Create(value: Intersect.IntersectionOutput.Empty),
+                (true, Polyline { Count: > 0 } pl) => ResultFactory.Create(value: new Intersection.IntersectionOutput([.. from point in pl select point], [], [], [], [], [pl])),
+                _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
             }),
             ((typeof(Sphere), typeof(Sphere)), (first, second, _, _, _) => CircleHandler((int)RhinoIntersect.SphereSphere((Sphere)first, (Sphere)second, out Circle circle), circle)),
             ((typeof(Circle), typeof(Circle)), (first, second, tolerance, _, _) => {
@@ -203,19 +307,9 @@ internal static class IntersectionCore {
                 int count = (int)RhinoIntersect.ArcArc((Arc)first, (Arc)second, out Point3d pointA, out Point3d pointB);
                 return TwoPointHandler(count, pointA, pointB, tolerance, null);
             }),
-            ((typeof(Point3d[]), typeof(Brep[])), (first, second, tolerance, options, context) => ProjectionHandler((Point3d[])first, second, options.ProjectionDirection, options.WithIndices, tolerance, context, V.Standard | V.Topology)),
-            ((typeof(Point3d[]), typeof(Mesh[])), (first, second, tolerance, options, context) => ProjectionHandler((Point3d[])first, second, options.ProjectionDirection, options.WithIndices, tolerance, context, V.MeshSpecific)),
-            ((typeof(Ray3d), typeof(GeometryBase[])), (first, second, _, options, context) => options.MaxHits switch {
-                int hits when hits > 0 => ResultFactory.Create<IEnumerable<GeometryBase>>(value: (GeometryBase[])second)
-                    .TraverseElements(item => ResultFactory.Create(value: item).Validate(args: [context, V.None,]))
-                    .Map<GeometryBase[]>(valid => [.. valid])
-                    .Map(validated => new Intersect.IntersectionOutput(RhinoIntersect.RayShoot((Ray3d)first, validated, hits), [], [], [], [], [])),
-                int hits => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits.WithContext(hits.ToString(CultureInfo.InvariantCulture))),
-                _ => ResultFactory.Create<Intersect.IntersectionOutput>(error: E.Geometry.InvalidMaxHits),
-            }),
         }.ToFrozenDictionary(static entry => entry.Key, entry => {
-            (V ModeA, V ModeB) = IntersectionConfig.ValidationModes.TryGetValue(entry.Key, out (V ModeA, V ModeB) found)
-                ? found
+            (V ModeA, V ModeB) = IntersectionConfig.PairOperations.TryGetValue(entry.Key, out IntersectionConfig.IntersectionPairMetadata? meta)
+                ? (meta.ValidationModeA, meta.ValidationModeB)
                 : (V.None, V.None);
             return new IntersectionStrategy(entry.Executor, ModeA, ModeB);
         });
@@ -242,43 +336,76 @@ internal static class IntersectionCore {
             };
     }
 
-    /// <summary>Normalizes intersection options validating tolerance and MaxHits with context defaults.</summary>
+    /// <summary>Normalizes intersection settings validating tolerance with context defaults.</summary>
     [Pure]
-    internal static Result<(double Tolerance, Intersect.IntersectionOptions Options)> NormalizeOptions(Intersect.IntersectionOptions options, IGeometryContext context) =>
-        ResultFactory.Create(value: options)
+    internal static Result<(double Tolerance, Intersection.IntersectionSettings Settings)> NormalizeSettings(Intersection.IntersectionSettings settings, IGeometryContext context) =>
+        ResultFactory.Create(value: settings)
             .Ensure(opt => !opt.Tolerance.HasValue || (RhinoMath.IsValidDouble(opt.Tolerance.Value) && opt.Tolerance.Value > RhinoMath.ZeroTolerance), E.Validation.ToleranceAbsoluteInvalid)
-            .Ensure(opt => !opt.MaxHits.HasValue || opt.MaxHits.Value > 0, E.Geometry.InvalidMaxHits)
             .Map(opt => {
                 double tolerance = opt.Tolerance ?? context.AbsoluteTolerance;
-                return (tolerance, new Intersect.IntersectionOptions(tolerance, opt.ProjectionDirection, opt.MaxHits, opt.WithIndices, opt.Sorted));
+                return (tolerance, new Intersection.IntersectionSettings(tolerance, opt.Sorted));
             });
 
-    /// <summary>Executes intersection with normalized options resolving strategy and validating inputs.</summary>
+    /// <summary>Executes intersection with normalized settings resolving strategy and validating inputs.</summary>
     [Pure]
-    internal static Result<Intersect.IntersectionOutput> ExecuteWithOptions(object geometryA, object geometryB, IGeometryContext context, (double Tolerance, Intersect.IntersectionOptions Options) normalized) {
+    internal static Result<Intersection.IntersectionOutput> ExecuteWithSettings(
+        object geometryA,
+        object geometryB,
+        IGeometryContext context,
+        (double Tolerance, Intersection.IntersectionSettings Settings) normalized,
+        IntersectionStrategy strategy,
+        bool swapped) {
         static Result<object> validate(object geometry, IGeometryContext ctx, V mode) =>
             mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [ctx, mode,]);
 
-        return ResolveStrategy(geometryA.GetType(), geometryB.GetType())
-            .Bind(entry => {
-                (V modeA, V modeB) = entry.Swapped
-                    ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
-                    : (entry.Strategy.ModeA, entry.Strategy.ModeB);
+        (V modeA, V modeB) = swapped
+            ? (strategy.ModeB, strategy.ModeA)
+            : (strategy.ModeA, strategy.ModeB);
 
-                return validate(geometryA, context, modeA)
-                    .Bind(validA => validate(geometryB, context, modeB)
-                        .Bind(validB => (entry.Swapped
-                            ? entry.Strategy.Executor(validB, validA, normalized.Tolerance, normalized.Options, context)
-                            : entry.Strategy.Executor(validA, validB, normalized.Tolerance, normalized.Options, context))
-                            .Map(output => entry.Swapped
-                                ? new Intersect.IntersectionOutput(output.Points, output.Curves, output.ParametersB, output.ParametersA, output.FaceIndices, output.Sections)
-                                : output)));
-            });
+        return validate(geometryA, context, modeA)
+            .Bind(validA => validate(geometryB, context, modeB)
+                .Bind(validB => (swapped
+                    ? strategy.Executor(validB, validA, normalized.Tolerance, normalized.Settings, context)
+                    : strategy.Executor(validA, validB, normalized.Tolerance, normalized.Settings, context))
+                    .Map(output => swapped
+                        ? new Intersection.IntersectionOutput(output.Points, output.Curves, output.ParametersB, output.ParametersA, output.FaceIndices, output.Sections)
+                        : output)));
     }
 
-    /// <summary>Executes intersection for typed geometry pair normalizing options before execution.</summary>
-    [Pure]
-    internal static Result<Intersect.IntersectionOutput> ExecutePair<T1, T2>(T1 geometryA, T2 geometryB, IGeometryContext context, Intersect.IntersectionOptions options) where T1 : notnull where T2 : notnull =>
-        NormalizeOptions(options, context)
-            .Bind(normalized => ExecuteWithOptions(geometryA, geometryB, context, normalized));
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Intersection.ClassificationResult> ExecuteClassification(
+        Intersection.IntersectionOutput output,
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        IGeometryContext context) =>
+        IntersectionCompute.Classify(output: output, geomA: geometryA, geomB: geometryB, context: context)
+            .Map(tuple => new Intersection.ClassificationResult(
+                Type: tuple.Type,
+                ApproachAngles: tuple.ApproachAngles,
+                IsGrazing: tuple.IsGrazing,
+                BlendScore: tuple.BlendScore));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Intersection.NearMissResult> ExecuteNearMiss(
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        double searchRadius,
+        IGeometryContext context) =>
+        IntersectionCompute.FindNearMisses(geomA: geometryA, geomB: geometryB, searchRadius: searchRadius, context: context)
+            .Map(tuple => new Intersection.NearMissResult(
+                LocationsA: tuple.Item1,
+                LocationsB: tuple.Item2,
+                Distances: tuple.Item3));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Intersection.StabilityResult> ExecuteStability(
+        Intersection.IntersectionOutput baseIntersection,
+        GeometryBase geometryA,
+        GeometryBase geometryB,
+        IGeometryContext context) =>
+        IntersectionCompute.AnalyzeStability(geomA: geometryA, geomB: geometryB, baseOutput: baseIntersection, context: context)
+            .Map(tuple => new Intersection.StabilityResult(
+                StabilityScore: tuple.Score,
+                PerturbationSensitivity: tuple.Sensitivity,
+                UnstableFlags: tuple.UnstableFlags));
 }
