@@ -6,10 +6,15 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Configuration constants for fields operations.</summary>
+/// <summary>Unified metadata, constants, and dispatch tables for field operations.</summary>
 [Pure]
 internal static class FieldsConfig {
-    /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
+    /// <summary>Base operation metadata containing validation mode and operation name.</summary>
+    internal sealed record FieldOperationMetadata(
+        V ValidationMode,
+        string OperationName);
+
+    /// <summary>Distance field metadata with geometry-specific buffer size.</summary>
     internal sealed record DistanceFieldMetadata(
         V ValidationMode,
         string OperationName,
@@ -35,6 +40,65 @@ internal static class FieldsConfig {
                 OperationName: "Fields.SurfaceDistance",
                 BufferSize: 4096),
         }.ToFrozenDictionary();
+
+    /// <summary>Differential field operations metadata.</summary>
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> DifferentialOperations =
+        new Dictionary<Type, FieldOperationMetadata> {
+            [typeof(GradientOp)] = new(V.None, "Fields.Gradient"),
+            [typeof(CurlOp)] = new(V.None, "Fields.Curl"),
+            [typeof(DivergenceOp)] = new(V.None, "Fields.Divergence"),
+            [typeof(LaplacianOp)] = new(V.None, "Fields.Laplacian"),
+            [typeof(HessianOp)] = new(V.None, "Fields.Hessian"),
+            [typeof(VectorPotentialOp)] = new(V.None, "Fields.VectorPotential"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Interpolation operation metadata.</summary>
+    internal static readonly FieldOperationMetadata InterpolationMetadata = new(
+        ValidationMode: V.None,
+        OperationName: "Fields.Interpolation");
+
+    /// <summary>Streamline integration metadata.</summary>
+    internal static readonly FieldOperationMetadata StreamlineMetadata = new(
+        ValidationMode: V.None,
+        OperationName: "Fields.Streamlines");
+
+    /// <summary>Isosurface extraction metadata.</summary>
+    internal static readonly FieldOperationMetadata IsosurfaceMetadata = new(
+        ValidationMode: V.None,
+        OperationName: "Fields.Isosurfaces");
+
+    /// <summary>Critical point detection metadata.</summary>
+    internal static readonly FieldOperationMetadata CriticalPointMetadata = new(
+        ValidationMode: V.None,
+        OperationName: "Fields.CriticalPoints");
+
+    /// <summary>Field statistics metadata.</summary>
+    internal static readonly FieldOperationMetadata StatisticsMetadata = new(
+        ValidationMode: V.None,
+        OperationName: "Fields.Statistics");
+
+    /// <summary>Field composition operations metadata.</summary>
+    internal static readonly FrozenDictionary<Type, FieldOperationMetadata> CompositionOperations =
+        new Dictionary<Type, FieldOperationMetadata> {
+            [typeof(DirectionalDerivativeOp)] = new(V.None, "Fields.DirectionalDerivative"),
+            [typeof(MagnitudeOp)] = new(V.None, "Fields.Magnitude"),
+            [typeof(NormalizeOp)] = new(V.None, "Fields.Normalize"),
+            [typeof(ScalarVectorProductOp)] = new(V.None, "Fields.ScalarVectorProduct"),
+            [typeof(VectorDotProductOp)] = new(V.None, "Fields.VectorDotProduct"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Internal operation type markers for metadata dispatch.</summary>
+    internal sealed record GradientOp;
+    internal sealed record CurlOp;
+    internal sealed record DivergenceOp;
+    internal sealed record LaplacianOp;
+    internal sealed record HessianOp;
+    internal sealed record VectorPotentialOp;
+    internal sealed record DirectionalDerivativeOp;
+    internal sealed record MagnitudeOp;
+    internal sealed record NormalizeOp;
+    internal sealed record ScalarVectorProductOp;
+    internal sealed record VectorDotProductOp;
 
     /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
     internal const int DefaultResolution = 32;
