@@ -104,7 +104,7 @@ internal static class OrientationConfig {
     internal const double BestFitResidualThreshold = 1e-3;
 
     /// <summary>Rotation symmetry sample count for curve analysis.</summary>
-    internal const int RotationSymmetrySampleCount = 32;
+    internal const int RotationSymmetrySampleCount = 36;
 
     /// <summary>Pattern detection minimum instance count.</summary>
     internal const int PatternMinInstances = 3;
