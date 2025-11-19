@@ -69,154 +69,110 @@ public static class Fields {
     /// <summary>Saddle point.</summary>
     public sealed record SaddleCriticalPoint : CriticalPointKind;
 
-    /// <summary>Critical point with location, classification (min/max/saddle), scalar value, and eigendecomposition.</summary>
+    /// <summary>Critical point with location, classification, value, and eigendecomposition.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct CriticalPoint(Point3d Location, CriticalPointKind Kind, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
 
-    /// <summary>Field statistics including min, max, mean, standard deviation, and extreme value locations.</summary>
+    /// <summary>Field statistics: min, max, mean, standard deviation, and extreme locations.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct FieldStatistics(double Min, double Max, double Mean, double StdDev, Point3d MinLocation, Point3d MaxLocation);
 
-    /// <summary>Scalar field samples with grid points and scalar values.</summary>
+    /// <summary>Scalar field samples with grid points and values.</summary>
     [DebuggerDisplay("Grid={Grid.Length}, Values={Values.Length}")]
     public sealed record ScalarFieldSamples(Point3d[] Grid, double[] Values);
 
-    /// <summary>Vector field samples with grid points and vector values.</summary>
+    /// <summary>Vector field samples with grid points and vectors.</summary>
     [DebuggerDisplay("Grid={Grid.Length}, Vectors={Vectors.Length}")]
     public sealed record VectorFieldSamples(Point3d[] Grid, Vector3d[] Vectors);
 
-    /// <summary>Hessian field samples with grid points and 3×3 Hessian matrices.</summary>
+    /// <summary>Hessian field samples with grid points and 3×3 matrices.</summary>
     [DebuggerDisplay("Grid={Grid.Length}")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
     public sealed record HessianFieldSamples(Point3d[] Grid, double[,][] Hessian);
+
+    /// <summary>Discriminated union for all field operation results.</summary>
+    public abstract record FieldResult {
+        private FieldResult() { }
+        /// <summary>Scalar field result.</summary>
+        public sealed record Scalar(ScalarFieldSamples Value) : FieldResult;
+        /// <summary>Vector field result.</summary>
+        public sealed record Vector(VectorFieldSamples Value) : FieldResult;
+        /// <summary>Hessian field result.</summary>
+        public sealed record Hessian(HessianFieldSamples Value) : FieldResult;
+        /// <summary>Scalar value result.</summary>
+        public sealed record ScalarValue(double Value) : FieldResult;
+        /// <summary>Vector value result.</summary>
+        public sealed record VectorValue(Vector3d Value) : FieldResult;
+        /// <summary>Curves result.</summary>
+        public sealed record Curves(Curve[] Value) : FieldResult;
+        /// <summary>Meshes result.</summary>
+        public sealed record Meshes(Mesh[] Value) : FieldResult;
+        /// <summary>Critical points result.</summary>
+        public sealed record CriticalPoints(CriticalPoint[] Value) : FieldResult;
+        /// <summary>Statistics result.</summary>
+        public sealed record Statistics(FieldStatistics Value) : FieldResult;
+    }
 
     /// <summary>Base type for all field operation requests.</summary>
     public abstract record FieldOperation;
 
     /// <summary>Request signed distance field computation for geometry.</summary>
-    /// <param name="Geometry">Input geometry (Mesh, Brep, Curve, or Surface).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
     public sealed record DistanceFieldRequest(GeometryBase Geometry, FieldSampling? Sampling) : FieldOperation;
 
     /// <summary>Request gradient field computation from distance field.</summary>
-    /// <param name="Geometry">Input geometry (Mesh, Brep, Curve, or Surface).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
     public sealed record GradientFieldRequest(GeometryBase Geometry, FieldSampling? Sampling) : FieldOperation;
 
     /// <summary>Request curl field computation: ∇×F.</summary>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
     public sealed record CurlFieldRequest(Vector3d[] VectorField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds) : FieldOperation;
 
     /// <summary>Request divergence field computation: ∇·F.</summary>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
     public sealed record DivergenceFieldRequest(Vector3d[] VectorField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds) : FieldOperation;
 
     /// <summary>Request Laplacian field computation: ∇²f.</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match scalar field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
     public sealed record LaplacianFieldRequest(double[] ScalarField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds) : FieldOperation;
 
-    /// <summary>Request vector potential field computation solving ∇²A = -∇×B.</summary>
-    /// <param name="MagneticField">Input magnetic field B (vector field).</param>
-    /// <param name="GridPoints">Grid sample points (must match field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
+    /// <summary>Request vector potential computation: solve ∇²A = -∇×B.</summary>
     public sealed record VectorPotentialFieldRequest(Vector3d[] MagneticField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds) : FieldOperation;
 
     /// <summary>Request scalar field interpolation at query point.</summary>
-    /// <param name="Query">Query point for interpolation.</param>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match scalar field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
-    /// <param name="Mode">Interpolation mode (nearest or trilinear).</param>
     public sealed record InterpolateScalarRequest(Point3d Query, double[] ScalarField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds, InterpolationMode? Mode) : FieldOperation;
 
     /// <summary>Request vector field interpolation at query point.</summary>
-    /// <param name="Query">Query point for interpolation.</param>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
-    /// <param name="Mode">Interpolation mode (nearest or trilinear).</param>
     public sealed record InterpolateVectorRequest(Point3d Query, Vector3d[] VectorField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds, InterpolationMode? Mode) : FieldOperation;
 
-    /// <summary>Request streamline tracing along vector field from seed points.</summary>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
-    /// <param name="Seeds">Seed points for streamline integration.</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
-    /// <param name="Scheme">Integration scheme (Euler, Midpoint, or RK4).</param>
+    /// <summary>Request streamline integration along vector field.</summary>
     public sealed record StreamlinesRequest(Vector3d[] VectorField, Point3d[] GridPoints, Point3d[] Seeds, FieldSampling Sampling, BoundingBox Bounds, IntegrationScheme? Scheme) : FieldOperation;
 
     /// <summary>Request isosurface extraction from scalar field using marching cubes.</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match scalar field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Isovalues">Isovalue thresholds for surface extraction.</param>
     public sealed record IsosurfacesRequest(double[] ScalarField, Point3d[] GridPoints, FieldSampling Sampling, double[] Isovalues) : FieldOperation;
 
-    /// <summary>Request Hessian matrix field computation (second derivatives).</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match scalar field length).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
-    /// <param name="Bounds">Bounding box defining field extent.</param>
+    /// <summary>Request Hessian tensor field computation: ∂²f/∂xᵢ∂xⱼ.</summary>
     public sealed record HessianFieldRequest(double[] ScalarField, Point3d[] GridPoints, FieldSampling Sampling, BoundingBox Bounds) : FieldOperation;
 
-    /// <summary>Request directional derivative field computation: ∇f·d.</summary>
-    /// <param name="GradientField">Input gradient field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match gradient field length).</param>
-    /// <param name="Direction">Direction vector for derivative computation.</param>
+    /// <summary>Request directional derivative computation: ∇f · d.</summary>
     public sealed record DirectionalDerivativeFieldRequest(Vector3d[] GradientField, Point3d[] GridPoints, Vector3d Direction) : FieldOperation;
 
-    /// <summary>Request vector field magnitude computation: |F|.</summary>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
+    /// <summary>Request vector field magnitude computation: ||v||.</summary>
     public sealed record FieldMagnitudeRequest(Vector3d[] VectorField, Point3d[] GridPoints) : FieldOperation;
 
-    /// <summary>Request vector field normalization: F/|F|.</summary>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match vector field length).</param>
+    /// <summary>Request vector field normalization: v/||v||.</summary>
     public sealed record NormalizeFieldRequest(Vector3d[] VectorField, Point3d[] GridPoints) : FieldOperation;
 
-    /// <summary>Request scalar-vector product field: s·F_component.</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="VectorField">Input vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match both field lengths).</param>
-    /// <param name="Component">Vector component to extract (X, Y, or Z).</param>
+    /// <summary>Request scalar-vector component product: s · v[component].</summary>
     public sealed record ScalarVectorProductRequest(double[] ScalarField, Vector3d[] VectorField, Point3d[] GridPoints, VectorComponent Component) : FieldOperation;
 
-    /// <summary>Request vector-vector dot product field: F1·F2.</summary>
-    /// <param name="VectorField1">First vector field values.</param>
-    /// <param name="VectorField2">Second vector field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match both field lengths).</param>
-    public sealed record VectorDotProductRequest(Vector3d[] VectorField1, Vector3d[] VectorField2, Point3d[] GridPoints) : FieldOperation;
+    /// <summary>Request vector-vector dot product: v₁ · v₂.</summary>
+    public sealed record VectorDotProductRequest(Vector3d[] FirstField, Vector3d[] SecondField, Point3d[] GridPoints) : FieldOperation;
 
-    /// <summary>Request critical point detection and classification (min/max/saddle).</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GradientField">Gradient field values (∇f).</param>
-    /// <param name="Hessian">Hessian matrix field (3×3 second derivatives).</param>
-    /// <param name="GridPoints">Grid sample points (must match field lengths).</param>
-    /// <param name="Sampling">Field sampling configuration (resolution, bounds, step size).</param>
+    /// <summary>Request critical point detection and classification using eigenanalysis.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
     public sealed record CriticalPointsRequest(double[] ScalarField, Vector3d[] GradientField, double[,][] Hessian, Point3d[] GridPoints, FieldSampling Sampling) : FieldOperation;
 
     /// <summary>Request field statistics computation (min, max, mean, stddev).</summary>
-    /// <param name="ScalarField">Input scalar field values.</param>
-    /// <param name="GridPoints">Grid sample points (must match scalar field length).</param>
     public sealed record ComputeStatisticsRequest(double[] ScalarField, Point3d[] GridPoints) : FieldOperation;
 
-    /// <summary>Execute field operation request.</summary>
+    /// <summary>Execute field operation and return discriminated union result.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<TResult> Execute<TResult>(FieldOperation operation, IGeometryContext context) =>
-        FieldsCore.Execute<TResult>(operation: operation, context: context);
+    public static Result<FieldResult> Execute(FieldOperation operation, IGeometryContext context) =>
+        FieldsCore.Execute(operation: operation, context: context);
 }
