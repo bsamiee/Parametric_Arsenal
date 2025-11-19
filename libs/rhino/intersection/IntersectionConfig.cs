@@ -109,4 +109,12 @@ internal static class IntersectionConfig {
     internal const double PerpendicularBlendScore = 0.5;
     internal const double CurveSurfaceTangentBlendScore = 0.8;
     internal const double CurveSurfacePerpendicularBlendScore = 0.4;
+
+    /// <summary>Gets type inheritance chain including interfaces for polymorphic type resolution.</summary>
+    internal static Type[] GetTypeChain(Type type) =>
+        [.. (type.BaseType is not null
+            ? Enumerable.Repeat(type, 1).Concat(GetTypeChain(type.BaseType))
+            : Enumerable.Repeat(type, 1))
+            .Concat(type.GetInterfaces())
+            .Distinct(),];
 }

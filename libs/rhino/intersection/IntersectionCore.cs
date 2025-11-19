@@ -96,12 +96,11 @@ internal static class IntersectionCore {
 
     [Pure]
     private static Result<(Func<object, object, double, Intersection.IntersectionMode, IGeometryContext, Result<Intersection.IntersectionResult>> Executor, IntersectionConfig.IntersectionOperationMetadata Metadata, bool Swapped)> ResolveExecutor(Type typeA, Type typeB) {
-        Type[] getTypeChain(Type type) => [.. (type.BaseType is not null ? Enumerable.Repeat(type, 1).Concat(getTypeChain(type.BaseType)) : Enumerable.Repeat(type, 1)).Concat(type.GetInterfaces()).Distinct(),];
-        (Type[] chainA, Type[] chainB) = (getTypeChain(typeA), getTypeChain(typeB));
+        (Type[] chainA, Type[] chainB) = (IntersectionConfig.GetTypeChain(typeA), IntersectionConfig.GetTypeChain(typeB));
         return chainA.SelectMany(a => chainB.Select(b => ((a, b), false))).Concat(chainB.SelectMany(a => chainA.Select(b => ((a, b), true))))
-            .Select(c => (_executors.TryGetValue(c.Item1, out var e), IntersectionConfig.Operations.TryGetValue(c.Item1, out var m), c.Item1, c.Item2, e, m))
+            .Select(c => (_executors.TryGetValue(c.Item1, out Func<object, object, double, Intersection.IntersectionMode, IGeometryContext, Result<Intersection.IntersectionResult>>? e), IntersectionConfig.Operations.TryGetValue(c.Item1, out IntersectionConfig.IntersectionOperationMetadata? m), c.Item1, c.Item2, e, m))
             .FirstOrDefault(x => x.Item1 && x.Item2) switch {
-                (true, true, _, bool swapped, var executor, var metadata) => ResultFactory.Create(value: (executor!, metadata!, swapped)),
+                (true, true, _, bool swapped, Func<object, object, double, Intersection.IntersectionMode, IGeometryContext, Result<Intersection.IntersectionResult>> executor, IntersectionConfig.IntersectionOperationMetadata metadata) => ResultFactory.Create(value: (executor, metadata, swapped)),
                 _ => ResultFactory.Create<(Func<object, object, double, Intersection.IntersectionMode, IGeometryContext, Result<Intersection.IntersectionResult>>, IntersectionConfig.IntersectionOperationMetadata, bool)>(error: E.Geometry.UnsupportedIntersection.WithContext($"{typeA.Name} × {typeB.Name}")),
             };
     }

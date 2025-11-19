@@ -14,12 +14,11 @@ namespace Arsenal.Rhino.Intersection;
 internal static class IntersectionCompute {
     [Pure]
     private static Result<IntersectionConfig.IntersectionOperationMetadata> ResolveMetadata(Type typeA, Type typeB) {
-        Type[] getTypeChain(Type type) => [.. (type.BaseType is not null ? Enumerable.Repeat(type, 1).Concat(getTypeChain(type.BaseType)) : Enumerable.Repeat(type, 1)).Concat(type.GetInterfaces()).Distinct(),];
-        (Type[] chainA, Type[] chainB) = (getTypeChain(typeA), getTypeChain(typeB));
+        (Type[] chainA, Type[] chainB) = (IntersectionConfig.GetTypeChain(typeA), IntersectionConfig.GetTypeChain(typeB));
         return chainA.SelectMany(a => chainB.Select(b => (a, b))).Concat(chainB.SelectMany(a => chainA.Select(b => (a, b))))
-            .Select(key => (IntersectionConfig.Operations.TryGetValue(key, out var m), key, m))
+            .Select(key => (IntersectionConfig.Operations.TryGetValue(key, out IntersectionConfig.IntersectionOperationMetadata? m), key, m))
             .FirstOrDefault(x => x.Item1) switch {
-                (true, _, var metadata) => ResultFactory.Create(value: metadata!),
+                (true, _, IntersectionConfig.IntersectionOperationMetadata metadata) => ResultFactory.Create(value: metadata),
                 _ => ResultFactory.Create<IntersectionConfig.IntersectionOperationMetadata>(error: E.Geometry.UnsupportedIntersection.WithContext($"{typeA.Name} × {typeB.Name}")),
             };
     }
@@ -130,7 +129,7 @@ internal static class IntersectionCompute {
                                                     ? (PointA: ca, PointB: pt, Distance: ca.DistanceTo(pt))
                                                     : (PointA: Point3d.Unset, PointB: pt, Distance: double.MaxValue))
                                                 .Where(c => c.Distance < searchRadius && c.Distance > minDistance))
-                                            .ToArray() is var curvePairs && curvePairs.Length > 0
+                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
                                             ? ResultFactory.Create(value: toArrays(curvePairs))
                                             : ResultFactory.Create(value: new Intersection.NearMissResult([], [], []))
                                         : ResultFactory.Create(value: new Intersection.NearMissResult([], [], [])),
@@ -141,7 +140,7 @@ internal static class IntersectionCompute {
                                                 ? (PointA: pt, PointB: surface.PointAt(u, v), Distance: pt.DistanceTo(surface.PointAt(u, v)))
                                                 : (PointA: pt, PointB: Point3d.Unset, Distance: double.MaxValue))
                                             .Where(c => c.Distance < searchRadius && c.Distance > minDistance)
-                                            .ToArray() is var pairs && pairs.Length > 0
+                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
                                             ? ResultFactory.Create(value: toArrays(pairs))
                                             : ResultFactory.Create(value: new Intersection.NearMissResult([], [], []))
                                         : ResultFactory.Create(value: new Intersection.NearMissResult([], [], [])),
@@ -152,7 +151,7 @@ internal static class IntersectionCompute {
                                                 ? (PointA: ca, PointB: cb, Distance: ca.DistanceTo(cb))
                                                 : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
                                             .Where(c => (c.Distance < searchRadius) && (c.Distance > minDistance) && c.PointA.IsValid && c.PointB.IsValid)
-                                            .ToArray() is var brepPairs && brepPairs.Length > 0
+                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
                                             ? ResultFactory.Create(value: toArrays(brepPairs))
                                             : ResultFactory.Create(value: new Intersection.NearMissResult([], [], []))
                                         : ResultFactory.Create(value: new Intersection.NearMissResult([], [], [])),
@@ -168,7 +167,7 @@ internal static class IntersectionCompute {
                                                     ? (PointA: mp.Point, PointB: pt, Distance: mp.Point.DistanceTo(pt))
                                                     : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue)))
                                             .Where(c => (c.Distance < searchRadius) && (c.Distance > minDistance) && c.PointA.IsValid && c.PointB.IsValid)
-                                            .ToArray() is var meshPairs && meshPairs.Length > 0
+                                            .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] meshPairs && meshPairs.Length > 0
                                             ? ResultFactory.Create(value: toArrays(meshPairs))
                                             : ResultFactory.Create(value: new Intersection.NearMissResult([], [], []))
                                         : ResultFactory.Create(value: new Intersection.NearMissResult([], [], [])),
