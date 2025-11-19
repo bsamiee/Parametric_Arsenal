@@ -175,25 +175,19 @@ internal static class OrientCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {
-            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
-                Point3d[] points = pc.GetPoints();
-                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
-                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
-                        ? ResultFactory.Create(value: plane)
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-            }))(),
+            PointCloud pc when pc.Count >= OrientConfig.BestFitMinPoints => pc.GetPoints() is Point3d[] pts
+                && Plane.FitPlaneToPoints(pts, out Plane plane) == PlaneFitResult.Success
+                && pts.Aggregate(0.0, (sum, p) => sum + (plane.DistanceTo(p) * plane.DistanceTo(p))) / pts.Length is double variance
+                && Math.Sqrt(variance) <= OrientConfig.BestFitResidualThreshold
+                    ? ResultFactory.Create(value: plane)
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             PointCloud pc => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {pc.Count}")),
-            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
-                Point3d[] points = m.Vertices.ToPoint3dArray();
-                double ComputeRMS(Point3d[] pts, Plane p) { double sum = 0.0; for (int i = 0; i < pts.Length; i++) { double d = p.DistanceTo(pts[i]); sum += d * d; } return Math.Sqrt(sum / pts.Length); }
-                return Plane.FitPlaneToPoints(points, out Plane plane) == PlaneFitResult.Success
-                    ? ComputeRMS(points, plane) is double rms && rms <= OrientConfig.BestFitResidualThreshold
-                        ? ResultFactory.Create(value: plane)
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)
-                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-            }))(),
+            Mesh m when m.Vertices.Count >= OrientConfig.BestFitMinPoints => m.Vertices.ToPoint3dArray() is Point3d[] pts
+                && Plane.FitPlaneToPoints(pts, out Plane plane) == PlaneFitResult.Success
+                && pts.Aggregate(0.0, (sum, p) => sum + (plane.DistanceTo(p) * plane.DistanceTo(p))) / pts.Length is double variance
+                && Math.Sqrt(variance) <= OrientConfig.BestFitResidualThreshold
+                    ? ResultFactory.Create(value: plane)
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed),
             Mesh m => ResultFactory.Create<Plane>(error: E.Geometry.InsufficientParameters.WithContext($"Best-fit plane requires {OrientConfig.BestFitMinPoints} points, got {m.Vertices.Count}")),
             _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
         };
@@ -201,40 +195,21 @@ internal static class OrientCore {
     /// <summary>Best-fit orientation with metadata dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> OrientToBestFit<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
-        OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.BestFit), out OrientConfig.OrientOperationMetadata? metadata)
-            ? UnifiedOperation.Apply(
-                input: geometry,
-                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                    ExtractBestFitPlane(item)
-                        .Bind(plane => ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
-                config: new OperationConfig<T, T> {
-                    Context = context,
-                    ValidationMode = metadata.ValidationMode,
-                    OperationName = metadata.OperationName,
-                }).Map(r => r[0])
-            : UnifiedOperation.Apply(
-                input: geometry,
-                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                    ExtractBestFitPlane(item)
-                        .Bind(plane => ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
-                config: new OperationConfig<T, T> {
-                    Context = context,
-                    ValidationMode = V.Standard,
-                    OperationName = "Orient.BestFit",
-                }).Map(r => r[0]);
+        UnifiedOperation.Apply(
+            input: geometry,
+            operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                ExtractBestFitPlane(item)
+                    .Bind(plane => ApplyTransform(item, Transform.PlaneToPlane(plane, Plane.WorldXY)))),
+            config: new OperationConfig<T, T> {
+                Context = context,
+                ValidationMode = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.BestFit), out OrientConfig.OrientOperationMetadata? m) ? m.ValidationMode : V.Standard,
+                OperationName = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.BestFit), out OrientConfig.OrientOperationMetadata? n) ? n.OperationName : "Orient.BestFit",
+            }).Map(r => r[0]);
 
     /// <summary>Mirror operation with metadata dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase {
-        OrientConfig.OrientOperationMetadata metadata = OrientConfig.GeometryOperations.TryGetValue(
-            (geometry.GetType(), OrientConfig.OpType.Mirror),
-            out OrientConfig.OrientOperationMetadata? m)
-                ? m
-                : new OrientConfig.OrientOperationMetadata(
-                    OrientConfig.DefaultValidationModes.GetValueOrDefault(geometry.GetType(), V.Standard),
-                    "Orient.Mirror",
-                    1024);
-        return UnifiedOperation.Apply(
+    internal static Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 plane.IsValid
@@ -242,23 +217,18 @@ internal static class OrientCore {
                     : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.InvalidOrientationPlane)),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = metadata.ValidationMode,
-                OperationName = metadata.OperationName,
+                ValidationMode = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.Mirror), out OrientConfig.OrientOperationMetadata? m)
+                    ? m.ValidationMode
+                    : OrientConfig.DefaultValidationModes.GetValueOrDefault(geometry.GetType(), V.Standard),
+                OperationName = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.Mirror), out OrientConfig.OrientOperationMetadata? n)
+                    ? n.OperationName
+                    : "Orient.Mirror",
             }).Map(r => r[0]);
-    }
 
     /// <summary>Flip direction operation with metadata dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<T> FlipDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase {
-        OrientConfig.OrientOperationMetadata metadata = OrientConfig.GeometryOperations.TryGetValue(
-            (geometry.GetType(), OrientConfig.OpType.FlipDirection),
-            out OrientConfig.OrientOperationMetadata? m)
-                ? m
-                : new OrientConfig.OrientOperationMetadata(
-                    OrientConfig.DefaultValidationModes.GetValueOrDefault(geometry.GetType(), V.Standard),
-                    "Orient.Flip",
-                    1024);
-        return UnifiedOperation.Apply(
+    internal static Result<T> FlipDirection<T>(T geometry, IGeometryContext context) where T : GeometryBase =>
+        UnifiedOperation.Apply(
             input: geometry,
             operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                 item.Duplicate() switch {
@@ -274,10 +244,13 @@ internal static class OrientCore {
                 }),
             config: new OperationConfig<T, T> {
                 Context = context,
-                ValidationMode = metadata.ValidationMode,
-                OperationName = metadata.OperationName,
+                ValidationMode = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.FlipDirection), out OrientConfig.OrientOperationMetadata? m)
+                    ? m.ValidationMode
+                    : OrientConfig.DefaultValidationModes.GetValueOrDefault(geometry.GetType(), V.Standard),
+                OperationName = OrientConfig.GeometryOperations.TryGetValue((geometry.GetType(), OrientConfig.OpType.FlipDirection), out OrientConfig.OrientOperationMetadata? n)
+                    ? n.OperationName
+                    : "Orient.Flip",
             }).Map(r => r[0]);
-    }
 
     /// <summary>Optimization orientation with metadata dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
