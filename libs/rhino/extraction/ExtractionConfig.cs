@@ -5,10 +5,13 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Configuration for semantic extraction: type IDs, thresholds, validation modes.</summary>
+/// <summary>Consolidated configuration with FrozenDictionary validation metadata and threshold constants.</summary>
 internal static class ExtractionConfig {
-    /// <summary>(Kind, Type) tuple to validation mode mapping.</summary>
-    internal static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> ValidationModes =
+    /// <summary>Operation metadata record containing validation modes.</summary>
+    internal readonly record struct OperationMetadata(string OperationName, V ValidationModes);
+
+    /// <summary>Point operation validation metadata registry.</summary>
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> _pointValidationEntries =
         new Dictionary<(byte, Type), V> {
             [(1, typeof(Brep))] = V.Standard | V.MassProperties,
             [(1, typeof(Curve))] = V.Standard | V.AreaCentroid,
@@ -39,6 +42,11 @@ internal static class ExtractionConfig {
             [(12, typeof(Brep))] = V.Standard | V.Topology,
             [(13, typeof(Curve))] = V.Standard | V.Degeneracy,
             [(13, typeof(PolyCurve))] = V.Standard | V.Degeneracy,
+        }.ToFrozenDictionary();
+
+    /// <summary>Curve operation validation metadata registry.</summary>
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), V> _curveValidationEntries =
+        new Dictionary<(byte, Type), V> {
             [(20, typeof(Surface))] = V.Standard | V.UVDomain,
             [(20, typeof(NurbsSurface))] = V.Standard | V.NurbsGeometry | V.UVDomain,
             [(20, typeof(Brep))] = V.Standard | V.Topology,
@@ -60,31 +68,27 @@ internal static class ExtractionConfig {
             [(34, typeof(Brep))] = V.Standard | V.Topology,
         }.ToFrozenDictionary();
 
-    /// <summary>Gets validation mode with fallback for (kind, type) pair.</summary>
-    internal static V GetValidationMode(byte kind, Type geometryType) =>
-        ValidationModes.TryGetValue((kind, geometryType), out V exact) ? exact : ValidationModes.Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType)).OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0)).Select(kv => kv.Value).DefaultIfEmpty(V.Standard).First();
+    /// <summary>Resolve point validation mode with fallback to base type matching.</summary>
+    internal static V ResolvePointValidation(byte kind, Type geometryType) =>
+        _pointValidationEntries.TryGetValue((kind, geometryType), out V exact)
+            ? exact
+            : _pointValidationEntries
+                .Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
+                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(V.Standard)
+                .First();
 
-    /// <summary>Feature type identifiers.</summary>
-    internal const byte FeatureTypeFillet = 0;
-    internal const byte FeatureTypeChamfer = 1;
-    internal const byte FeatureTypeHole = 2;
-    internal const byte FeatureTypeGenericEdge = 3;
-    internal const byte FeatureTypeVariableRadiusFillet = 4;
-
-    /// <summary>Primitive type identifiers.</summary>
-    internal const byte PrimitiveTypePlane = 0;
-    internal const byte PrimitiveTypeCylinder = 1;
-    internal const byte PrimitiveTypeSphere = 2;
-    internal const byte PrimitiveTypeUnknown = 3;
-    internal const byte PrimitiveTypeCone = 4;
-    internal const byte PrimitiveTypeTorus = 5;
-    internal const byte PrimitiveTypeExtrusion = 6;
-
-    /// <summary>Pattern type identifiers.</summary>
-    internal const byte PatternTypeLinear = 0;
-    internal const byte PatternTypeRadial = 1;
-    internal const byte PatternTypeGrid = 2;
-    internal const byte PatternTypeScaling = 3;
+    /// <summary>Resolve curve validation mode with fallback to base type matching.</summary>
+    internal static V ResolveCurveValidation(byte kind, Type geometryType) =>
+        _curveValidationEntries.TryGetValue((kind, geometryType), out V exact)
+            ? exact
+            : _curveValidationEntries
+                .Where(kv => kv.Key.Kind == kind && kv.Key.GeometryType.IsAssignableFrom(geometryType))
+                .OrderByDescending(kv => kv.Key.GeometryType, Comparer<Type>.Create(static (a, b) => a.IsAssignableFrom(b) ? -1 : b.IsAssignableFrom(a) ? 1 : 0))
+                .Select(kv => kv.Value)
+                .DefaultIfEmpty(V.Standard)
+                .First();
 
     /// <summary>Fillet detection thresholds.</summary>
     internal const double FilletCurvatureVariationThreshold = 0.15;
@@ -117,4 +121,26 @@ internal static class ExtractionConfig {
     internal const int MaxIsocurveCount = 100;
     internal const int DefaultOsculatingFrameCount = 10;
     internal const int BoundaryIsocurveCount = 5;
+
+    /// <summary>Feature type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
+    internal const byte FeatureTypeFillet = 0;
+    internal const byte FeatureTypeChamfer = 1;
+    internal const byte FeatureTypeHole = 2;
+    internal const byte FeatureTypeGenericEdge = 3;
+    internal const byte FeatureTypeVariableRadiusFillet = 4;
+
+    /// <summary>Primitive type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
+    internal const byte PrimitiveTypePlane = 0;
+    internal const byte PrimitiveTypeCylinder = 1;
+    internal const byte PrimitiveTypeSphere = 2;
+    internal const byte PrimitiveTypeUnknown = 3;
+    internal const byte PrimitiveTypeCone = 4;
+    internal const byte PrimitiveTypeTorus = 5;
+    internal const byte PrimitiveTypeExtrusion = 6;
+
+    /// <summary>Pattern type identifiers (kept for backward compatibility with ExtractionCompute).</summary>
+    internal const byte PatternTypeLinear = 0;
+    internal const byte PatternTypeRadial = 1;
+    internal const byte PatternTypeGrid = 2;
+    internal const byte PatternTypeScaling = 3;
 }

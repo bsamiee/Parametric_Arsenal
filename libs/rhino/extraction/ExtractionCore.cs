@@ -12,41 +12,159 @@ using Rhino.Geometry.Collections;
 
 namespace Arsenal.Rhino.Extraction;
 
-/// <summary>Point extraction with FrozenDictionary dispatch and normalization.</summary>
+/// <summary>Internal dispatch orchestration with FrozenDictionary handler registry.</summary>
 internal static class ExtractionCore {
+    /// <summary>Internal point operation kind enumeration.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "Byte enum for compact storage")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1008:Enums should have zero value", Justification = "Non-zero values required for dispatch")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1027:Mark enums with FlagsAttribute", Justification = "Not a flags enum")]
+    internal enum PointOperationKind : byte {
+        Analytical = 1,
+        Extremal = 2,
+        Greville = 3,
+        Inflection = 4,
+        Quadrant = 5,
+        EdgeMidpoints = 6,
+        FaceCentroids = 7,
+        OsculatingFrames = 8,
+        DivideByCount = 10,
+        DivideByLength = 11,
+        DirectionalExtrema = 12,
+        Discontinuities = 13,
+    }
+
+    /// <summary>Internal curve operation kind enumeration.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1028:Enum Storage should be Int32", Justification = "Byte enum for compact storage")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1008:Enums should have zero value", Justification = "Non-zero values required for dispatch")]
+    internal enum CurveOperationKind : byte {
+        Boundary = 20,
+        IsocurveU = 21,
+        IsocurveV = 22,
+        IsocurveUV = 23,
+        FeatureEdges = 24,
+        IsocurveByCount = 30,
+        IsocurveByCountDirectional = 31,
+        IsocurveByParameters = 32,
+        IsocurveByParametersDirectional = 33,
+        FeatureEdgesByAngle = 34,
+    }
+
+    /// <summary>Normalized internal request with operation kind and validation mode.</summary>
+    internal readonly record struct NormalizedRequest(byte Kind, object? Parameter, bool IncludeEnds, V ValidationMode);
+
     private static readonly IComparer<Type> _specificityComparer = Comparer<Type>.Create(static (a, b) =>
         a == b ? 0 : a.IsAssignableFrom(b) ? 1 : b.IsAssignableFrom(a) ? -1 : 0);
 
     /// <summary>(Kind, Type) to handler function mapping for O(1) dispatch.</summary>
-    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> Map,
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) _pointRegistry = BuildHandlerRegistry();
+    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) _pointRegistry = BuildHandlerRegistry();
 
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> _handlers = _pointRegistry.Map;
-    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> _handlerFallbacks = _pointRegistry.Fallbacks;
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>>> _handlers = _pointRegistry.Map;
+    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[]> _handlerFallbacks = _pointRegistry.Fallbacks;
 
     /// <summary>(Kind, Type) to curve handler function mapping for O(1) dispatch.</summary>
-    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> Map,
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) _curveRegistry = BuildCurveHandlerRegistry();
+    private static readonly (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) _curveRegistry = BuildCurveHandlerRegistry();
 
-    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> _curveHandlers = _curveRegistry.Map;
-    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> _curveHandlerFallbacks = _curveRegistry.Fallbacks;
+    private static readonly FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>>> _curveHandlers = _curveRegistry.Map;
+    private static readonly FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[]> _curveHandlerFallbacks = _curveRegistry.Fallbacks;
+
+    /// <summary>Normalize point request from discriminated union to internal representation.</summary>
+    [Pure]
+    internal static Result<NormalizedRequest> NormalizePointRequest(Extraction.PointRequest request, Type geometryType, IGeometryContext context) =>
+        request switch {
+            Extraction.SemanticPoint semanticPoint =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)semanticPoint.Semantic,
+                    Parameter: semanticPoint.SampleCount,
+                    IncludeEnds: true,
+                    ValidationMode: ExtractionConfig.ResolvePointValidation(kind: (byte)semanticPoint.Semantic, geometryType: geometryType))),
+            Extraction.DivideByCount { Count: int count, IncludeEndpoints: bool include } =>
+                count <= 0
+                    ? ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidCount)
+                    : ResultFactory.Create(value: new NormalizedRequest(
+                        Kind: (byte)PointOperationKind.DivideByCount,
+                        Parameter: count,
+                        IncludeEnds: include,
+                        ValidationMode: ExtractionConfig.ResolvePointValidation(kind: (byte)PointOperationKind.DivideByCount, geometryType: geometryType))),
+            Extraction.DivideByLength { Length: double length, IncludeEndpoints: bool include } =>
+                length <= 0
+                    ? ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidLength)
+                    : ResultFactory.Create(value: new NormalizedRequest(
+                        Kind: (byte)PointOperationKind.DivideByLength,
+                        Parameter: length,
+                        IncludeEnds: include,
+                        ValidationMode: ExtractionConfig.ResolvePointValidation(kind: (byte)PointOperationKind.DivideByLength, geometryType: geometryType))),
+            Extraction.DirectionalExtrema { Direction: Vector3d direction } =>
+                direction.Length <= context.AbsoluteTolerance
+                    ? ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidDirection)
+                    : ResultFactory.Create(value: new NormalizedRequest(
+                        Kind: (byte)PointOperationKind.DirectionalExtrema,
+                        Parameter: direction,
+                        IncludeEnds: true,
+                        ValidationMode: ExtractionConfig.ResolvePointValidation(kind: (byte)PointOperationKind.DirectionalExtrema, geometryType: geometryType))),
+            Extraction.Discontinuities { Continuity: Continuity continuity } =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)PointOperationKind.Discontinuities,
+                    Parameter: continuity,
+                    IncludeEnds: true,
+                    ValidationMode: ExtractionConfig.ResolvePointValidation(kind: (byte)PointOperationKind.Discontinuities, geometryType: geometryType))),
+            _ => ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidExtraction),
+        };
+
+    /// <summary>Normalize curve request from discriminated union to internal representation.</summary>
+    [Pure]
+    internal static Result<NormalizedRequest> NormalizeCurveRequest(Extraction.CurveRequest request, Type geometryType) =>
+        request switch {
+            Extraction.SemanticCurve { Semantic: Extraction.CurveSemantic semantic, Count: var count } when count is null =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)semantic,
+                    Parameter: null,
+                    IncludeEnds: true,
+                    ValidationMode: ExtractionConfig.ResolveCurveValidation(kind: (byte)semantic, geometryType: geometryType))),
+            Extraction.IsocurveByCount { Count: < ExtractionConfig.MinIsocurveCount } or Extraction.IsocurveByCount { Count: > ExtractionConfig.MaxIsocurveCount } =>
+                ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidCount),
+            Extraction.IsocurveByCount { Count: int count, Direction: Extraction.IsocurveDirection direction } =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)CurveOperationKind.IsocurveByCountDirectional,
+                    Parameter: (count, (byte)direction),
+                    IncludeEnds: true,
+                    ValidationMode: ExtractionConfig.ResolveCurveValidation(kind: (byte)CurveOperationKind.IsocurveByCountDirectional, geometryType: geometryType))),
+            Extraction.IsocurveByParameters { Parameters.Length: 0 } =>
+                ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidParameters.WithContext("Parameters array is empty")),
+            Extraction.IsocurveByParameters { Parameters: double[] parameters, Direction: Extraction.IsocurveDirection direction } =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)CurveOperationKind.IsocurveByParametersDirectional,
+                    Parameter: (parameters, (byte)direction),
+                    IncludeEnds: false,
+                    ValidationMode: ExtractionConfig.ResolveCurveValidation(kind: (byte)CurveOperationKind.IsocurveByParametersDirectional, geometryType: geometryType))),
+            Extraction.FeatureEdges { AngleThreshold: <= 0 } =>
+                ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidAngle.WithContext("Angle threshold must be positive")),
+            Extraction.FeatureEdges { AngleThreshold: double angleThreshold } =>
+                ResultFactory.Create(value: new NormalizedRequest(
+                    Kind: (byte)CurveOperationKind.FeatureEdgesByAngle,
+                    Parameter: angleThreshold,
+                    IncludeEnds: false,
+                    ValidationMode: ExtractionConfig.ResolveCurveValidation(kind: (byte)CurveOperationKind.FeatureEdgesByAngle, geometryType: geometryType))),
+            _ => ResultFactory.Create<NormalizedRequest>(error: E.Geometry.InvalidExtraction),
+        };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
-        ExecuteWithNormalization(geometry, request, context);
+    internal static Result<IReadOnlyList<Point3d>> Execute(GeometryBase geometry, NormalizedRequest request, IGeometryContext context) =>
+        ExecuteWithNormalization(geometry: geometry, request: request, context: context);
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<Curve>> ExecuteCurves(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
-        _curveHandlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>? handler)
+    internal static Result<IReadOnlyList<Curve>> ExecuteCurves(GeometryBase geometry, NormalizedRequest request, IGeometryContext context) =>
+        _curveHandlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>>? handler)
             ? handler(geometry, request, context).Map(curves => (IReadOnlyList<Curve>)curves)
-            : _curveHandlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]? fallbacks)
-                ? InvokeFallback(geometry, request, context, fallbacks)
+            : _curveHandlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[]? fallbacks)
+                ? InvokeFallback(geometry: geometry, request: request, context: context, fallbacks: fallbacks)
                 : ResultFactory.Create<IReadOnlyList<Curve>>(error: E.Geometry.InvalidExtraction.WithContext("No curve handler registered"));
 
     [Pure]
     private static Result<IReadOnlyList<Point3d>> ExecuteWithNormalization(
         GeometryBase geometry,
-        Extract.Request request,
+        NormalizedRequest request,
         IGeometryContext context) {
         (GeometryBase? candidate, bool shouldDispose) = (geometry, request.Kind) switch {
             (Extrusion extrusion, 1 or 6 or 7 or 10 or 11 or 12) => (extrusion.ToBrep(splitKinkyFaces: true), true),
@@ -58,10 +176,9 @@ internal static class ExtractionCore {
             ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("Normalization failed"))
             : ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
                 GeometryBase normalized = candidate;
-                V mode = ExtractionConfig.GetValidationMode(request.Kind, normalized.GetType());
                 Result<IReadOnlyList<Point3d>> result = ResultFactory.Create(value: normalized)
-                    .Validate(args: mode == V.None ? null : [context, mode,])
-                    .Bind(_ => DispatchExtraction(normalized, request, context).Map(points => (IReadOnlyList<Point3d>)points));
+                    .Validate(args: request.ValidationMode == V.None ? null : [context, request.ValidationMode,])
+                    .Bind(_ => DispatchExtraction(geometry: normalized, request: request, context: context).Map(points => (IReadOnlyList<Point3d>)points));
                 return (shouldDispose, normalized) switch {
                     (true, IDisposable disposable) => result.Tap(onSuccess: _ => disposable.Dispose(), onFailure: _ => disposable.Dispose()),
                     _ => result,
@@ -70,18 +187,18 @@ internal static class ExtractionCore {
     }
 
     [Pure]
-    private static Result<Point3d[]> DispatchExtraction(GeometryBase geometry, Extract.Request request, IGeometryContext context) =>
-        _handlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>? handler)
+    private static Result<Point3d[]> DispatchExtraction(GeometryBase geometry, NormalizedRequest request, IGeometryContext context) =>
+        _handlers.TryGetValue((request.Kind, geometry.GetType()), out Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>>? handler)
             ? handler(geometry, request, context)
-            : _handlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]? fallbacks)
-                ? InvokeFallback(geometry, request, context, fallbacks)
+            : _handlerFallbacks.TryGetValue(request.Kind, out (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[]? fallbacks)
+                ? InvokeFallback(geometry: geometry, request: request, context: context, fallbacks: fallbacks)
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("No handler registered"));
 
     private static Result<IReadOnlyList<Curve>> InvokeFallback(
         GeometryBase geometry,
-        Extract.Request request,
+        NormalizedRequest request,
         IGeometryContext context,
-        (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[] fallbacks) {
+        (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[] fallbacks) {
         int match = Array.FindIndex(fallbacks, candidate => candidate.GeometryType.IsInstanceOfType(geometry));
         return match >= 0
             ? fallbacks[match].Handler(geometry, request, context).Map(curves => (IReadOnlyList<Curve>)curves)
@@ -90,9 +207,9 @@ internal static class ExtractionCore {
 
     private static Result<Point3d[]> InvokeFallback(
         GeometryBase geometry,
-        Extract.Request request,
+        NormalizedRequest request,
         IGeometryContext context,
-        (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[] fallbacks) {
+        (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[] fallbacks) {
         int match = Array.FindIndex(fallbacks, candidate => candidate.GeometryType.IsInstanceOfType(geometry));
         return match >= 0
             ? fallbacks[match].Handler(geometry, request, context)
@@ -100,9 +217,9 @@ internal static class ExtractionCore {
     }
 
     [Pure]
-    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> Map,
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) BuildHandlerRegistry() {
-        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>>> map = new() {
+    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[]> Fallbacks) BuildHandlerRegistry() {
+        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>>> map = new() {
             [(1, typeof(Brep))] = static (geometry, _, _) => geometry is Brep brep
                 ? ((Func<Result<Point3d[]>>)(() => {
                     using VolumeMassProperties? massProperties = VolumeMassProperties.Compute(brep);
@@ -285,7 +402,7 @@ internal static class ExtractionCore {
                     : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected frame count >= 2"))
                 : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidExtraction.WithContext("Expected Curve")),
         };
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Point3d[]>> Handler)[]> fallbacks = map
             .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
                 static group => group.Key,
@@ -297,9 +414,9 @@ internal static class ExtractionCore {
     }
 
     [Pure]
-    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> Map,
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) BuildCurveHandlerRegistry() {
-        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>>> map = new() {
+    private static (FrozenDictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>>> Map,
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[]> Fallbacks) BuildCurveHandlerRegistry() {
+        Dictionary<(byte Kind, Type GeometryType), Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>>> map = new() {
             [(20, typeof(Surface))] = static (geometry, _, _) => geometry is Surface surface && (surface.Domain(0), surface.Domain(1)) is (Interval u, Interval v) && new Curve?[] { surface.IsoCurve(direction: 0, constantParameter: u.Min), surface.IsoCurve(direction: 1, constantParameter: v.Min), surface.IsoCurve(direction: 0, constantParameter: u.Max), surface.IsoCurve(direction: 1, constantParameter: v.Max), } is Curve?[] curves
                 ? ResultFactory.Create<Curve[]>(value: [.. curves.OfType<Curve>(),])
                 : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Surface domain unavailable")),
@@ -344,7 +461,7 @@ internal static class ExtractionCore {
                 ? ResultFactory.Create<Curve[]>(value: [.. brep.Edges.Where(edge => edge.AdjacentFaces() is int[] adjacentFaces && adjacentFaces.Length == 2 && edge.PointAt(edge.Domain.ParameterAt(0.5)) is Point3d midPoint && brep.Faces[adjacentFaces[0]].ClosestPoint(testPoint: midPoint, u: out double u0, v: out double v0) && brep.Faces[adjacentFaces[1]].ClosestPoint(testPoint: midPoint, u: out double u1, v: out double v1) && Math.Abs(Vector3d.VectorAngle(brep.Faces[adjacentFaces[0]].NormalAt(u: u0, v: v0), brep.Faces[adjacentFaces[1]].NormalAt(u: u1, v: v1))) >= angleThreshold).Select(edge => edge.DuplicateCurve()).OfType<Curve>()])
                 : ResultFactory.Create<Curve[]>(error: E.Geometry.InvalidExtraction.WithContext("Invalid angle or brep")),
         };
-        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, Extract.Request, IGeometryContext, Result<Curve[]>> Handler)[]> fallbacks = map
+        FrozenDictionary<byte, (Type GeometryType, Func<GeometryBase, NormalizedRequest, IGeometryContext, Result<Curve[]>> Handler)[]> fallbacks = map
             .GroupBy(static entry => entry.Key.Kind)
             .ToDictionary(
                 static group => group.Key,
