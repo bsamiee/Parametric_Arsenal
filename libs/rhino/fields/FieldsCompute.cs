@@ -9,7 +9,7 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Fields;
 
-/// <summary>Dense field computation algorithms for gradient, curl, divergence, Laplacian, Hessian, vector potential, interpolation, streamlines, isosurfaces, critical points, and statistics.</summary>
+/// <summary>Dense field computation algorithms: gradient, curl, divergence, Laplacian, Hessian, vector potential, interpolation, streamlines, isosurfaces, critical points, statistics.</summary>
 [Pure]
 internal static class FieldsCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -369,8 +369,12 @@ internal static class FieldsCompute {
                     int stepCount = 0;
                     pathBuffer[stepCount++] = current;
                     for (int step = 0; step < FieldsConfig.MaxStreamlineSteps - 1; step++) {
-                        Vector3d k1 = InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current, resolution: resolution, bounds: bounds);
-                        Vector3d Interpolate(double coeff, Vector3d k) => InterpolateVectorFieldInternal(vectorField: vectorField, gridPoints: gridPoints, query: current + (stepSize * coeff * k), resolution: resolution, bounds: bounds);
+                        Vector3d k1 = InterpolateTrilinear(query: current, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
+                            .OnError(_ => InterpolateNearest(query: current, field: vectorField, grid: gridPoints))
+                            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
+                        Vector3d Interpolate(double coeff, Vector3d k) => InterpolateTrilinear(query: current + (stepSize * coeff * k), field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
+                            .OnError(_ => InterpolateNearest(query: current + (stepSize * coeff * k), field: vectorField, grid: gridPoints))
+                            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
                         Vector3d delta = scheme switch {
                             Fields.EulerIntegrationScheme => stepSize * k1,
                             Fields.MidpointIntegrationScheme => stepSize * Interpolate(FieldsConfig.RK2HalfStep, k1),
@@ -396,13 +400,6 @@ internal static class FieldsCompute {
                 ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
             }
         }))();
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d InterpolateVectorFieldInternal(Vector3d[] vectorField, Point3d[] gridPoints, Point3d query, int resolution, BoundingBox bounds) =>
-        InterpolateTrilinear(query: query, field: vectorField, resolution: resolution, bounds: bounds, lerp: (a, b, t) => a + (t * (b - a)))
-            .OnError(_ => InterpolateNearest(query: query, field: vectorField, grid: gridPoints))
-            .Match(onSuccess: value => value, onFailure: _ => Vector3d.Zero);
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,
@@ -704,7 +701,39 @@ internal static class FieldsCompute {
                                     }
                                 }
 
-                                (double[] eigenvalues, Vector3d[] eigenvectors) = ComputeEigendecomposition3x3(localHessian);
+                                double a = localHessian[0, 0];
+                                double b = localHessian[0, 1];
+                                double c = localHessian[0, 2];
+                                double d = localHessian[1, 1];
+                                double e = localHessian[1, 2];
+                                double f = localHessian[2, 2];
+                                double p1 = (b * b) + (c * c) + (e * e);
+                                bool isDiagonal = p1 < RhinoMath.SqrtEpsilon;
+                                (double[] eigenvalues, Vector3d[] eigenvectors) = isDiagonal switch {
+                                    true => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
+                                    false => ((Func<(double[], Vector3d[])>)(() => {
+                                        double trace = a + d + f;
+                                        double p = ((b * b) + (c * c) + (e * e)) + ((((a - d) * (a - d)) + ((a - f) * (a - f)) + ((d - f) * (d - f))) / 6.0);
+                                        double q = ((a - (trace / 3.0)) * (((d - (trace / 3.0)) * (f - (trace / 3.0))) - (e * e))) - (b * ((b * (f - (trace / 3.0))) - (c * e))) + (c * ((b * e) - (c * (d - (trace / 3.0)))));
+                                        double phi = q / (2.0 * Math.Pow(p, 1.5)) switch {
+                                            double r when r <= -1.0 => Math.PI / 3.0,
+                                            double r when r >= 1.0 => 0.0,
+                                            double r => Math.Acos(r) / 3.0,
+                                        };
+                                        double sqrtP = Math.Sqrt(p);
+                                        (double lambda1, double lambda2, double lambda3) = ((trace / 3.0) + (2.0 * sqrtP * Math.Cos(phi)), (trace / 3.0) - (sqrtP * (Math.Cos(phi) + (Math.Sqrt(3.0) * Math.Sin(phi)))), (trace / 3.0) - (sqrtP * (Math.Cos(phi) - (Math.Sqrt(3.0) * Math.Sin(phi)))));
+                                        Vector3d ComputeEigenvector(double lambda) {
+                                            (double aShift, double bVal, double cVal, double dShift, double eVal, double fShift) = (localHessian[0, 0] - lambda, localHessian[0, 1], localHessian[0, 2], localHessian[1, 1] - lambda, localHessian[1, 2], localHessian[2, 2] - lambda);
+                                            (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
+                                                new Vector3d((bVal * eVal) - (cVal * dShift), (cVal * bVal) - (aShift * eVal), (aShift * dShift) - (bVal * bVal)),
+                                                new Vector3d((bVal * fShift) - (cVal * eVal), (cVal * cVal) - (aShift * fShift), (aShift * eVal) - (bVal * cVal)),
+                                                new Vector3d((dShift * fShift) - (eVal * eVal), (eVal * cVal) - (bVal * fShift), (bVal * eVal) - (cVal * dShift)));
+                                            Vector3d result = cross1.Length > cross2.Length ? (cross1.Length > cross3.Length ? cross1 : cross3) : (cross2.Length > cross3.Length ? cross2 : cross3);
+                                            return result.Length > RhinoMath.ZeroTolerance ? result / result.Length : new Vector3d(1, 0, 0);
+                                        }
+                                        return ([lambda1, lambda2, lambda3,], [ComputeEigenvector(lambda1), ComputeEigenvector(lambda2), ComputeEigenvector(lambda3),]);
+                                    }))(),
+                                };
                                 int positiveCount = eigenvalues.Count(ev => ev > FieldsConfig.EigenvalueThreshold);
                                 int negativeCount = eigenvalues.Count(ev => ev < -FieldsConfig.EigenvalueThreshold);
                                 Fields.CriticalPointKind criticalKind = (positiveCount, negativeCount) switch {
@@ -729,58 +758,6 @@ internal static class FieldsCompute {
             }))(),
         };
     }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate for eigendecomposition")]
-    private static (double[] Eigenvalues, Vector3d[] Eigenvectors) ComputeEigendecomposition3x3(double[,] matrix) {
-        double a = matrix[0, 0];
-        double b = matrix[0, 1];
-        double c = matrix[0, 2];
-        double d = matrix[1, 1];
-        double e = matrix[1, 2];
-        double f = matrix[2, 2];
-
-        double p1 = (b * b) + (c * c) + (e * e);
-        bool isDiagonal = p1 < RhinoMath.SqrtEpsilon;
-
-        return isDiagonal switch {
-            true => ([a, d, f,], [new Vector3d(1, 0, 0), new Vector3d(0, 1, 0), new Vector3d(0, 0, 1),]),
-            false => ((Func<(double[], Vector3d[])>)(() => {
-                double trace = a + d + f;
-                double p = ((b * b) + (c * c) + (e * e)) + ((((a - d) * (a - d)) + ((a - f) * (a - f)) + ((d - f) * (d - f))) / 6.0);
-                double q = ((a - (trace / 3.0)) * (((d - (trace / 3.0)) * (f - (trace / 3.0))) - (e * e))) - (b * ((b * (f - (trace / 3.0))) - (c * e))) + (c * ((b * e) - (c * (d - (trace / 3.0)))));
-                double phi = q / (2.0 * Math.Pow(p, 1.5)) switch {
-                    double r when r <= -1.0 => Math.PI / 3.0,
-                    double r when r >= 1.0 => 0.0,
-                    double r => Math.Acos(r) / 3.0,
-                };
-
-                double sqrtP = Math.Sqrt(p);
-                double lambda1 = (trace / 3.0) + (2.0 * sqrtP * Math.Cos(phi));
-                double lambda2 = (trace / 3.0) - (sqrtP * (Math.Cos(phi) + (Math.Sqrt(3.0) * Math.Sin(phi))));
-                double lambda3 = (trace / 3.0) - (sqrtP * (Math.Cos(phi) - (Math.Sqrt(3.0) * Math.Sin(phi))));
-
-                Vector3d v1 = ComputeEigenvector3x3(matrix, lambda1);
-                Vector3d v2 = ComputeEigenvector3x3(matrix, lambda2);
-                Vector3d v3 = ComputeEigenvector3x3(matrix, lambda3);
-
-                return ([lambda1, lambda2, lambda3,], [v1, v2, v3,]);
-            }))(),
-        };
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 matrix parameter is mathematically appropriate")]
-    private static Vector3d ComputeEigenvector3x3(double[,] matrix, double eigenvalue) {
-        (double a, double b, double c, double d, double e, double f) = (matrix[0, 0] - eigenvalue, matrix[0, 1], matrix[0, 2], matrix[1, 1] - eigenvalue, matrix[1, 2], matrix[2, 2] - eigenvalue);
-        (Vector3d cross1, Vector3d cross2, Vector3d cross3) = (
-            new Vector3d((b * e) - (c * d), (c * b) - (a * e), (a * d) - (b * b)),
-            new Vector3d((b * f) - (c * e), (c * c) - (a * f), (a * e) - (b * c)),
-            new Vector3d((d * f) - (e * e), (e * c) - (b * f), (b * e) - (c * d)));
-        Vector3d result = cross1.Length > cross2.Length ? (cross1.Length > cross3.Length ? cross1 : cross3) : (cross2.Length > cross3.Length ? cross2 : cross3);
-        return result.Length > RhinoMath.ZeroTolerance ? result / result.Length : new Vector3d(1, 0, 0);
-    }
-
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Fields.FieldStatistics> ComputeFieldStatistics(
         double[] scalarField,
