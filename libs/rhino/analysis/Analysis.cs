@@ -128,7 +128,7 @@ public static class Analysis {
         Brep brep,
         IGeometryContext context,
         (double u, double v)? uvParameter = null,
-        int faceIndex = 0,
+        int? faceIndex = null,
         Point3d? testPoint = null,
         int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder) =>
         AnalysisCore.Execute(brep, context, t: null, uv: uvParameter, index: faceIndex, testPoint: testPoint, derivativeOrder: derivativeOrder)
@@ -139,7 +139,7 @@ public static class Analysis {
     public static Result<MeshData> Analyze(
         Mesh mesh,
         IGeometryContext context,
-        int vertexIndex = 0) =>
+        int? vertexIndex = null) =>
         AnalysisCore.Execute(mesh, context, t: null, uv: null, index: vertexIndex, testPoint: null, derivativeOrder: 0)
             .Map(results => (MeshData)results[0]);
 
@@ -182,7 +182,7 @@ public static class Analysis {
 
     /// <summary>Analyzes mesh quality for FEA via aspect ratio, skewness, and Jacobian metrics.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaceIndices, (int WarningCount, int CriticalCount) QualityFlags)> AnalyzeMeshForFEA(
+    public static Result<(double[] AspectRatios, double[] Skewness, double[] Jacobians, int[] ProblematicFaceIndices, (int Warning, int Critical) QualityFlags)> AnalyzeMeshForFEA(
         Mesh mesh,
         IGeometryContext context) =>
         AnalysisCompute.MeshForFEA(mesh: mesh, context: context);
