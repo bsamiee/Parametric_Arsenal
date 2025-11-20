@@ -260,25 +260,25 @@ internal static class OrientationCompute {
                     ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin)
                     : new Plane(pa.Origin, pa.ZAxis),
                  reflected: ba.Vertices.Select(v => { Point3d p = v.Location; p.Transform(Transform.Mirror((pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin) : new Plane(pa.Origin, pa.ZAxis))); return p; }).ToArray()) switch {
-                    var ctx when ctx.mirror.IsValid && ctx.reflected.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
-                        && bb.Vertices.All(vb => ctx.reflected.Any(ra => ra.DistanceTo(vb.Location) < tolerance)) => new Orientation.MirrorSymmetry(),
-                    _ => new Orientation.NoSymmetry(),
-                },
+                     var ctx when ctx.mirror.IsValid && ctx.reflected.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
+                         && bb.Vertices.All(vb => ctx.reflected.Any(ra => ra.DistanceTo(vb.Location) < tolerance)) => new Orientation.MirrorSymmetry(),
+                     _ => new Orientation.NoSymmetry(),
+                 },
             (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > tolerance =>
                 (samplesA: Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))).ToArray(),
                  samplesB: Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))).ToArray()) switch {
-                    var samples => new[] { 0, samples.samplesA.Length / 2, samples.samplesA.Length - 1 }.Select(idx =>
-                        (projA: samples.samplesA[idx] - pa.Origin - (((samples.samplesA[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis),
-                         projB: samples.samplesB[idx] - pa.Origin - (((samples.samplesB[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis)) switch {
-                            var p when p.projA.Length < tolerance || p.projB.Length < tolerance => double.NaN,
-                            var p => Vector3d.CrossProduct(p.projA, p.projB) * pa.ZAxis < 0 ? -Vector3d.VectorAngle(p.projA, p.projB) : Vector3d.VectorAngle(p.projA, p.projB),
-                        }).Where(a => !double.IsNaN(a)).ToArray() switch {
-                            double[] angles when angles.Length > 0 && angles.All(a => Math.Abs(a - angles[0]) < angleTol)
-                                && samples.samplesA.Zip(samples.samplesB, (ptA, ptB) => { Point3d r = ptA; r.Transform(Transform.Rotation(angles[0], pa.ZAxis, pa.Origin)); return r.DistanceTo(ptB); }).All(d => d < tolerance)
-                                => new Orientation.RotationalSymmetry(),
-                            _ => new Orientation.NoSymmetry(),
-                        },
-                },
+                     var samples => new[] { 0, samples.samplesA.Length / 2, samples.samplesA.Length - 1 }.Select(idx =>
+                         (projA: samples.samplesA[idx] - pa.Origin - (((samples.samplesA[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis),
+                          projB: samples.samplesB[idx] - pa.Origin - (((samples.samplesB[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis)) switch {
+                              var p when p.projA.Length < tolerance || p.projB.Length < tolerance => double.NaN,
+                              var p => Vector3d.CrossProduct(p.projA, p.projB) * pa.ZAxis < 0 ? -Vector3d.VectorAngle(p.projA, p.projB) : Vector3d.VectorAngle(p.projA, p.projB),
+                          }).Where(a => !double.IsNaN(a)).ToArray() switch {
+                              double[] angles when angles.Length > 0 && angles.All(a => Math.Abs(a - angles[0]) < angleTol)
+                                 && samples.samplesA.Zip(samples.samplesB, (ptA, ptB) => { Point3d r = ptA; r.Transform(Transform.Rotation(angles[0], pa.ZAxis, pa.Origin)); return r.DistanceTo(ptB); }).All(d => d < tolerance)
+                                 => new Orientation.RotationalSymmetry(),
+                              _ => new Orientation.NoSymmetry(),
+                          },
+                 },
             _ => new Orientation.NoSymmetry(),
         };
 }

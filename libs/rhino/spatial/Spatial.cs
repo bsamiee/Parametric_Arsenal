@@ -58,7 +58,7 @@ public static class Spatial {
     public sealed record DirectionalProximityRequest(Vector3d Direction, double MaxDistance, double AngleWeight);
 
     /// <summary>Proximity field result entry.</summary>
-    public sealed record ProximityFieldResult(int Index, double Distance, double Angle);
+    public sealed record ProximityFieldResult(int Index, double Distance, double Angle, double WeightedDistance);
 
     /// <summary>Cluster geometry by proximity using algebraic clustering request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -92,7 +92,7 @@ internal static class SpatialCore {
                     double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
                     double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
                     if (weightedDist <= request.MaxDistance) {
-                        results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle, WeightedDistance: weightedDist));
+                        results.Add(new Spatial.ProximityFieldResult(args.Id, dist, angle, weightedDist));
                     }
                 }
                 _ = tree.Search(searchSphere, CollectResults);
