@@ -14,7 +14,7 @@ namespace Arsenal.Rhino.Intersection;
 [Pure]
 internal static class IntersectionCompute {
     /// <summary>Validates geometry with mode or returns success if mode is None.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<T> Validate<T>(T geometry, IGeometryContext context, V mode) where T : notnull =>
         mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [context, mode,]);
 
