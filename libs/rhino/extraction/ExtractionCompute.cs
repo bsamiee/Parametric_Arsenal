@@ -284,10 +284,42 @@ internal static class ExtractionCompute {
                 Point3d surfacePoint = surface.PointAt(u: up, v: vp);
                 Point3d primitivePoint = primitive switch {
                     Extraction.PlanarPrimitive pl => pl.Frame.ClosestPoint(surfacePoint),
-                    Extraction.CylindricalPrimitive cyl => ProjectPointToCylinder(point: surfacePoint, cylinderPlane: cyl.Frame, radius: cyl.Radius),
-                    Extraction.SphericalPrimitive sph => ProjectPointToSphere(point: surfacePoint, center: sph.Frame.Origin, radius: sph.Radius),
-                    Extraction.ConicalPrimitive cone => ProjectPointToCone(point: surfacePoint, conePlane: cone.Frame, baseRadius: cone.BaseRadius, height: cone.Height),
-                    Extraction.ToroidalPrimitive tor => ProjectPointToTorus(point: surfacePoint, torusPlane: tor.Frame, majorRadius: tor.MajorRadius, minorRadius: tor.MinorRadius),
+                    Extraction.CylindricalPrimitive cyl => ((Func<Point3d>)(() => {
+                        Vector3d toPoint = surfacePoint - cyl.Frame.Origin;
+                        double axisProjection = Vector3d.Multiply(toPoint, cyl.Frame.ZAxis);
+                        Point3d axisPoint = cyl.Frame.Origin + (cyl.Frame.ZAxis * axisProjection);
+                        Vector3d radialDir = surfacePoint - axisPoint;
+                        return radialDir.Length > RhinoMath.ZeroTolerance
+                            ? axisPoint + ((radialDir / radialDir.Length) * cyl.Radius)
+                            : axisPoint + (cyl.Frame.XAxis * cyl.Radius);
+                    }))(),
+                    Extraction.SphericalPrimitive sph => ((Func<Point3d>)(() => {
+                        Vector3d dir = surfacePoint - sph.Frame.Origin;
+                        return dir.Length > RhinoMath.ZeroTolerance
+                            ? sph.Frame.Origin + ((dir / dir.Length) * sph.Radius)
+                            : sph.Frame.Origin + new Vector3d(sph.Radius, 0, 0);
+                    }))(),
+                    Extraction.ConicalPrimitive cone => ((Func<Point3d>)(() => {
+                        Vector3d toPoint = surfacePoint - cone.Frame.Origin;
+                        double axisProjection = Vector3d.Multiply(toPoint, cone.Frame.ZAxis);
+                        double coneRadius = cone.BaseRadius * (1.0 - (axisProjection / cone.Height));
+                        Point3d axisPoint = cone.Frame.Origin + (cone.Frame.ZAxis * axisProjection);
+                        Vector3d radialDir = surfacePoint - axisPoint;
+                        return radialDir.Length > RhinoMath.ZeroTolerance
+                            ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
+                            : axisPoint + (cone.Frame.XAxis * coneRadius);
+                    }))(),
+                    Extraction.ToroidalPrimitive tor => ((Func<Point3d>)(() => {
+                        Vector3d toPoint = surfacePoint - tor.Frame.Origin;
+                        Vector3d radialInPlane = toPoint - (tor.Frame.ZAxis * Vector3d.Multiply(toPoint, tor.Frame.ZAxis));
+                        Point3d majorCirclePoint = radialInPlane.Length > RhinoMath.ZeroTolerance
+                            ? tor.Frame.Origin + ((radialInPlane / radialInPlane.Length) * tor.MajorRadius)
+                            : tor.Frame.Origin + (tor.Frame.XAxis * tor.MajorRadius);
+                        Vector3d toMinor = surfacePoint - majorCirclePoint;
+                        return toMinor.Length > RhinoMath.ZeroTolerance
+                            ? majorCirclePoint + ((toMinor / toMinor.Length) * tor.MinorRadius)
+                            : majorCirclePoint + (tor.Frame.ZAxis * tor.MinorRadius);
+                    }))(),
                     Extraction.ExtrusionPrimitive ext => ext.Frame.ClosestPoint(surfacePoint),
                     _ => surfacePoint,
                 };
@@ -296,50 +328,6 @@ internal static class ExtractionCompute {
         }
 
         return Math.Sqrt(sumSquaredDistances / totalSamples);
-    }
-
-    [Pure]
-    private static Point3d ProjectPointToCylinder(Point3d point, Plane cylinderPlane, double radius) {
-        Vector3d toPoint = point - cylinderPlane.Origin;
-        double axisProjection = Vector3d.Multiply(toPoint, cylinderPlane.ZAxis);
-        Point3d axisPoint = cylinderPlane.Origin + (cylinderPlane.ZAxis * axisProjection);
-        Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * radius)
-            : axisPoint + (cylinderPlane.XAxis * radius);
-    }
-
-    [Pure]
-    private static Point3d ProjectPointToSphere(Point3d point, Point3d center, double radius) {
-        Vector3d dir = point - center;
-        return dir.Length > RhinoMath.ZeroTolerance
-            ? center + ((dir / dir.Length) * radius)
-            : center + new Vector3d(radius, 0, 0);
-    }
-
-    [Pure]
-    private static Point3d ProjectPointToCone(Point3d point, Plane conePlane, double baseRadius, double height) {
-        Vector3d toPoint = point - conePlane.Origin;
-        double axisProjection = Vector3d.Multiply(toPoint, conePlane.ZAxis);
-        double coneRadius = baseRadius * (1.0 - (axisProjection / height));
-        Point3d axisPoint = conePlane.Origin + (conePlane.ZAxis * axisProjection);
-        Vector3d radialDir = point - axisPoint;
-        return radialDir.Length > RhinoMath.ZeroTolerance
-            ? axisPoint + ((radialDir / radialDir.Length) * coneRadius)
-            : axisPoint + (conePlane.XAxis * coneRadius);
-    }
-
-    [Pure]
-    private static Point3d ProjectPointToTorus(Point3d point, Plane torusPlane, double majorRadius, double minorRadius) {
-        Vector3d toPoint = point - torusPlane.Origin;
-        Vector3d radialInPlane = toPoint - (torusPlane.ZAxis * Vector3d.Multiply(toPoint, torusPlane.ZAxis));
-        Point3d majorCirclePoint = radialInPlane.Length > RhinoMath.ZeroTolerance
-            ? torusPlane.Origin + ((radialInPlane / radialInPlane.Length) * majorRadius)
-            : torusPlane.Origin + (torusPlane.XAxis * majorRadius);
-        Vector3d toMinor = point - majorCirclePoint;
-        return toMinor.Length > RhinoMath.ZeroTolerance
-            ? majorCirclePoint + ((toMinor / toMinor.Length) * minorRadius)
-            : majorCirclePoint + (torusPlane.ZAxis * minorRadius);
     }
 
     [Pure]
@@ -374,35 +362,32 @@ internal static class ExtractionCompute {
     private static Result<Extraction.PatternDetectionResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
         Point3d centroid = new(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z));
         double meanDistance = centers.Average(c => centroid.DistanceTo(c));
-        return meanDistance > context.AbsoluteTolerance
-            && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
-            && (centers.Select(c => c - centroid).ToArray(), ComputeBestFitPlaneNormal(points: centers, centroid: centroid)) is (Vector3d[] radii, Vector3d normal)
-            && Enumerable.Range(0, radii.Length - 1).Select(i => Vector3d.VectorAngle(radii[i], radii[i + 1])).ToArray() is double[] angles
-            && angles.Average() is double meanAngle
-            && angles.All(a => RhinoMath.EpsilonEquals(a, meanAngle, ExtractionConfig.RadialAngleVariationThreshold))
-                ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.RadialPattern(SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid)), Confidence: 0.9))
-                : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
-    }
-
-    [Pure]
-    private static Vector3d ComputeBestFitPlaneNormal(Point3d[] points, Point3d centroid) =>
-        Plane.FitPlaneToPoints(points: points, plane: out Plane bestFit) == PlaneFitResult.Success
+        Vector3d normal = Plane.FitPlaneToPoints(points: centers, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
-            : (points[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
+            : (centers[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
                 ? ((Func<Vector3d>)(() => {
                     Vector3d v1n = v1 / v1.Length;
-                    for (int i = 1; i < points.Length; i++) {
-                        Vector3d v2 = points[i] - centroid;
+                    for (int i = 1; i < centers.Length; i++) {
+                        Vector3d v2 = centers[i] - centroid;
                         if (v2.Length > RhinoMath.ZeroTolerance) {
-                            Vector3d normal = Vector3d.CrossProduct(v1n, v2);
-                            if (normal.Length > RhinoMath.ZeroTolerance) {
-                                return normal / normal.Length;
+                            Vector3d normalCand = Vector3d.CrossProduct(v1n, v2);
+                            if (normalCand.Length > RhinoMath.ZeroTolerance) {
+                                return normalCand / normalCand.Length;
                             }
                         }
                     }
                     return Vector3d.ZAxis;
                 }))()
                 : Vector3d.ZAxis;
+        return meanDistance > context.AbsoluteTolerance
+            && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
+            && centers.Select(c => c - centroid).ToArray() is Vector3d[] radii
+            && Enumerable.Range(0, radii.Length - 1).Select(i => Vector3d.VectorAngle(radii[i], radii[i + 1])).ToArray() is double[] angles
+            && angles.Average() is double meanAngle
+            && angles.All(a => RhinoMath.EpsilonEquals(a, meanAngle, ExtractionConfig.RadialAngleVariationThreshold))
+                ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.RadialPattern(SymmetryTransform: Transform.Rotation(meanAngle, normal, centroid)), Confidence: 0.9))
+                : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
+    }
 
     private static Result<Extraction.PatternDetectionResult> TryDetectGridPattern(Point3d[] centers, IGeometryContext context) =>
         (centers[0], Enumerable.Range(0, centers.Length - 1).Select(i => centers[i + 1] - centers[0]).ToArray()) is (Point3d origin, Vector3d[] relativeVectors)
@@ -456,17 +441,12 @@ internal static class ExtractionCompute {
         new Point3d(centers.Average(p => p.X), centers.Average(p => p.Y), centers.Average(p => p.Z)) is Point3d centroid
             && centers.Select(c => centroid.DistanceTo(c)).ToArray() is double[] distances
             && Enumerable.Range(0, distances.Length - 1).Select(i => distances[i] > context.AbsoluteTolerance ? distances[i + 1] / distances[i] : 0.0).Where(r => r > context.AbsoluteTolerance).ToArray() is double[] validRatios
-            && validRatios.Length >= 2 && ComputeVariance(values: validRatios) is double variance && variance < ExtractionConfig.ScalingVarianceThreshold
+            && validRatios.Length >= 2
+            && (validRatios.Length switch {
+                0 => double.MaxValue,
+                1 => 0.0,
+                int n => validRatios.Average() is double mean ? validRatios.Sum(v => (v - mean) * (v - mean)) / n : 0.0,
+            }) is double variance && variance < ExtractionConfig.ScalingVarianceThreshold
                 ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.ScalingPattern(SymmetryTransform: Transform.Scale(anchor: centroid, scaleFactor: validRatios.Average())), Confidence: 0.7))
                 : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
-
-    [Pure]
-    private static double ComputeVariance(double[] values) =>
-        values.Length switch {
-            0 => double.MaxValue,
-            1 => 0.0,
-            int n => values.Average() is double mean
-                ? values.Sum(v => (v - mean) * (v - mean)) / n
-                : 0.0,
-        };
 }

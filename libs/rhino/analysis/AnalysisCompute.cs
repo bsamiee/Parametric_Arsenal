@@ -62,30 +62,30 @@ internal static class AnalysisCompute {
         Surface surface,
         double u,
         double v,
-        int derivativeOrder) =>
-        !surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)
+        int derivativeOrder) {
+        if (!surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)) {
+            return ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed);
+        }
+        SurfaceCurvature sc = surface.CurvatureAt(u, v);
+        using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
+        return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
             ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-            : ((Func<Result<Analysis.SurfaceData>>)(() => {
-                SurfaceCurvature sc = surface.CurvatureAt(u, v);
-                using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
-                return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
-                    ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-                    : ResultFactory.Create(value: new Analysis.SurfaceData(
-                        Location: surface.PointAt(u, v),
-                        Derivatives: derivs,
-                        Gaussian: sc.Gaussian,
-                        Mean: sc.Mean,
-                        K1: sc.Kappa(0),
-                        K2: sc.Kappa(1),
-                        PrincipalDir1: sc.Direction(0),
-                        PrincipalDir2: sc.Direction(1),
-                        Frame: frame,
-                        Normal: frame.Normal,
-                        AtSeam: surface.IsAtSeam(u, v) != 0,
-                        AtSingularity: surface.IsAtSingularity(u, v, exact: true),
-                        Area: amp.Area,
-                        Centroid: amp.Centroid));
-            }))();
+            : ResultFactory.Create(value: new Analysis.SurfaceData(
+                Location: surface.PointAt(u, v),
+                Derivatives: derivs,
+                Gaussian: sc.Gaussian,
+                Mean: sc.Mean,
+                K1: sc.Kappa(0),
+                K2: sc.Kappa(1),
+                PrincipalDir1: sc.Direction(0),
+                PrincipalDir2: sc.Direction(1),
+                Frame: frame,
+                Normal: frame.Normal,
+                AtSeam: surface.IsAtSeam(u, v) != 0,
+                AtSingularity: surface.IsAtSingularity(u, v, exact: true),
+                Area: amp.Area,
+                Centroid: amp.Centroid));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Analysis.CurveData> ComputeCurve(
@@ -104,32 +104,30 @@ internal static class AnalysisCompute {
                 s = td + context.AbsoluteTolerance;
             }
             double[] disc = [.. buffer[..discCount]];
-            return !curve.FrameAt(parameter, out Plane frame)
-                ? ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed)
-                : ((Func<Result<Analysis.CurveData>>)(() => {
-                    using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
-                    return amp is null
-                        ? ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed)
-                        : ((Func<Result<Analysis.CurveData>>)(() => {
-                            Vector3d[] derivatives = curve.DerivativeAt(parameter, derivativeOrder) is Vector3d[] d ? d : [];
-                            double[] frameParams = new double[frameSampleCount];
-                            for (int i = 0; i < frameSampleCount; i++) {
-                                frameParams[i] = curve.Domain.ParameterAt(frameSampleCount > 1 ? i / (frameSampleCount - 1.0) : 0.5);
-                            }
-                            Plane[] frames = curve.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
-                            return ResultFactory.Create(value: new Analysis.CurveData(
-                                Location: curve.PointAt(parameter),
-                                Derivatives: derivatives,
-                                Curvature: curve.CurvatureAt(parameter).Length,
-                                Frame: frame,
-                                PerpendicularFrames: frames,
-                                Torsion: curve.TorsionAt(parameter),
-                                DiscontinuityParameters: disc,
-                                DiscontinuityTypes: [.. disc.Select(dp => curve.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
-                                Length: curve.GetLength(),
-                                Centroid: amp.Centroid));
-                        }))();
-                }))();
+            if (!curve.FrameAt(parameter, out Plane frame)) {
+                return ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed);
+            }
+            using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
+            if (amp is null) {
+                return ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed);
+            }
+            Vector3d[] derivatives = curve.DerivativeAt(parameter, derivativeOrder) is Vector3d[] d ? d : [];
+            double[] frameParams = new double[frameSampleCount];
+            for (int i = 0; i < frameSampleCount; i++) {
+                frameParams[i] = curve.Domain.ParameterAt(frameSampleCount > 1 ? i / (frameSampleCount - 1.0) : 0.5);
+            }
+            Plane[] frames = curve.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
+            return ResultFactory.Create(value: new Analysis.CurveData(
+                Location: curve.PointAt(parameter),
+                Derivatives: derivatives,
+                Curvature: curve.CurvatureAt(parameter).Length,
+                Frame: frame,
+                PerpendicularFrames: frames,
+                Torsion: curve.TorsionAt(parameter),
+                DiscontinuityParameters: disc,
+                DiscontinuityTypes: [.. disc.Select(dp => curve.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                Length: curve.GetLength(),
+                Centroid: amp.Centroid));
         } finally {
             ArrayPool<double>.Shared.Return(buffer, clearArray: true);
         }
@@ -147,39 +145,38 @@ internal static class AnalysisCompute {
         IGeometryContext context) {
         int fIdx = RhinoMath.Clamp(faceIndex, 0, brep.Faces.Count - 1);
         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
-        return !sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs)
+        if (!sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs)
             || !sf.FrameAt(u, v, out Plane frame)
-            || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, context.AbsoluteTolerance * closestPointToleranceMultiplier, out Vector3d _)
+            || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, context.AbsoluteTolerance * closestPointToleranceMultiplier, out Vector3d _)) {
+            return ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed);
+        }
+        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+        using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
+        using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
+        return amp is null || vmp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
             ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
-            : ((Func<Result<Analysis.BrepData>>)(() => {
-                SurfaceCurvature sc = sf.CurvatureAt(u, v);
-                using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                return amp is null || vmp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
-                    ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
-                    : ResultFactory.Create(value: new Analysis.BrepData(
-                        Location: sf.PointAt(u, v),
-                        Derivatives: derivs,
-                        Gaussian: sc.Gaussian,
-                        Mean: sc.Mean,
-                        K1: sc.Kappa(0),
-                        K2: sc.Kappa(1),
-                        PrincipalDir1: sc.Direction(0),
-                        PrincipalDir2: sc.Direction(1),
-                        Frame: frame,
-                        Normal: frame.Normal,
-                        Vertices: [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
-                        Edges: [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
-                        IsManifold: brep.IsManifold,
-                        IsSolid: brep.IsSolid,
-                        ClosestPoint: cp,
-                        Distance: testPoint.DistanceTo(cp),
-                        Component: ci,
-                        SurfaceUV: (uOut, vOut),
-                        Area: amp.Area,
-                        Volume: vmp.Volume,
-                        Centroid: vmp.Centroid));
-            }))();
+            : ResultFactory.Create(value: new Analysis.BrepData(
+                Location: sf.PointAt(u, v),
+                Derivatives: derivs,
+                Gaussian: sc.Gaussian,
+                Mean: sc.Mean,
+                K1: sc.Kappa(0),
+                K2: sc.Kappa(1),
+                PrincipalDir1: sc.Direction(0),
+                PrincipalDir2: sc.Direction(1),
+                Frame: frame,
+                Normal: frame.Normal,
+                Vertices: [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
+                Edges: [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
+                IsManifold: brep.IsManifold,
+                IsSolid: brep.IsSolid,
+                ClosestPoint: cp,
+                Distance: testPoint.DistanceTo(cp),
+                Component: ci,
+                SurfaceUV: (uOut, vOut),
+                Area: amp.Area,
+                Volume: vmp.Volume,
+                Centroid: vmp.Centroid));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
