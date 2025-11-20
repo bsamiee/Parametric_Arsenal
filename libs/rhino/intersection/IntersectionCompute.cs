@@ -161,7 +161,7 @@ internal static class IntersectionCompute {
     }
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersection.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
             0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
