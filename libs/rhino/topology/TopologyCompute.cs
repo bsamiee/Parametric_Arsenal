@@ -96,8 +96,8 @@ internal static class TopologyCompute {
                 .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
-                    Brep? bestHealed = null;
-                    Topology.Strategy? bestStrategy = null;
+                    Topology.Strategy bestStrategy = strategies.Count > 0 ? strategies[0] : Topology.Strategy.ConservativeRepair;
+                    Brep bestHealed = validBrep.DuplicateBrep();
                     int bestNakedEdges = originalNakedEdges;
 
                     foreach (Topology.Strategy currentStrategy in strategies) {
@@ -150,7 +150,7 @@ internal static class TopologyCompute {
                         (bool isValid, int nakedEdges) = success && copy.IsValidTopology(out validationLog)
                             ? (true, copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked))
                             : ((Func<(bool, int)>)(() => { System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}"); return (false, int.MaxValue); }))();
-                        bool isImprovement = isValid && nakedEdges < originalNakedEdges && nakedEdges < bestNakedEdges;
+                        bool isImprovement = isValid && nakedEdges < bestNakedEdges;
 
                         Brep? toDispose = isImprovement ? bestHealed : copy;
                         toDispose?.Dispose();
@@ -159,8 +159,9 @@ internal static class TopologyCompute {
                             : (bestHealed, bestStrategy, bestNakedEdges);
                     }
 
-                    return bestHealed is Brep healed && bestStrategy is Topology.Strategy strategy
-                        ? ResultFactory.Create(value: new Topology.HealingResult(Healed: healed, AppliedStrategy: strategy, Success: bestNakedEdges < originalNakedEdges))
-                        : ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
+                    bool healedSuccessfully = bestNakedEdges < originalNakedEdges || originalNakedEdges == 0;
+                    return healedSuccessfully
+                        ? ResultFactory.Create(value: new Topology.HealingResult(Healed: bestHealed, AppliedStrategy: bestStrategy, Success: true))
+                        : ((Func<Result<Topology.HealingResult>>)(() => { bestHealed.Dispose(); return ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed")); }))();
                 });
 }
