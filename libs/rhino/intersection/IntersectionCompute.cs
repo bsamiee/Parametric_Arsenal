@@ -59,7 +59,7 @@ internal static class IntersectionCompute {
                                             ? Vector3d.VectorAngle(tangentA, tangentB)
                                             : RhinoMath.UnsetValue)
                                         .Where(static angle => RhinoMath.IsValidDouble(angle))
-                                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
+                                        .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(a => Math.Sin(a)) / angles.Length, angles.Sum(a => Math.Cos(a)) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? (byte)0 : (byte)1, ApproachAngles: angles, IsGrazing: angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                                             : ResultFactory.Create<(byte, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
                                     (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA,]),
@@ -193,7 +193,7 @@ internal static class IntersectionCompute {
                                     Vector3d[] directions = [.. Enumerable.Range(0, phiSteps)
                                         .SelectMany(phiIndex => Enumerable.Range(0, thetaSteps)
                                             .Select(thetaIndex => {
-                                                (double phi, double theta) = ((Math.PI * phiIndex) / phiSteps, (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
+                                                (double phi, double theta) = (Math.Acos(1.0 - (2.0 * (phiIndex + 0.5)) / phiSteps), (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
                                                 return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
                                             }))
                                         .Take(IntersectionConfig.StabilitySampleCount),
