@@ -62,30 +62,30 @@ internal static class AnalysisCompute {
         Surface surface,
         double u,
         double v,
-        int derivativeOrder) =>
-        !surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)
+        int derivativeOrder) {
+        if (!surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)) {
+            return ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed);
+        }
+        SurfaceCurvature sc = surface.CurvatureAt(u, v);
+        using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
+        return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
             ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-            : ((Func<Result<Analysis.SurfaceData>>)(() => {
-                SurfaceCurvature sc = surface.CurvatureAt(u, v);
-                using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
-                return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
-                    ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-                    : ResultFactory.Create(value: new Analysis.SurfaceData(
-                        Location: surface.PointAt(u, v),
-                        Derivatives: derivs,
-                        Gaussian: sc.Gaussian,
-                        Mean: sc.Mean,
-                        K1: sc.Kappa(0),
-                        K2: sc.Kappa(1),
-                        PrincipalDir1: sc.Direction(0),
-                        PrincipalDir2: sc.Direction(1),
-                        Frame: frame,
-                        Normal: frame.Normal,
-                        AtSeam: surface.IsAtSeam(u, v) != 0,
-                        AtSingularity: surface.IsAtSingularity(u, v, exact: true),
-                        Area: amp.Area,
-                        Centroid: amp.Centroid));
-            }))();
+            : ResultFactory.Create(value: new Analysis.SurfaceData(
+                Location: surface.PointAt(u, v),
+                Derivatives: derivs,
+                Gaussian: sc.Gaussian,
+                Mean: sc.Mean,
+                K1: sc.Kappa(0),
+                K2: sc.Kappa(1),
+                PrincipalDir1: sc.Direction(0),
+                PrincipalDir2: sc.Direction(1),
+                Frame: frame,
+                Normal: frame.Normal,
+                AtSeam: surface.IsAtSeam(u, v) != 0,
+                AtSingularity: surface.IsAtSingularity(u, v, exact: true),
+                Area: amp.Area,
+                Centroid: amp.Centroid));
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Analysis.CurveData> ComputeCurve(
@@ -104,32 +104,30 @@ internal static class AnalysisCompute {
                 s = td + context.AbsoluteTolerance;
             }
             double[] disc = [.. buffer[..discCount]];
-            return !curve.FrameAt(parameter, out Plane frame)
-                ? ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed)
-                : ((Func<Result<Analysis.CurveData>>)(() => {
-                    using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
-                    return amp is null
-                        ? ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed)
-                        : ((Func<Result<Analysis.CurveData>>)(() => {
-                            Vector3d[] derivatives = curve.DerivativeAt(parameter, derivativeOrder) is Vector3d[] d ? d : [];
-                            double[] frameParams = new double[frameSampleCount];
-                            for (int i = 0; i < frameSampleCount; i++) {
-                                frameParams[i] = curve.Domain.ParameterAt(frameSampleCount > 1 ? i / (frameSampleCount - 1.0) : 0.5);
-                            }
-                            Plane[] frames = curve.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
-                            return ResultFactory.Create(value: new Analysis.CurveData(
-                                Location: curve.PointAt(parameter),
-                                Derivatives: derivatives,
-                                Curvature: curve.CurvatureAt(parameter).Length,
-                                Frame: frame,
-                                PerpendicularFrames: frames,
-                                Torsion: curve.TorsionAt(parameter),
-                                DiscontinuityParameters: disc,
-                                DiscontinuityTypes: [.. disc.Select(dp => curve.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
-                                Length: curve.GetLength(),
-                                Centroid: amp.Centroid));
-                        }))();
-                }))();
+            if (!curve.FrameAt(parameter, out Plane frame)) {
+                return ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed);
+            }
+            using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
+            if (amp is null) {
+                return ResultFactory.Create<Analysis.CurveData>(error: E.Geometry.CurveAnalysisFailed);
+            }
+            Vector3d[] derivatives = curve.DerivativeAt(parameter, derivativeOrder) is Vector3d[] d ? d : [];
+            double[] frameParams = new double[frameSampleCount];
+            for (int i = 0; i < frameSampleCount; i++) {
+                frameParams[i] = curve.Domain.ParameterAt(frameSampleCount > 1 ? i / (frameSampleCount - 1.0) : 0.5);
+            }
+            Plane[] frames = curve.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
+            return ResultFactory.Create(value: new Analysis.CurveData(
+                Location: curve.PointAt(parameter),
+                Derivatives: derivatives,
+                Curvature: curve.CurvatureAt(parameter).Length,
+                Frame: frame,
+                PerpendicularFrames: frames,
+                Torsion: curve.TorsionAt(parameter),
+                DiscontinuityParameters: disc,
+                DiscontinuityTypes: [.. disc.Select(dp => curve.IsContinuous(Continuity.C2_continuous, dp) ? Continuity.C1_continuous : Continuity.C0_continuous),],
+                Length: curve.GetLength(),
+                Centroid: amp.Centroid));
         } finally {
             ArrayPool<double>.Shared.Return(buffer, clearArray: true);
         }
@@ -147,39 +145,38 @@ internal static class AnalysisCompute {
         IGeometryContext context) {
         int fIdx = RhinoMath.Clamp(faceIndex, 0, brep.Faces.Count - 1);
         using Surface sf = brep.Faces[fIdx].UnderlyingSurface();
-        return !sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs)
+        if (!sf.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs)
             || !sf.FrameAt(u, v, out Plane frame)
-            || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, context.AbsoluteTolerance * closestPointToleranceMultiplier, out Vector3d _)
+            || !brep.ClosestPoint(testPoint, out Point3d cp, out ComponentIndex ci, out double uOut, out double vOut, context.AbsoluteTolerance * closestPointToleranceMultiplier, out Vector3d _)) {
+            return ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed);
+        }
+        SurfaceCurvature sc = sf.CurvatureAt(u, v);
+        using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
+        using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
+        return amp is null || vmp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
             ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
-            : ((Func<Result<Analysis.BrepData>>)(() => {
-                SurfaceCurvature sc = sf.CurvatureAt(u, v);
-                using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                return amp is null || vmp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
-                    ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
-                    : ResultFactory.Create(value: new Analysis.BrepData(
-                        Location: sf.PointAt(u, v),
-                        Derivatives: derivs,
-                        Gaussian: sc.Gaussian,
-                        Mean: sc.Mean,
-                        K1: sc.Kappa(0),
-                        K2: sc.Kappa(1),
-                        PrincipalDir1: sc.Direction(0),
-                        PrincipalDir2: sc.Direction(1),
-                        Frame: frame,
-                        Normal: frame.Normal,
-                        Vertices: [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
-                        Edges: [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
-                        IsManifold: brep.IsManifold,
-                        IsSolid: brep.IsSolid,
-                        ClosestPoint: cp,
-                        Distance: testPoint.DistanceTo(cp),
-                        Component: ci,
-                        SurfaceUV: (uOut, vOut),
-                        Area: amp.Area,
-                        Volume: vmp.Volume,
-                        Centroid: vmp.Centroid));
-            }))();
+            : ResultFactory.Create(value: new Analysis.BrepData(
+                Location: sf.PointAt(u, v),
+                Derivatives: derivs,
+                Gaussian: sc.Gaussian,
+                Mean: sc.Mean,
+                K1: sc.Kappa(0),
+                K2: sc.Kappa(1),
+                PrincipalDir1: sc.Direction(0),
+                PrincipalDir2: sc.Direction(1),
+                Frame: frame,
+                Normal: frame.Normal,
+                Vertices: [.. brep.Vertices.Select((vtx, i) => (i, vtx.Location)),],
+                Edges: [.. brep.Edges.Select((e, i) => (i, new Line(e.PointAtStart, e.PointAtEnd))),],
+                IsManifold: brep.IsManifold,
+                IsSolid: brep.IsSolid,
+                ClosestPoint: cp,
+                Distance: testPoint.DistanceTo(cp),
+                Component: ci,
+                SurfaceUV: (uOut, vOut),
+                Area: amp.Area,
+                Volume: vmp.Volume,
+                Centroid: vmp.Centroid));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -256,12 +253,23 @@ internal static class AnalysisCompute {
             vSpan * proximityFactor,
             RhinoMath.SqrtEpsilon,
             vSpan * boundaryFraction);
-        double[] gaussianSorted = [.. samples.Select(s => Math.Abs(s.curvature.Gaussian)).Order(),];
-        double medianGaussian = gaussianSorted.Length % 2 is 0
-            ? (gaussianSorted[(gaussianSorted.Length / 2) - 1] + gaussianSorted[gaussianSorted.Length / 2]) / 2.0
-            : gaussianSorted[gaussianSorted.Length / 2];
-        double avgGaussian = samples.Average(s => Math.Abs(s.curvature.Gaussian));
-        double stdDevGaussian = Math.Sqrt(samples.Sum(s => Math.Pow(Math.Abs(s.curvature.Gaussian) - avgGaussian, 2)) / samples.Length);
+        double[] gaussianAbs = new double[samples.Length];
+        double gaussianSum = 0.0;
+        for (int i = 0; i < samples.Length; i++) {
+            gaussianAbs[i] = Math.Abs(samples[i].curvature.Gaussian);
+            gaussianSum += gaussianAbs[i];
+        }
+        Array.Sort(gaussianAbs);
+        double medianGaussian = gaussianAbs.Length % 2 is 0
+            ? (gaussianAbs[(gaussianAbs.Length / 2) - 1] + gaussianAbs[gaussianAbs.Length / 2]) / 2.0
+            : gaussianAbs[gaussianAbs.Length / 2];
+        double avgGaussian = gaussianSum / samples.Length;
+        double sumSquaredDiff = 0.0;
+        for (int i = 0; i < gaussianAbs.Length; i++) {
+            double diff = gaussianAbs[i] - avgGaussian;
+            sumSquaredDiff += diff * diff;
+        }
+        double stdDevGaussian = Math.Sqrt(sumSquaredDiff / samples.Length);
         return ResultFactory.Create(value: new Analysis.SurfaceQualityResult(
             GaussianCurvatures: [.. samples.Select(s => s.curvature.Gaussian),],
             MeanCurvatures: [.. samples.Select(s => s.curvature.Mean),],
@@ -273,7 +281,7 @@ internal static class AnalysisCompute {
             UniformityScore: RhinoMath.Clamp(
                 medianGaussian > context.AbsoluteTolerance
                     ? (1.0 - (stdDevGaussian / (medianGaussian * curvatureMultiplier)))
-                    : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0,
+                    : gaussianAbs[^1] < context.AbsoluteTolerance ? 1.0 : 0.0,
                 0.0,
                 1.0)));
     }
@@ -282,12 +290,22 @@ internal static class AnalysisCompute {
     internal static Result<Analysis.MeshQualityResult> ComputeMeshQuality(
         Mesh mesh,
         IGeometryContext context) {
+        int faceCount = mesh.Faces.Count;
+        if (faceCount is 0) {
+            return ResultFactory.Create<Analysis.MeshQualityResult>(error: E.Geometry.MeshAnalysisFailed);
+        }
         Point3d[] vertices = ArrayPool<Point3d>.Shared.Rent(4);
+        double[] aspectRatios = new double[faceCount];
+        double[] skewness = new double[faceCount];
+        double[] jacobians = new double[faceCount];
+        List<int> problematicIndices = [];
+        int warningCount = 0;
+        int criticalCount = 0;
         try {
-            (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, mesh.Faces.Count).Select(i => {
-                Point3d center = mesh.Faces.GetFaceCenter(i);
+            for (int i = 0; i < faceCount; i++) {
                 MeshFace face = mesh.Faces[i];
                 bool isQuad = face.IsQuad;
+                Point3d center = mesh.Faces.GetFaceCenter(i);
                 bool validIndices = face.A >= 0 && face.A < mesh.Vertices.Count
                     && face.B >= 0 && face.B < mesh.Vertices.Count
                     && face.C >= 0 && face.C < mesh.Vertices.Count
@@ -297,53 +315,56 @@ internal static class AnalysisCompute {
                 vertices[2] = validIndices ? (Point3d)mesh.Vertices[face.C] : center;
                 vertices[3] = validIndices && isQuad ? (Point3d)mesh.Vertices[face.D] : vertices[0];
                 int vertCount = isQuad ? 4 : 3;
-                double[] edgeLengthsArray = [.. Enumerable.Range(0, vertCount)
-                    .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount])),
-                ];
-                double minEdge = edgeLengthsArray.Min();
-                double maxEdge = edgeLengthsArray.Max();
-                double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
-                double skewness = isQuad
-                    ? ((double[])[
-                        Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0]),
-                        Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1]),
-                        Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2]),
-                        Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3]),
-                    ]).Max(angle => Math.Abs(RhinoMath.ToDegrees(angle) - AnalysisConfig.QuadIdealAngleDegrees)) / AnalysisConfig.QuadIdealAngleDegrees
-                    : (vertices[1] - vertices[0], vertices[2] - vertices[0], vertices[2] - vertices[1]) is (Vector3d ab, Vector3d ac, Vector3d bc)
-                        ? (
-                            RhinoMath.ToDegrees(Vector3d.VectorAngle(ab, ac)),
-                            RhinoMath.ToDegrees(Vector3d.VectorAngle(bc, -ab)),
-                            RhinoMath.ToDegrees(Vector3d.VectorAngle(-ac, -bc))
-                        ) is (double angleA, double angleB, double angleC)
-                            ? Math.Max(Math.Abs(angleA - AnalysisConfig.TriangleIdealAngleDegrees), Math.Max(Math.Abs(angleB - AnalysisConfig.TriangleIdealAngleDegrees), Math.Abs(angleC - AnalysisConfig.TriangleIdealAngleDegrees))) / AnalysisConfig.TriangleIdealAngleDegrees
-                            : 1.0
-                        : 1.0;
-                double jacobian = isQuad
-                    ? edgeLengthsArray.Average() is double avgLen && avgLen > context.AbsoluteTolerance
-                        ? ((double[])[
-                            Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
-                            Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length,
-                            Vector3d.CrossProduct(vertices[3] - vertices[2], vertices[1] - vertices[2]).Length,
-                            Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length,
-                        ]).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
-                        : 0.0
-                    : edgeLengthsArray.Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
-                        ? Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * triAvgLen * triAvgLen) + context.AbsoluteTolerance)
-                        : 0.0;
-                return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
-            }),
-            ];
-            return metrics.Length is 0
-                ? ResultFactory.Create<Analysis.MeshQualityResult>(error: E.Geometry.MeshAnalysisFailed)
-                : ResultFactory.Create(value: new Analysis.MeshQualityResult(
-                    AspectRatios: [.. metrics.Select(m => m.AspectRatio),],
-                    Skewness: [.. metrics.Select(m => m.Skewness),],
-                    Jacobians: [.. metrics.Select(m => m.Jacobian),],
-                    ProblematicFaceIndices: [.. metrics.Select((m, i) => (m, i)).Where(pair => pair.m.AspectRatio > AnalysisConfig.AspectRatioCritical || pair.m.Skewness > AnalysisConfig.SkewnessCritical || pair.m.Jacobian < AnalysisConfig.JacobianCritical).Select(pair => pair.i),],
-                    QualityFlags: (
-                        Warning: metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioWarning || m.Skewness > AnalysisConfig.SkewnessWarning || m.Jacobian < AnalysisConfig.JacobianWarning),
-                        Critical: metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioCritical || m.Skewness > AnalysisConfig.SkewnessCritical || m.Jacobian < AnalysisConfig.JacobianCritical))));
+                double edge0 = vertices[0].DistanceTo(vertices[1]);
+                double edge1 = vertices[1].DistanceTo(vertices[2]);
+                double edge2 = vertices[2].DistanceTo(isQuad ? vertices[3] : vertices[0]);
+                double edge3 = isQuad ? vertices[3].DistanceTo(vertices[0]) : edge0;
+                double minEdge = Math.Min(Math.Min(edge0, edge1), Math.Min(edge2, edge3));
+                double maxEdge = Math.Max(Math.Max(edge0, edge1), Math.Max(edge2, edge3));
+                aspectRatios[i] = maxEdge / (minEdge + context.AbsoluteTolerance);
+                skewness[i] = isQuad
+                    ? ((Func<double>)(() => {
+                        double angle0 = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[3] - vertices[0])) - AnalysisConfig.QuadIdealAngleDegrees);
+                        double angle1 = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1])) - AnalysisConfig.QuadIdealAngleDegrees);
+                        double angle2 = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[3] - vertices[2], vertices[1] - vertices[2])) - AnalysisConfig.QuadIdealAngleDegrees);
+                        double angle3 = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[0] - vertices[3], vertices[2] - vertices[3])) - AnalysisConfig.QuadIdealAngleDegrees);
+                        return Math.Max(Math.Max(angle0, angle1), Math.Max(angle2, angle3)) / AnalysisConfig.QuadIdealAngleDegrees;
+                    }))()
+                    : ((Func<double>)(() => {
+                        double angleA = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[1] - vertices[0], vertices[2] - vertices[0])) - AnalysisConfig.TriangleIdealAngleDegrees);
+                        double angleB = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[2] - vertices[1], vertices[0] - vertices[1])) - AnalysisConfig.TriangleIdealAngleDegrees);
+                        double angleC = Math.Abs(RhinoMath.ToDegrees(Vector3d.VectorAngle(vertices[0] - vertices[2], vertices[1] - vertices[2])) - AnalysisConfig.TriangleIdealAngleDegrees);
+                        return Math.Max(Math.Max(angleA, angleB), angleC) / AnalysisConfig.TriangleIdealAngleDegrees;
+                    }))();
+                double avgEdge = isQuad ? (edge0 + edge1 + edge2 + edge3) / 4.0 : (edge0 + edge1 + edge2) / 3.0;
+                jacobians[i] = avgEdge > context.AbsoluteTolerance
+                    ? isQuad
+                        ? Math.Min(
+                            Math.Min(
+                                Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
+                                Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length),
+                            Math.Min(
+                                Vector3d.CrossProduct(vertices[3] - vertices[2], vertices[1] - vertices[2]).Length,
+                                Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length)
+                        ) / ((avgEdge * avgEdge) + context.AbsoluteTolerance)
+                        : Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * avgEdge * avgEdge) + context.AbsoluteTolerance)
+                    : 0.0;
+                bool isCritical = aspectRatios[i] > AnalysisConfig.AspectRatioCritical || skewness[i] > AnalysisConfig.SkewnessCritical || jacobians[i] < AnalysisConfig.JacobianCritical;
+                bool isWarning = aspectRatios[i] > AnalysisConfig.AspectRatioWarning || skewness[i] > AnalysisConfig.SkewnessWarning || jacobians[i] < AnalysisConfig.JacobianWarning;
+                if (isCritical) {
+                    problematicIndices.Add(i);
+                    criticalCount++;
+                }
+                if (isWarning) {
+                    warningCount++;
+                }
+            }
+            return ResultFactory.Create(value: new Analysis.MeshQualityResult(
+                AspectRatios: aspectRatios,
+                Skewness: skewness,
+                Jacobians: jacobians,
+                ProblematicFaceIndices: [.. problematicIndices,],
+                QualityFlags: (Warning: warningCount, Critical: criticalCount)));
         } finally {
             ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
         }
