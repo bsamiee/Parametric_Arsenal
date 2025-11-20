@@ -99,7 +99,7 @@ internal static class SpatialCore {
                             results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
                         }
                         _ = tree.Search(searchBox, CollectResults);
-                        return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(r => r.Distance * (1.0 + (request.AngleWeight * r.Angle))),]);
+                        return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance * (1.0 + (request.AngleWeight * r.Angle))),]);
                     }))()),
                     config: new OperationConfig<GeometryBase[], Spatial.ProximityFieldResult> {
                         Context = context,
