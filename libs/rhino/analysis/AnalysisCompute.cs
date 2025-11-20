@@ -12,6 +12,82 @@ namespace Arsenal.Rhino.Analysis;
 /// <summary>Dense geometric quality and differential analysis algorithms.</summary>
 internal static class AnalysisCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.MeshData> ComputeMesh(
+        Mesh mesh,
+        int vertexIndex) {
+        int vIdx = RhinoMath.Clamp(vertexIndex, 0, mesh.Vertices.Count - 1);
+        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
+        using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
+        using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
+        return amp is null || vmp is null
+            ? ResultFactory.Create<Analysis.MeshData>(error: E.Geometry.MeshAnalysisFailed)
+            : ResultFactory.Create(value: new Analysis.MeshData(
+                Location: mesh.Vertices[vIdx],
+                Frame: new Plane(mesh.Vertices[vIdx], normal),
+                Normal: normal,
+                TopologyVertices: [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
+                TopologyEdges: [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
+                IsManifold: mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
+                IsClosed: mesh.IsClosed,
+                Area: amp.Area,
+                Volume: vmp.Volume));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.BrepData> ComputeExtrusion(
+        Extrusion extrusion,
+        int faceIndex,
+        double u,
+        double v,
+        Point3d testPoint,
+        int derivativeOrder,
+        double closestPointToleranceMultiplier,
+        IGeometryContext context) {
+        using Brep? brep = extrusion.ToBrep();
+        return brep is null
+            ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
+            : ComputeBrep(
+                brep: brep,
+                faceIndex: faceIndex,
+                u: u,
+                v: v,
+                testPoint: testPoint,
+                derivativeOrder: derivativeOrder,
+                closestPointToleranceMultiplier: closestPointToleranceMultiplier,
+                context: context);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.SurfaceData> ComputeSurface(
+        Surface surface,
+        double u,
+        double v,
+        int derivativeOrder) =>
+        !surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)
+            ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
+            : ((Func<Result<Analysis.SurfaceData>>)(() => {
+                SurfaceCurvature sc = surface.CurvatureAt(u, v);
+                using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
+                return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
+                    ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
+                    : ResultFactory.Create(value: new Analysis.SurfaceData(
+                        Location: surface.PointAt(u, v),
+                        Derivatives: derivs,
+                        Gaussian: sc.Gaussian,
+                        Mean: sc.Mean,
+                        K1: sc.Kappa(0),
+                        K2: sc.Kappa(1),
+                        PrincipalDir1: sc.Direction(0),
+                        PrincipalDir2: sc.Direction(1),
+                        Frame: frame,
+                        Normal: frame.Normal,
+                        AtSeam: surface.IsAtSeam(u, v) != 0,
+                        AtSingularity: surface.IsAtSingularity(u, v, exact: true),
+                        Area: amp.Area,
+                        Centroid: amp.Centroid));
+            }))();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Analysis.CurveData> ComputeCurve(
         Curve curve,
         double parameter,
@@ -58,36 +134,6 @@ internal static class AnalysisCompute {
             ArrayPool<double>.Shared.Return(buffer, clearArray: true);
         }
     }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Analysis.SurfaceData> ComputeSurface(
-        Surface surface,
-        double u,
-        double v,
-        int derivativeOrder) =>
-        !surface.Evaluate(u, v, derivativeOrder, out Point3d _, out Vector3d[] derivs) || !surface.FrameAt(u, v, out Plane frame)
-            ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-            : ((Func<Result<Analysis.SurfaceData>>)(() => {
-                SurfaceCurvature sc = surface.CurvatureAt(u, v);
-                using AreaMassProperties? amp = AreaMassProperties.Compute(surface);
-                return amp is null || !RhinoMath.IsValidDouble(sc.Gaussian) || !RhinoMath.IsValidDouble(sc.Mean)
-                    ? ResultFactory.Create<Analysis.SurfaceData>(error: E.Geometry.SurfaceAnalysisFailed)
-                    : ResultFactory.Create(value: new Analysis.SurfaceData(
-                        Location: surface.PointAt(u, v),
-                        Derivatives: derivs,
-                        Gaussian: sc.Gaussian,
-                        Mean: sc.Mean,
-                        K1: sc.Kappa(0),
-                        K2: sc.Kappa(1),
-                        PrincipalDir1: sc.Direction(0),
-                        PrincipalDir2: sc.Direction(1),
-                        Frame: frame,
-                        Normal: frame.Normal,
-                        AtSeam: surface.IsAtSeam(u, v) != 0,
-                        AtSingularity: surface.IsAtSingularity(u, v, exact: true),
-                        Area: amp.Area,
-                        Centroid: amp.Centroid));
-            }))();
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Analysis.BrepData> ComputeBrep(
@@ -137,49 +183,43 @@ internal static class AnalysisCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Analysis.BrepData> ComputeExtrusion(
-        Extrusion extrusion,
-        int faceIndex,
-        double u,
-        double v,
-        Point3d testPoint,
-        int derivativeOrder,
-        double closestPointToleranceMultiplier,
+    internal static Result<Analysis.CurveFairnessResult> ComputeCurveFairness(
+        Curve curve,
+        int sampleCount,
+        double inflectionThreshold,
+        double smoothnessSensitivity,
         IGeometryContext context) {
-        using Brep? brep = extrusion.ToBrep();
-        return brep is null
-            ? ResultFactory.Create<Analysis.BrepData>(error: E.Geometry.BrepAnalysisFailed)
-            : ComputeBrep(
-                brep: brep,
-                faceIndex: faceIndex,
-                u: u,
-                v: v,
-                testPoint: testPoint,
-                derivativeOrder: derivativeOrder,
-                closestPointToleranceMultiplier: closestPointToleranceMultiplier,
-                context: context);
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Analysis.MeshData> ComputeMesh(
-        Mesh mesh,
-        int vertexIndex) {
-        int vIdx = RhinoMath.Clamp(vertexIndex, 0, mesh.Vertices.Count - 1);
-        Vector3d normal = mesh.Normals.Count > vIdx ? mesh.Normals[vIdx] : Vector3d.ZAxis;
-        using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
-        using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
-        return amp is null || vmp is null
-            ? ResultFactory.Create<Analysis.MeshData>(error: E.Geometry.MeshAnalysisFailed)
-            : ResultFactory.Create(value: new Analysis.MeshData(
-                Location: mesh.Vertices[vIdx],
-                Frame: new Plane(mesh.Vertices[vIdx], normal),
-                Normal: normal,
-                TopologyVertices: [.. Enumerable.Range(0, mesh.TopologyVertices.Count).Select(i => (i, (Point3d)mesh.TopologyVertices[i])),],
-                TopologyEdges: [.. Enumerable.Range(0, mesh.TopologyEdges.Count).Select(i => (i, mesh.TopologyEdges.EdgeLine(i))),],
-                IsManifold: mesh.IsManifold(topologicalTest: true, out bool _, out bool _),
-                IsClosed: mesh.IsClosed,
-                Area: amp.Area,
-                Volume: vmp.Volume));
+        int maxSamples = Math.Max(2, sampleCount);
+        (double Parameter, Vector3d Curvature)[] samples = new (double, Vector3d)[maxSamples];
+        double[] curvatures = new double[maxSamples];
+        int validCount = 0;
+        double sampleDivisor = maxSamples - 1.0;
+        for (int i = 0; i < maxSamples; i++) {
+            double t = curve.Domain.ParameterAt(i / sampleDivisor);
+            Vector3d curvature = curve.CurvatureAt(t);
+            if (curvature.IsValid) {
+                samples[validCount] = (t, curvature);
+                curvatures[validCount] = curvature.Length;
+                validCount++;
+            }
+        }
+        (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
+        double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
+        if (validSamples.Length <= 2) {
+            return ResultFactory.Create<Analysis.CurveFairnessResult>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
+        }
+        double avgDiff = Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1);
+        double curveLength = curve.GetLength();
+        return ResultFactory.Create(value: new Analysis.CurveFairnessResult(
+            SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * smoothnessSensitivity)), 0.0, 1.0),
+            CurvatureValues: validCurvatures,
+            InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
+                .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
+                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
+            ],
+            BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
+                ? (validCurvatures.Sum(k => k * k) * (curveLength / (sampleCount - 1))) / (maxCurv * curveLength)
+                : 0.0));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -236,46 +276,6 @@ internal static class AnalysisCompute {
                     : gaussianSorted[^1] < context.AbsoluteTolerance ? 1.0 : 0.0,
                 0.0,
                 1.0)));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Analysis.CurveFairnessResult> ComputeCurveFairness(
-        Curve curve,
-        int sampleCount,
-        double inflectionThreshold,
-        double smoothnessSensitivity,
-        IGeometryContext context) {
-        int maxSamples = Math.Max(2, sampleCount);
-        (double Parameter, Vector3d Curvature)[] samples = new (double, Vector3d)[maxSamples];
-        double[] curvatures = new double[maxSamples];
-        int validCount = 0;
-        double sampleDivisor = maxSamples - 1.0;
-        for (int i = 0; i < maxSamples; i++) {
-            double t = curve.Domain.ParameterAt(i / sampleDivisor);
-            Vector3d curvature = curve.CurvatureAt(t);
-            if (curvature.IsValid) {
-                samples[validCount] = (t, curvature);
-                curvatures[validCount] = curvature.Length;
-                validCount++;
-            }
-        }
-        (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
-        double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
-        if (validSamples.Length <= 2) {
-            return ResultFactory.Create<Analysis.CurveFairnessResult>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
-        }
-        double avgDiff = Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1);
-        double curveLength = curve.GetLength();
-        return ResultFactory.Create(value: new Analysis.CurveFairnessResult(
-            SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * smoothnessSensitivity)), 0.0, 1.0),
-            CurvatureValues: validCurvatures,
-            InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
-                .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
-                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
-            ],
-            BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
-                ? (validCurvatures.Sum(k => k * k) * (curveLength / (sampleCount - 1))) / (maxCurv * curveLength)
-                : 0.0));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

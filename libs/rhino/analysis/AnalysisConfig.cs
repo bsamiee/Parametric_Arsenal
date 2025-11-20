@@ -8,26 +8,6 @@ namespace Arsenal.Rhino.Analysis;
 /// <summary>Unified metadata, constants, and dispatch tables for differential and quality analysis.</summary>
 [Pure]
 internal static class AnalysisConfig {
-    /// <summary>Unified metadata for differential geometry operations.</summary>
-    internal sealed record DifferentialMetadata(
-        V ValidationMode,
-        string OperationName,
-        int FrameSampleCount,
-        int MaxDiscontinuities,
-        double ClosestPointToleranceMultiplier);
-
-    /// <summary>Unified metadata for quality analysis operations.</summary>
-    internal sealed record QualityMetadata(
-        V ValidationMode,
-        string OperationName,
-        int SampleCount,
-        int GridDimension,
-        double BoundaryFraction,
-        double ProximityFactor,
-        double CurvatureMultiplier,
-        double InflectionThreshold,
-        double SmoothnessSensitivity);
-
     /// <summary>Differential geometry dispatch table: request type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, DifferentialMetadata> DifferentialOperations =
         new Dictionary<Type, DifferentialMetadata> {
@@ -98,6 +78,9 @@ internal static class AnalysisConfig {
                 SmoothnessSensitivity: 0.0),
         }.ToFrozenDictionary();
 
+    /// <summary>Ideal interior angles for mesh element types.</summary>
+    internal static readonly double QuadIdealAngleDegrees = RhinoMath.ToDegrees(RhinoMath.HalfPI);
+
     /// <summary>Default derivative order for position, tangent, and curvature computation.</summary>
     internal const int DefaultDerivativeOrder = 2;
 
@@ -115,5 +98,24 @@ internal static class AnalysisConfig {
 
     /// <summary>Ideal interior angles for mesh element types.</summary>
     internal const double TriangleIdealAngleDegrees = 60.0;
-    internal static readonly double QuadIdealAngleDegrees = RhinoMath.ToDegrees(RhinoMath.HalfPI);
+
+    /// <summary>Unified metadata for differential geometry operations.</summary>
+    internal sealed record DifferentialMetadata(
+        V ValidationMode,
+        string OperationName,
+        int FrameSampleCount,
+        int MaxDiscontinuities,
+        double ClosestPointToleranceMultiplier);
+
+    /// <summary>Unified metadata for quality analysis operations.</summary>
+    internal sealed record QualityMetadata(
+        V ValidationMode,
+        string OperationName,
+        int SampleCount,
+        int GridDimension,
+        double BoundaryFraction,
+        double ProximityFactor,
+        double CurvatureMultiplier,
+        double InflectionThreshold,
+        double SmoothnessSensitivity);
 }
