@@ -17,6 +17,29 @@ public static class Analysis {
     /// <summary>Base type for differential geometry analysis requests.</summary>
     public abstract record DifferentialRequest(GeometryBase Geometry, int DerivativeOrder);
 
+    /// <summary>Base type for geometric quality analysis requests.</summary>
+    public abstract record QualityRequest(GeometryBase Geometry);
+
+    /// <summary>Extrusion differential analysis request (converts to Brep internally).</summary>
+    public sealed record ExtrusionAnalysis(Extrusion Extrusion, int FaceIndex, double U, double V, Point3d TestPoint, int DerivativeOrder) : DifferentialRequest(Extrusion, DerivativeOrder);
+
+    /// <summary>Batch differential analysis request.</summary>
+    public sealed record BatchAnalysis<T>(IReadOnlyList<T> Geometries, double? Parameter, (double U, double V)? UV, int? Index, Point3d? TestPoint, int DerivativeOrder) : DifferentialRequest(default!, DerivativeOrder) where T : GeometryBase;
+
+    /// <summary>Surface quality analysis request (curvature uniformity, singularities).</summary>
+    public sealed record SurfaceQualityAnalysis(Surface Surface) : QualityRequest(Surface);
+
+    /// <summary>Curve fairness analysis request (smoothness, inflections, bending energy).</summary>
+    public sealed record CurveFairnessAnalysis(Curve Curve) : QualityRequest(Curve);
+
+    /// <summary>Mesh quality analysis request (FEA metrics: aspect ratio, skewness, Jacobian).</summary>
+    public sealed record MeshQualityAnalysis(Mesh Mesh) : QualityRequest(Mesh);
+
+    /// <summary>Mesh topology analysis request.</summary>
+    public sealed record MeshAnalysis(Mesh Mesh, int VertexIndex) : DifferentialRequest(Mesh, 0) {
+        public MeshAnalysis(Mesh mesh) : this(mesh, 0) { }
+    }
+
     /// <summary>Curve differential analysis request.</summary>
     public sealed record CurveAnalysis(Curve Curve, double Parameter, int DerivativeOrder) : DifferentialRequest(Curve, DerivativeOrder) {
         public CurveAnalysis(Curve curve, int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder)
@@ -28,6 +51,31 @@ public static class Analysis {
         public SurfaceAnalysis(Surface surface, int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder)
             : this(surface, surface.Domain(0).Mid, surface.Domain(1).Mid, derivativeOrder) { }
     }
+
+    /// <summary>Surface quality metrics: curvature samples, singularity locations, uniformity score.</summary>
+    [DebuggerDisplay("SurfaceQuality | Uniformity={UniformityScore:F3} | Singularities={SingularityLocations.Length}")]
+    public sealed record SurfaceQualityResult(
+        double[] GaussianCurvatures,
+        double[] MeanCurvatures,
+        (double U, double V)[] SingularityLocations,
+        double UniformityScore) : IResult;
+
+    /// <summary>Curve fairness metrics: smoothness score, curvature samples, inflection points, bending energy.</summary>
+    [DebuggerDisplay("CurveFairness | Smoothness={SmoothnessScore:F3} | Inflections={InflectionPoints.Length} | Energy={BendingEnergy:F3}")]
+    public sealed record CurveFairnessResult(
+        double SmoothnessScore,
+        double[] CurvatureValues,
+        (double Parameter, bool IsSharp)[] InflectionPoints,
+        double BendingEnergy) : IResult;
+
+    /// <summary>Mesh quality metrics for FEA: aspect ratios, skewness, Jacobians, problematic faces, quality flags.</summary>
+    [DebuggerDisplay("MeshQuality | Warnings={QualityFlags.Warning} | Critical={QualityFlags.Critical} | Problematic={ProblematicFaceIndices.Length}")]
+    public sealed record MeshQualityResult(
+        double[] AspectRatios,
+        double[] Skewness,
+        double[] Jacobians,
+        int[] ProblematicFaceIndices,
+        (int Warning, int Critical) QualityFlags) : IResult;
 
     /// <summary>Brep surface and topology analysis request.</summary>
     public sealed record BrepAnalysis(Brep Brep, int FaceIndex, double U, double V, Point3d TestPoint, int DerivativeOrder) : DifferentialRequest(Brep, DerivativeOrder) {
@@ -41,28 +89,18 @@ public static class Analysis {
                 derivativeOrder) { }
     }
 
-    /// <summary>Extrusion differential analysis request (converts to Brep internally).</summary>
-    public sealed record ExtrusionAnalysis(Extrusion Extrusion, int FaceIndex, double U, double V, Point3d TestPoint, int DerivativeOrder) : DifferentialRequest(Extrusion, DerivativeOrder);
-
-    /// <summary>Mesh topology analysis request.</summary>
-    public sealed record MeshAnalysis(Mesh Mesh, int VertexIndex) : DifferentialRequest(Mesh, 0) {
-        public MeshAnalysis(Mesh mesh) : this(mesh, 0) { }
-    }
-
-    /// <summary>Batch differential analysis request.</summary>
-    public sealed record BatchAnalysis<T>(IReadOnlyList<T> Geometries, double? Parameter, (double U, double V)? UV, int? Index, Point3d? TestPoint, int DerivativeOrder) : DifferentialRequest(default!, DerivativeOrder) where T : GeometryBase;
-
-    /// <summary>Base type for geometric quality analysis requests.</summary>
-    public abstract record QualityRequest(GeometryBase Geometry);
-
-    /// <summary>Surface quality analysis request (curvature uniformity, singularities).</summary>
-    public sealed record SurfaceQualityAnalysis(Surface Surface) : QualityRequest(Surface);
-
-    /// <summary>Curve fairness analysis request (smoothness, inflections, bending energy).</summary>
-    public sealed record CurveFairnessAnalysis(Curve Curve) : QualityRequest(Curve);
-
-    /// <summary>Mesh quality analysis request (FEA metrics: aspect ratio, skewness, Jacobian).</summary>
-    public sealed record MeshQualityAnalysis(Mesh Mesh) : QualityRequest(Mesh);
+    /// <summary>Mesh topology: vertices, edges, manifold state, closure, area, volume.</summary>
+    [DebuggerDisplay("Mesh @ {Location} | V={Volume:F3} | A={Area:F3}{(IsClosed ? \" [closed]\" : \"\")}{(IsManifold ? \" [manifold]\" : \"\")}")]
+    public sealed record MeshData(
+        Point3d Location,
+        Plane Frame,
+        Vector3d Normal,
+        (int Index, Point3d Point)[] TopologyVertices,
+        (int Index, Line Geometry)[] TopologyEdges,
+        bool IsManifold,
+        bool IsClosed,
+        double Area,
+        double Volume) : IResult;
 
     /// <summary>Curve differential geometry: derivatives, curvature, frames, discontinuities, length, centroid.</summary>
     [DebuggerDisplay("Curve @ {Location} | κ={Curvature:F3} | L={Length:F3} | Disc={DiscontinuityParameters.Length}")]
@@ -121,43 +159,36 @@ public static class Analysis {
         double Volume,
         Point3d Centroid) : IResult;
 
-    /// <summary>Mesh topology: vertices, edges, manifold state, closure, area, volume.</summary>
-    [DebuggerDisplay("Mesh @ {Location} | V={Volume:F3} | A={Area:F3}{(IsClosed ? \" [closed]\" : \"\")}{(IsManifold ? \" [manifold]\" : \"\")}")]
-    public sealed record MeshData(
-        Point3d Location,
-        Plane Frame,
-        Vector3d Normal,
-        (int Index, Point3d Point)[] TopologyVertices,
-        (int Index, Line Geometry)[] TopologyEdges,
-        bool IsManifold,
-        bool IsClosed,
-        double Area,
-        double Volume) : IResult;
+    /// <summary>Analyzes surface quality via curvature sampling and singularity detection.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<SurfaceQualityResult> AnalyzeSurfaceQuality(
+        Surface surface,
+        IGeometryContext context) =>
+        AnalysisCore.ExecuteQuality<SurfaceQualityResult>(request: new SurfaceQualityAnalysis(Surface: surface), context: context);
 
-    /// <summary>Surface quality metrics: curvature samples, singularity locations, uniformity score.</summary>
-    [DebuggerDisplay("SurfaceQuality | Uniformity={UniformityScore:F3} | Singularities={SingularityLocations.Length}")]
-    public sealed record SurfaceQualityResult(
-        double[] GaussianCurvatures,
-        double[] MeanCurvatures,
-        (double U, double V)[] SingularityLocations,
-        double UniformityScore) : IResult;
+    /// <summary>Analyzes curve fairness via curvature variation and inflection detection.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<CurveFairnessResult> AnalyzeCurveFairness(
+        Curve curve,
+        IGeometryContext context) =>
+        AnalysisCore.ExecuteQuality<CurveFairnessResult>(request: new CurveFairnessAnalysis(Curve: curve), context: context);
 
-    /// <summary>Curve fairness metrics: smoothness score, curvature samples, inflection points, bending energy.</summary>
-    [DebuggerDisplay("CurveFairness | Smoothness={SmoothnessScore:F3} | Inflections={InflectionPoints.Length} | Energy={BendingEnergy:F3}")]
-    public sealed record CurveFairnessResult(
-        double SmoothnessScore,
-        double[] CurvatureValues,
-        (double Parameter, bool IsSharp)[] InflectionPoints,
-        double BendingEnergy) : IResult;
+    /// <summary>Analyzes mesh quality for FEA via aspect ratio, skewness, and Jacobian metrics.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<MeshQualityResult> AnalyzeMeshForFEA(
+        Mesh mesh,
+        IGeometryContext context) =>
+        AnalysisCore.ExecuteQuality<MeshQualityResult>(request: new MeshQualityAnalysis(Mesh: mesh), context: context);
 
-    /// <summary>Mesh quality metrics for FEA: aspect ratios, skewness, Jacobians, problematic faces, quality flags.</summary>
-    [DebuggerDisplay("MeshQuality | Warnings={QualityFlags.Warning} | Critical={QualityFlags.Critical} | Problematic={ProblematicFaceIndices.Length}")]
-    public sealed record MeshQualityResult(
-        double[] AspectRatios,
-        double[] Skewness,
-        double[] Jacobians,
-        int[] ProblematicFaceIndices,
-        (int Warning, int Critical) QualityFlags) : IResult;
+    /// <summary>Analyzes mesh topology and manifold properties at vertex.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<MeshData> Analyze(
+        Mesh mesh,
+        IGeometryContext context,
+        int vertexIndex = 0) =>
+        AnalysisCore.Execute<MeshData>(request: new MeshAnalysis(
+            Mesh: mesh,
+            VertexIndex: vertexIndex), context: context);
 
     /// <summary>Analyzes curve differential geometry at specified parameter.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -201,16 +232,6 @@ public static class Analysis {
             TestPoint: testPoint ?? brep.GetBoundingBox(accurate: false).Center,
             DerivativeOrder: derivativeOrder), context: context);
 
-    /// <summary>Analyzes mesh topology and manifold properties at vertex.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<MeshData> Analyze(
-        Mesh mesh,
-        IGeometryContext context,
-        int vertexIndex = 0) =>
-        AnalysisCore.Execute<MeshData>(request: new MeshAnalysis(
-            Mesh: mesh,
-            VertexIndex: vertexIndex), context: context);
-
     /// <summary>Batch analysis for multiple geometry instances with unified error handling.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<IResult>> AnalyzeMultiple<T>(
@@ -229,25 +250,4 @@ public static class Analysis {
             index: index,
             testPoint: testPoint,
             derivativeOrder: derivativeOrder);
-
-    /// <summary>Analyzes surface quality via curvature sampling and singularity detection.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<SurfaceQualityResult> AnalyzeSurfaceQuality(
-        Surface surface,
-        IGeometryContext context) =>
-        AnalysisCore.ExecuteQuality<SurfaceQualityResult>(request: new SurfaceQualityAnalysis(Surface: surface), context: context);
-
-    /// <summary>Analyzes curve fairness via curvature variation and inflection detection.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<CurveFairnessResult> AnalyzeCurveFairness(
-        Curve curve,
-        IGeometryContext context) =>
-        AnalysisCore.ExecuteQuality<CurveFairnessResult>(request: new CurveFairnessAnalysis(Curve: curve), context: context);
-
-    /// <summary>Analyzes mesh quality for FEA via aspect ratio, skewness, and Jacobian metrics.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<MeshQualityResult> AnalyzeMeshForFEA(
-        Mesh mesh,
-        IGeometryContext context) =>
-        AnalysisCore.ExecuteQuality<MeshQualityResult>(request: new MeshQualityAnalysis(Mesh: mesh), context: context);
 }
