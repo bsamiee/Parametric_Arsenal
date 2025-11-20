@@ -103,6 +103,7 @@ internal static class IntersectionConfig {
     /// <summary>Stability analysis parameters.</summary>
     internal const double StabilityPerturbationFactor = 0.001;
     internal const int StabilitySampleCount = 8;
+    internal const double UnstableCountDeltaThreshold = 1.0;
 
     /// <summary>Blend quality scores for intersection types.</summary>
     internal const double TangentBlendScore = 1.0;

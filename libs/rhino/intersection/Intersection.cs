@@ -39,15 +39,15 @@ public static class Intersection {
         double? Tolerance = null,
         bool Sorted = false);
 
-    /// <summary>Intersection type classification: tangent, transverse, or unknown.</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
-    public readonly record struct IntersectionType(byte Value) {
+    /// <summary>Base type for intersection type classification.</summary>
+    public abstract record IntersectionType {
+        private IntersectionType() { }
         /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
-        public static readonly IntersectionType Tangent = new(0);
+        public sealed record Tangent : IntersectionType;
         /// <summary>Transverse intersection with significant angular separation.</summary>
-        public static readonly IntersectionType Transverse = new(1);
+        public sealed record Transverse : IntersectionType;
         /// <summary>Unknown classification when insufficient data available.</summary>
-        public static readonly IntersectionType Unknown = new(2);
+        public sealed record Unknown : IntersectionType;
     }
 
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
