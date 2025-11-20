@@ -1,8 +1,24 @@
-# Code Organization Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: organization
+difficulty: beginner
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+---
 
-**Role**: Expert C# organizer enforcing consistent, logical structure across Rhino module folders.
+# Code Organization
 
-**Mission**: Reorder members within `libs/rhino/<<TARGET_FOLDER_N>>/` folders to achieve consistent category-based organization with size-based ordering—purely organizational, no functional changes.
+Reorder members within Rhino module folders to achieve consistent category-based organization with size-based ordering—purely organizational, no functional changes.
+
+## Task Description
+
+Enforce consistent, logical structure across module folders. Reorder members by category and size, consolidate duplicate documentation, adjust whitespace for grouping clarity. No signature, behavior, or logic changes allowed.
 
 ## Inputs
 
@@ -24,30 +40,11 @@ Each folder contains 4 files:
 ✅ No signature, attribute, accessibility, namespace changes  
 ✅ Zero new warnings, all analyzers pass
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any reordering**, read and strictly obey:
-- `/CLAUDE.md` - Standards and patterns
-- `/AGENTS.md` - Agent patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/.editorconfig` - Style enforcement
-- `/libs/rhino/file_architecture.md` - 4-file architecture roles
+Follow CLAUDE.md rules. This is a non-functional task—reordering and documentation consolidation only. No signature, behavior, or logic changes allowed.
 
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- K&R braces - opening on same line
-- Named parameters - non-obvious calls
-- One type per file (CA1050)
-- No extension methods, no new helpers
-- **No functional code changes** - reordering and doc grouping only
-
-**4-File Architecture (understand roles)**:
-- `.cs` - Public API + nested algebraic domain types
-- `Config.cs` - Constants + metadata + `FrozenDictionary` dispatch
-- `Core.cs` - Orchestration (no public API)
-- `Compute.cs` - Dense algorithms and helpers
-
----
+**4-File Architecture**: Understand roles of `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
 
 ## Organizational Principles
 
@@ -96,11 +93,13 @@ Consistent categories across all files with vertical size ordering within each c
 
 **Overload Families**: Keep adjacent even if sizes differ. Order family by size of smallest member.
 
+## Methodology
+
 ---
 
-## Multi-Pass Procedure (Per File)
+### Multi-Pass Procedure (Per File)
 
-### Pass 1: Member Inventory & Classification
+**Pass 1: Member Inventory & Classification**
 - List all members inside top-level type:
   - Static fields (FrozenDictionary vs other)
   - Nested types (interfaces, enums, records, structs)
@@ -148,7 +147,7 @@ Within file, rearrange members per:
 - Introduce new documentation asserting behavior
 - Change meaning of existing comments—only delete duplicates or move to group-level
 
-### Pass 5: Final Consistency & Safety Check
+**Pass 5: Final Consistency & Safety Check**
 **Confirm for each file**:
 - All code identical aside from:
   - Member ordering
@@ -161,6 +160,15 @@ Within file, rearrange members per:
 - FrozenDictionary fields at top of type (if present)
 - Within each category, smaller members before larger
 - File still compiles under project rules and analyzers
+
+## Verification
+
+After organization:
+- Members reordered by category and size
+- FrozenDictionary fields at top
+- XML docs consolidated where duplicate
+- No functional changes
+- Zero new warnings
 
 ---
 

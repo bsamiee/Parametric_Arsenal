@@ -1,8 +1,25 @@
-# Code Cleanup Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: cleanup
+difficulty: intermediate
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+  - libs/rhino/LIBRARY_GUIDELINES.md
+---
 
-**Role**: Expert C# refactorer improving code quality, consistency, and density across Rhino module folders.
+# Code Cleanup
 
-**Mission**: Clean up `libs/rhino/<<TARGET_FOLDER_N>>/` folders by removing bloat, improving expression-based patterns, and tightening alignment with project standards—all while preserving behavior.
+Clean up Rhino module folders by removing bloat, improving expression-based patterns, and tightening alignment with project standards while preserving behavior.
+
+## Task Description
+
+Refactor existing code to improve quality, consistency, and density. Remove redundant abstractions, consolidate types, eliminate magic numbers, and ensure strict adherence to project coding standards—all without changing external behavior.
 
 ## Inputs
 
@@ -25,47 +42,11 @@ Each folder contains 4 files:
 ✅ Advanced C# features (`MethodImpl`, `readonly struct`, etc.) used only where beneficial  
 ✅ Zero new warnings, all analyzers pass
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Absolute standards and exemplars
-- `/AGENTS.md` - Agent-specific patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/.editorconfig` - Style enforcement
-- `/libs/rhino/file_architecture.md` - 4-file architecture
-- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
-- `/libs/rhino/rhino_math_class.md` - RhinoMath usage
-- `/libs/rhino/rhino_math_reference.md` - SDK reference
+Follow all rules in CLAUDE.md. Study core infrastructure before cleanup (Result.cs, UnifiedOperation.cs, ValidationRules.cs). Reference exemplar folders (fields/, spatial/) for consistency patterns.
 
-**Core Infrastructure (study before cleanup)**:
-- `libs/core/results/Result.cs` - Monad patterns
-- `libs/core/results/ResultFactory.cs` - Creation helpers
-- `libs/core/operations/UnifiedOperation.cs` - Dispatch engine
-- `libs/core/context/GeometryContext.cs` - Shared context
-- `libs/core/diagnostics/` - Diagnostic patterns
-
-**Reference Folders (for consistency)**:
-- `libs/rhino/fields/` - Exemplar dispatch and algebraic design
-- `libs/rhino/spatial/` - Metadata-driven operations
-- `libs/rhino/topology/`, `libs/rhino/morphology/`
-
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - use ternary (binary), switch expression (multiple), pattern matching (type discrimination). **Note**: `if` without `else` for early return/throw is acceptable.
-- K&R braces - opening on same line
-- Named parameters - for non-obvious calls
-- Trailing commas - in multi-line collections
-- One type per file - never multiple (CA1050)
-- No extension methods, no helpers forwarding parameters
-- Expression-oriented when it improves clarity (not dogmatically)
-
-**4-File Architecture (preserve)**:
-- `.cs` - Public API + nested algebraic domain types
-- `Config.cs` - Constants + metadata + `FrozenDictionary` dispatch
-- `Core.cs` - Orchestration + `UnifiedOperation` wiring
-- `Compute.cs` - Dense SDK algorithms
-
----
+**4-File Architecture**: Preserve `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
 
 ## Cleanup Goals (Per Folder)
 
@@ -155,13 +136,15 @@ Justify by: hot-path likelihood, semantic safety, analyzer consistency
 - Align with algebraic/dispatch patterns and library guidelines
 - Preserve or improve clarity and performance
 
+## Methodology
+
 ---
 
-## Multi-Pass Procedure (Per Folder)
+### Multi-Pass Procedure (Per Folder)
 
-**Do not collapse passes** - work systematically through each.
+Work systematically through each pass.
 
-### Pass 1: Context & Inventory
+**Pass 1: Context & Inventory**
 - Confirm 4-file structure and roles (`.cs`, `Config`, `Core`, `Compute`)
 - For each file, catalog:
   - Public APIs, internal helpers, nested types, constants, metadata, `FrozenDictionary` tables
@@ -251,7 +234,7 @@ For each unused item:
 - API surface reduced only when consolidation clearly better
 - LOC reduced or unchanged for materially better clarity/performance
 
-### Pass 9: Final Organization, LOC, Self-Check
+**Pass 9: Final Organization, LOC, Self-Check**
 **Verify organization**:
 - 4-file architecture and file count preserved
 - Code in correct file per separation of concerns
@@ -273,6 +256,16 @@ For each unused item:
 - Builds with 0 new warnings
 - Passes analyzers and `.editorconfig`
 - No partial refactors or TODOs
+
+## Verification
+
+After cleanup:
+- Net LOC reduced or unchanged per folder
+- Semantics fully preserved
+- Zero new warnings
+- All analyzers pass
+- Expression-based C# used correctly
+- Magic numbers eliminated
 
 ---
 

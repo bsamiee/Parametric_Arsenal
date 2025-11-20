@@ -1,8 +1,25 @@
-# Code Optimization Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: optimization
+difficulty: expert
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+  - libs/rhino/LIBRARY_GUIDELINES.md
+---
 
-**Role**: Expert C# performance engineer optimizing hot paths in Rhino computational geometry modules.
+# Code Optimization
 
-**Mission**: Perform deep, surgical optimization of `libs/rhino/<<TARGET_FOLDER_N>>/` folders to improve performance and reduce LOC while preserving all behavior.
+Perform deep, surgical optimization of Rhino module folders to improve performance and reduce LOC while preserving all behavior.
+
+## Task Description
+
+Performance engineering focused on hot paths. Reduce allocations, eliminate branches, combine loops, exploit Result monad effectively, and apply advanced C# features strategically—all while maintaining code clarity and preserving external behavior.
 
 ## Inputs
 
@@ -25,47 +42,11 @@ Each folder contains 4 files:
 ✅ Dead code eliminated (unused constants, single-use helpers inlined)  
 ✅ Zero new warnings, all analyzers pass
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Standards, exemplars, performance patterns
-- `/AGENTS.md` - Agent patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/.editorconfig` - Style enforcement
-- `/libs/rhino/file_architecture.md` - 4-file architecture
-- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
-- `/libs/rhino/rhino_math_class.md` - RhinoMath usage
-- `/libs/rhino/rhino_math_reference.md` - SDK reference
+Follow all rules in CLAUDE.md. Study core infrastructure for optimization opportunities (UnifiedOperation.cs 108 LOC exemplar, ValidationRules.cs zero-allocation patterns). Reference exemplar folders (fields/, spatial/) for hot path optimization patterns.
 
-**Core Infrastructure (study for optimization)**:
-- `libs/core/results/Result.cs` - Monadic operations, lazy evaluation
-- `libs/core/results/ResultFactory.cs` - Polymorphic creation
-- `libs/core/operations/UnifiedOperation.cs` - Dispatch engine (108 LOC exemplar)
-- `libs/core/validation/ValidationRules.cs` - Expression tree compilation (zero allocations)
-- `libs/core/context/GeometryContext.cs` - Shared context
-
-**Reference Folders (for patterns)**:
-- `libs/rhino/fields/` - Exemplar density and dispatch
-- `libs/rhino/spatial/` - Hot path optimization examples
-- `libs/rhino/morphology/`, `libs/rhino/topology/`
-
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - expressions: ternary, switch expression, pattern matching. **Note**: `if` without `else` for early return/throw is acceptable.
-- K&R braces - opening on same line
-- Named parameters - non-obvious calls
-- Trailing commas - multi-line collections
-- One type per file (CA1050)
-- No extension methods, no helpers forwarding parameters
-- Dense, expression-oriented, functional style
-
-**4-File Architecture (preserve)**:
-- `.cs` - Public API + nested algebraic domain types
-- `Config.cs` - Constants + metadata + `FrozenDictionary` dispatch
-- `Core.cs` - Orchestration + `UnifiedOperation` wiring
-- `Compute.cs` - Dense SDK algorithms
-
----
+**4-File Architecture**: Preserve `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
 
 ## Optimization Goals (Per Folder)
 
@@ -132,13 +113,15 @@ Remove:
 - No stylistic churn increasing LOC/complexity
 - Respect `.editorconfig`, analyzers, constraints from CLAUDE.md/AGENTS.md
 
+## Methodology
+
 ---
 
-## Multi-Pass Procedure (Per Folder)
+### Multi-Pass Procedure (Per Folder)
 
-**Use explicit passes** - do not collapse into single sweep.
+Use explicit passes - do not collapse into single sweep.
 
-### Pass 1: Inventory, Roles, Hot-Path Identification
+**Pass 1: Inventory, Roles, Hot-Path Identification**
 - Enumerate 4 files, confirm roles (`.cs`, `Config`, `Core`, `Compute`)
 - For folder:
   - Summarize domain and main operations
@@ -232,7 +215,7 @@ Apply chosen optimizations respecting constraints:
 - Prefer transformations that **reduce LOC and improve performance**
 - Keep changes local and well-scoped (no large sweeping rewrites)
 
-### Pass 9: Cross-Folder Coherence & Final Self-Check
+**Pass 9: Cross-Folder Coherence & Final Self-Check**
 **Compare updated folders with reference folders**:
 - Similar patterns implemented in similarly optimized ways
 - Consistent `Result` and validation usage across ecosystem
@@ -249,6 +232,16 @@ Apply chosen optimizations respecting constraints:
 - Repo builds with 0 new warnings
 - All analyzers and `.editorconfig` rules pass
 - No TODO markers or partial refactors
+
+## Verification
+
+After optimization:
+- External behavior preserved
+- Hot paths optimized (measured)
+- LOC reduced through dense C#
+- Advanced C# features used strategically
+- Zero new warnings
+- All analyzers pass
 
 ---
 

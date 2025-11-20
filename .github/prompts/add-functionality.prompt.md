@@ -1,8 +1,26 @@
-# Add Functionality Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: functionality
+difficulty: advanced
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - libs/rhino/file_architecture.md
+  - libs/rhino/LIBRARY_GUIDELINES.md
+  - libs/rhino/rhino_math_class.md
+  - libs/rhino/rhino_math_reference.md
+---
 
-**Role**: Expert C# developer adding surgical, high-value functionality to Rhino computational geometry modules.
+# Add Functionality
 
-**Mission**: Add or upgrade exactly one capability in `libs/rhino/<<TARGET_FOLDER_NAME>>/` following strict architectural patterns.
+Add or upgrade exactly one capability in `libs/rhino/<<TARGET_FOLDER_NAME>>/` following strict architectural patterns.
+
+## Task Description
+
+Surgical addition of high-value functionality to Rhino computational geometry modules. Focus on adding genuinely useful capabilities that integrate seamlessly with existing 4-file architecture, Result monad patterns, and unified dispatch infrastructure.
 
 ## Inputs
 
@@ -19,25 +37,11 @@
 ✅ Zero new warnings, all analyzers pass, builds cleanly  
 ✅ No duplicate logic or magic numbers—everything flows from metadata
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Absolute coding standards and exemplars
-- `/AGENTS.md` - Agent-specific patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/libs/rhino/file_architecture.md` - 4-file architecture roles
-- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
-- `/libs/rhino/rhino_math_class.md` - RhinoMath usage
-- `/libs/rhino/rhino_math_reference.md` - SDK reference
+Follow all style rules in CLAUDE.md and architectural patterns in AGENTS.md. Key constraints specific to this task:
 
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - use ternary (binary), switch expression (multiple), pattern matching (type discrimination). **Note**: `if` without `else` for early return/throw is acceptable.
-- K&R braces - opening brace on same line
-- Named parameters - for all non-obvious calls
-- Trailing commas - in all multi-line collections
-- One type per file - never multiple top-level types (CA1050)
-- No extension methods, no helpers that forward parameters
+**Style**: Follow CLAUDE.md rules (no var, no if/else statements, K&R braces, named parameters, trailing commas, one type per file)
 
 **4-File Architecture (mandatory)**:
 - `<<BASENAME>>.cs` - Public API + nested algebraic domain types only
@@ -52,20 +56,19 @@
 - Errors via `E` registry (prefer existing codes)
 - No parallel validation or error pipelines
 
-**Anti-Hallucination Rule**:
-- Never invent SDK types, methods, or overloads
-- Confirm existence in codebase or docs before using
-- If uncertain, do not use it
+**Anti-Hallucination**: Never invent SDK types, methods, or overloads. Confirm existence in codebase or docs before using.
+
+## Methodology
 
 ---
 
-## Phase 1: Research (No Code Changes)
+### Phase 1: Research (No Code Changes)
 
 **Goal**: Understand patterns, SDK, and existing architecture before proposing changes.
 
 ### 1.1 Study Internal Patterns
 
-1. **Mandatory reading**: Re-read all documents in "Non-Negotiable Constraints" section
+1. **Mandatory reading**: Study CLAUDE.md, AGENTS.md, and prerequisite files
 2. **Study exemplar folders end-to-end** (pick 2):
    - `libs/rhino/fields/` - FrozenDictionary dispatch, algebraic requests
    - `libs/rhino/spatial/` - Metadata-driven operations
@@ -345,6 +348,16 @@ If new `E` codes added:
 - All `V` flag usage is appropriate and non-redundant
 
 **If any check fails**: Revise within folder until all criteria satisfied.
+
+## Verification
+
+After implementation:
+- Build cleanly with zero warnings
+- All analyzers pass
+- Tests pass (if applicable)
+- Code follows CLAUDE.md standards
+- 4-file architecture preserved
+- UnifiedOperation integration correct
 
 ---
 

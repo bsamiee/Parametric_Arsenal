@@ -1,8 +1,27 @@
-# SDK & Logic Audit Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: sdk-audit
+difficulty: expert
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+  - libs/rhino/LIBRARY_GUIDELINES.md
+  - libs/rhino/rhino_math_class.md
+  - libs/rhino/rhino_math_reference.md
+---
 
-**Role**: Expert C# developer auditing and refining mathematical correctness, SDK usage, and architectural patterns in Rhino computational geometry modules.
+# SDK & Logic Audit
 
-**Mission**: Perform deep, surgical audit and refactor of `libs/rhino/<<TARGET_FOLDER_N>>/` focusing on algorithmic correctness, complete RhinoCommon/RhinoMath usage, unified dispatch, and cross-folder coherence.
+Perform deep, surgical audit and refactor focusing on algorithmic correctness, complete RhinoCommon/RhinoMath usage, unified dispatch, and cross-folder coherence.
+
+## Task Description
+
+Audit and refine mathematical correctness, SDK usage, and architectural patterns. Verify algorithms, eliminate incomplete implementations, ensure full RhinoCommon/RhinoMath usage, unify constants/dispatch, and enforce cross-folder coherence.
 
 ## Inputs
 
@@ -25,47 +44,11 @@ Each folder contains 4 files:
 ✅ Parameter-driven logic (no constant spam, reuse computed intermediates)  
 ✅ Zero new warnings, all analyzers pass
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Standards, exemplars, patterns
-- `/AGENTS.md` - Agent patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/.editorconfig` - Style enforcement
-- `/libs/rhino/file_architecture.md` - 4-file architecture
-- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
-- `/libs/rhino/rhino_math_class.md` - RhinoMath usage (SqrtTwo, TwoPi, etc.)
-- `/libs/rhino/rhino_math_reference.md` - SDK reference
+Follow all rules in CLAUDE.md. Study core infrastructure (Result.cs, UnifiedOperation.cs, ValidationRules.cs, E.cs). Reference exemplar folders (fields/, spatial/) for patterns. Use RhinoMath constants (rhino_math_class.md).
 
-**Core Infrastructure (understand thoroughly)**:
-- `libs/core/results/Result.cs` - Monad patterns
-- `libs/core/results/ResultFactory.cs` - Creation helpers
-- `libs/core/operations/UnifiedOperation.cs` - Dispatch engine
-- `libs/core/validation/ValidationRules.cs` - Expression tree compilation
-- `libs/core/errors/E.cs` - Error registry and domain ranges
-
-**Reference Folders (study for patterns)**:
-- `libs/rhino/fields/` - Exemplar FrozenDictionary dispatch, algebraic design
-- `libs/rhino/spatial/` - Metadata-driven operations
-- `libs/rhino/morphology/`, `libs/rhino/topology/`
-
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - ternary (binary), switch expression (multiple), pattern matching (type). **Note**: `if` without `else` for early return/throw is acceptable.
-- K&R braces - opening on same line
-- Named parameters - non-obvious calls
-- Trailing commas - multi-line collections
-- One type per file (CA1050)
-- No extension methods, no helpers forwarding parameters
-- Dense, parameterized logic (no method proliferation)
-
-**4-File Architecture (preserve)**:
-- `.cs` - Public API + nested algebraic domain types
-- `Config.cs` - Constants + metadata + `FrozenDictionary` dispatch (single source of truth)
-- `Core.cs` - Orchestration: pattern match → metadata lookup → `UnifiedOperation.Apply`
-- `Compute.cs` - Dense SDK algorithms, no `Result<T>`/`V`/`E` knowledge
-
----
+**4-File Architecture**: Preserve `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
 
 ## Audit Goals (Per Folder)
 
@@ -111,13 +94,15 @@ For similar concepts (distance fields, sampling strategies, tolerance derivation
 - Ensure coherence with canonical reference folders
 - Don't invent folder-local patterns contradicting better-established designs unless clear, documented reason
 
+## Methodology
+
 ---
 
-## Multi-Pass Procedure (Per Folder)
+### Multi-Pass Procedure (Per Folder)
 
-**Use multiple explicit thinking passes** treating entire 4-file module as unit of work. Do not collapse passes.
+Use multiple explicit thinking passes treating entire 4-file module as unit of work. Do not collapse passes.
 
-### Pass 1: Folder Inventory & Roles
+**Pass 1: Folder Inventory & Roles**
 - Enumerate all files, confirm 4-file architecture intact
 - For folder as whole:
   - Summarize conceptual domain (what module is about)
@@ -235,7 +220,7 @@ Compare final structure and behavior against reference folders:
 
 Where reasonable, align with most mature reference (often `fields`), unless clear documented domain-specific reason to differ.
 
-### Pass 9: Final Integration & Self-Check
+**Pass 9: Final Integration & Self-Check**
 **Confirm per folder**:
 - Folder has exactly 4 files with intended roles
 - All public APIs in `.cs` return `Result<T>`
@@ -253,6 +238,16 @@ Where reasonable, align with most mature reference (often `fields`), unless clea
 - Repo builds with 0 new warnings under analyzers
 - Changes tightly scoped, fully justified, improve correctness/robustness/architectural clarity
 - No TODO comments or partial refactors
+
+## Verification
+
+After audit:
+- All algorithms mathematically/geometrically correct
+- Full RhinoCommon/RhinoMath usage (no SDK reinvention)
+- Unified constants and dispatch in Config
+- Correct UnifiedOperation wiring
+- Cross-folder coherence
+- Zero new warnings
 
 ---
 

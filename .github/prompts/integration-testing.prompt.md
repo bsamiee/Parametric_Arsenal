@@ -1,8 +1,27 @@
-# Integration Testing Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: integration-testing
+difficulty: advanced
+target: both
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - libs/core/operations/UnifiedOperation.cs
+  - libs/core/operations/OperationConfig.cs
+  - libs/core/results/Result.cs
+  - test/shared/Test.cs
+  - test/core/Results/ResultAlgebraTests.cs
+---
 
-**Role**: Expert C# integration test engineer implementing comprehensive cross-module pipeline tests with UnifiedOperation chains, caching validation, and system-level verification.
+# Integration Testing
 
-**Mission**: Design and implement integration tests for multi-module workflows in `libs/rhino/` and `libs/core/` that verify UnifiedOperation pipelines, Result monad composition, validation propagation, caching behavior, and cross-folder interactions.
+Design and implement integration tests for multi-module workflows verifying UnifiedOperation pipelines, Result monad composition, validation propagation, caching behavior, and cross-folder interactions.
+
+## Task Description
+
+Comprehensive cross-module pipeline testing. Verify UnifiedOperation chains, ConditionalWeakTable caching, Result composition, error accumulation, and cross-module interactions across libs/core and libs/rhino.
 
 ## Inputs
 
@@ -20,36 +39,17 @@
 ✅ Diagnostic capture integration verified (when enabled)  
 ✅ All tests pass with zero warnings
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Coding standards and patterns
-- `/AGENTS.md` - Agent patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/libs/core/operations/UnifiedOperation.cs` - Dispatch engine and caching
-- `/libs/core/operations/OperationConfig.cs` - Configuration patterns
-- `/libs/core/results/Result.cs` - Monadic composition patterns
-- `/test/shared/Test.cs` - Unified test utilities
-- `/test/core/Results/ResultAlgebraTests.cs` - Testing exemplars
+Follow all rules in CLAUDE.md. Use test/shared/Test.cs utilities. Study UnifiedOperation.cs, Result.cs, and ResultAlgebraTests.cs for patterns.
 
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - ternary, switch expressions, pattern matching. **Note**: `if` without `else` for guards is acceptable.
-- K&R braces - opening on same line
-- Named parameters - non-obvious calls
-- Trailing commas - multi-line collections
-- One type per file (CA1050)
+**Core Integration Patterns**: UnifiedOperation.Apply, Result.Bind, Result.Map, ConditionalWeakTable caching, OperationConfig
 
-**Core Integration Patterns**:
-- **UnifiedOperation.Apply** - Primary dispatch mechanism for all operations
-- **Result.Bind** - Monadic chaining of operations
-- **Result.Map** - Functor transformation within pipelines
-- **ConditionalWeakTable** - Automatic caching in UnifiedOperation
-- **OperationConfig** - Validation modes, diagnostics, error accumulation
+## Methodology
 
 ---
 
-## Phase 1: Integration Scenario Analysis (No Code Changes)
+### Phase 1: Integration Scenario Analysis (No Code Changes)
 
 **Goal**: Map integration points and workflows before testing.
 
@@ -113,9 +113,7 @@ Result<Output> first = UnifiedOperation.Apply(...);  // Cache miss
 Result<Output> second = UnifiedOperation.Apply(...); // Cache hit (same input)
 ```
 
----
-
-## Phase 2: Integration Test Design (No Code Changes)
+### Phase 2: Integration Test Design (No Code Changes)
 
 **Goal**: Complete test plan with scenarios, assertions, and metrics.
 
@@ -285,9 +283,7 @@ public void ErrorAccumulation_CollectsAllErrors() {
 }
 ```
 
----
-
-## Phase 3: Core Integration Tests Implementation
+### Phase 3: Core Integration Tests Implementation
 
 **Goal**: Implement tests for core infrastructure integration.
 
@@ -413,9 +409,7 @@ public void DiagnosticCapture_CollectsMetadata() {
 }
 ```
 
----
-
-## Phase 4: Rhino Module Integration Tests
+### Phase 4: Rhino Module Integration Tests
 
 **Goal**: Test cross-module Rhino geometry workflows.
 
@@ -543,9 +537,7 @@ public void Progressive_Validation_Pipeline() {
 }
 ```
 
----
-
-## Phase 5: Performance & Caching Tests
+### Phase 5: Performance & Caching Tests
 
 **Goal**: Verify caching behavior and performance characteristics.
 
@@ -657,9 +649,7 @@ public void Parallel_Operations_ThreadSafe() {
 }
 ```
 
----
-
-## Phase 6: Error Propagation Tests
+### Phase 6: Error Propagation Tests
 
 **Goal**: Verify error handling through integration pipelines.
 
@@ -725,9 +715,7 @@ public void ErrorContext_PreservedThroughPipeline() {
 }
 ```
 
----
-
-## Phase 7: Final Quality Pass
+### Phase 7: Final Quality Pass
 
 **Goal**: Holistic verification of integration test quality.
 
@@ -754,6 +742,16 @@ dotnet test --filter "Name~SpatialToTopology"
 # Run with performance profiling
 dotnet test --logger "console;verbosity=detailed" --filter "Category=Integration"
 ```
+
+## Verification
+
+After implementation:
+- Complete pipeline integration tests
+- UnifiedOperation chain verification
+- ConditionalWeakTable caching validated
+- Cross-module Result composition tested
+- Performance characteristics measured
+- All tests pass with zero warnings
 
 ---
 

@@ -1,8 +1,26 @@
-# Rhino Headless Testing Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: rhino-testing
+difficulty: advanced
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - test/shared/Test.cs
+  - test/rhino/Rhino.Testing.Configs.xml
+  - libs/rhino/rhino_math_class.md
+  - libs/rhino/rhino_math_reference.md
+---
 
-**Role**: Expert C# test engineer implementing comprehensive NUnit tests for RhinoCommon geometry operations using Rhino.Testing headless mode with property-based testing and algebraic verification.
+# Rhino Headless Testing
 
-**Mission**: Design and implement complete test coverage for `libs/rhino/<<TARGET_FOLDER>>/` using NUnit + Rhino.Testing (headless Rhino SDK) with CsCheck property-based testing, RTree spatial indexing verification, and geometry operation validation.
+Design and implement complete test coverage for Rhino geometry operations using NUnit + Rhino.Testing headless mode with property-based testing, RTree verification, and tolerance-based comparisons.
+
+## Task Description
+
+Comprehensive NUnit testing for RhinoCommon geometry operations. Use headless Rhino.Testing, CsCheck property-based testing, RTree spatial indexing verification, and RhinoMath tolerance-based comparisons.
 
 ## Inputs
 
@@ -20,41 +38,17 @@
 ✅ All tests pass in headless mode with zero warnings  
 ✅ Test utilities leverage test/shared/Test.cs patterns
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Coding standards and exemplar patterns
-- `/AGENTS.md` - Agent patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/test/shared/Test.cs` - Unified test utilities
-- `/test/rhino/Rhino.Testing.Configs.xml` - Headless Rhino configuration
-- `/libs/rhino/rhino_math_class.md` - RhinoMath constants and methods
-- `/libs/rhino/rhino_math_reference.md` - SDK reference
+Follow all rules in CLAUDE.md. Use NUnit framework with Rhino.Testing headless mode. Study test/shared/Test.cs utilities. Use RhinoMath constants for tolerances (ZeroTolerance, SqrtEpsilon).
 
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - ternary, switch expressions, pattern matching. **Note**: `if` without `else` for guards is acceptable.
-- K&R braces - opening on same line
-- Named parameters - non-obvious calls
-- Trailing commas - multi-line collections
-- One type per file (CA1050)
+**Rhino Testing**: NUnit + Rhino.Testing + RhinoCommon types + RhinoMath constants. Tolerance-based comparisons, validity checks, RTree verification.
 
-**Rhino Testing Infrastructure**:
-- **NUnit framework** - Use `[TestFixture]` and `[Test]` attributes
-- **Rhino.Testing** - Headless Rhino SDK without UI
-- **Rhino.Testing.Configs.xml** - Configuration for headless mode
-- **RhinoCommon types** - Point3d, Vector3d, Line, Curve, Mesh, Surface, Brep, RTree
-- **RhinoMath constants** - ZeroTolerance, SqrtEpsilon, SqrtTwo, TwoPi, etc.
-
-**Geometry Testing Patterns**:
-- Tolerance-based comparisons (EqualWithin using RhinoMath.ZeroTolerance)
-- Validity checks (GeometryBase.IsValid, Mesh.IsValidWithLog)
-- Spatial indexing verification (RTree performance, correctness)
-- Property-based generators for valid/degenerate geometry
+## Methodology
 
 ---
 
-## Phase 1: Rhino Testing Environment Setup (No Code Changes)
+### Phase 1: Rhino Testing Environment Setup (No Code Changes)
 
 **Goal**: Understand Rhino.Testing infrastructure and headless mode.
 
@@ -108,9 +102,7 @@ bool isZero = Math.Abs(value) < RhinoMath.ZeroTolerance;
 bool isUnset = Math.Abs(value - RhinoMath.UnsetValue) < RhinoMath.ZeroTolerance;
 ```
 
----
-
-## Phase 2: Target Implementation Analysis (No Code Changes)
+### Phase 2: Target Implementation Analysis (No Code Changes)
 
 **Goal**: Map Rhino module operations to test scenarios.
 
@@ -142,9 +134,7 @@ bool isUnset = Math.Abs(value - RhinoMath.UnsetValue) < RhinoMath.ZeroTolerance;
 - Radius/box/sphere searches
 - Performance characteristics (O(log n) vs O(n))
 
----
-
-## Phase 3: Geometry Generator Design (No Code Changes)
+### Phase 3: Geometry Generator Design (No Code Changes)
 
 **Goal**: Design CsCheck generators for RhinoCommon types.
 
@@ -301,9 +291,7 @@ public static Gen<Mesh> DegenerateMeshGen =>
         }));
 ```
 
----
-
-## Phase 4: NUnit Test Implementation
+### Phase 4: NUnit Test Implementation
 
 **Goal**: Implement comprehensive NUnit tests with Rhino.Testing.
 
@@ -503,9 +491,7 @@ public void Transformation_PreservesDistance() {
 }
 ```
 
----
-
-## Phase 5: RTree Spatial Indexing Tests
+### Phase 5: RTree Spatial Indexing Tests
 
 **Goal**: Verify RTree correctness and performance.
 
@@ -652,9 +638,7 @@ public void RTree_Performance_LogarithmicSearch() {
 }
 ```
 
----
-
-## Phase 6: Tolerance & Precision Tests
+### Phase 6: Tolerance & Precision Tests
 
 **Goal**: Verify numerical stability and tolerance handling.
 
@@ -720,9 +704,7 @@ public void InvalidCoordinate_Infinity_ReturnsValidationError() {
 }
 ```
 
----
-
-## Phase 7: Final Quality Pass
+### Phase 7: Final Quality Pass
 
 **Goal**: Holistic verification of Rhino test quality.
 
@@ -781,6 +763,16 @@ dotnet test --filter "Name~RTree_NearestNeighbor"
 - Assume UI is available (headless mode only)
 - Create tests that require user interaction
 - Use magic numbers for coordinates/tolerances
+
+## Verification
+
+After implementation:
+- Complete NUnit test coverage
+- Headless Rhino.Testing functional
+- Property-based tests with geometry generators
+- RTree performance tests (O(log n) vs O(n))
+- Tolerance-based comparisons (RhinoMath.ZeroTolerance)
+- All tests pass with zero warnings
 
 ---
 

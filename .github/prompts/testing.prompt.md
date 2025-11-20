@@ -1,8 +1,25 @@
-# Testing Agent
+---
+version: 1.0
+last_updated: 2025-11-20
+category: testing
+difficulty: advanced
+target: both
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - test/shared/Test.cs
+  - test/core/Results/ResultAlgebraTests.cs
+  - test/core/Results/ResultGenerators.cs
+---
 
-**Role**: Expert C# test engineer implementing comprehensive property-based and unit tests for Rhino computational geometry modules with algebraic law verification.
+# Testing Implementation
 
-**Mission**: Design and implement complete test coverage for `<<TARGET_FOLDER>>/` using xUnit + CsCheck (libs/core) or NUnit + Rhino.Testing (libs/rhino) with category theory laws, property-based testing, and zero-allocation patterns.
+Design and implement complete test coverage using xUnit + CsCheck (libs/core) or NUnit + Rhino.Testing (libs/rhino) with category theory laws, property-based testing, and zero-allocation patterns.
+
+## Task Description
+
+Comprehensive property-based and unit testing. Verify category theory laws (functor, monad, applicative), implement property-based generators, test edge cases, validate algebraic invariants, and ensure zero-allocation patterns.
 
 ## Inputs
 
@@ -20,43 +37,17 @@
 ✅ Test utilities leverage test/shared/Test.cs patterns  
 ✅ Rhino tests use headless mode with Rhino.Testing.Configs.xml
 
-## Non-Negotiable Constraints
+## Constraints
 
-**Before any code**, read and strictly obey:
-- `/CLAUDE.md` - Coding standards and exemplar patterns
-- `/AGENTS.md` - Agent-specific patterns
-- `/.github/copilot-instructions.md` - Quick reference
-- `/test/shared/Test.cs` - Unified test utilities with FrozenDictionary dispatch
-- `/test/core/Results/ResultAlgebraTests.cs` - Exemplar property-based tests
-- `/test/core/Results/ResultGenerators.cs` - Generator patterns
-- `/test/rhino/Rhino.Testing.Configs.xml` - Headless Rhino configuration
+Follow all rules in CLAUDE.md. Study test/shared/Test.cs, ResultAlgebraTests.cs, and ResultGenerators.cs for patterns. Use zero-allocation static lambdas and FrozenDictionary dispatch.
 
-**Style (zero tolerance)**:
-- No `var` - explicit types always
-- No `if`/`else` **statements** - ternary (binary), switch expression (multiple), pattern matching (type). **Note**: `if` without `else` for early return/throw is acceptable.
-- K&R braces - opening brace on same line
-- Named parameters - non-obvious calls
-- Trailing commas - multi-line collections
-- One type per file (CA1050)
-- Zero-allocation static lambdas in generators
-- FrozenDictionary for O(1) law/comparison dispatch
+**Testing Framework**: xUnit + CsCheck (libs/core), NUnit + Rhino.Testing (libs/rhino). Use test/shared/Test.cs utilities for all projects.
 
-**Core Testing Infrastructure**:
-- **test/shared/Test.cs** - Unified property-based testing with polymorphic dispatch
-- **Test.Run** - Polymorphic delegate dispatch for Func, Action, tuple patterns
-- **Test.RunAll** - Sequential assertion execution with for-loop optimization
-- **Test.Law** - Category theory law verification via FrozenDictionary dispatch
-- **Test.ForAll/Exists/Implies** - Quantifier verification
-- **Test.Success/Failure** - Result monad assertions
-
-**Testing Framework Selection**:
-- **libs/core**: xUnit + CsCheck property-based testing
-- **libs/rhino**: NUnit + Rhino.Testing (headless Rhino)
-- **Shared utilities**: test/shared/Test.cs for all projects
+## Methodology
 
 ---
 
-## Phase 1: Target Analysis (No Code Changes)
+### Phase 1: Target Analysis (No Code Changes)
 
 **Goal**: Understand what to test before writing tests.
 
@@ -94,9 +85,7 @@
 - FrozenDictionary dispatch for law/comparison operations
 - Test.RunAll for sequential assertions
 
----
-
-## Phase 2: Test Design (No Code Changes)
+### Phase 2: Test Design (No Code Changes)
 
 **Goal**: Complete test plan before implementation.
 
@@ -199,9 +188,7 @@ Test.Ordering(collection, "Increasing");
 Test.Count(collection, predicate, expectedCount: 5);
 ```
 
----
-
-## Phase 3: Generator Implementation
+### Phase 3: Generator Implementation
 
 **Goal**: Implement CsCheck generators for property-based testing.
 
@@ -271,9 +258,7 @@ public static Gen<Result<T>> SuccessGen<T>() =>
         deferredWeight: 1);
 ```
 
----
-
-## Phase 4: Test Implementation
+### Phase 4: Test Implementation
 
 **Goal**: Implement complete test coverage.
 
@@ -436,9 +421,7 @@ public void SpatialAndTopologyIntegration() =>
     }), 30);
 ```
 
----
-
-## Phase 5: Rhino Headless Testing (libs/rhino)
+### Phase 5: Rhino Headless Testing (libs/rhino)
 
 **Goal**: Implement NUnit tests with Rhino.Testing for geometry operations.
 
@@ -534,9 +517,7 @@ public void PropertyBasedWithCsCheck() {
 }
 ```
 
----
-
-## Phase 6: Test Utilities & Reusability
+### Phase 6: Test Utilities & Reusability
 
 **Goal**: Create reusable test infrastructure.
 
@@ -577,9 +558,7 @@ public static class CustomAssertions {
 }
 ```
 
----
-
-## Phase 7: Final Quality Pass
+### Phase 7: Final Quality Pass
 
 **Goal**: Holistic verification of test quality.
 
@@ -622,6 +601,16 @@ dotnet test --logger "console;verbosity=detailed"
 # Run specific test
 dotnet test --filter "Name~AlgebraTests"
 ```
+
+## Verification
+
+After implementation:
+- Comprehensive test coverage (property-based and concrete)
+- Category theory laws verified (functor, monad, applicative)
+- Zero-allocation static lambdas in generators
+- Test utilities leverage test/shared/Test.cs
+- All tests pass with zero warnings
+- Edge cases comprehensively covered
 
 ---
 
