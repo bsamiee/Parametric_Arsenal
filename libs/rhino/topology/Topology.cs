@@ -283,7 +283,7 @@ public static class Topology {
     public static Result<TopologyDiagnosis> DiagnoseTopology(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.Diagnose(brep: brep, context: context);
+        TopologyCore.ExecuteDiagnosis(input: brep, context: context);
 
     /// <summary>Classify edges by G0/G1/G2 continuity with angle threshold.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -299,7 +299,7 @@ public static class Topology {
     public static Result<TopologicalFeatures> ExtractTopologicalFeatures(
         Brep brep,
         IGeometryContext context) =>
-        TopologyCompute.ExtractFeatures(brep: brep, context: context);
+        TopologyCore.ExecuteFeatures(input: brep, context: context);
 
     /// <summary>Progressive healing with automatic rollback and strategy selection.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -307,5 +307,5 @@ public static class Topology {
         Brep brep,
         IReadOnlyList<Strategy> strategies,
         IGeometryContext context) =>
-        TopologyCompute.Heal(brep: brep, strategies: strategies, context: context);
+        TopologyCore.ExecuteHeal(input: brep, strategies: strategies, context: context);
 }

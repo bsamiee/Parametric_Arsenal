@@ -91,6 +91,30 @@ internal static class TopologyCore {
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
+    internal static Result<Topology.TopologyDiagnosis> ExecuteDiagnosis(Brep input, IGeometryContext context) =>
+        Execute(input: input, context: context, opType: TopologyConfig.OpType.Diagnosis,
+            operation: g => g switch {
+                Brep brep => TopologyCompute.Diagnose(brep: brep, context: context)
+                    .Map(value => (IReadOnlyList<Topology.TopologyDiagnosis>)[value,]),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.TopologyDiagnosis>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(Brep).Name}")),
+            });
+
+    internal static Result<Topology.HealingResult> ExecuteHeal(Brep input, IReadOnlyList<Topology.Strategy> strategies, IGeometryContext context) =>
+        Execute(input: input, context: context, opType: TopologyConfig.OpType.Healing,
+            operation: g => g switch {
+                Brep brep => TopologyCompute.Heal(brep: brep, strategies: strategies, context: context)
+                    .Map(value => (IReadOnlyList<Topology.HealingResult>)[value,]),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.HealingResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(Brep).Name}")),
+            });
+
+    internal static Result<Topology.TopologicalFeatures> ExecuteFeatures(Brep input, IGeometryContext context) =>
+        Execute(input: input, context: context, opType: TopologyConfig.OpType.TopologicalFeatures,
+            operation: g => g switch {
+                Brep brep => TopologyCompute.ExtractFeatures(brep: brep, context: context)
+                    .Map(value => (IReadOnlyList<Topology.TopologicalFeatures>)[value,]),
+                _ => ResultFactory.Create<IReadOnlyList<Topology.TopologicalFeatures>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(Brep).Name}")),
+            });
+
     internal static Result<Topology.VertexData> ExecuteVertexData<T>(T input, IGeometryContext context, int vertexIndex) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.VertexData,
             operation: g => (g, vertexIndex) switch {

@@ -37,6 +37,9 @@ internal static class TopologyConfig {
             [(typeof(Brep), OpType.VertexData)] = (V.Standard | V.Topology, "Topology.GetVertexData.Brep"),
             [(typeof(Mesh), OpType.VertexData)] = (V.Standard | V.MeshSpecific, "Topology.GetVertexData.Mesh"),
             [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
+            [(typeof(Brep), OpType.Diagnosis)] = (V.Standard | V.Topology | V.BrepGranular, "Topology.DiagnoseTopology.Brep"),
+            [(typeof(Brep), OpType.Healing)] = (V.Standard | V.Topology, "Topology.HealTopology.Brep"),
+            [(typeof(Brep), OpType.TopologicalFeatures)] = (V.Standard | V.Topology | V.MassProperties, "Topology.ExtractTopologicalFeatures.Brep"),
         }.ToFrozenDictionary();
 
     internal const double CurvatureThresholdRatio = 0.1;
@@ -45,5 +48,5 @@ internal static class TopologyConfig {
     internal const int MaxEdgesForNearMissAnalysis = 100;
 
     /// <summary>Topology operation types for dispatch lookup.</summary>
-    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
+    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7, Diagnosis = 8, Healing = 9, TopologicalFeatures = 10 }
 }
