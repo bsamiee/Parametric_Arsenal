@@ -218,7 +218,7 @@ internal static class AnalysisCompute {
                 .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
             ],
             BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
-                ? (validCurvatures.Sum(k => k * k) * (curveLength / (sampleCount - 1))) / (maxCurv * curveLength)
+                ? (validCurvatures.Sum(k => k * k) * (curveLength / (validCount - 1))) / (maxCurv * curveLength)
                 : 0.0));
     }
 
@@ -301,6 +301,9 @@ internal static class AnalysisCompute {
                 double[] edgeLengthsArray = [.. Enumerable.Range(0, vertCount)
                     .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount])),
                 ];
+                for (int j = 0; j < vertCount; j++) {
+                    edgeLengths[j] = edgeLengthsArray[j];
+                }
                 double minEdge = edgeLengthsArray.Min();
                 double maxEdge = edgeLengthsArray.Max();
                 double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
@@ -321,7 +324,7 @@ internal static class AnalysisCompute {
                             : 1.0
                         : 1.0;
                 double jacobian = isQuad
-                    ? edgeLengths.Take(4).Average() is double avgLen && avgLen > context.AbsoluteTolerance
+                    ? edgeLengthsArray.Average() is double avgLen && avgLen > context.AbsoluteTolerance
                         ? ((double[])[
                             Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[3] - vertices[0]).Length,
                             Vector3d.CrossProduct(vertices[2] - vertices[1], vertices[0] - vertices[1]).Length,
@@ -329,7 +332,7 @@ internal static class AnalysisCompute {
                             Vector3d.CrossProduct(vertices[0] - vertices[3], vertices[2] - vertices[3]).Length,
                         ]).Min() / ((avgLen * avgLen) + context.AbsoluteTolerance)
                         : 0.0
-                    : edgeLengths.Take(3).Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
+                    : edgeLengthsArray.Average() is double triAvgLen && triAvgLen > context.AbsoluteTolerance
                         ? Vector3d.CrossProduct(vertices[1] - vertices[0], vertices[2] - vertices[0]).Length / ((2.0 * triAvgLen * triAvgLen) + context.AbsoluteTolerance)
                         : 0.0;
                 return (AspectRatio: aspectRatio, Skewness: skewness, Jacobian: jacobian);
