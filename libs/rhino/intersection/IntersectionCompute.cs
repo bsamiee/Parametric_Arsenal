@@ -19,7 +19,7 @@ internal static class IntersectionCompute {
         mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [context, mode,]);
 
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(byte Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
         static Result<(byte, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
             double averageDeviation = angles.Sum(angle => Math.Abs(RhinoMath.HalfPI - angle)) / angles.Length;
