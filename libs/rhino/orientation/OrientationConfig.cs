@@ -115,17 +115,35 @@ internal static class OrientationConfig {
     private static Result<Plane> ExtractBrepPlane(GeometryBase geometry) {
         Brep brep = (Brep)geometry;
         Vector3d normal = brep.Faces.Count > 0 ? brep.Faces[0].NormalAt(0.5, 0.5) : Vector3d.ZAxis;
-        return (brep, normal) switch {
-            var (b, n) when b.IsSolid => ComputeMassPlane(VolumeMassProperties.Compute(b), n),
-            var (b, n) when b.SolidOrientation != BrepSolidOrientation.None => ComputeMassPlane(AreaMassProperties.Compute(b), n),
-            var (b, n) => ResultFactory.Create(value: new Plane(b.GetBoundingBox(accurate: false).Center, n)),
-        };
+        return brep.IsSolid
+            ? ((Func<Result<Plane>>)(() => {
+                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
+                return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))()
+            : brep.SolidOrientation != BrepSolidOrientation.None
+                ? ((Func<Result<Plane>>)(() => {
+                    using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
+                    return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+                }))()
+                : ResultFactory.Create(value: new Plane(brep.GetBoundingBox(accurate: false).Center, normal));
     }
 
     private static Result<Plane> ExtractExtrusionPlane(GeometryBase geometry) =>
         ((Extrusion)geometry) switch {
-            Extrusion e when e.IsSolid => ((Func<Result<Plane>>)(() => { using LineCurve? path = e.PathLineCurve(); return ComputeMassPlane(VolumeMassProperties.Compute(e), path?.TangentAtStart ?? Vector3d.ZAxis); }))(),
-            Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ((Func<Result<Plane>>)(() => { using LineCurve? path = e.PathLineCurve(); return ComputeMassPlane(AreaMassProperties.Compute(e), path?.TangentAtStart ?? Vector3d.ZAxis); }))(),
+            Extrusion e when e.IsSolid => ((Func<Result<Plane>>)(() => {
+                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(e);
+                using LineCurve? path = e.PathLineCurve();
+                return vmp is not null && path is not null
+                    ? ResultFactory.Create(value: new Plane(vmp.Centroid, path.TangentAtStart))
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
+            Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ((Func<Result<Plane>>)(() => {
+                using AreaMassProperties? amp = AreaMassProperties.Compute(e);
+                using LineCurve? path = e.PathLineCurve();
+                return amp is not null && path is not null
+                    ? ResultFactory.Create(value: new Plane(amp.Centroid, path.TangentAtStart))
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
             Extrusion e => ((Func<Result<Plane>>)(() => {
                 using LineCurve? path = e.PathLineCurve();
                 return path is not null
@@ -134,15 +152,17 @@ internal static class OrientationConfig {
             }))(),
         };
 
-    private static Result<Plane> ExtractMeshPlane(GeometryBase geometry) =>
-        ((Mesh)geometry, ((Mesh)geometry).Normals.Count > 0 ? ((Mesh)geometry).Normals[0] : Vector3d.ZAxis) switch {
-            (Mesh m, Vector3d n) when m.IsClosed => ComputeMassPlane(VolumeMassProperties.Compute(m), n),
-            (Mesh m, Vector3d n) => ComputeMassPlane(AreaMassProperties.Compute(m), n),
-        };
-
-    private static Result<Plane> ComputeMassPlane(VolumeMassProperties? vmp, Vector3d normal) =>
-        vmp is not null ? ((Func<Result<Plane>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: new Plane(c, normal)); }))() : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-
-    private static Result<Plane> ComputeMassPlane(AreaMassProperties? amp, Vector3d normal) =>
-        amp is not null ? ((Func<Result<Plane>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: new Plane(c, normal)); }))() : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+    private static Result<Plane> ExtractMeshPlane(GeometryBase geometry) {
+        Mesh mesh = (Mesh)geometry;
+        Vector3d normal = mesh.Normals.Count > 0 ? mesh.Normals[0] : Vector3d.ZAxis;
+        return mesh.IsClosed
+            ? ((Func<Result<Plane>>)(() => {
+                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
+                return vmp is not null ? ResultFactory.Create(value: new Plane(vmp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))()
+            : ((Func<Result<Plane>>)(() => {
+                using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
+                return amp is not null ? ResultFactory.Create(value: new Plane(amp.Centroid, normal)) : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))();
+    }
 }

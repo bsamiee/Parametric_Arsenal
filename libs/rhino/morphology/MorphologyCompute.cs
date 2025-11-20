@@ -208,17 +208,15 @@ internal static class MorphologyCompute {
                                         int wingCount = 0;
                                         for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
                                             int n = v1Neighbors[i];
-                                            wingContrib = n != default && n != v2 && n != opposite1 && n != opposite2
-                                                ? wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin))
-                                                : wingContrib;
-                                            wingCount += n != default && n != v2 && n != opposite1 && n != opposite2 ? 1 : 0;
+                                            (wingContrib, wingCount) = n != default && n != v2 && n != opposite1 && n != opposite2
+                                                ? (wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin)), wingCount + 1)
+                                                : (wingContrib, wingCount);
                                         }
                                         for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
                                             int n = v2Neighbors[i];
-                                            wingContrib = n != default && n != v1 && n != opposite1 && n != opposite2
-                                                ? wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin))
-                                                : wingContrib;
-                                            wingCount += n != default && n != v1 && n != opposite1 && n != opposite2 ? 1 : 0;
+                                            (wingContrib, wingCount) = n != default && n != v1 && n != opposite1 && n != opposite2
+                                                ? (wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin)), wingCount + 1)
+                                                : (wingContrib, wingCount);
                                         }
                                         return Point3d.Origin + (mid - Point3d.Origin) + oppositeContrib + wingContrib;
                                     }))();
@@ -463,25 +461,23 @@ internal static class MorphologyCompute {
 
     [Pure]
     internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
-        MorphologyCore.ComputeMeshMetrics(mesh, context) is (double[] edgeLengths, double[] aspectRatios, double[] minAngles)
-            && aspectRatios.Length > 0 && minAngles.Length > 0
-            ? (aspectRatios.Max(), minAngles.Min()) is (double maxAspect, double minAngle)
-                ? maxAspect > MorphologyConfig.AspectRatioThreshold
-                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
-                    : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                        ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
-                        : ResultFactory.Create(value: mesh)
-                : ResultFactory.Create(value: mesh)
-            : ResultFactory.Create(value: mesh);
+        MorphologyCore.ComputeMeshMetrics(mesh, context) switch {
+            (_, [], _) or (_, _, []) => ResultFactory.Create(value: mesh),
+            (_, double[] aspectRatios, double[] minAngles) when aspectRatios.Max() > MorphologyConfig.AspectRatioThreshold =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {aspectRatios.Max():F2}"))),
+            (_, _, double[] minAngles) when minAngles.Min() < MorphologyConfig.MinAngleRadiansThreshold =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngles.Min()):F1}°"))),
+            _ => ResultFactory.Create(value: mesh),
+        };
 
     [Pure]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
         byte flags,
         double weldTolerance,
-        IGeometryContext _) =>
+        IGeometryContext __) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
             ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
@@ -498,7 +494,7 @@ internal static class MorphologyCompute {
                 ];
                 for (int i = 0; i < repairFlags.Length; i++) {
                     byte flag = repairFlags[i];
-                    bool applied = (flags & flag) != 0 && (MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)?.RepairAction?.Invoke(repaired, tol) ?? false);
+                    _ = (flags & flag) != 0 && (MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)?.RepairAction?.Invoke(repaired, tol) ?? false);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -519,7 +515,7 @@ internal static class MorphologyCompute {
         Mesh mesh,
         double tolerance,
         bool weldNormals,
-        IGeometryContext _) =>
+        IGeometryContext __) =>
         (tolerance, mesh.DuplicateMesh()) switch {
             ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext(
@@ -527,7 +523,7 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh welded) => ((Func<Result<Mesh>>)(() => {
-                bool combined = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                _ = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
                 return !weldNormals || welded.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: welded)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed"));

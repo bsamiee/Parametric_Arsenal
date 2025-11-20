@@ -287,9 +287,13 @@ internal static class MorphologyCore {
                                 double len = remeshData.Remeshed.TopologyEdges.EdgeLine(i).Length;
                                 (sum, sumSq) = (sum + len, sumSq + (len * len));
                             }
-                            (double mean, double variance, double stdDev) = edgeCount > 0
-                                ? (sum / edgeCount, (sumSq / edgeCount) - ((sum / edgeCount) * (sum / edgeCount)), Math.Sqrt(Math.Max((sumSq / edgeCount) - ((sum / edgeCount) * (sum / edgeCount)), 0.0)))
-                                : (0.0, 0.0, 0.0);
+                            (double mean, double stdDev) = edgeCount > 0
+                                ? ((Func<(double, double)>)(() => {
+                                    double m = sum / edgeCount;
+                                    double variance = (sumSq / edgeCount) - (m * m);
+                                    return (m, Math.Sqrt(Math.Max(variance, 0.0)));
+                                }))()
+                                : (0.0, 0.0);
                             double uniformity = mean > context.AbsoluteTolerance ? Math.Exp(-stdDev / Math.Max(mean, RhinoMath.ZeroTolerance)) : 0.0;
                             bool converged = Math.Abs(mean - operation.TargetEdgeLength) <= (operation.TargetEdgeLength * MorphologyConfig.RemeshConvergenceThreshold)
                                 && mean > RhinoMath.ZeroTolerance && (stdDev / mean) <= MorphologyConfig.RemeshUniformityWeight;
@@ -361,15 +365,15 @@ internal static class MorphologyCore {
         Enumerable.Range(0, Math.Min(original.Vertices.Count, smoothed.Vertices.Count))
             .Aggregate((SumSq: 0.0, MaxDisp: 0.0, Count: 0), (acc, i) => ((Point3d)original.Vertices[i]).DistanceTo(smoothed.Vertices[i]) is double dist
                 ? (acc.SumSq + (dist * dist), Math.Max(acc.MaxDisp, dist), acc.Count + 1)
-                : acc) is (double sumSq, double maxDisp, int count)
+                : acc) is (double sumSq, double maxDisp, int count) && Math.Sqrt(sumSq / Math.Max(count, 1)) is double rms
             ? ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
                 new Morphology.SmoothingResult(
                     smoothed,
                     iterations,
-                    Math.Sqrt(sumSq / Math.Max(count, 1)),
+                    rms,
                     maxDisp,
                     MorphologyCompute.ValidateMeshQuality(smoothed, context).IsSuccess ? 1.0 : 0.0,
-                    Math.Sqrt(sumSq / Math.Max(count, 1)) < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier),
+                    rms < context.AbsoluteTolerance * MorphologyConfig.ConvergenceMultiplier),
             ])
             : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount);
 
