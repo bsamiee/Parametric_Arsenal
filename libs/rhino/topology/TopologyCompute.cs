@@ -19,18 +19,20 @@ internal static class TopologyCompute {
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
                 .Bind(validBrep => (validBrep.Vertices.Count, validBrep.Edges.Count, validBrep.Faces.Count) switch {
-                    (int v, int e, int f) when v > 0 && e > 0 && f > 0 => (
-                        IsSolid: validBrep.IsSolid && validBrep.IsManifold,
-                        Numerator: e - v - f + 2,
-                        Loops: [.. validBrep.Loops.Select((l, i) => {
+                    (int v, int e, int f) when v > 0 && e > 0 && f > 0 => ((Func<Result<Topology.TopologicalFeatures>>)(() => {
+                        bool isSolid = validBrep.IsSolid && validBrep.IsManifold;
+                        int numerator = e - v - f + 2;
+                        (int, bool)[] loops = [.. validBrep.Loops.Select((l, i) => {
                             using Curve? loopCurve = l.To3dCurve();
                             return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
                         }),
-                        ]) switch {
-                        (true, int numerator, IReadOnlyList<(int, bool)> loops) when numerator >= 0 && (numerator & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: numerator / 2, Loops: loops, IsSolid: true, HandleCount: numerator / 2)),
-                        (true, _, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
-                        (false, _, IReadOnlyList<(int, bool)> loops) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: false, HandleCount: 0)),
-                    },
+                        ];
+                        return (isSolid, numerator, loops) switch {
+                            (true, int num, (int, bool)[] lps) when num >= 0 && (num & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: num / 2, Loops: lps, IsSolid: true, HandleCount: num / 2)),
+                            (true, _, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
+                            (false, _, (int, bool)[] lps) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: lps, IsSolid: false, HandleCount: 0)),
+                        };
+                    }))(),
                     _ => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
                 });
 
