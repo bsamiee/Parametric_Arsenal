@@ -22,7 +22,7 @@ internal static class TopologyCompute {
                     (int v, int e, int f) when v > 0 && e > 0 && f > 0 => (
                         IsSolid: validBrep.IsSolid && validBrep.IsManifold,
                         Numerator: e - v - f + 2,
-                        Loops: (IReadOnlyList<(int LoopIndex, bool IsHole)>)[.. validBrep.Loops.Select((l, i) => {
+                        Loops: [.. validBrep.Loops.Select((l, i) => {
                             using Curve? loopCurve = l.To3dCurve();
                             return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
                         }),
