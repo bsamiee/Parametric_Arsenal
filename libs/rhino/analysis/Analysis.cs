@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Rhino.Geometry;
 

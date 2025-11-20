@@ -102,11 +102,6 @@ yarn-error.log*
 *.rws
 *.rws.data
 
-# --- Local development files --------------------------------------------------
-.secrets.baseline
-todo.txt
-placeholder.txt
-
 # ------------------------------------------------------------------------------
 # Leave Rhino / Grasshopper assets *tracked* via Git LFS
 #   *.3dm

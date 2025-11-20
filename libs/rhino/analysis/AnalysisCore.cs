@@ -4,7 +4,6 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Analysis;
@@ -70,7 +69,8 @@ internal static class AnalysisCore {
                 : Execute<Analysis.MeshData>(request: new Analysis.MeshAnalysis(mesh: m), context: context)
                     .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null),
             _ => null,
-        }),];
+        }),
+        ];
         return results.Any(r => r is null)
             ? ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext("One or more geometries failed analysis"))
             : ResultFactory.Create(value: (IReadOnlyList<Analysis.IResult>)[.. results.Where(r => r is not null).Select(r => r!),]);

@@ -228,7 +228,8 @@ internal static class AnalysisCompute {
             SingularityLocations: [.. samples.Select(s => (s.u, s.v)).Where(uv =>
                 surface.IsAtSingularity(u: uv.u, v: uv.v, exact: false)
                 || Math.Min(Math.Abs(uv.u - uDomain.Min), Math.Abs(uDomain.Max - uv.u)) <= singularityThresholdU
-                || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV),],
+                || Math.Min(Math.Abs(uv.v - vDomain.Min), Math.Abs(vDomain.Max - uv.v)) <= singularityThresholdV),
+            ],
             UniformityScore: RhinoMath.Clamp(
                 medianGaussian > context.AbsoluteTolerance
                     ? (1.0 - (stdDevGaussian / (medianGaussian * curvatureMultiplier)))
@@ -270,7 +271,8 @@ internal static class AnalysisCompute {
             CurvatureValues: validCurvatures,
             InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
                 .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
-                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),],
+                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
+            ],
             BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
                 ? (validCurvatures.Sum(k => k * k) * (curveLength / (sampleCount - 1))) / (maxCurv * curveLength)
                 : 0.0));
@@ -297,7 +299,8 @@ internal static class AnalysisCompute {
                 vertices[3] = validIndices && isQuad ? (Point3d)mesh.Vertices[face.D] : vertices[0];
                 int vertCount = isQuad ? 4 : 3;
                 double[] edgeLengthsArray = [.. Enumerable.Range(0, vertCount)
-                    .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount])),];
+                    .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount])),
+                ];
                 double minEdge = edgeLengthsArray.Min();
                 double maxEdge = edgeLengthsArray.Max();
                 double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
