@@ -37,7 +37,7 @@ internal static class AnalysisCore {
             };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<object>> ExecuteBatch<T>(
+    internal static Result<IReadOnlyList<Analysis.IResult>> ExecuteBatch<T>(
         IReadOnlyList<T> geometries,
         IGeometryContext context,
         double? parameter,
@@ -45,41 +45,35 @@ internal static class AnalysisCore {
         int? index,
         Point3d? testPoint,
         int derivativeOrder) where T : GeometryBase {
-        List<object> results = [];
-        foreach (T item in geometries) {
-            Result<object> itemResult = item switch {
-                Curve c => Execute<Analysis.CurveData>(request: new Analysis.CurveAnalysis(
-                    Curve: c,
-                    Parameter: parameter ?? c.Domain.Mid,
-                    DerivativeOrder: derivativeOrder), context: context).Map(r => (object)r),
-                Surface s => Execute<Analysis.SurfaceData>(request: new Analysis.SurfaceAnalysis(
-                    Surface: s,
-                    U: uv?.Item1 ?? s.Domain(0).Mid,
-                    V: uv?.Item2 ?? s.Domain(1).Mid,
-                    DerivativeOrder: derivativeOrder), context: context).Map(r => (object)r),
-                Brep b => Execute<Analysis.BrepData>(request: new Analysis.BrepAnalysis(
-                    Brep: b,
-                    FaceIndex: index ?? 0,
-                    U: uv?.Item1 ?? (b.Faces.Count > 0 ? b.Faces[0].Domain(0).Mid : 0.5),
-                    V: uv?.Item2 ?? (b.Faces.Count > 0 ? b.Faces[0].Domain(1).Mid : 0.5),
-                    TestPoint: testPoint ?? b.GetBoundingBox(accurate: false).Center,
-                    DerivativeOrder: derivativeOrder), context: context).Map(r => (object)r),
-                Mesh m => Execute<Analysis.MeshData>(request: new Analysis.MeshAnalysis(
-                    Mesh: m,
-                    VertexIndex: index ?? 0), context: context).Map(r => (object)r),
-                _ => ResultFactory.Create<object>(error: E.Geometry.UnsupportedAnalysis.WithContext(item.GetType().Name)),
-            };
-            Result<IReadOnlyList<object>> accumResult = itemResult.Match(
-                onSuccess: obj => {
-                    results.Add(obj);
-                    return ResultFactory.Create(value: (IReadOnlyList<object>)results);
-                },
-                onFailure: errors => ResultFactory.Create<IReadOnlyList<object>>(errors: errors));
-            if (accumResult.Match(onSuccess: _ => false, onFailure: _ => true)) {
-                return accumResult;
-            }
-        }
-        return ResultFactory.Create(value: (IReadOnlyList<object>)results);
+        Analysis.IResult?[] results = [.. geometries.Select(item => item switch {
+            Curve c => parameter is double p
+                ? Execute<Analysis.CurveData>(request: new Analysis.CurveAnalysis(Curve: c, Parameter: p, DerivativeOrder: derivativeOrder), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null)
+                : Execute<Analysis.CurveData>(request: new Analysis.CurveAnalysis(curve: c, derivativeOrder: derivativeOrder), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null),
+            Surface s => uv is (double u, double v)
+                ? Execute<Analysis.SurfaceData>(request: new Analysis.SurfaceAnalysis(Surface: s, U: u, V: v, DerivativeOrder: derivativeOrder), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null)
+                : Execute<Analysis.SurfaceData>(request: new Analysis.SurfaceAnalysis(surface: s, derivativeOrder: derivativeOrder), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null),
+            Brep b => ((Func<Analysis.IResult?>)(() => {
+                int fIdx = index ?? 0;
+                double u = uv?.Item1 ?? (b.Faces.Count > fIdx ? b.Faces[fIdx].Domain(0).Mid : 0.5);
+                double v = uv?.Item2 ?? (b.Faces.Count > fIdx ? b.Faces[fIdx].Domain(1).Mid : 0.5);
+                Point3d tp = testPoint ?? b.GetBoundingBox(accurate: false).Center;
+                return Execute<Analysis.BrepData>(request: new Analysis.BrepAnalysis(Brep: b, FaceIndex: fIdx, U: u, V: v, TestPoint: tp, DerivativeOrder: derivativeOrder), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null);
+            }))(),
+            Mesh m => index is int idx
+                ? Execute<Analysis.MeshData>(request: new Analysis.MeshAnalysis(Mesh: m, VertexIndex: idx), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null)
+                : Execute<Analysis.MeshData>(request: new Analysis.MeshAnalysis(mesh: m), context: context)
+                    .Match(onSuccess: r => (Analysis.IResult?)r, onFailure: _ => null),
+            _ => null,
+        }),];
+        return results.Any(r => r is null)
+            ? ResultFactory.Create<IReadOnlyList<Analysis.IResult>>(error: E.Geometry.UnsupportedAnalysis.WithContext("One or more geometries failed analysis"))
+            : ResultFactory.Create(value: (IReadOnlyList<Analysis.IResult>)[.. results.Where(r => r is not null).Select(r => r!),]);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
