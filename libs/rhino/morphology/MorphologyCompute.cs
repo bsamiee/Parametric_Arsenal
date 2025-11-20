@@ -559,18 +559,18 @@ internal static class MorphologyCompute {
                 }))();
 
     [Pure]
-    internal static Result<Mesh> ThickenMesh(
+    internal static Result<(Mesh Thickened, int WallFaceCount)> ThickenMesh(
         Mesh mesh,
         double thickness,
         bool solidify,
         Vector3d direction,
         IGeometryContext _) =>
         !RhinoMath.IsValidDouble(thickness) || Math.Abs(thickness) < MorphologyConfig.MinThickenDistance || Math.Abs(thickness) > MorphologyConfig.MaxThickenDistance
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
+            ? ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
                 string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Thickness: {thickness:F6}, Range: [{MorphologyConfig.MinThickenDistance:F6}, {MorphologyConfig.MaxThickenDistance:F6}]")))
-            : mesh.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? _) is { IsValid: true } thickened
-                ? ResultFactory.Create(value: thickened)
-                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext("Offset operation returned null or invalid mesh"));
+            : mesh.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? wallFaces) is { IsValid: true } thickened
+                ? ResultFactory.Create(value: (thickened, wallFaces?.Count ?? 0))
+                : ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext("Offset operation returned null or invalid mesh"));
 
     [Pure]
     internal static Result<Mesh> UnwrapMesh(

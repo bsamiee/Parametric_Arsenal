@@ -140,10 +140,10 @@ internal static class OrientationCompute {
             (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
                 (su: new Vector3d(s), tu: new Vector3d(t), pt: anchor ?? box.Center) switch {
                     var ctx when ctx.su.Unitize() && ctx.tu.Unitize() =>
-                        Vector3d.CrossProduct(ctx.su, ctx.tu).Length < RhinoMath.SqrtEpsilon
-                            ? Math.Abs((ctx.su * ctx.tu) - 1.0) < RhinoMath.SqrtEpsilon
+                        Vector3d.CrossProduct(ctx.su, ctx.tu).Length < Math.Sin(RhinoMath.DefaultAngleTolerance)
+                            ? Math.Abs((ctx.su * ctx.tu) - 1.0) < (1.0 - Math.Cos(RhinoMath.DefaultAngleTolerance))
                                 ? ResultFactory.Create(value: Transform.Identity)
-                                : Math.Abs((ctx.su * ctx.tu) + 1.0) < RhinoMath.SqrtEpsilon
+                                : Math.Abs((ctx.su * ctx.tu) + 1.0) < (1.0 - Math.Cos(RhinoMath.DefaultAngleTolerance))
                                     ? ((Func<Result<Transform>>)(() => {
                                         Vector3d axis = Math.Abs(ctx.su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(ctx.su, Vector3d.XAxis) : Vector3d.CrossProduct(ctx.su, Vector3d.YAxis);
                                         return axis.Unitize() ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axis, ctx.pt)) : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);

@@ -3,6 +3,7 @@ using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Results;
+using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
@@ -135,13 +136,20 @@ public static class Orientation {
         double Deviation);
 
     /// <summary>Result of relative orientation computation.</summary>
-    [DebuggerDisplay("Twist={Twist:F3}°, Tilt={Tilt:F3}°")]
+    [DebuggerDisplay("Twist={TwistDegrees:F3}°, Tilt={TiltDegrees:F3}°")]
     public sealed record RelativeOrientationResult(
         Transform RelativeTransform,
         double Twist,
         double Tilt,
         SymmetryType Symmetry,
-        RelationshipType Relationship);
+        RelationshipType Relationship) {
+        /// <summary>Twist angle in degrees for display purposes.</summary>
+        [Pure]
+        public double TwistDegrees => RhinoMath.ToDegrees(this.Twist);
+        /// <summary>Tilt angle in degrees for display purposes.</summary>
+        [Pure]
+        public double TiltDegrees => RhinoMath.ToDegrees(this.Tilt);
+    }
 
     /// <summary>Execute orientation operation on geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

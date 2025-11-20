@@ -264,7 +264,7 @@ internal static class MorphologyCore {
                 config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                     Context = context,
                     ValidationMode = V.Standard | V.MeshSpecific | V.Topology,
-                    OperationName = "Morphology.MeshReduce",
+                    OperationName = "Morphology.MeshReduction",
                     EnableDiagnostics = false,
                 });
 
@@ -562,24 +562,19 @@ internal static class MorphologyCore {
                 input: mesh,
                 operation: (Func<Mesh, Result<IReadOnlyList<Morphology.IMorphologyResult>>>)(m =>
                     MorphologyCompute.ThickenMesh(m, operation.OffsetDistance, operation.Solidify, operation.Direction, context)
-                        .Bind(thickened => {
-                            int wallCount = m.Offset(distance: operation.OffsetDistance, solidify: operation.Solidify, direction: operation.Direction, wallFacesOut: out List<int>? wallFaces) is not null
-                                ? wallFaces?.Count ?? 0
-                                : 0;
-                            return ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
-                                new Morphology.MeshThickenResult(
-                                    thickened,
-                                    operation.OffsetDistance,
-                                    operation.Solidify && thickened.IsClosed,
-                                    m.Vertices.Count,
-                                    thickened.Vertices.Count,
-                                    m.Faces.Count,
-                                    thickened.Faces.Count,
-                                    wallCount,
-                                    m.GetBoundingBox(accurate: false),
-                                    thickened.GetBoundingBox(accurate: false)),
-                            ]);
-                        })),
+                        .Bind(result => ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(value: [
+                            new Morphology.MeshThickenResult(
+                                result.Thickened,
+                                operation.OffsetDistance,
+                                operation.Solidify && result.Thickened.IsClosed,
+                                m.Vertices.Count,
+                                result.Thickened.Vertices.Count,
+                                m.Faces.Count,
+                                result.Thickened.Faces.Count,
+                                result.WallFaceCount,
+                                m.GetBoundingBox(accurate: false),
+                                result.Thickened.GetBoundingBox(accurate: false)),
+                        ]))),
                 config: new OperationConfig<Mesh, Morphology.IMorphologyResult> {
                     Context = context,
                     ValidationMode = V.Standard | V.MeshSpecific,
