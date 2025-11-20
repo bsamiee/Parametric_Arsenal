@@ -396,8 +396,13 @@ internal static class SpatialCompute {
 
             (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
         }
-        (double dx, double dy) = ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleScale, (maxY - minY) * SpatialConfig.DelaunaySuperTriangleScale);
-        Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, z0), new Point3d(maxX + dx, minY - dy, z0), new Point3d(minX + ((maxX - minX) * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, z0),];
+        double extentX = maxX - minX;
+        double extentY = maxY - minY;
+        double extentTolerance = Math.Max(context.AbsoluteTolerance, RhinoMath.ZeroTolerance);
+        if (extentX <= extentTolerance || extentY <= extentTolerance) { return ResultFactory.Create<int[][]>(error: E.Validation.DegenerateGeometry.WithContext("DelaunayTriangulation2D requires non-collinear points")); }
+
+        (double dx, double dy) = (extentX * SpatialConfig.DelaunaySuperTriangleScale, extentY * SpatialConfig.DelaunaySuperTriangleScale);
+        Point3d[] superTriangle = [new Point3d(minX - dx, minY - dy, z0), new Point3d(maxX + dx, minY - dy, z0), new Point3d(minX + (extentX * SpatialConfig.DelaunaySuperTriangleCenterWeight), maxY + dy, z0),];
         HashSet<(int, int, int)> triangles = [(points.Length, points.Length + 1, points.Length + 2),];
         Point3d[] allPoints = [.. points, .. superTriangle,];
         for (int i = 0; i < points.Length; i++) {
