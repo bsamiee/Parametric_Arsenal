@@ -20,10 +20,13 @@ internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure]
     internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+        // Curve-surface: angle between curve tangent and surface normal
+        // Parallel (0° or 180°) → tangent intersection (smooth blend)
+        // Perpendicular (90°) → transverse intersection (sharp meeting)
         static Result<(Intersection.IntersectionType, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
-            const double perpendicularAngle = RhinoMath.HalfPI;
-            double averageDeviation = angles.Sum(angle => Math.Abs(perpendicularAngle - angle)) / angles.Length;
-            bool grazing = angles.Any(angle => Math.Abs(perpendicularAngle - angle) <= IntersectionConfig.GrazingAngleThreshold);
+            static double minAngleToParallel(double angle) => Math.Min(Math.Abs(angle), Math.Abs(Math.PI - angle));
+            double averageDeviation = angles.Sum(minAngleToParallel) / angles.Length;
+            bool grazing = angles.Any(angle => minAngleToParallel(angle) <= IntersectionConfig.GrazingAngleThreshold);
             bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
             (Intersection.IntersectionType, double[], bool, double) result = (
                 tangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance,
@@ -62,7 +65,10 @@ internal static class IntersectionCompute {
                                         .Where(static angle => RhinoMath.IsValidDouble(angle))
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ((Func<Result<(Intersection.IntersectionType, double[], bool, double)>>)(() => {
-                                                (Intersection.IntersectionType, double[], bool, double) result = (averageAngle < IntersectionConfig.TangentAngleThreshold ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold), averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
+                                                // Curve-curve: tangent (0° or 180°) vs transverse (90°)
+                                                // Check both parallel (0°) and antiparallel (180°/2π) cases
+                                                bool isTangent = averageAngle < IntersectionConfig.TangentAngleThreshold || averageAngle > (RhinoMath.TwoPI - IntersectionConfig.TangentAngleThreshold);
+                                                (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold || angle > (RhinoMath.TwoPI - IntersectionConfig.GrazingAngleThreshold)), isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
                                                 return ResultFactory.Create(value: result);
                                             }))()
                                             : ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
