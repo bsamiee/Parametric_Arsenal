@@ -16,12 +16,10 @@ internal static class AnalysisCore {
         Type geometryType = geometry.GetType();
         Type requestType = request.GetType();
 
-        return AnalysisConfig.Operations.TryGetValue((geometryType, requestType), out AnalysisConfig.AnalysisOperationMetadata? meta)
-            ? ExecuteWithMetadata(geometry: geometry, request: request, meta: meta, context: context)
-            : AnalysisConfig.Operations.Keys.Any(k => k.Request == requestType && k.Geometry.IsAssignableFrom(geometryType)) is true
-                ? AnalysisConfig.Operations.First(kv => kv.Key.Request == requestType && kv.Key.Geometry.IsAssignableFrom(geometryType)) is KeyValuePair<(Type, Type), AnalysisConfig.AnalysisOperationMetadata> match
-                    ? ExecuteWithMetadata(geometry: geometry, request: request, meta: match.Value, context: context)
-                    : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"{geometryType.Name} + {requestType.Name}"))
+        return AnalysisConfig.Operations.TryGetValue((geometryType, requestType), out AnalysisConfig.AnalysisOperationMetadata? exactMeta)
+            ? ExecuteWithMetadata(geometry: geometry, request: request, meta: exactMeta, context: context)
+            : AnalysisConfig.Operations.FirstOrDefault(kv => kv.Key.Request == requestType && kv.Key.Geometry.IsAssignableFrom(geometryType)) is { } baseMatch
+                ? ExecuteWithMetadata(geometry: geometry, request: request, meta: baseMatch.Value, context: context)
                 : ResultFactory.Create<Analysis.IResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"{geometryType.Name} + {requestType.Name}"));
     }
 

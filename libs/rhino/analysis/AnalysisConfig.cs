@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Diagnostics.Contracts;
 using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
@@ -6,6 +7,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Unified metadata, constants, and dispatch tables for differential geometry analysis.</summary>
+[Pure]
 internal static class AnalysisConfig {
     /// <summary>Unified operation metadata for all analysis operations.</summary>
     internal sealed record AnalysisOperationMetadata(
