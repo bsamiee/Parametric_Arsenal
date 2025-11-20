@@ -24,7 +24,7 @@ internal static class TopologyCompute {
                         int numerator = e - v - f + 2;
                         (int, bool)[] loops = [.. validBrep.Loops.Select((l, i) => {
                             using Curve? loopCurve = l.To3dCurve();
-                            return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
+                            return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > context.AbsoluteTolerance);
                         }),
                         ];
                         return (isSolid, numerator, loops) switch {
@@ -45,6 +45,7 @@ internal static class TopologyCompute {
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
                 .Map(validBrep => {
+                    double nearMissThreshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                     (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, validBrep.Edges.Count)
                         .Where(i => validBrep.Edges[i].Valence == EdgeAdjacency.Naked && validBrep.Edges[i].EdgeCurve is not null)
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
@@ -55,7 +56,7 @@ internal static class TopologyCompute {
                                from e2 in nakedEdges
                                where e1.Index != e2.Index
                                from dist in new[] { e1.Start.DistanceTo(e2.Start), e1.Start.DistanceTo(e2.End), e1.End.DistanceTo(e2.Start), e1.End.DistanceTo(e2.End), }
-                               where dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
+                               where dist > context.AbsoluteTolerance && dist < nearMissThreshold
                                select dist),
                         ]
                         : [];
@@ -67,7 +68,7 @@ internal static class TopologyCompute {
                                let edgeI = validBrep.Edges[nakedEdges[i].Index]
                                let edgeJ = validBrep.Edges[nakedEdges[j].Index]
                                let dist = edgeI.EdgeCurve.ClosestPoints(edgeJ.EdgeCurve, out Point3d ptA, out Point3d ptB) ? ptA.DistanceTo(ptB) : double.MaxValue
-                               where dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier && dist > context.AbsoluteTolerance
+                               where dist < nearMissThreshold && dist > context.AbsoluteTolerance
                                select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: dist)),
                         ]
                         : [];
@@ -95,6 +96,7 @@ internal static class TopologyCompute {
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => {
+                    double nearMissThreshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
                     Topology.Strategy bestStrategy = strategies.Count > 0 ? strategies[0] : Topology.Strategy.ConservativeRepair;
                     Brep bestHealed = validBrep.DuplicateBrep();
@@ -102,14 +104,15 @@ internal static class TopologyCompute {
 
                     foreach (Topology.Strategy currentStrategy in strategies) {
                         Brep copy = validBrep.DuplicateBrep();
-                        double toleranceMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(currentStrategy.GetType(), out double mult) ? mult : 1.0;
+                        double toleranceMultiplier = TopologyConfig.StrategyMetadata.TryGetValue(currentStrategy.GetType(), out TopologyConfig.HealingStrategyMetadata? meta) ? meta.ToleranceMultiplier : 1.0;
+                        double repairTolerance = TopologyConfig.StrategyMetadata.TryGetValue(typeof(Topology.ConservativeRepairStrategy), out TopologyConfig.HealingStrategyMetadata? conservativeMeta) ? conservativeMeta.ToleranceMultiplier * context.AbsoluteTolerance : 0.1 * context.AbsoluteTolerance;
+                        double joinTolerance = TopologyConfig.StrategyMetadata.TryGetValue(typeof(Topology.ModerateJoinStrategy), out TopologyConfig.HealingStrategyMetadata? moderateMeta) ? moderateMeta.ToleranceMultiplier * context.AbsoluteTolerance : context.AbsoluteTolerance;
                         bool success = currentStrategy switch {
                             Topology.ConservativeRepairStrategy => copy.Repair(toleranceMultiplier * context.AbsoluteTolerance),
                             Topology.ModerateJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
                             Topology.AggressiveJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
-                            Topology.CombinedStrategy => copy.Repair((TopologyConfig.StrategyToleranceMultipliers.GetValueOrDefault(typeof(Topology.ConservativeRepairStrategy), 0.1)) * context.AbsoluteTolerance) && copy.JoinNakedEdges((TopologyConfig.StrategyToleranceMultipliers.GetValueOrDefault(typeof(Topology.ModerateJoinStrategy), 1.0)) * context.AbsoluteTolerance) > 0,
+                            Topology.CombinedStrategy => copy.Repair(repairTolerance) && copy.JoinNakedEdges(joinTolerance) > 0,
                             Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
-                                double threshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
                                 bool joinedAny = false;
                                 for (int iteration = 0; iteration < TopologyConfig.MaxEdgesForNearMissAnalysis; iteration++) {
                                     int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
@@ -127,7 +130,7 @@ internal static class TopologyCompute {
                                                     Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd))
                                                 )
                                                 : double.MaxValue;
-                                            joinedThisPass = (bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)) || joinedThisPass;
+                                            joinedThisPass = (bothNaked && minDist < nearMissThreshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: nearMissThreshold, compact: false)) || joinedThisPass;
                                         }
                                     }
                                     joinedAny = joinedAny || joinedThisPass;

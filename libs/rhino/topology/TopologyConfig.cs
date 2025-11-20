@@ -8,39 +8,47 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Operation types, validation dispatch, and healing configuration for topology.</summary>
 [Pure]
 internal static class TopologyConfig {
+    /// <summary>Topology operation metadata containing validation mode and operation name.</summary>
+    internal sealed record TopologyOperationMetadata(
+        V ValidationMode,
+        string OperationName);
+
+    /// <summary>Healing strategy metadata containing tolerance multiplier.</summary>
+    internal sealed record HealingStrategyMetadata(
+        double ToleranceMultiplier);
+
     /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
-    internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
-        new Dictionary<Type, double> {
-            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
-            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
-            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
-            [typeof(Topology.CombinedStrategy)] = 1.0,
-            [typeof(Topology.TargetedJoinStrategy)] = 100.0,
-            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
+    internal static readonly FrozenDictionary<Type, HealingStrategyMetadata> StrategyMetadata =
+        new Dictionary<Type, HealingStrategyMetadata> {
+            [typeof(Topology.ConservativeRepairStrategy)] = new(ToleranceMultiplier: 0.1),
+            [typeof(Topology.ModerateJoinStrategy)] = new(ToleranceMultiplier: 1.0),
+            [typeof(Topology.AggressiveJoinStrategy)] = new(ToleranceMultiplier: 10.0),
+            [typeof(Topology.CombinedStrategy)] = new(ToleranceMultiplier: 1.0),
+            [typeof(Topology.TargetedJoinStrategy)] = new(ToleranceMultiplier: 100.0),
+            [typeof(Topology.ComponentJoinStrategy)] = new(ToleranceMultiplier: 1.0),
         }.ToFrozenDictionary();
 
-    /// <summary>Operation metadata: (Type, OpType) to (ValidationMode, Name) mapping.</summary>
-    internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), (V ValidationMode, string OpName)> OperationMeta =
-        new Dictionary<(Type, OpType), (V, string)> {
-            [(typeof(Brep), OpType.NakedEdges)] = (V.Standard | V.Topology, "Topology.GetNakedEdges.Brep"),
-            [(typeof(Mesh), OpType.NakedEdges)] = (V.Standard | V.MeshSpecific, "Topology.GetNakedEdges.Mesh"),
-            [(typeof(Brep), OpType.BoundaryLoops)] = (V.Standard | V.Topology, "Topology.GetBoundaryLoops.Brep"),
-            [(typeof(Mesh), OpType.BoundaryLoops)] = (V.Standard | V.MeshSpecific, "Topology.GetBoundaryLoops.Mesh"),
-            [(typeof(Brep), OpType.NonManifold)] = (V.Standard | V.Topology, "Topology.GetNonManifold.Brep"),
-            [(typeof(Mesh), OpType.NonManifold)] = (V.Standard | V.MeshSpecific, "Topology.GetNonManifold.Mesh"),
-            [(typeof(Brep), OpType.Connectivity)] = (V.Standard | V.Topology, "Topology.GetConnectivity.Brep"),
-            [(typeof(Mesh), OpType.Connectivity)] = (V.Standard | V.MeshSpecific, "Topology.GetConnectivity.Mesh"),
-            [(typeof(Brep), OpType.EdgeClassification)] = (V.Standard | V.Topology, "Topology.ClassifyEdges.Brep"),
-            [(typeof(Mesh), OpType.EdgeClassification)] = (V.Standard | V.MeshSpecific, "Topology.ClassifyEdges.Mesh"),
-            [(typeof(Brep), OpType.Adjacency)] = (V.Standard | V.Topology, "Topology.GetAdjacency.Brep"),
-            [(typeof(Mesh), OpType.Adjacency)] = (V.Standard | V.MeshSpecific, "Topology.GetAdjacency.Mesh"),
-            [(typeof(Brep), OpType.VertexData)] = (V.Standard | V.Topology, "Topology.GetVertexData.Brep"),
-            [(typeof(Mesh), OpType.VertexData)] = (V.Standard | V.MeshSpecific, "Topology.GetVertexData.Mesh"),
-            [(typeof(Mesh), OpType.NgonTopology)] = (V.Standard | V.MeshSpecific, "Topology.GetNgonTopology.Mesh"),
+    /// <summary>Operation metadata: (Type, OpType) to metadata mapping.</summary>
+    internal static readonly FrozenDictionary<(Type GeometryType, OpType Operation), TopologyOperationMetadata> OperationMetadata =
+        new Dictionary<(Type, OpType), TopologyOperationMetadata> {
+            [(typeof(Brep), OpType.NakedEdges)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetNakedEdges.Brep"),
+            [(typeof(Mesh), OpType.NakedEdges)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetNakedEdges.Mesh"),
+            [(typeof(Brep), OpType.BoundaryLoops)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetBoundaryLoops.Brep"),
+            [(typeof(Mesh), OpType.BoundaryLoops)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetBoundaryLoops.Mesh"),
+            [(typeof(Brep), OpType.NonManifold)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetNonManifold.Brep"),
+            [(typeof(Mesh), OpType.NonManifold)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetNonManifold.Mesh"),
+            [(typeof(Brep), OpType.Connectivity)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetConnectivity.Brep"),
+            [(typeof(Mesh), OpType.Connectivity)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetConnectivity.Mesh"),
+            [(typeof(Brep), OpType.EdgeClassification)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.ClassifyEdges.Brep"),
+            [(typeof(Mesh), OpType.EdgeClassification)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.ClassifyEdges.Mesh"),
+            [(typeof(Brep), OpType.Adjacency)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetAdjacency.Brep"),
+            [(typeof(Mesh), OpType.Adjacency)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetAdjacency.Mesh"),
+            [(typeof(Brep), OpType.VertexData)] = new(ValidationMode: V.Standard | V.Topology, OperationName: "Topology.GetVertexData.Brep"),
+            [(typeof(Mesh), OpType.VertexData)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetVertexData.Mesh"),
+            [(typeof(Mesh), OpType.NgonTopology)] = new(ValidationMode: V.Standard | V.MeshSpecific, OperationName: "Topology.GetNgonTopology.Mesh"),
         }.ToFrozenDictionary();
 
     internal const double CurvatureThresholdRatio = 0.1;
-    internal const double MinLoopLength = 1e-6;
     internal const double NearMissMultiplier = 100.0;
     internal const int MaxEdgesForNearMissAnalysis = 100;
 

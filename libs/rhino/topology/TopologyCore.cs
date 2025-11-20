@@ -45,10 +45,10 @@ internal static class TopologyCore {
             })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] nakedCurves => ((Func<Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(() => {
-                    foreach (Curve sourceCurve in nakedCurves) {
-                        using (sourceCurve) { }
-                    }
                     Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
+                    foreach (Curve sourceCurve in nakedCurves) {
+                        sourceCurve.Dispose();
+                    }
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                         Loops: joined,
                         EdgeIndicesPerLoop: [.. joined.Select(static _ => (IReadOnlyList<int>)[]),],
@@ -328,8 +328,8 @@ internal static class TopologyCore {
             : mesh.FaceNormals.ComputeFaceNormals() && mesh.FaceNormals.UnitizeFaceNormals();
 
     private static Result<TResult> Execute<T, TResult>(T input, IGeometryContext context, TopologyConfig.OpType opType, Func<T, Result<IReadOnlyList<TResult>>> operation) where T : notnull =>
-        TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out (V ValidationMode, string OpName) meta)
-            ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta.ValidationMode, OperationName = meta.OpName, EnableDiagnostics = false }).Map(results => results[0])
+        TopologyConfig.OperationMetadata.TryGetValue((input.GetType(), opType), out TopologyConfig.TopologyOperationMetadata? meta)
+            ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta.ValidationMode, OperationName = meta.OperationName, EnableDiagnostics = false }).Map(results => results[0])
             : ResultFactory.Create<TResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}, Operation: {opType}"));
 
     private static Result<IReadOnlyList<Topology.ConnectivityData>> ComputeConnectivity<TGeometry>(
