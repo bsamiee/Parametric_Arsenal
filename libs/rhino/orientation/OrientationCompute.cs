@@ -19,38 +19,28 @@ internal static class OrientationCompute {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
-        (geometry, useMassProperties) switch {
-            (Brep brep, true) when brep.IsSolid => ((Func<Result<Point3d>>)(() => {
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(brep);
-                return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Brep brep, true) when brep.SolidOrientation != BrepSolidOrientation.None => ((Func<Result<Point3d>>)(() => {
-                using AreaMassProperties? amp = AreaMassProperties.Compute(brep);
-                return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Extrusion ext, true) when ext.IsSolid => ((Func<Result<Point3d>>)(() => {
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(ext);
-                return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Extrusion ext, true) when ext.IsClosed(0) && ext.IsClosed(1) => ((Func<Result<Point3d>>)(() => {
-                using AreaMassProperties? amp = AreaMassProperties.Compute(ext);
-                return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Mesh mesh, true) when mesh.IsClosed => ((Func<Result<Point3d>>)(() => {
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(mesh);
-                return vmp is not null ? ResultFactory.Create(value: vmp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Mesh mesh, true) => ((Func<Result<Point3d>>)(() => {
-                using AreaMassProperties? amp = AreaMassProperties.Compute(mesh);
-                return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (Curve curve, true) => ((Func<Result<Point3d>>)(() => {
-                using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
-                return amp is not null ? ResultFactory.Create(value: amp.Centroid) : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
-            }))(),
-            (GeometryBase g, false) when g.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid => ResultFactory.Create(value: box.Center),
-            _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
-        };
+        useMassProperties
+            ? geometry switch {
+                Brep b when b.IsSolid => ComputeMassCentroid(VolumeMassProperties.Compute(b)),
+                Brep b when b.SolidOrientation != BrepSolidOrientation.None => ComputeMassCentroid(AreaMassProperties.Compute(b)),
+                Extrusion e when e.IsSolid => ComputeMassCentroid(VolumeMassProperties.Compute(e)),
+                Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ComputeMassCentroid(AreaMassProperties.Compute(e)),
+                Mesh m when m.IsClosed => ComputeMassCentroid(VolumeMassProperties.Compute(m)),
+                Mesh m => ComputeMassCentroid(AreaMassProperties.Compute(m)),
+                Curve c => ComputeMassCentroid(AreaMassProperties.Compute(c)),
+                _ => ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed),
+            }
+            : geometry.GetBoundingBox(accurate: true) is BoundingBox box && box.IsValid
+                ? ResultFactory.Create(value: box.Center)
+                : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Point3d> ComputeMassCentroid(VolumeMassProperties? vmp) =>
+        vmp is not null ? ((Func<Result<Point3d>>)(() => { Point3d c = vmp.Centroid; vmp.Dispose(); return ResultFactory.Create(value: c); }))() : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Point3d> ComputeMassCentroid(AreaMassProperties? amp) =>
+        amp is not null ? ((Func<Result<Point3d>>)(() => { Point3d c = amp.Centroid; amp.Dispose(); return ResultFactory.Create(value: c); }))() : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
@@ -135,118 +125,106 @@ internal static class OrientationCompute {
     internal static Result<Transform> ComputeVectorRotation(GeometryBase geometry, Vector3d target, Vector3d? source, Point3d? anchor) =>
         (geometry.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
             (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
-                ((Func<Result<Transform>>)(() => {
-                    Vector3d su = new(s);
-                    Vector3d tu = new(t);
-                    _ = su.Unitize();
-                    _ = tu.Unitize();
-                    Point3d pt = anchor ?? box.Center;
-                    return Vector3d.CrossProduct(su, tu).Length < RhinoMath.SqrtEpsilon
-                        ? Math.Abs((su * tu) - 1.0) < RhinoMath.SqrtEpsilon
-                            ? ResultFactory.Create(value: Transform.Identity)
-                            : Math.Abs((su * tu) + 1.0) < RhinoMath.SqrtEpsilon
-                                ? ((Func<Result<Transform>>)(() => {
-                                    Vector3d axisCandidate = Math.Abs(su * Vector3d.XAxis) < 0.95
-                                        ? Vector3d.CrossProduct(su, Vector3d.XAxis)
-                                        : Vector3d.CrossProduct(su, Vector3d.YAxis);
-                                    bool normalized = axisCandidate.Unitize();
-                                    return normalized
-                                        ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axisCandidate, pt))
-                                        : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
-                                }))()
-                                : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
-                        : ResultFactory.Create(value: Transform.Rotation(su, tu, pt));
-                }))(),
+                (su: new Vector3d(s), tu: new Vector3d(t), pt: anchor ?? box.Center) switch {
+                    var ctx when ctx.su.Unitize() && ctx.tu.Unitize() =>
+                        Vector3d.CrossProduct(ctx.su, ctx.tu).Length < RhinoMath.SqrtEpsilon
+                            ? Math.Abs((ctx.su * ctx.tu) - 1.0) < RhinoMath.SqrtEpsilon
+                                ? ResultFactory.Create(value: Transform.Identity)
+                                : Math.Abs((ctx.su * ctx.tu) + 1.0) < RhinoMath.SqrtEpsilon
+                                    ? ((Func<Result<Transform>>)(() => {
+                                        Vector3d axis = Math.Abs(ctx.su * Vector3d.XAxis) < 0.95 ? Vector3d.CrossProduct(ctx.su, Vector3d.XAxis) : Vector3d.CrossProduct(ctx.su, Vector3d.YAxis);
+                                        return axis.Unitize() ? ResultFactory.Create(value: Transform.Rotation(Math.PI, axis, ctx.pt)) : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors);
+                                    }))()
+                                    : ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors)
+                            : ResultFactory.Create(value: Transform.Rotation(ctx.su, ctx.tu, ctx.pt)),
+                    _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
+                },
             _ => ResultFactory.Create<Transform>(error: E.Geometry.InvalidOrientationVectors),
         };
 
     internal static Result<Orientation.OptimizationResult> OptimizeOrientation(Brep brep, Orientation.OptimizationCriteria criteria, double tolerance) =>
-        tolerance <= 0.0 ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Validation.ToleranceAbsoluteInvalid)
-            : brep.GetBoundingBox(accurate: true) is BoundingBox box && !box.IsValid ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"))
-                : ExtractCentroid(geometry: brep, useMassProperties: true) is Result<Point3d> centroidResult && criteria is Orientation.CenteredCriteria && !centroidResult.IsSuccess
-                    ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.CentroidExtractionFailed)
-                    : box.IsValid ? ((Func<Result<Orientation.OptimizationResult>>)(() => {
-                        Vector3d diag1 = new(1, 1, 0);
-                        Vector3d diag2 = new(1, 0, 1);
-                        Vector3d diag3 = new(0, 1, 1);
-                        _ = diag1.Unitize();
-                        _ = diag2.Unitize();
-                        _ = diag3.Unitize();
-                        Plane[] testPlanes = [
-                            new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
-                            new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
-                            new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
-                            new Plane(box.Center, diag1, Vector3d.ZAxis),
-                            new Plane(box.Center, diag2, Vector3d.YAxis),
-                            new Plane(box.Center, diag3, Vector3d.XAxis),
-                        ];
-                        (Transform xform, double score, Orientation.OptimizationCriteria[] satisfied)[] results = [.. testPlanes.Select(plane => {
-                            Transform xf = Transform.PlaneToPlane(plane, Plane.WorldXY);
-                            using Brep test = (Brep)brep.Duplicate();
-                            return !test.Transform(xf) ? (Transform.Identity, 0.0, Array.Empty<Orientation.OptimizationCriteria>())
-                                : test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid
-                                    ? (xf, criteria switch {
-                                        Orientation.CompactCriteria => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
-                                        Orientation.CenteredCriteria => centroidResult.IsSuccess && testBox.Diagonal.Length > tolerance
-                                            ? ((Func<double>)(() => {
-                                                Point3d centroid = centroidResult.Value;
-                                                centroid.Transform(xf);
-                                                return Math.Max(0.0, 1.0 - (Math.Abs(centroid.Z) / testBox.Diagonal.Length));
-                                            }))()
-                                            : 0.0,
-                                        Orientation.FlatnessCriteria => ((Math.Abs(testBox.Max.X - testBox.Min.X) <= tolerance ? 1 : 0)
-                                            + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
-                                            + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
-                                                0 => 0.0,
-                                                int degeneracy and >= 1 and <= 3 => degeneracy / (double)OrientationConfig.MaxDegeneracyDimensions,
-                                                _ => 0.0,
-                                            },
-                                        Orientation.CanonicalCriteria => (testBox.Min.Z >= -tolerance ? OrientationConfig.OrientationScoreWeight1 : 0.0)
-                                            + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientationConfig.OrientationScoreWeight2 : 0.0)
-                                            + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientationConfig.LowProfileAspectRatio) ? OrientationConfig.OrientationScoreWeight3 : 0.0),
-                                        _ => 0.0,
-                                    }, [criteria,])
-                                    : (Transform.Identity, 0.0, Array.Empty<Orientation.OptimizationCriteria>());
-                        }),
-                        ];
-                        return results.MaxBy(r => r.score) is (Transform best, double bestScore, Orientation.OptimizationCriteria[] met) && bestScore > 0
-                            ? ResultFactory.Create(value: new Orientation.OptimizationResult(OptimalTransform: best, Score: bestScore, CriteriaSatisfied: met))
-                            : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found"));
-                    }))() : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box"));
+        tolerance <= 0.0
+            ? ResultFactory.Create<Orientation.OptimizationResult>(error: E.Validation.ToleranceAbsoluteInvalid)
+            : brep.GetBoundingBox(accurate: true) switch {
+                BoundingBox box when !box.IsValid => ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("Invalid bounding box")),
+                BoundingBox box when criteria is Orientation.CenteredCriteria && ExtractCentroid(geometry: brep, useMassProperties: true) is Result<Point3d> r && !r.IsSuccess =>
+                    ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.CentroidExtractionFailed),
+                BoundingBox box => (testPlanes: GenerateTestPlanes(box), centroid: criteria is Orientation.CenteredCriteria ? ExtractCentroid(geometry: brep, useMassProperties: true).Value : Point3d.Unset) switch {
+                    var ctx => ctx.testPlanes.Select(plane => EvaluateOrientation(brep, plane, criteria, tolerance, ctx.centroid))
+                        .MaxBy(r => r.score) is (Transform best, double score, _) && score > 0.0
+                            ? ResultFactory.Create(value: new Orientation.OptimizationResult(OptimalTransform: best, Score: score, CriteriaSatisfied: [criteria,]))
+                            : ResultFactory.Create<Orientation.OptimizationResult>(error: E.Geometry.TransformFailed.WithContext("No valid orientation found")),
+                },
+            };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Plane[] GenerateTestPlanes(BoundingBox box) =>
+        (d1: new Vector3d(1, 1, 0), d2: new Vector3d(1, 0, 1), d3: new Vector3d(0, 1, 1)) switch {
+            var d when d.d1.Unitize() && d.d2.Unitize() && d.d3.Unitize() => [
+                new Plane(box.Center, Vector3d.XAxis, Vector3d.YAxis),
+                new Plane(box.Center, Vector3d.YAxis, Vector3d.ZAxis),
+                new Plane(box.Center, Vector3d.XAxis, Vector3d.ZAxis),
+                new Plane(box.Center, d.d1, Vector3d.ZAxis),
+                new Plane(box.Center, d.d2, Vector3d.YAxis),
+                new Plane(box.Center, d.d3, Vector3d.XAxis),
+            ],
+            _ => [],
+        };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (Transform xform, double score, Orientation.OptimizationCriteria[] satisfied) EvaluateOrientation(
+        Brep brep, Plane plane, Orientation.OptimizationCriteria criteria, double tolerance, Point3d centroid) =>
+        (xf: Transform.PlaneToPlane(plane, Plane.WorldXY), test: (Brep)brep.Duplicate()) switch {
+            var ctx when ctx.test.Transform(ctx.xf) && ctx.test.GetBoundingBox(accurate: true) is BoundingBox testBox && testBox.IsValid =>
+                ((Func<(Transform, double, Orientation.OptimizationCriteria[])>)(() => {
+                    double score = criteria switch {
+                        Orientation.CompactCriteria => testBox.Diagonal.Length > tolerance ? 1.0 / testBox.Diagonal.Length : 0.0,
+                        Orientation.CenteredCriteria when centroid != Point3d.Unset && testBox.Diagonal.Length > tolerance =>
+                            ((Func<double>)(() => { Point3d c = centroid; c.Transform(ctx.xf); return Math.Max(0.0, 1.0 - (Math.Abs(c.Z) / testBox.Diagonal.Length)); }))(),
+                        Orientation.FlatnessCriteria => ((Math.Abs(testBox.Max.X - testBox.Min.X) <= tolerance ? 1 : 0)
+                            + (Math.Abs(testBox.Max.Y - testBox.Min.Y) <= tolerance ? 1 : 0)
+                            + (Math.Abs(testBox.Max.Z - testBox.Min.Z) <= tolerance ? 1 : 0)) switch {
+                                int deg and >= 1 and <= 3 => deg / (double)OrientationConfig.MaxDegeneracyDimensions,
+                                _ => 0.0,
+                            },
+                        Orientation.CanonicalCriteria => (testBox.Min.Z >= -tolerance ? OrientationConfig.OrientationScoreWeight1 : 0.0)
+                            + (Math.Abs(testBox.Center.X) < tolerance && Math.Abs(testBox.Center.Y) < tolerance ? OrientationConfig.OrientationScoreWeight2 : 0.0)
+                            + ((testBox.Max.Z - testBox.Min.Z) < (testBox.Diagonal.Length * OrientationConfig.LowProfileAspectRatio) ? OrientationConfig.OrientationScoreWeight3 : 0.0),
+                        _ => 0.0,
+                    };
+                    ctx.test.Dispose();
+                    return (ctx.xf, score, new[] { criteria });
+                }))(),
+            var ctx => ((Func<(Transform, double, Orientation.OptimizationCriteria[])>)(() => { ctx.test.Dispose(); return (Transform.Identity, 0.0, Array.Empty<Orientation.OptimizationCriteria>()); }))(),
+        };
 
     internal static Result<Orientation.PatternDetectionResult> DetectPattern(GeometryBase[] geometries, double absoluteTolerance, double angleTolerance) =>
         geometries.Length < OrientationConfig.PatternMinInstances
             ? ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientationConfig.PatternMinInstances} geometries, got {geometries.Length}"))
-            : ((Func<Result<Orientation.PatternDetectionResult>>)(() => {
-                Result<Point3d>[] centroidResults = [.. geometries.Select(static g => ExtractCentroid(geometry: g, useMassProperties: false)),];
-                return centroidResults.All(static r => r.IsSuccess)
-                    ? centroidResults.Select(static r => r.Value).ToArray() is Point3d[] centroids && centroids.Length >= 3
-                      && centroids.Skip(1).Zip(centroids, static (c2, c1) => c2 - c1).ToArray() is Vector3d[] deltas
-                      && deltas.Average(static v => v.Length) is double avgLen && avgLen > absoluteTolerance
-                        ? deltas[0].Length >= absoluteTolerance
-                          && deltas.Skip(1).All(v => Math.Abs(v.Length - avgLen) / avgLen < absoluteTolerance && Vector3d.VectorAngle(deltas[0], v) <= angleTolerance)
-                            ? ResultFactory.Create(value: new Orientation.PatternDetectionResult(
-                                Pattern: new Orientation.LinearPattern(),
-                                IdealTransforms: [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Translation(deltas[0] * i)),],
-                                Anomalies: [.. deltas.Select((v, i) => (v, i)).Where(pair => Math.Abs(pair.v.Length - avgLen) / avgLen >= (absoluteTolerance * OrientationConfig.PatternAnomalyThreshold)).Select(static pair => pair.i),],
-                                Deviation: deltas.Sum(v => Math.Abs(v.Length - avgLen)) / centroids.Length))
-                            : new Point3d(centroids.Average(static p => p.X), centroids.Average(static p => p.Y), centroids.Average(static p => p.Z)) is Point3d center
-                              && centroids.Select(p => p.DistanceTo(center)).ToArray() is double[] radii
-                              && radii.Average() is double avgRadius && avgRadius > absoluteTolerance
-                              && radii.All(r => Math.Abs(r - avgRadius) / avgRadius < absoluteTolerance)
+            : geometries.Select(g => ExtractCentroid(geometry: g, useMassProperties: false)).ToArray() switch {
+                Result<Point3d>[] results when results.All(r => r.IsSuccess) =>
+                    (centroids: results.Select(r => r.Value).ToArray(), deltas: results.Select(r => r.Value).Skip(1).Zip(results.Select(r => r.Value), (c2, c1) => c2 - c1).ToArray()) switch {
+                        var ctx when ctx.deltas.Length > 0 && ctx.deltas.Average(v => v.Length) is double avgLen && avgLen > absoluteTolerance =>
+                            ctx.deltas[0].Length >= absoluteTolerance && ctx.deltas.Skip(1).All(v => Math.Abs(v.Length - avgLen) / avgLen < absoluteTolerance && Vector3d.VectorAngle(ctx.deltas[0], v) <= angleTolerance)
                                 ? ResultFactory.Create(value: new Orientation.PatternDetectionResult(
-                                    Pattern: new Orientation.RadialPattern(),
-                                    IdealTransforms: [.. Enumerable.Range(0, centroids.Length).Select(i => Transform.Rotation(RhinoMath.TwoPI * i / centroids.Length, Vector3d.ZAxis, center)),],
-                                    Anomalies: [.. radii.Select((r, i) => (r, i)).Where(pair => Math.Abs(pair.r - avgRadius) / avgRadius >= (absoluteTolerance * OrientationConfig.PatternAnomalyThreshold)).Select(static pair => pair.i),],
-                                    Deviation: radii.Sum(r => Math.Abs(r - avgRadius)) / centroids.Length))
-                                : ResultFactory.Create(value: new Orientation.PatternDetectionResult(
-                                    Pattern: new Orientation.NoPattern(),
-                                    IdealTransforms: [],
-                                    Anomalies: [],
-                                    Deviation: double.NaN))
-                        : ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular"))
-                    : ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {centroidResults.Count(static r => !r.IsSuccess)} geometries"));
-            }))();
+                                    Pattern: new Orientation.LinearPattern(),
+                                    IdealTransforms: [.. Enumerable.Range(0, ctx.centroids.Length).Select(i => Transform.Translation(ctx.deltas[0] * i)),],
+                                    Anomalies: [.. ctx.deltas.Select((v, i) => (v, i)).Where(p => Math.Abs(p.v.Length - avgLen) / avgLen >= (absoluteTolerance * OrientationConfig.PatternAnomalyThreshold)).Select(p => p.i),],
+                                    Deviation: ctx.deltas.Sum(v => Math.Abs(v.Length - avgLen)) / ctx.centroids.Length))
+                                : (center: new Point3d(ctx.centroids.Average(p => p.X), ctx.centroids.Average(p => p.Y), ctx.centroids.Average(p => p.Z)),
+                                   radii: ctx.centroids.Select(p => p.DistanceTo(new Point3d(ctx.centroids.Average(pp => pp.X), ctx.centroids.Average(pp => pp.Y), ctx.centroids.Average(pp => pp.Z)))).ToArray()) switch {
+                                    var rc when rc.radii.Average() is double avgRadius && avgRadius > absoluteTolerance && rc.radii.All(r => Math.Abs(r - avgRadius) / avgRadius < absoluteTolerance) =>
+                                        ResultFactory.Create(value: new Orientation.PatternDetectionResult(
+                                            Pattern: new Orientation.RadialPattern(),
+                                            IdealTransforms: [.. Enumerable.Range(0, ctx.centroids.Length).Select(i => Transform.Rotation(RhinoMath.TwoPI * i / ctx.centroids.Length, Vector3d.ZAxis, rc.center)),],
+                                            Anomalies: [.. rc.radii.Select((r, i) => (r, i)).Where(p => Math.Abs(p.r - avgRadius) / avgRadius >= (absoluteTolerance * OrientationConfig.PatternAnomalyThreshold)).Select(p => p.i),],
+                                            Deviation: rc.radii.Sum(r => Math.Abs(r - avgRadius)) / ctx.centroids.Length)),
+                                    _ => ResultFactory.Create(value: new Orientation.PatternDetectionResult(Pattern: new Orientation.NoPattern(), IdealTransforms: [], Anomalies: [], Deviation: double.NaN)),
+                                },
+                        _ => ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.PatternDetectionFailed.WithContext("Pattern too irregular")),
+                    },
+                Result<Point3d>[] results => ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {results.Count(r => !r.IsSuccess)} geometries")),
+            };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Orientation.RelationshipType ClassifyRelationship(Plane pa, Plane pb, double angleTolerance) =>
@@ -257,54 +235,32 @@ internal static class OrientationCompute {
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Orientation.SymmetryType CheckMirrorSymmetry(Brep ba, Brep bb, Plane pa, Plane pb, double tolerance) {
-        Plane mirror = (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
-            ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin)
-            : new Plane(pa.Origin, pa.ZAxis);
-        Point3d[] reflectedA = [.. ba.Vertices.Select(va => {
-            Point3d r = va.Location;
-            r.Transform(Transform.Mirror(mirrorPlane: mirror));
-            return r;
-        }),
-        ];
-        return !mirror.IsValid
-            ? new Orientation.NoSymmetry()
-            : reflectedA.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
-               && bb.Vertices.All(vb => reflectedA.Any(ra => ra.DistanceTo(vb.Location) < tolerance))
-                ? new Orientation.MirrorSymmetry()
-                : new Orientation.NoSymmetry();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Orientation.SymmetryType ClassifySymmetry(GeometryBase geometryA, GeometryBase geometryB, Plane pa, Plane pb, double tolerance, double angleTol) =>
         (geometryA, geometryB) switch {
             (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count =>
-                CheckMirrorSymmetry(ba: ba, bb: bb, pa: pa, pb: pb, tolerance: tolerance),
+                (mirror: (pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance
+                    ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin)
+                    : new Plane(pa.Origin, pa.ZAxis),
+                 reflected: ba.Vertices.Select(v => { Point3d p = v.Location; p.Transform(Transform.Mirror((pb.Origin - pa.Origin).Length > RhinoMath.ZeroTolerance ? new Plane(pa.Origin + ((pb.Origin - pa.Origin) * 0.5), pb.Origin - pa.Origin) : new Plane(pa.Origin, pa.ZAxis))); return p; }).ToArray()) switch {
+                    var ctx when ctx.mirror.IsValid && ctx.reflected.All(ra => bb.Vertices.Any(vb => ra.DistanceTo(vb.Location) < tolerance))
+                        && bb.Vertices.All(vb => ctx.reflected.Any(ra => ra.DistanceTo(vb.Location) < tolerance)) => new Orientation.MirrorSymmetry(),
+                    _ => new Orientation.NoSymmetry(),
+                },
             (Curve ca, Curve cb) when ca.SpanCount == cb.SpanCount && pa.ZAxis.IsValid && pa.ZAxis.Length > tolerance =>
-                ((Func<Orientation.SymmetryType>)(() => {
-                    Point3d[] samplesA = [.. Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))),];
-                    Point3d[] samplesB = [.. Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))),];
-                    int[] testIndices = [0, samplesA.Length / 2, samplesA.Length - 1,];
-                    double[] candidateAngles = [.. testIndices.Select(idx => {
-                        Vector3d vecA = samplesA[idx] - pa.Origin;
-                        Vector3d vecB = samplesB[idx] - pa.Origin;
-                        Vector3d projA = vecA - ((vecA * pa.ZAxis) * pa.ZAxis);
-                        Vector3d projB = vecB - ((vecB * pa.ZAxis) * pa.ZAxis);
-                        return projA.Length < tolerance || projB.Length < tolerance
-                            ? double.NaN
-                            : Vector3d.CrossProduct(projA, projB) * pa.ZAxis < 0
-                                ? -Vector3d.VectorAngle(projA, projB)
-                                : Vector3d.VectorAngle(projA, projB);
-                    }).Where(static a => !double.IsNaN(a)),
-                    ];
-                    return candidateAngles.Length == 0
-                        ? new Orientation.NoSymmetry()
-                        : candidateAngles.All(a => Math.Abs(a - candidateAngles[0]) < angleTol)
-                          && Transform.Rotation(candidateAngles[0], pa.ZAxis, pa.Origin) is Transform rotation
-                          && samplesA.Zip(samplesB, (ptA, ptB) => { Point3d r = ptA; r.Transform(rotation); return r.DistanceTo(ptB); }).All(dist => dist < tolerance)
-                            ? new Orientation.RotationalSymmetry()
-                            : new Orientation.NoSymmetry();
-                }))(),
+                (samplesA: Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => ca.PointAt(ca.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))).ToArray(),
+                 samplesB: Enumerable.Range(0, OrientationConfig.RotationSymmetrySampleCount).Select(i => cb.PointAt(cb.Domain.ParameterAt(i / (double)(OrientationConfig.RotationSymmetrySampleCount - 1)))).ToArray()) switch {
+                    var samples => new[] { 0, samples.samplesA.Length / 2, samples.samplesA.Length - 1 }.Select(idx =>
+                        (projA: samples.samplesA[idx] - pa.Origin - (((samples.samplesA[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis),
+                         projB: samples.samplesB[idx] - pa.Origin - (((samples.samplesB[idx] - pa.Origin) * pa.ZAxis) * pa.ZAxis)) switch {
+                            var p when p.projA.Length < tolerance || p.projB.Length < tolerance => double.NaN,
+                            var p => Vector3d.CrossProduct(p.projA, p.projB) * pa.ZAxis < 0 ? -Vector3d.VectorAngle(p.projA, p.projB) : Vector3d.VectorAngle(p.projA, p.projB),
+                        }).Where(a => !double.IsNaN(a)).ToArray() switch {
+                            double[] angles when angles.Length > 0 && angles.All(a => Math.Abs(a - angles[0]) < angleTol)
+                                && samples.samplesA.Zip(samples.samplesB, (ptA, ptB) => { Point3d r = ptA; r.Transform(Transform.Rotation(angles[0], pa.ZAxis, pa.Origin)); return r.DistanceTo(ptB); }).All(d => d < tolerance)
+                                => new Orientation.RotationalSymmetry(),
+                            _ => new Orientation.NoSymmetry(),
+                        },
+                },
             _ => new Orientation.NoSymmetry(),
         };
 }
