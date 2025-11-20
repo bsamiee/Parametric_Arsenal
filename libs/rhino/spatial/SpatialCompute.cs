@@ -19,7 +19,7 @@ internal static class SpatialCompute {
 
     private static readonly (Type GeometryType, Func<GeometryBase, Point3d> Extractor)[] _centroidFallbacks =
         [.. SpatialConfig.Operations
-            .Where(static kv => string.Equals(kv.Key.OperationType, "Centroid", StringComparison.Ordinal) && kv.Value.CentroidExtractor is not null)
+            .Where(static kv => string.Equals(kv.Key.OperationType, SpatialConfig.OperationTypeCentroid, StringComparison.Ordinal) && kv.Value.CentroidExtractor is not null)
             .OrderByDescending(static kv => kv.Key.InputType, _typeSpecificity)
             .Select(static kv => (kv.Key.InputType, kv.Value.CentroidExtractor!)),
         ];
@@ -57,7 +57,7 @@ internal static class SpatialCompute {
             GeometryBase current = geometry[i];
             Type geometryType = current.GetType();
             Func<GeometryBase, Point3d> extractor = _centroidExtractorCache.GetOrAdd(key: geometryType, valueFactory: t =>
-                SpatialConfig.Operations.TryGetValue((t, "Centroid"), out SpatialConfig.SpatialOperationMetadata? exact) && exact.CentroidExtractor is not null
+                SpatialConfig.Operations.TryGetValue((t, SpatialConfig.OperationTypeCentroid), out SpatialConfig.SpatialOperationMetadata? exact) && exact.CentroidExtractor is not null
                     ? exact.CentroidExtractor
                     : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(t)) is int match and >= 0
                         ? _centroidFallbacks[match].Extractor
@@ -308,16 +308,17 @@ internal static class SpatialCompute {
             : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
                 ? ((Func<Result<Point3d[]>>)(() => {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+                    double areaTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
-                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= context.AbsoluteTolerance) {
+                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= areaTolerance) {
                             lower.RemoveAt(lower.Count - 1);
                         }
                         lower.Add(pts[i]);
                     }
                     List<Point3d> upper = [];
                     for (int i = pts.Length - 1; i >= 0; i--) {
-                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= context.AbsoluteTolerance) {
+                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= areaTolerance) {
                             upper.RemoveAt(upper.Count - 1);
                         }
                         upper.Add(pts[i]);
@@ -436,10 +437,16 @@ internal static class SpatialCompute {
         double by = b.Y - p.Y;
         double cx = c.X - p.X;
         double cy = c.Y - p.Y;
-        double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
+        double aNormSq = (ax * ax) + (ay * ay);
+        double bNormSq = (bx * bx) + (by * by);
+        double cNormSq = (cx * cx) + (cy * cy);
+        double det = (aNormSq * ((bx * cy) - (by * cx))) + (bNormSq * ((cx * ay) - (cy * ax))) + (cNormSq * ((ax * by) - (ay * bx)));
         // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
         double adjustedDet = orientation > 0.0 ? det : -det;
-        return adjustedDet > context.AbsoluteTolerance;
+        // Scale tolerance to match determinant dimension (length⁴): use squared tolerance × max squared norm.
+        double maxNormSq = Math.Max(Math.Max(aNormSq, bNormSq), cNormSq);
+        double scaledTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance * maxNormSq;
+        return adjustedDet > scaledTolerance;
     }
 
     /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>

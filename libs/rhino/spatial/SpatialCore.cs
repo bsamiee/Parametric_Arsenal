@@ -170,7 +170,7 @@ internal static class SpatialCore {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunMeshOverlapAnalysis(Spatial.MeshOverlapAnalysis request, IGeometryContext context) =>
-        SpatialConfig.Operations.TryGetValue((typeof(Mesh), "Overlap"), out SpatialConfig.SpatialOperationMetadata? meta)
+        SpatialConfig.Operations.TryGetValue((typeof(Mesh), SpatialConfig.OperationTypeOverlap), out SpatialConfig.SpatialOperationMetadata? meta)
             ? UnifiedOperation.Apply(
                 input: request.First,
                 operation: (Func<Mesh, Result<IReadOnlyList<int>>>)(first => {
@@ -182,7 +182,7 @@ internal static class SpatialCore {
                     int count = 0;
                     try {
                         void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                            _ = count + 1 < buffer.Length
+                            _ = count + 2 <= buffer.Length
                                 ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
                                 : default;
                         }
@@ -215,13 +215,13 @@ internal static class SpatialCore {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
-        SpatialConfig.Operations.TryGetValue((inputType, "Range"), out SpatialConfig.SpatialOperationMetadata? meta)
+        SpatialConfig.Operations.TryGetValue((inputType, SpatialConfig.OperationTypeRange), out SpatialConfig.SpatialOperationMetadata? meta)
             ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
-        SpatialConfig.Operations.TryGetValue((inputType, "Proximity"), out SpatialConfig.SpatialOperationMetadata? meta)
+        SpatialConfig.Operations.TryGetValue((inputType, SpatialConfig.OperationTypeProximity), out SpatialConfig.SpatialOperationMetadata? meta)
             ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
 
