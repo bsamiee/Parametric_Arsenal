@@ -12,7 +12,7 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Dense field computation algorithms: gradient, curl, divergence, Laplacian, Hessian, vector potential, interpolation, streamlines, isosurfaces, critical points, statistics.</summary>
 [Pure]
 internal static class FieldsCompute {
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, Vector3d[] Gradients)> ComputeGradient(
         double[] distances,
         Point3d[] grid,
@@ -68,7 +68,7 @@ internal static class FieldsCompute {
             }
         }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<(Point3d[] Grid, TOut[] Output)> ComputeDerivativeField<TIn, TOut>(
         TIn[] inputField,
         Point3d[] grid,
@@ -100,7 +100,7 @@ internal static class FieldsCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, Vector3d[] Curl)> ComputeCurl(
         Vector3d[] vectorField,
         Point3d[] grid,
@@ -125,7 +125,7 @@ internal static class FieldsCompute {
             resolutionError: E.Geometry.InvalidCurlComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] Divergence)> ComputeDivergence(
         Vector3d[] vectorField,
         Point3d[] grid,
@@ -147,7 +147,7 @@ internal static class FieldsCompute {
             resolutionError: E.Geometry.InvalidDivergenceComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] Laplacian)> ComputeLaplacian(
         double[] scalarField,
         Point3d[] grid,
@@ -169,7 +169,7 @@ internal static class FieldsCompute {
             resolutionError: E.Geometry.InvalidLaplacianComputation.WithContext($"Resolution below minimum {FieldsConfig.MinResolution.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, Vector3d[] Potential)> ComputeVectorPotential(
         Vector3d[] vectorField,
         Point3d[] grid,
@@ -254,7 +254,7 @@ internal static class FieldsCompute {
                 }))()),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<T> InterpolateField<T>(
         Point3d query,
         T[] field,
@@ -269,7 +269,7 @@ internal static class FieldsCompute {
             _ => ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext($"Unsupported interpolation mode: {mode.GetType().Name}")),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<double> InterpolateScalar(
         Point3d query,
         double[] scalarField,
@@ -279,7 +279,7 @@ internal static class FieldsCompute {
         Fields.InterpolationMode mode) =>
         InterpolateField(query: query, field: scalarField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: (a, b, t) => a + (t * (b - a)));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Vector3d> InterpolateVector(
         Point3d query,
         Vector3d[] vectorField,
@@ -289,7 +289,7 @@ internal static class FieldsCompute {
         Fields.InterpolationMode mode) =>
         InterpolateField(query: query, field: vectorField, grid: grid, resolution: resolution, bounds: bounds, mode: mode, lerp: (a, b, t) => a + (t * (b - a)));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<T> InterpolateNearest<T>(Point3d query, T[] field, Point3d[] grid) {
         int nearestIdx = grid.Length > FieldsConfig.FieldRTreeThreshold
             ? ((Func<int>)(() => {
@@ -317,7 +317,7 @@ internal static class FieldsCompute {
             : ResultFactory.Create<T>(error: E.Geometry.InvalidFieldInterpolation.WithContext("Nearest neighbor search failed"));
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<T> InterpolateTrilinear<T>(
         Point3d query,
         T[] field,
@@ -350,7 +350,7 @@ internal static class FieldsCompute {
         };
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Curve[]> IntegrateStreamlines(
         Vector3d[] vectorField,
         Point3d[] gridPoints,
@@ -400,7 +400,7 @@ internal static class FieldsCompute {
                 ArrayPool<Point3d>.Shared.Return(pathBuffer, clearArray: true);
             }
         }))();
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<Mesh[]> ExtractIsosurfaces(
         double[] scalarField,
         Point3d[] gridPoints,
@@ -461,7 +461,7 @@ internal static class FieldsCompute {
             return ResultFactory.Create(value: meshes);
         }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 symmetric matrix structure is mathematically clear and appropriate")]
     internal static Result<(Point3d[] Grid, double[,][] Hessian)> ComputeHessian(
         double[] scalarField,
@@ -548,7 +548,7 @@ internal static class FieldsCompute {
         };
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<(Point3d[] Grid, TOut[] Output)> ApplyFieldOperation<TIn, TOut>(
         TIn[] inputField,
         Point3d[] grid,
@@ -571,7 +571,7 @@ internal static class FieldsCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<(Point3d[] Grid, TOut[] Output)> ApplyBinaryFieldOperation<T1, T2, TOut>(
         T1[] inputField1,
         T2[] inputField2,
@@ -597,7 +597,7 @@ internal static class FieldsCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] DirectionalDerivatives)> ComputeDirectionalDerivative(
         Vector3d[] gradientField,
         Point3d[] grid,
@@ -614,7 +614,7 @@ internal static class FieldsCompute {
             }))(),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] Magnitudes)> ComputeFieldMagnitude(
         Vector3d[] vectorField,
         Point3d[] grid) =>
@@ -624,7 +624,7 @@ internal static class FieldsCompute {
             operation: (vector, _) => vector.Length,
             error: E.Geometry.InvalidFieldMagnitude.WithContext("Vector field length must match grid points"));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, Vector3d[] Normalized)> NormalizeVectorField(
         Vector3d[] vectorField,
         Point3d[] grid) =>
@@ -637,7 +637,7 @@ internal static class FieldsCompute {
             },
             error: E.Geometry.InvalidFieldNormalization.WithContext("Vector field length must match grid points"));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] Product)> ScalarVectorProduct(
         double[] scalarField,
         Vector3d[] vectorField,
@@ -659,7 +659,7 @@ internal static class FieldsCompute {
             error2: E.Geometry.InvalidFieldComposition.WithContext("Vector field length must match grid points"));
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[] Grid, double[] DotProduct)> VectorDotProduct(
         Vector3d[] vectorField1,
         Vector3d[] vectorField2,
@@ -672,7 +672,7 @@ internal static class FieldsCompute {
             error1: E.Geometry.InvalidFieldComposition.WithContext("First vector field length must match grid points"),
             error2: E.Geometry.InvalidFieldComposition.WithContext("Second vector field length must match grid points"));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1814:Prefer jagged arrays over multidimensional", Justification = "3x3 Hessian matrix parameter is mathematically appropriate")]
     internal static Result<Fields.CriticalPoint[]> DetectCriticalPoints(
         double[] scalarField,
@@ -759,7 +759,8 @@ internal static class FieldsCompute {
             }))(),
         };
     }
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+
+    [Pure]
     internal static Result<Fields.FieldStatistics> ComputeFieldStatistics(
         double[] scalarField,
         Point3d[] grid) {

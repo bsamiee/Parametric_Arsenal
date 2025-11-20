@@ -70,7 +70,7 @@ public static class Fields {
     public sealed record SaddleCriticalPoint : CriticalPointKind;
 
     /// <summary>Critical point with location, classification, value, and eigendecomposition.</summary>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "MA0008:Add StructLayoutAttribute", Justification = "Contains reference types (arrays), StructLayout inappropriate")]
     public readonly record struct CriticalPoint(Point3d Location, CriticalPointKind Kind, double Value, Vector3d[] Eigenvectors, double[] Eigenvalues);
 
     /// <summary>Field statistics: min, max, mean, standard deviation, and extreme locations.</summary>
@@ -172,7 +172,7 @@ public static class Fields {
     public sealed record ComputeStatisticsRequest(double[] ScalarField, Point3d[] GridPoints) : FieldOperation;
 
     /// <summary>Execute field operation and return discriminated union result.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     public static Result<FieldResult> Execute(FieldOperation operation, IGeometryContext context) =>
         FieldsCore.Execute(operation: operation, context: context);
 }
