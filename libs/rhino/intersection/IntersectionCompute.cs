@@ -134,26 +134,34 @@ internal static class IntersectionCompute {
                                                 ? ResultFactory.Create(value: unpackPairs(pairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
-                                        (Brep brepA, Brep brepB) => brepA.Faces.Count > 0 && Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samplesPerFace
-                                            ? brepA.Faces
-                                                .SelectMany(face => face.Domain(0) is Interval uDomain && face.Domain(1) is Interval vDomain
-                                                    ? Enumerable.Range(0, samplesPerFace)
-                                                        .SelectMany(uIndex => Enumerable.Range(0, samplesPerFace)
-                                                            .Select(vIndex => {
-                                                                double u = uDomain.ParameterAt(uIndex / (double)(samplesPerFace - 1));
-                                                                double v = vDomain.ParameterAt(vIndex / (double)(samplesPerFace - 1));
-                                                                return face.IsAtSingularity(u, v, checkBothSides: true) ? Point3d.Unset : face.PointAt(u, v);
-                                                            }))
-                                                        .Where(point => point.IsValid)
-                                                    : Enumerable.Empty<Point3d>())
-                                                .Select(point => brepB.ClosestPoint(point) is Point3d closestB
-                                                    ? (PointA: point, PointB: closestB, Distance: point.DistanceTo(closestB))
-                                                    : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
-                                                .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance && candidate.PointA.IsValid && candidate.PointB.IsValid)
-                                                .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
-                                                ? ResultFactory.Create(value: unpackPairs(brepPairs))
-                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
-                                            : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
+                                        (Brep brepA, Brep brepB) when brepA.Faces.Count > 0 => brepA.Faces
+                                                .Select(face => (Face: face, Size: face.GetSurfaceSize(accuracy: 1e-6, out double area) && area > 0.0 ? area : 0.0))
+                                                .Where(entry => entry.Size > 0.0)
+                                                .ToArray() is (BrepFace Face, double Size)[] validFaces && validFaces.Length > 0 && validFaces.Sum(static entry => entry.Size) is double totalArea && totalArea > 0.0
+                                                && Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int totalBudget
+                                                ? validFaces
+                                                    .SelectMany(entry => {
+                                                        int faceSamples = Math.Max(IntersectionConfig.MinSamplesPerFace, (int)Math.Round(totalBudget * (entry.Size / totalArea)));
+                                                        int samplesPerDimension = (int)Math.Ceiling(Math.Sqrt(faceSamples));
+                                                        return entry.Face.Domain(0) is Interval uDomain && entry.Face.Domain(1) is Interval vDomain
+                                                            ? Enumerable.Range(0, samplesPerDimension)
+                                                                .SelectMany(uIndex => Enumerable.Range(0, samplesPerDimension)
+                                                                    .Select(vIndex => {
+                                                                        double u = uDomain.ParameterAt(uIndex / (double)(samplesPerDimension - 1));
+                                                                        double v = vDomain.ParameterAt(vIndex / (double)(samplesPerDimension - 1));
+                                                                        return entry.Face.IsAtSingularity(u, v, checkBothSides: true) ? Point3d.Unset : entry.Face.PointAt(u, v);
+                                                                    }))
+                                                                .Where(static point => point.IsValid)
+                                                            : Enumerable.Empty<Point3d>();
+                                                    })
+                                                    .Select(point => brepB.ClosestPoint(point) is Point3d closestB
+                                                        ? (PointA: point, PointB: closestB, Distance: point.DistanceTo(closestB))
+                                                        : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                                    .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance && candidate.PointA.IsValid && candidate.PointB.IsValid)
+                                                    .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
+                                                    ? ResultFactory.Create(value: unpackPairs(brepPairs))
+                                                    : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
+                                                : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0)
                                                 && (meshB.Vertices.Count > 0)
                                                 && Math.Min(meshA.Vertices.Count, IntersectionConfig.MaxNearMissSamples) is int samplesA
@@ -194,15 +202,15 @@ internal static class IntersectionCompute {
                         .Bind(validA => Validate(geomB, context, modeB)
                             .Bind(validB => IntersectionCore.NormalizeSettings(new Intersection.IntersectionSettings(), context)
                                 .Bind(normalized => {
-                                    int sqrtSamples = (int)Math.Ceiling(Math.Sqrt(IntersectionConfig.StabilitySampleCount));
-                                    (int phiSteps, int thetaSteps) = (sqrtSamples, (int)Math.Ceiling(IntersectionConfig.StabilitySampleCount / (double)sqrtSamples));
-                                    Vector3d[] directions = [.. Enumerable.Range(0, phiSteps + 1)
-                                        .SelectMany(phiIndex => Enumerable.Range(0, thetaSteps)
-                                            .Select(thetaIndex => {
-                                                (double phi, double theta) = ((RhinoMath.PI * phiIndex) / phiSteps, (RhinoMath.TwoPI * thetaIndex) / thetaSteps);
-                                                return new Vector3d(Math.Sin(phi) * Math.Cos(theta), Math.Sin(phi) * Math.Sin(theta), Math.Cos(phi));
-                                            }))
-                                        .Take(IntersectionConfig.StabilitySampleCount),
+                                    Vector3d[] directions = [.. Enumerable.Range(0, IntersectionConfig.StabilitySampleCount)
+                                        .Select(i => {
+                                            double theta = RhinoMath.TwoPI * i / IntersectionConfig.GoldenRatio;
+                                            double phi = Math.Acos(1.0 - (2.0 * (i + 0.5)) / IntersectionConfig.StabilitySampleCount);
+                                            return new Vector3d(
+                                                Math.Cos(theta) * Math.Sin(phi),
+                                                Math.Sin(theta) * Math.Sin(phi),
+                                                Math.Cos(phi));
+                                        }),
                                     ];
                                     double maxDiagonalLength = Math.Max(
                                         validA.GetBoundingBox(accurate: false).Diagonal.Length,
