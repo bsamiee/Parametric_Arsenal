@@ -21,12 +21,12 @@ internal static class IntersectionCompute {
     [Pure]
     internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
         static Result<(Intersection.IntersectionType, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
-            double perpendicularAngle = RhinoMath.HalfPI;
+            const double perpendicularAngle = RhinoMath.HalfPI;
             double averageDeviation = angles.Sum(angle => Math.Abs(perpendicularAngle - angle)) / angles.Length;
             bool grazing = angles.Any(angle => Math.Abs(perpendicularAngle - angle) <= IntersectionConfig.GrazingAngleThreshold);
             bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
             return ResultFactory.Create(value: (
-                Type: tangent ? new Intersection.IntersectionType.Tangent() : new Intersection.IntersectionType.Transverse(),
+                Type: tangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance,
                 ApproachAngles: angles,
                 IsGrazing: grazing,
                 BlendScore: tangent ? IntersectionConfig.CurveSurfaceTangentBlendScore : IntersectionConfig.CurveSurfacePerpendicularBlendScore));
@@ -60,12 +60,12 @@ internal static class IntersectionCompute {
                                             : RhinoMath.UnsetValue)
                                         .Where(static angle => RhinoMath.IsValidDouble(angle))
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
-                                            ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? new Intersection.IntersectionType.Tangent() : new Intersection.IntersectionType.Transverse(), ApproachAngles: angles, IsGrazing: angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
+                                            ? ResultFactory.Create(value: (Type: averageAngle < IntersectionConfig.TangentAngleThreshold ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, ApproachAngles: angles, IsGrazing: angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold), BlendScore: averageAngle < IntersectionConfig.TangentAngleThreshold ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore))
                                             : ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
                                     (Curve curve, Surface surface) when parametersA >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersA,]),
                                     (Surface surface, Curve curve) when parametersB >= count => computeCurveSurfaceAngles(curve, surface, output, count, [.. output.ParametersB,]),
                                     _ when parametersA < count || parametersB < count => ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
-                                    _ => ResultFactory.Create(value: (new Intersection.IntersectionType.Unknown(), Array.Empty<double>(), false, 0.0)),
+                                    _ => ResultFactory.Create(value: (Intersection.IntersectionType.Unknown.Instance, Array.Empty<double>(), false, 0.0)),
                                 },
                             }));
                 });

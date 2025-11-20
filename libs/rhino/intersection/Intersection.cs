@@ -43,11 +43,23 @@ public static class Intersection {
     public abstract record IntersectionType {
         private IntersectionType() { }
         /// <summary>Tangent intersection with near-parallel approach vectors.</summary>
-        public sealed record Tangent : IntersectionType;
+        public sealed record Tangent : IntersectionType {
+            private Tangent() { }
+            /// <summary>Singleton instance for tangent intersections.</summary>
+            public static Tangent Instance { get; } = new();
+        }
         /// <summary>Transverse intersection with significant angular separation.</summary>
-        public sealed record Transverse : IntersectionType;
+        public sealed record Transverse : IntersectionType {
+            private Transverse() { }
+            /// <summary>Singleton instance for transverse intersections.</summary>
+            public static Transverse Instance { get; } = new();
+        }
         /// <summary>Unknown classification when insufficient data available.</summary>
-        public sealed record Unknown : IntersectionType;
+        public sealed record Unknown : IntersectionType {
+            private Unknown() { }
+            /// <summary>Singleton instance for unknown classifications.</summary>
+            public static Unknown Instance { get; } = new();
+        }
     }
 
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
@@ -65,7 +77,7 @@ public static class Intersection {
     }
 
     /// <summary>Result of intersection classification analysis.</summary>
-    [DebuggerDisplay("Type={Type.Value}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
+    [DebuggerDisplay("Type={Type}, IsGrazing={IsGrazing}, BlendScore={BlendScore:F3}")]
     public sealed record ClassificationResult(
         IntersectionType Type,
         double[] ApproachAngles,
