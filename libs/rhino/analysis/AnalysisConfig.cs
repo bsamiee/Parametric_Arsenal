@@ -97,7 +97,7 @@ internal static class AnalysisConfig {
     internal const double JacobianCritical = 0.1;
 
     /// <summary>Ideal interior angles for mesh element types.</summary>
-    internal const double TriangleIdealAngleDegrees = 60.0;
+    internal static readonly double TriangleIdealAngleDegrees = RhinoMath.ToDegrees(Math.PI / 3.0);
 
     /// <summary>Unified metadata for differential geometry operations.</summary>
     internal sealed record DifferentialMetadata(
