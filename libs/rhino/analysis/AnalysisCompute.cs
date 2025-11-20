@@ -283,7 +283,6 @@ internal static class AnalysisCompute {
         Mesh mesh,
         IGeometryContext context) {
         Point3d[] vertices = ArrayPool<Point3d>.Shared.Rent(4);
-        double[] edgeLengths = ArrayPool<double>.Shared.Rent(4);
         try {
             (double AspectRatio, double Skewness, double Jacobian)[] metrics = [.. Enumerable.Range(0, mesh.Faces.Count).Select(i => {
                 Point3d center = mesh.Faces.GetFaceCenter(i);
@@ -301,9 +300,6 @@ internal static class AnalysisCompute {
                 double[] edgeLengthsArray = [.. Enumerable.Range(0, vertCount)
                     .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount])),
                 ];
-                for (int j = 0; j < vertCount; j++) {
-                    edgeLengths[j] = edgeLengthsArray[j];
-                }
                 double minEdge = edgeLengthsArray.Min();
                 double maxEdge = edgeLengthsArray.Max();
                 double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
@@ -350,7 +346,6 @@ internal static class AnalysisCompute {
                         Critical: metrics.Count(m => m.AspectRatio > AnalysisConfig.AspectRatioCritical || m.Skewness > AnalysisConfig.SkewnessCritical || m.Jacobian < AnalysisConfig.JacobianCritical))));
         } finally {
             ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
-            ArrayPool<double>.Shared.Return(edgeLengths, clearArray: true);
         }
     }
 }
