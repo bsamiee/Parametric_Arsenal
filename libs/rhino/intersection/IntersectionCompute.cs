@@ -74,6 +74,19 @@ internal static class IntersectionCompute {
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
+        static (Point3d[], Point3d[], double[]) unpackPairs((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
+            int n = pairs.Length;
+            Point3d[] pointsA = new Point3d[n];
+            Point3d[] pointsB = new Point3d[n];
+            double[] distances = new double[n];
+            for (int i = 0; i < n; i++) {
+                pointsA[i] = pairs[i].PointA;
+                pointsB[i] = pairs[i].PointB;
+                distances[i] = pairs[i].Distance;
+            }
+            return (pointsA, pointsB, distances);
+        }
+
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
                 ? ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.InvalidSearchRadius.WithContext(string.Create(CultureInfo.InvariantCulture, $"SearchRadius must exceed tolerance * {IntersectionConfig.NearMissToleranceMultiplier}")))
@@ -107,7 +120,7 @@ internal static class IntersectionCompute {
                                                         : (PointA: Point3d.Unset, PointB: point, Distance: double.MaxValue))
                                                     .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance))
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] curvePairs && curvePairs.Length > 0
-                                                ? ResultFactory.Create(value: ((Point3d[], Point3d[], double[]))([.. curvePairs.Select(p => p.PointA)], [.. curvePairs.Select(p => p.PointB)], [.. curvePairs.Select(p => p.Distance)]))
+                                                ? ResultFactory.Create(value: unpackPairs(curvePairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Curve curve, Surface surface) => Math.Max(IntersectionConfig.MinCurveNearMissSamples, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
@@ -118,7 +131,7 @@ internal static class IntersectionCompute {
                                                     : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
                                                 .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
-                                                ? ResultFactory.Create(value: ((Point3d[], Point3d[], double[]))([.. pairs.Select(p => p.PointA)], [.. pairs.Select(p => p.PointB)], [.. pairs.Select(p => p.Distance)]))
+                                                ? ResultFactory.Create(value: unpackPairs(pairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Brep brepA, Brep brepB) => Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int samples && brepA.GetBoundingBox(accurate: false) is BoundingBox bbox
@@ -132,7 +145,7 @@ internal static class IntersectionCompute {
                                                     : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue))
                                                 .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] brepPairs && brepPairs.Length > 0
-                                                ? ResultFactory.Create(value: ((Point3d[], Point3d[], double[]))([.. brepPairs.Select(p => p.PointA)], [.. brepPairs.Select(p => p.PointB)], [.. brepPairs.Select(p => p.Distance)]))
+                                                ? ResultFactory.Create(value: unpackPairs(brepPairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         (Mesh meshA, Mesh meshB) => (meshA.Vertices.Count > 0)
@@ -151,7 +164,7 @@ internal static class IntersectionCompute {
                                                         : (PointA: Point3d.Unset, PointB: Point3d.Unset, Distance: double.MaxValue)))
                                                 .Where(candidate => (candidate.Distance < searchRadius) && (candidate.Distance > minDistance) && candidate.PointA.IsValid && candidate.PointB.IsValid)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] meshPairs && meshPairs.Length > 0
-                                                ? ResultFactory.Create(value: ((Point3d[], Point3d[], double[]))([.. meshPairs.Select(p => p.PointA)], [.. meshPairs.Select(p => p.PointB)], [.. meshPairs.Select(p => p.Distance)]))
+                                                ? ResultFactory.Create(value: unpackPairs(meshPairs))
                                                 : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], []))
                                             : ResultFactory.Create<(Point3d[], Point3d[], double[])>(value: ([], [], [])),
                                         _ => ResultFactory.Create<(Point3d[], Point3d[], double[])>(error: E.Geometry.NearMissSearchFailed),
