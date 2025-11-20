@@ -15,10 +15,6 @@ namespace Arsenal.Rhino.Fields;
 /// <summary>Fields dispatch registry with UnifiedOperation integration.</summary>
 [Pure]
 internal static class FieldsCore {
-    private sealed record DistanceOperationMetadata(
-        Func<GeometryBase, Fields.FieldSampling, int, IGeometryContext, Result<IReadOnlyList<(Point3d[], double[])>>> Executor,
-        FieldsConfig.DistanceFieldMetadata Metadata);
-
     private static readonly FrozenDictionary<Type, DistanceOperationMetadata> DistanceDispatch =
         FieldsConfig.DistanceFields
             .ToDictionary(
@@ -33,6 +29,10 @@ internal static class FieldsCore {
                                 : static (geometry, sampling, bufferSize, context) => ExecuteDistanceField<Surface>(geometry, sampling, bufferSize, context).Map(result => (IReadOnlyList<(Point3d[], double[])>)[result,]),
                     Metadata: entry.Value))
             .ToFrozenDictionary();
+
+    private sealed record DistanceOperationMetadata(
+        Func<GeometryBase, Fields.FieldSampling, int, IGeometryContext, Result<IReadOnlyList<(Point3d[], double[])>>> Executor,
+        FieldsConfig.DistanceFieldMetadata Metadata);
 
     [Pure]
     internal static Result<Fields.FieldResult> Execute(Fields.FieldOperation operation, IGeometryContext context) =>

@@ -35,6 +35,12 @@ public static class Extraction {
     /// <summary>Topology face centroids computed via area properties.</summary>
     public sealed record FaceCentroids : PointOperation;
 
+    /// <summary>Extract discontinuity points.</summary>
+    public sealed record Discontinuity(Continuity Type) : PointOperation;
+
+    /// <summary>Extract extreme points along direction.</summary>
+    public sealed record ByDirection(Vector3d Direction) : PointOperation;
+
     /// <summary>Osculating frames sampled along curve via perpendicular frame computation.</summary>
     public sealed record OsculatingFrames(int Count = 10) : PointOperation;
 
@@ -44,26 +50,20 @@ public static class Extraction {
     /// <summary>Divide curve by length.</summary>
     public sealed record ByLength(double Length, bool IncludeEnds = true) : PointOperation;
 
-    /// <summary>Extract extreme points along direction.</summary>
-    public sealed record ByDirection(Vector3d Direction) : PointOperation;
-
-    /// <summary>Extract discontinuity points.</summary>
-    public sealed record Discontinuity(Continuity Type) : PointOperation;
-
     /// <summary>Base type for curve extraction operations.</summary>
     public abstract record CurveOperation;
 
     /// <summary>Boundary curves including outer loop and inner holes.</summary>
     public sealed record Boundary : CurveOperation;
 
+    /// <summary>Sharp feature curves detected via edge angle threshold.</summary>
+    public sealed record FeatureEdges(double AngleThreshold) : CurveOperation;
+
     /// <summary>Isocurves extracted at specified direction.</summary>
     public sealed record Isocurves(IsocurveDirection Direction, int Count) : CurveOperation;
 
     /// <summary>Isocurves at explicit parameters.</summary>
     public sealed record IsocurvesAt(IsocurveDirection Direction, double[] Parameters) : CurveOperation;
-
-    /// <summary>Sharp feature curves detected via edge angle threshold.</summary>
-    public sealed record FeatureEdges(double AngleThreshold) : CurveOperation;
 
     /// <summary>Isocurve direction specification.</summary>
     public abstract record IsocurveDirection;
@@ -89,11 +89,11 @@ public static class Extraction {
     /// <summary>Hole feature with area measurement.</summary>
     public sealed record Hole(double Area) : Feature;
 
-    /// <summary>Variable radius fillet.</summary>
-    public sealed record VariableRadiusFillet(double AverageRadius) : Feature;
-
     /// <summary>Generic edge with length.</summary>
     public sealed record GenericEdge(double Length) : Feature;
+
+    /// <summary>Variable radius fillet.</summary>
+    public sealed record VariableRadiusFillet(double AverageRadius) : Feature;
 
     /// <summary>Result of feature extraction.</summary>
     [DebuggerDisplay("Features={Features.Length}, Confidence={Confidence:F3}")]
@@ -104,26 +104,26 @@ public static class Extraction {
     /// <summary>Base type for primitive geometry classifications.</summary>
     public abstract record Primitive(Plane Frame);
 
+    /// <summary>Unknown primitive type.</summary>
+    public sealed record UnknownPrimitive(Plane Frame) : Primitive(Frame);
+
     /// <summary>Planar surface primitive.</summary>
     public sealed record PlanarPrimitive(Plane Frame, Point3d Origin) : Primitive(Frame);
-
-    /// <summary>Cylindrical surface primitive.</summary>
-    public sealed record CylindricalPrimitive(Plane Frame, double Radius, double Height) : Primitive(Frame);
 
     /// <summary>Spherical surface primitive.</summary>
     public sealed record SphericalPrimitive(Plane Frame, double Radius) : Primitive(Frame);
 
-    /// <summary>Conical surface primitive.</summary>
-    public sealed record ConicalPrimitive(Plane Frame, double BaseRadius, double Height, double Angle) : Primitive(Frame);
+    /// <summary>Extrusion primitive.</summary>
+    public sealed record ExtrusionPrimitive(Plane Frame, double Length) : Primitive(Frame);
+
+    /// <summary>Cylindrical surface primitive.</summary>
+    public sealed record CylindricalPrimitive(Plane Frame, double Radius, double Height) : Primitive(Frame);
 
     /// <summary>Toroidal surface primitive.</summary>
     public sealed record ToroidalPrimitive(Plane Frame, double MajorRadius, double MinorRadius) : Primitive(Frame);
 
-    /// <summary>Extrusion primitive.</summary>
-    public sealed record ExtrusionPrimitive(Plane Frame, double Length) : Primitive(Frame);
-
-    /// <summary>Unknown primitive type.</summary>
-    public sealed record UnknownPrimitive(Plane Frame) : Primitive(Frame);
+    /// <summary>Conical surface primitive.</summary>
+    public sealed record ConicalPrimitive(Plane Frame, double BaseRadius, double Height, double Angle) : Primitive(Frame);
 
     /// <summary>Result of primitive decomposition.</summary>
     [DebuggerDisplay("Primitives={Primitives.Length}")]

@@ -9,11 +9,6 @@ namespace Arsenal.Rhino.Extraction;
 /// <summary>Unified metadata, constants, and dispatch tables for extraction operations.</summary>
 [Pure]
 internal static class ExtractionConfig {
-    /// <summary>Unified operation metadata for all extraction transforms.</summary>
-    internal sealed record ExtractionOperationMetadata(
-        V ValidationMode,
-        string OperationName);
-
     /// <summary>Point operation validation modes.</summary>
     internal static readonly FrozenDictionary<Type, ExtractionOperationMetadata> PointOperations =
         new Dictionary<Type, ExtractionOperationMetadata> {
@@ -100,6 +95,11 @@ internal static class ExtractionConfig {
     internal const int MaxIsocurveCount = 100;
     internal const int DefaultOsculatingFrameCount = 10;
     internal const int BoundaryIsocurveCount = 5;
+
+    /// <summary>Unified operation metadata for all extraction transforms.</summary>
+    internal sealed record ExtractionOperationMetadata(
+        V ValidationMode,
+        string OperationName);
 
     /// <summary>Gets validation mode with geometry-specific refinements.</summary>
     internal static V GetValidationMode(Type _, Type geometryType, V baseMode) =>
