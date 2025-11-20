@@ -147,8 +147,12 @@ internal static class IntersectionCompute {
                                                             ? Enumerable.Range(0, samplesPerDimension)
                                                                 .SelectMany(uIndex => Enumerable.Range(0, samplesPerDimension)
                                                                     .Select(vIndex => {
-                                                                        double u = uDomain.ParameterAt(uIndex / (double)(samplesPerDimension - 1));
-                                                                        double v = vDomain.ParameterAt(vIndex / (double)(samplesPerDimension - 1));
+                                                                        double u = samplesPerDimension > 1 
+                                                                            ? uDomain.ParameterAt(uIndex / (double)(samplesPerDimension - 1))
+                                                                            : uDomain.Mid;
+                                                                        double v = samplesPerDimension > 1
+                                                                            ? vDomain.ParameterAt(vIndex / (double)(samplesPerDimension - 1))
+                                                                            : vDomain.Mid;
                                                                         return entry.Face.IsAtSingularity(u, v, checkBothSides: true) ? Point3d.Unset : entry.Face.PointAt(u, v);
                                                                     }))
                                                                 .Where(static point => point.IsValid)
