@@ -72,7 +72,7 @@ internal static class IntersectionCompute {
     }
 
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
         double minDistance = context.AbsoluteTolerance * IntersectionConfig.NearMissToleranceMultiplier;
         return searchRadius <= minDistance
