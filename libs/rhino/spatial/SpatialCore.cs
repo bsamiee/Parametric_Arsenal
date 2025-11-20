@@ -72,31 +72,42 @@ internal static class SpatialCore {
             (_, null) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDirection.WithContext("Request cannot be null")),
             (_, { Direction.Length: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.ZeroLengthDirection),
             (_, { MaxDistance: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must be positive")),
-            _ => ((Func<Result<Spatial.ProximityFieldResult[]>>)(() => {
-                using RTree tree = new();
-                BoundingBox bounds = BoundingBox.Empty;
-                Point3d[] centers = new Point3d[geometry.Length];
-                for (int i = 0; i < geometry.Length; i++) {
-                    BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
-                    _ = tree.Insert(bbox, i);
-                    bounds.Union(bbox);
-                    centers[i] = bbox.Center;
-                }
-                Vector3d dir = request.Direction / request.Direction.Length;
-                Point3d origin = bounds.Center;
-                BoundingBox searchBox = new(origin - new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance), origin + new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance));
-                List<Spatial.ProximityFieldResult> results = [];
-                void CollectResults(object? sender, RTreeEventArgs args) {
-                    Vector3d toGeom = centers[args.Id] - origin;
-                    double dist = toGeom.Length;
-                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-                    double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-                    if (weightedDist > request.MaxDistance) { return; }
-                    results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
-                }
-                _ = tree.Search(searchBox, CollectResults);
-                return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance),]);
-            }))(),
+            _ => SpatialConfig.Operations.TryGetValue((typeof(GeometryBase[]), "ProximityField"), out SpatialConfig.SpatialOperationMetadata? meta)
+                ? UnifiedOperation.Apply(
+                    input: geometry,
+                    operation: (Func<GeometryBase[], Result<Spatial.ProximityFieldResult[]>>)(items => ((Func<Result<Spatial.ProximityFieldResult[]>>)(() => {
+                        using RTree tree = new();
+                        BoundingBox bounds = BoundingBox.Empty;
+                        Point3d[] centers = new Point3d[items.Length];
+                        for (int i = 0; i < items.Length; i++) {
+                            BoundingBox bbox = items[i].GetBoundingBox(accurate: true);
+                            _ = tree.Insert(bbox, i);
+                            bounds.Union(bbox);
+                            centers[i] = bbox.Center;
+                        }
+                        Vector3d dir = request.Direction / request.Direction.Length;
+                        Point3d origin = bounds.Center;
+                        Vector3d offset = new(request.MaxDistance, request.MaxDistance, request.MaxDistance);
+                        BoundingBox searchBox = new(origin - offset, origin + offset);
+                        List<Spatial.ProximityFieldResult> results = new(meta.BufferSize > 0 ? meta.BufferSize : items.Length);
+                        void CollectResults(object? sender, RTreeEventArgs args) {
+                            Vector3d toGeom = centers[args.Id] - origin;
+                            double dist = toGeom.Length;
+                            double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
+                            double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
+                            if (weightedDist > request.MaxDistance) { return; }
+                            results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
+                        }
+                        _ = tree.Search(searchBox, CollectResults);
+                        return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(r => r.Distance * (1.0 + (request.AngleWeight * r.Angle))),]);
+                    }))()),
+                    config: new OperationConfig<GeometryBase[], Spatial.ProximityFieldResult> {
+                        Context = context,
+                        ValidationMode = meta.ValidationMode,
+                        OperationName = meta.OperationName,
+                        EnableDiagnostics = false,
+                    })
+                : ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.UnsupportedTypeCombo.WithContext("ProximityField operation not configured")),
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
