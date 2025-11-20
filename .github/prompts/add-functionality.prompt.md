@@ -16,11 +16,11 @@ prerequisites:
 
 # Add Functionality
 
-Add or upgrade exactly one capability in `libs/rhino/<<TARGET_FOLDER_NAME>>/` following strict architectural patterns.
+Add or upgrade one or more capabilities in `libs/rhino/<<TARGET_FOLDER_NAME>>/` following strict architectural patterns.
 
 ## Task Description
 
-Surgical addition of high-value functionality to Rhino computational geometry modules. Focus on adding genuinely useful capabilities that integrate seamlessly with existing 4-file architecture, Result monad patterns, and unified dispatch infrastructure.
+Surgical addition of high-value functionality to Rhino computational geometry modules. Add 1-3 genuinely useful capabilities that integrate seamlessly with existing 4-file architecture, Result monad patterns, and unified dispatch infrastructure. Multiple capabilities can be added in a single pass when they share architectural patterns and metadata.
 
 ## Inputs
 
