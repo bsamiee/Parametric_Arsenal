@@ -91,7 +91,7 @@ internal static class TopologyCompute {
         !brep.IsValidTopology(out string topologyLog)
             ? ResultFactory.Create<Topology.HealingResult>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid before healing: {topologyLog}"))
             : ResultFactory.Create(value: brep)
-                .Validate(args: [context, V.Topology | V.Standard,])
+                .Validate(args: [context, V.Standard | V.Topology,])
                 .Bind(validBrep => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
                     Brep? bestHealed = null;
