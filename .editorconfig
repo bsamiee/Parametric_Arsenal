@@ -12,6 +12,19 @@ indent_style = space                       # Use spaces not tabs
 indent_size = 4                            # 4 spaces per indent
 
 # ====================================================================
+# MARKDOWN
+# ====================================================================
+[*.md]
+trim_trailing_whitespace = false              # Keep trailing spaces (line breaks)
+max_line_length = 120                         # Readable width
+indent_size = 4
+
+[*.mdx]
+trim_trailing_whitespace = false
+max_line_length = 120
+indent_size = 4
+
+# ====================================================================
 # C# CONFIGURATION
 # ====================================================================
 [*.cs]
