@@ -308,12 +308,11 @@ internal static class AnalysisCompute {
                 int vertCount = isQuad ? 4 : 3;
                 double minEdge = double.MaxValue;
                 double maxEdge = double.MinValue;
-                for (int j = 0; j < vertCount; j++) {
-                    double length = vertices[j].DistanceTo(vertices[(j + 1) % vertCount]);
-                    edgeLengths[j] = length;
-                    minEdge = length < minEdge ? length : minEdge;
-                    maxEdge = length > maxEdge ? length : maxEdge;
-                }
+                double[] edgeLengthsArray = Enumerable.Range(0, vertCount)
+                    .Select(j => vertices[j].DistanceTo(vertices[(j + 1) % vertCount]))
+                    .ToArray();
+                double minEdge = edgeLengthsArray.Min();
+                double maxEdge = edgeLengthsArray.Max();
                 double aspectRatio = maxEdge / (minEdge + context.AbsoluteTolerance);
                 double skewness = isQuad
                     ? ((double[])[
