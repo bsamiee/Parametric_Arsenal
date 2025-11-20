@@ -22,19 +22,13 @@ internal static class SpatialConfig {
             [(typeof(Mesh), "Overlap")] = new(V.MeshSpecific, "Spatial.Mesh.Overlap", 4096),
             [(typeof(GeometryBase[]), "Clustering")] = new(V.Standard, "Spatial.Clustering", 2048),
             [(typeof(GeometryBase[]), "ProximityField")] = new(V.Standard, "Spatial.ProximityField", 2048),
-            [(typeof(Curve), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Curve c ? (AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct } ? ct : c.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
-            [(typeof(Surface), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Surface s ? (AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } ct } ? ct : s.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
-            [(typeof(Brep), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Brep b ? (VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } ct } ? ct : b.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
-            [(typeof(Mesh), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g is Mesh m ? (VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } ct } ? ct : m.GetBoundingBox(accurate: false).Center) : Point3d.Origin),
-            [(typeof(GeometryBase), "Centroid")] = new(V.None, "Spatial.CentroidExtraction", 0, static g => g.GetBoundingBox(accurate: false).Center),
         }.ToFrozenDictionary();
 
-    /// <summary>Unified spatial operation metadata with discriminators for tree building and operation type.</summary>
+    /// <summary>Spatial operation metadata for dispatch table.</summary>
     internal sealed record SpatialOperationMetadata(
         V ValidationMode,
         string OperationName,
-        int BufferSize,
-        Func<GeometryBase, Point3d>? CentroidExtractor = null);
+        int BufferSize);
 
     /// <summary>DBSCAN clustering algorithm parameters.</summary>
     internal const int DBSCANRTreeThreshold = 100;

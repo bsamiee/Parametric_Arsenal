@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
@@ -12,17 +11,6 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
-    private static readonly ConcurrentDictionary<Type, Func<GeometryBase, Point3d>> _centroidExtractorCache = new();
-
-    private static readonly IComparer<Type> _typeSpecificity = Comparer<Type>.Create(static (left, right) =>
-        left == right ? 0 : left.IsAssignableFrom(right) ? 1 : right.IsAssignableFrom(left) ? -1 : 0);
-
-    private static readonly (Type GeometryType, Func<GeometryBase, Point3d> Extractor)[] _centroidFallbacks =
-        [.. SpatialConfig.Operations
-            .Where(static kv => string.Equals(kv.Key.OperationType, "Centroid", StringComparison.Ordinal) && kv.Value.CentroidExtractor is not null)
-            .OrderByDescending(static kv => kv.Key.InputType, _typeSpecificity)
-            .Select(static kv => (kv.Key.InputType, kv.Value.CentroidExtractor!)),
-        ];
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterKMeans<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase {
@@ -51,18 +39,28 @@ internal static class SpatialCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Point3d ExtractCentroid(GeometryBase geometry) =>
+        geometry switch {
+            Mesh m => VolumeMassProperties.Compute(m) is { Centroid: { IsValid: true } c }
+                ? c
+                : m.GetBoundingBox(accurate: false).Center,
+            Brep b => VolumeMassProperties.Compute(b) is { Centroid: { IsValid: true } c }
+                ? c
+                : b.GetBoundingBox(accurate: false).Center,
+            Surface s => AreaMassProperties.Compute(s) is { Centroid: { IsValid: true } c }
+                ? c
+                : s.GetBoundingBox(accurate: false).Center,
+            Curve c => AreaMassProperties.Compute(c) is { Centroid: { IsValid: true } ct }
+                ? ct
+                : c.GetBoundingBox(accurate: false).Center,
+            _ => geometry.GetBoundingBox(accurate: false).Center,
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Point3d[] ExtractCentroids<T>(T[] geometry) where T : GeometryBase {
         Point3d[] centroids = new Point3d[geometry.Length];
         for (int i = 0; i < geometry.Length; i++) {
-            GeometryBase current = geometry[i];
-            Type geometryType = current.GetType();
-            Func<GeometryBase, Point3d> extractor = _centroidExtractorCache.GetOrAdd(key: geometryType, valueFactory: t =>
-                SpatialConfig.Operations.TryGetValue((t, "Centroid"), out SpatialConfig.SpatialOperationMetadata? exact) && exact.CentroidExtractor is not null
-                    ? exact.CentroidExtractor
-                    : Array.FindIndex(_centroidFallbacks, entry => entry.GeometryType.IsAssignableFrom(t)) is int match and >= 0
-                        ? _centroidFallbacks[match].Extractor
-                        : static geometry => geometry.GetBoundingBox(accurate: false).Center);
-            centroids[i] = extractor(current);
+            centroids[i] = ExtractCentroid(geometry[i]);
         }
         return centroids;
     }
@@ -227,36 +225,46 @@ internal static class SpatialCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static int[] HierarchicalAssign(Point3d[] pts, int k) =>
-        ((Func<int[]>)(() => {
-            int[] assignments = [.. Enumerable.Range(0, pts.Length),];
-            int targetClusters = pts.Length - k;
-            int[] clusterRepresentatives = [.. Enumerable.Range(0, pts.Length),];
-            for (int iteration = 0; iteration < targetClusters; iteration++) {
-                (int repr1, int repr2, double minDist) = (0, 1, double.MaxValue);
-                for (int i = 0; i < pts.Length; i++) {
-                    int cluster1 = assignments[i];
-                    if (cluster1 != clusterRepresentatives[cluster1]) {
+    internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
+        int n = pts.Length;
+        int[] assignments = [.. Enumerable.Range(0, n),];
+        HashSet<int> activeClusters = [.. Enumerable.Range(0, n),];
+
+        for (int mergeIteration = 0; mergeIteration < n - k; mergeIteration++) {
+            (int cluster1, int cluster2, double minDist) = (0, 1, double.MaxValue);
+            int[] activeArray = [.. activeClusters.OrderBy(static c => c),];
+
+            for (int i = 0; i < activeArray.Length; i++) {
+                int c1 = activeArray[i];
+                int repr1 = Array.FindIndex(assignments, idx => assignments[idx] == c1);
+                if (repr1 == -1) {
+                    continue;
+                }
+
+                for (int j = i + 1; j < activeArray.Length; j++) {
+                    int c2 = activeArray[j];
+                    int repr2 = Array.FindIndex(assignments, idx => assignments[idx] == c2);
+                    if (repr2 == -1) {
                         continue;
                     }
-                    for (int j = i + 1; j < pts.Length; j++) {
-                        int cluster2 = assignments[j];
-                        if (cluster1 == cluster2 || cluster2 != clusterRepresentatives[cluster2]) {
-                            continue;
-                        }
-                        double dist = pts[clusterRepresentatives[cluster1]].DistanceTo(pts[clusterRepresentatives[cluster2]]);
-                        (repr1, repr2, minDist) = dist < minDist ? (cluster1, cluster2, dist) : (repr1, repr2, minDist);
+
+                    double dist = pts[repr1].DistanceTo(pts[repr2]);
+                    if (dist < minDist) {
+                        (cluster1, cluster2, minDist) = (c1, c2, dist);
                     }
                 }
-                for (int i = 0; i < assignments.Length; i++) {
-                    assignments[i] = assignments[i] == repr2 ? repr1 : assignments[i] > repr2 ? assignments[i] - 1 : assignments[i];
-                }
-                if (repr2 < clusterRepresentatives.Length) {
-                    clusterRepresentatives[repr2] = clusterRepresentatives[repr1];
+            }
+
+            for (int i = 0; i < n; i++) {
+                if (assignments[i] == cluster2) {
+                    assignments[i] = cluster1;
                 }
             }
-            return assignments;
-        }))();
+            _ = activeClusters.Remove(cluster2);
+        }
+
+        return assignments;
+    }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
@@ -305,19 +313,20 @@ internal static class SpatialCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
-            : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
+            : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
                 ? ((Func<Result<Point3d[]>>)(() => {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+                    double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
-                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= context.AbsoluteTolerance) {
+                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
                             lower.RemoveAt(lower.Count - 1);
                         }
                         lower.Add(pts[i]);
                     }
                     List<Point3d> upper = [];
                     for (int i = pts.Length - 1; i >= 0; i--) {
-                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= context.AbsoluteTolerance) {
+                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= crossProductTolerance) {
                             upper.RemoveAt(upper.Count - 1);
                         }
                         upper.Add(pts[i]);
@@ -392,7 +401,7 @@ internal static class SpatialCompute {
         for (int i = 1; i < points.Length; i++) {
             double x = points[i].X;
             double y = points[i].Y;
-            if (Math.Abs(points[i].Z - z0) > context.AbsoluteTolerance) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate")); }
+            if (!RhinoMath.EpsilonEquals(points[i].Z, z0, epsilon: context.AbsoluteTolerance)) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate")); }
 
             (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
         }
@@ -425,7 +434,6 @@ internal static class SpatialCompute {
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-        // Check for degenerate triangle: if orientation is near zero, the points are collinear and the incircle predicate is not meaningful.
         if (Math.Abs(orientation) <= orientationTolerance) {
             return false;
         }
@@ -437,9 +445,9 @@ internal static class SpatialCompute {
         double cx = c.X - p.X;
         double cy = c.Y - p.Y;
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
-        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
         double adjustedDet = orientation > 0.0 ? det : -det;
-        return adjustedDet > context.AbsoluteTolerance;
+        double determinantTolerance = orientationTolerance * orientationTolerance;
+        return adjustedDet > determinantTolerance;
     }
 
     /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>

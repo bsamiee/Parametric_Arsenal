@@ -182,7 +182,7 @@ internal static class SpatialCore {
                     int count = 0;
                     try {
                         void CollectOverlaps(object? sender, RTreeEventArgs args) {
-                            _ = count + 1 < buffer.Length
+                            _ = count + 2 <= buffer.Length
                                 ? (buffer[count++] = args.Id, buffer[count++] = args.IdB, true)
                                 : default;
                         }
