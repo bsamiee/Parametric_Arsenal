@@ -73,8 +73,40 @@ public static class Transformation {
         public static TransformSpec FromPlaneToPlane(Plane from, Plane to) => new() { PlaneToPlane = (from, to) };
     }
 
-    /// <summary>Array transformation specification.</summary>
+    /// <summary>Base type for array transformation requests.</summary>
+    public abstract record ArrayRequest;
+
+    /// <summary>Rectangular grid array.</summary>
+    public sealed record RectangularArrayRequest(
+        int XCount,
+        int YCount,
+        int ZCount,
+        double XSpacing,
+        double YSpacing,
+        double ZSpacing) : ArrayRequest;
+
+    /// <summary>Polar/circular array.</summary>
+    public sealed record PolarArrayRequest(
+        Point3d Center,
+        Vector3d Axis,
+        int Count,
+        double TotalAngle) : ArrayRequest;
+
+    /// <summary>Linear array along direction.</summary>
+    public sealed record LinearArrayRequest(
+        Vector3d Direction,
+        int Count,
+        double Spacing) : ArrayRequest;
+
+    /// <summary>Path-based array with optional orientation.</summary>
+    public sealed record PathArrayRequest(
+        Curve Path,
+        int Count,
+        bool OrientToPath) : ArrayRequest;
+
+    /// <summary>Array transformation specification (backward compatibility).</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    [Obsolete("Use ArrayRequest algebraic types (RectangularArrayRequest, PolarArrayRequest, etc.) instead of ArraySpec with byte Mode discriminator.", error: false)]
     public readonly record struct ArraySpec {
         /// <summary>Array mode: 1=Rectangular, 2=Polar, 3=Linear, 4=Path.</summary>
         public byte Mode { get; init; }
@@ -129,8 +161,58 @@ public static class Transformation {
             new() { Mode = 4, PathCurve = path, Count = count, OrientToPath = orient };
     }
 
-    /// <summary>SpaceMorph operation specification.</summary>
+    /// <summary>Base type for morph transformation requests.</summary>
+    public abstract record MorphRequest;
+
+    /// <summary>Flow morph between base and target curves.</summary>
+    public sealed record FlowMorphRequest(
+        Curve BaseCurve,
+        Curve TargetCurve,
+        bool PreserveStructure) : MorphRequest;
+
+    /// <summary>Twist morph around axis.</summary>
+    public sealed record TwistMorphRequest(
+        Line Axis,
+        double AngleRadians,
+        bool Infinite) : MorphRequest;
+
+    /// <summary>Bend morph along spine.</summary>
+    public sealed record BendMorphRequest(
+        Line Spine,
+        double AngleRadians) : MorphRequest;
+
+    /// <summary>Taper morph from start to end width.</summary>
+    public sealed record TaperMorphRequest(
+        Line Axis,
+        double StartWidth,
+        double EndWidth) : MorphRequest;
+
+    /// <summary>Stretch morph along axis.</summary>
+    public sealed record StretchMorphRequest(
+        Line Axis) : MorphRequest;
+
+    /// <summary>Splop (surface project/plop) morph.</summary>
+    public sealed record SplopMorphRequest(
+        Plane BasePlane,
+        Surface TargetSurface,
+        Point3d TargetPoint) : MorphRequest;
+
+    /// <summary>Sporph (surface-to-surface morph).</summary>
+    public sealed record SporphMorphRequest(
+        Surface SourceSurface,
+        Surface TargetSurface,
+        bool PreserveStructure) : MorphRequest;
+
+    /// <summary>Maelstrom vortex morph.</summary>
+    public sealed record MaelstromMorphRequest(
+        Point3d Center,
+        Vector3d Axis,
+        double Radius,
+        double AngleRadians) : MorphRequest;
+
+    /// <summary>SpaceMorph operation specification (backward compatibility).</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    [Obsolete("Use MorphRequest algebraic types (FlowMorphRequest, TwistMorphRequest, etc.) instead of MorphSpec with byte Operation discriminator.", error: false)]
     public readonly record struct MorphSpec {
         /// <summary>Morph operation: 1=Flow, 2=Twist, 3=Bend, 4=Taper, 5=Stretch, 6=Splop, 7=Sporph, 8=Maelstrom.</summary>
         public byte Operation { get; init; }
@@ -217,8 +299,22 @@ public static class Transformation {
                 }))
             .Map(r => r[0]);
 
-    /// <summary>Apply array transformation.</summary>
+    /// <summary>Apply array transformation using algebraic request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<IReadOnlyList<T>> ArrayTransform<T>(
+        T geometry,
+        ArrayRequest request,
+        IGeometryContext context,
+        bool enableDiagnostics = false) where T : GeometryBase =>
+        TransformationCore.ApplyArrayTransform(
+            geometry: geometry,
+            request: request,
+            context: context,
+            enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Apply array transformation (backward compatibility with ArraySpec).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Obsolete("Use ArrayTransform with ArrayRequest algebraic types instead.", error: false)]
     public static Result<IReadOnlyList<T>> ArrayTransform<T>(
         T geometry,
         ArraySpec spec,
@@ -260,8 +356,20 @@ public static class Transformation {
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode),
         };
 
-    /// <summary>Apply SpaceMorph deformation.</summary>
+    /// <summary>Apply SpaceMorph deformation using algebraic request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Morph<T>(
+        T geometry,
+        MorphRequest request,
+        IGeometryContext context) where T : GeometryBase =>
+        TransformationCore.ApplyMorphTransform(
+            geometry: geometry,
+            request: request,
+            context: context);
+
+    /// <summary>Apply SpaceMorph deformation (backward compatibility with MorphSpec).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Obsolete("Use Morph with MorphRequest algebraic types instead.", error: false)]
     public static Result<T> Morph<T>(
         T geometry,
         MorphSpec spec,

@@ -207,4 +207,103 @@ internal static class TransformationCore {
                 EnableDiagnostics = enableDiagnostics,
             });
     }
+
+    /// <summary>Apply array transformation using algebraic request type dispatch.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<T>> ApplyArrayTransform<T>(
+        T geometry,
+        Transformation.ArrayRequest request,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        request switch {
+            Transformation.RectangularArrayRequest r => RectangularArray(
+                geometry: geometry,
+                xCount: r.XCount,
+                yCount: r.YCount,
+                zCount: r.ZCount,
+                xSpacing: r.XSpacing,
+                ySpacing: r.YSpacing,
+                zSpacing: r.ZSpacing,
+                context: context,
+                enableDiagnostics: enableDiagnostics),
+            Transformation.PolarArrayRequest r => PolarArray(
+                geometry: geometry,
+                center: r.Center,
+                axis: r.Axis,
+                count: r.Count,
+                totalAngle: r.TotalAngle,
+                context: context,
+                enableDiagnostics: enableDiagnostics),
+            Transformation.LinearArrayRequest r => LinearArray(
+                geometry: geometry,
+                direction: r.Direction,
+                count: r.Count,
+                spacing: r.Spacing,
+                context: context,
+                enableDiagnostics: enableDiagnostics),
+            Transformation.PathArrayRequest r => TransformationCompute.PathArray(
+                geometry: geometry,
+                path: r.Path,
+                count: r.Count,
+                orientToPath: r.OrientToPath,
+                context: context,
+                enableDiagnostics: enableDiagnostics),
+            _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode),
+        };
+
+    /// <summary>Apply morph transformation using algebraic request type dispatch.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<T> ApplyMorphTransform<T>(
+        T geometry,
+        Transformation.MorphRequest request,
+        IGeometryContext context) where T : GeometryBase =>
+        request switch {
+            Transformation.FlowMorphRequest r => TransformationCompute.Flow(
+                geometry: geometry,
+                baseCurve: r.BaseCurve,
+                targetCurve: r.TargetCurve,
+                preserveStructure: r.PreserveStructure,
+                context: context),
+            Transformation.TwistMorphRequest r => TransformationCompute.Twist(
+                geometry: geometry,
+                axis: r.Axis,
+                angleRadians: r.AngleRadians,
+                infinite: r.Infinite,
+                context: context),
+            Transformation.BendMorphRequest r => TransformationCompute.Bend(
+                geometry: geometry,
+                spine: r.Spine,
+                angle: r.AngleRadians,
+                context: context),
+            Transformation.TaperMorphRequest r => TransformationCompute.Taper(
+                geometry: geometry,
+                axis: r.Axis,
+                startWidth: r.StartWidth,
+                endWidth: r.EndWidth,
+                context: context),
+            Transformation.StretchMorphRequest r => TransformationCompute.Stretch(
+                geometry: geometry,
+                axis: r.Axis,
+                context: context),
+            Transformation.SplopMorphRequest r => TransformationCompute.Splop(
+                geometry: geometry,
+                basePlane: r.BasePlane,
+                targetSurface: r.TargetSurface,
+                targetPoint: r.TargetPoint,
+                context: context),
+            Transformation.SporphMorphRequest r => TransformationCompute.Sporph(
+                geometry: geometry,
+                sourceSurface: r.SourceSurface,
+                targetSurface: r.TargetSurface,
+                preserveStructure: r.PreserveStructure,
+                context: context),
+            Transformation.MaelstromMorphRequest r => TransformationCompute.Maelstrom(
+                geometry: geometry,
+                center: r.Center,
+                axis: new Line(r.Center, r.Axis),
+                radius: r.Radius,
+                angle: r.AngleRadians,
+                context: context),
+            _ => ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMorphOperation),
+        };
 }

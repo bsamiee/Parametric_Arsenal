@@ -9,7 +9,38 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform validation modes and algorithmic constants.</summary>
 internal static class TransformationConfig {
-    /// <summary>Geometry type validation mode mapping.</summary>
+    /// <summary>Unified transformation operation dispatch table: (GeometryType, OperationType) → metadata.</summary>
+    internal static readonly FrozenDictionary<(Type GeometryType, string OperationType), TransformMetadata> Operations =
+        new Dictionary<(Type, string), TransformMetadata> {
+            [(typeof(GeometryBase), "UniformScale")] = new(V.Standard, "Transformation.UniformScale"),
+            [(typeof(GeometryBase), "NonUniformScale")] = new(V.Standard, "Transformation.NonUniformScale"),
+            [(typeof(GeometryBase), "Rotation")] = new(V.Standard, "Transformation.Rotation"),
+            [(typeof(GeometryBase), "Mirror")] = new(V.Standard, "Transformation.Mirror"),
+            [(typeof(GeometryBase), "Translation")] = new(V.None, "Transformation.Translation"),
+            [(typeof(GeometryBase), "Shear")] = new(V.Standard, "Transformation.Shear"),
+            [(typeof(GeometryBase), "Projection")] = new(V.Standard, "Transformation.Projection"),
+            [(typeof(GeometryBase), "ChangeBasis")] = new(V.Standard, "Transformation.ChangeBasis"),
+            [(typeof(GeometryBase), "PlaneToPlane")] = new(V.Standard, "Transformation.PlaneToPlane"),
+            [(typeof(GeometryBase), "RectangularArray")] = new(V.Standard, "Transformation.RectangularArray"),
+            [(typeof(GeometryBase), "PolarArray")] = new(V.Standard, "Transformation.PolarArray"),
+            [(typeof(GeometryBase), "LinearArray")] = new(V.Standard, "Transformation.LinearArray"),
+            [(typeof(GeometryBase), "PathArray")] = new(V.Standard, "Transformation.PathArray"),
+            [(typeof(GeometryBase), "Flow")] = new(V.Standard, "Transformation.Flow"),
+            [(typeof(GeometryBase), "Twist")] = new(V.Standard, "Transformation.Twist"),
+            [(typeof(GeometryBase), "Bend")] = new(V.Standard, "Transformation.Bend"),
+            [(typeof(GeometryBase), "Taper")] = new(V.Standard, "Transformation.Taper"),
+            [(typeof(GeometryBase), "Stretch")] = new(V.Standard, "Transformation.Stretch"),
+            [(typeof(GeometryBase), "Splop")] = new(V.Standard, "Transformation.Splop"),
+            [(typeof(GeometryBase), "Sporph")] = new(V.Standard, "Transformation.Sporph"),
+            [(typeof(GeometryBase), "Maelstrom")] = new(V.Standard, "Transformation.Maelstrom"),
+        }.ToFrozenDictionary();
+
+    /// <summary>Transformation operation metadata containing validation mode and operation name.</summary>
+    internal sealed record TransformMetadata(
+        V ValidationMode,
+        string OperationName);
+
+    /// <summary>Geometry type validation mode mapping (backward compatibility).</summary>
     internal static readonly FrozenDictionary<Type, V> ValidationModes =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
