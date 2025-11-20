@@ -384,7 +384,7 @@ internal static class IntersectionCore {
             operation: (Func<GeometryBase, Result<IReadOnlyList<Intersection.ClassificationResult>>>)(geomA =>
                 IntersectionCompute.Classify(output: output, geomA: geomA, geomB: geometryB, context: context)
                     .Map(tuple => (IReadOnlyList<Intersection.ClassificationResult>)[new Intersection.ClassificationResult(
-                        Type: new Intersection.IntersectionType(tuple.Type),
+                        Type: tuple.Type,
                         ApproachAngles: tuple.ApproachAngles,
                         IsGrazing: tuple.IsGrazing,
                         BlendScore: tuple.BlendScore),
