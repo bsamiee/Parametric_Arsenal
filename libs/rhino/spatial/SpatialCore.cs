@@ -84,18 +84,19 @@ internal static class SpatialCore {
                 }
                 Vector3d dir = request.Direction / request.Direction.Length;
                 Point3d origin = bounds.Center;
-                BoundingBox searchBox = new(origin - new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance), origin + new Vector3d(request.MaxDistance, request.MaxDistance, request.MaxDistance));
+                Sphere searchSphere = new(origin, request.MaxDistance);
                 List<Spatial.ProximityFieldResult> results = [];
                 void CollectResults(object? sender, RTreeEventArgs args) {
                     Vector3d toGeom = centers[args.Id] - origin;
                     double dist = toGeom.Length;
                     double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
                     double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-                    if (weightedDist > request.MaxDistance) { return; }
-                    results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
+                    if (weightedDist <= request.MaxDistance) {
+                        results.Add(new Spatial.ProximityFieldResult(Index: args.Id, Distance: dist, Angle: angle));
+                    }
                 }
-                _ = tree.Search(searchBox, CollectResults);
-                return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.Distance),]);
+                _ = tree.Search(searchSphere, CollectResults);
+                return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(r => r.Distance * (1.0 + (request.AngleWeight * r.Angle))),]);
             }))(),
         };
 
