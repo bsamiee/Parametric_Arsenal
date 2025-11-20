@@ -88,6 +88,46 @@ internal static class AnalysisCompute {
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.CurveFairnessResult> ComputeCurveFairness(
+        Curve curve,
+        int sampleCount,
+        double inflectionThreshold,
+        double smoothnessSensitivity,
+        IGeometryContext context) {
+        int maxSamples = Math.Max(2, sampleCount);
+        (double Parameter, Vector3d Curvature)[] samples = new (double, Vector3d)[maxSamples];
+        double[] curvatures = new double[maxSamples];
+        int validCount = 0;
+        double sampleDivisor = maxSamples - 1.0;
+        for (int i = 0; i < maxSamples; i++) {
+            double t = curve.Domain.ParameterAt(i / sampleDivisor);
+            Vector3d curvature = curve.CurvatureAt(t);
+            if (curvature.IsValid) {
+                samples[validCount] = (t, curvature);
+                curvatures[validCount] = curvature.Length;
+                validCount++;
+            }
+        }
+        (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
+        double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
+        if (validSamples.Length <= 2) {
+            return ResultFactory.Create<Analysis.CurveFairnessResult>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
+        }
+        double avgDiff = Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1);
+        double curveLength = curve.GetLength();
+        return ResultFactory.Create(value: new Analysis.CurveFairnessResult(
+            SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * smoothnessSensitivity)), 0.0, 1.0),
+            CurvatureValues: validCurvatures,
+            InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
+                .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
+                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
+            ],
+            BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
+                ? (validCurvatures.Sum(k => k * k) * (curveLength / (validCount - 1))) / (maxCurv * curveLength)
+                : 0.0));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Analysis.CurveData> ComputeCurve(
         Curve curve,
         double parameter,
@@ -177,46 +217,6 @@ internal static class AnalysisCompute {
                 Area: amp.Area,
                 Volume: vmp.Volume,
                 Centroid: vmp.Centroid));
-    }
-
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Analysis.CurveFairnessResult> ComputeCurveFairness(
-        Curve curve,
-        int sampleCount,
-        double inflectionThreshold,
-        double smoothnessSensitivity,
-        IGeometryContext context) {
-        int maxSamples = Math.Max(2, sampleCount);
-        (double Parameter, Vector3d Curvature)[] samples = new (double, Vector3d)[maxSamples];
-        double[] curvatures = new double[maxSamples];
-        int validCount = 0;
-        double sampleDivisor = maxSamples - 1.0;
-        for (int i = 0; i < maxSamples; i++) {
-            double t = curve.Domain.ParameterAt(i / sampleDivisor);
-            Vector3d curvature = curve.CurvatureAt(t);
-            if (curvature.IsValid) {
-                samples[validCount] = (t, curvature);
-                curvatures[validCount] = curvature.Length;
-                validCount++;
-            }
-        }
-        (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
-        double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
-        if (validSamples.Length <= 2) {
-            return ResultFactory.Create<Analysis.CurveFairnessResult>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"));
-        }
-        double avgDiff = Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1);
-        double curveLength = curve.GetLength();
-        return ResultFactory.Create(value: new Analysis.CurveFairnessResult(
-            SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * smoothnessSensitivity)), 0.0, 1.0),
-            CurvatureValues: validCurvatures,
-            InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
-                .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
-                .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
-            ],
-            BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
-                ? (validCurvatures.Sum(k => k * k) * (curveLength / (validCount - 1))) / (maxCurv * curveLength)
-                : 0.0));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
