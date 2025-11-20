@@ -51,14 +51,52 @@ internal static class TransformationCore {
                 input: geometry,
                 operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
                     operation switch {
-                        Transformation.Flow flow => TransformationCompute.Flow(geometry: item, baseCurve: flow.BaseCurve, targetCurve: flow.TargetCurve, preserveStructure: flow.PreserveStructure, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Twist twist => TransformationCompute.Twist(geometry: item, axis: twist.Axis, angleRadians: twist.AngleRadians, infinite: twist.Infinite, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Bend bend => TransformationCompute.Bend(geometry: item, spine: bend.Spine, angle: bend.AngleRadians, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Taper taper => TransformationCompute.Taper(geometry: item, axis: taper.Axis, startWidth: taper.StartWidth, endWidth: taper.EndWidth, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Stretch stretch => TransformationCompute.Stretch(geometry: item, axis: stretch.Axis, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Splop splop => TransformationCompute.Splop(geometry: item, basePlane: splop.BasePlane, targetSurface: splop.TargetSurface, targetPoint: splop.TargetPoint, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Sporph sporph => TransformationCompute.Sporph(geometry: item, sourceSurface: sporph.SourceSurface, targetSurface: sporph.TargetSurface, preserveStructure: sporph.PreserveStructure, context: context).Map(r => (IReadOnlyList<T>)[r,]),
-                        Transformation.Maelstrom maelstrom => TransformationCompute.Maelstrom(geometry: item, center: maelstrom.Center, axis: new Line(maelstrom.Center, maelstrom.Axis), radius: maelstrom.Radius, angle: maelstrom.AngleRadians, context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Flow flow => TransformationCompute.Flow(
+                            geometry: item,
+                            baseCurve: flow.BaseCurve,
+                            targetCurve: flow.TargetCurve,
+                            preserveStructure: flow.PreserveStructure,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Twist twist => TransformationCompute.Twist(
+                            geometry: item,
+                            axis: twist.Axis,
+                            angleRadians: twist.AngleRadians,
+                            infinite: twist.Infinite,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Bend bend => TransformationCompute.Bend(
+                            geometry: item,
+                            spine: bend.Spine,
+                            angle: bend.AngleRadians,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Taper taper => TransformationCompute.Taper(
+                            geometry: item,
+                            axis: taper.Axis,
+                            startWidth: taper.StartWidth,
+                            endWidth: taper.EndWidth,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Stretch stretch => TransformationCompute.Stretch(
+                            geometry: item,
+                            axis: stretch.Axis,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Splop splop => TransformationCompute.Splop(
+                            geometry: item,
+                            basePlane: splop.BasePlane,
+                            targetSurface: splop.TargetSurface,
+                            targetPoint: splop.TargetPoint,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Sporph sporph => TransformationCompute.Sporph(
+                            geometry: item,
+                            sourceSurface: sporph.SourceSurface,
+                            targetSurface: sporph.TargetSurface,
+                            preserveStructure: sporph.PreserveStructure,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
+                        Transformation.Maelstrom maelstrom => TransformationCompute.Maelstrom(
+                            geometry: item,
+                            center: maelstrom.Center,
+                            axis: new Line(maelstrom.Center, maelstrom.Axis),
+                            radius: maelstrom.Radius,
+                            angle: maelstrom.AngleRadians,
+                            context: context).Map(r => (IReadOnlyList<T>)[r,]),
                         _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidMorphOperation.WithContext($"Unhandled operation: {operation.GetType().Name}")),
                     }),
                 config: new OperationConfig<T, T> {
@@ -105,7 +143,7 @@ internal static class TransformationCore {
 
     /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<T>> ApplyTransform<T>(T item, Transform transform) where T : GeometryBase {
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T item, Transform transform) where T : GeometryBase {
         GeometryBase normalized = item is Extrusion extrusion
             ? extrusion.ToBrep(splitKinkyFaces: true)
             : item;
@@ -124,84 +162,88 @@ internal static class TransformationCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<T>> ExecuteRectangularArray<T>(T geometry, Transformation.RectangularArray operation, TransformationConfig.ArrayOperationMetadata meta, IGeometryContext context) where T : GeometryBase {
         int totalCount = operation.XCount * operation.YCount * operation.ZCount;
-        return operation.XCount <= 0 || operation.YCount <= 0 || operation.ZCount <= 0
+        if (operation.XCount <= 0 || operation.YCount <= 0 || operation.ZCount <= 0
             || totalCount > meta.MaxCount
             || Math.Abs(operation.XSpacing) <= context.AbsoluteTolerance
             || Math.Abs(operation.YSpacing) <= context.AbsoluteTolerance
-            || (operation.ZCount > 1 && Math.Abs(operation.ZSpacing) <= context.AbsoluteTolerance)
-                ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {operation.XCount}, YCount: {operation.YCount}, ZCount: {operation.ZCount}, Total: {totalCount}"))
-                : ((Func<Result<IReadOnlyList<T>>>)(() => {
-                    Transform[] transforms = new Transform[totalCount];
-                    int index = 0;
-                    for (int i = 0; i < operation.XCount; i++) {
-                        double dx = i * operation.XSpacing;
-                        for (int j = 0; j < operation.YCount; j++) {
-                            double dy = j * operation.YSpacing;
-                            for (int k = 0; k < operation.ZCount; k++) {
-                                transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: k * operation.ZSpacing);
-                            }
-                        }
-                    }
-                    return UnifiedOperation.Apply(
-                        input: transforms,
-                        operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                            ApplyTransform(item: geometry, transform: xform)),
-                        config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                            Context = context,
-                            ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
-                            OperationName = meta.OperationName,
-                        });
-                }))();
+            || (operation.ZCount > 1 && Math.Abs(operation.ZSpacing) <= context.AbsoluteTolerance)) {
+            return ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"XCount: {operation.XCount}, YCount: {operation.YCount}, ZCount: {operation.ZCount}, Total: {totalCount}"));
+        }
+
+        Transform[] transforms = new Transform[totalCount];
+        int index = 0;
+        for (int i = 0; i < operation.XCount; i++) {
+            double dx = i * operation.XSpacing;
+            for (int j = 0; j < operation.YCount; j++) {
+                double dy = j * operation.YSpacing;
+                for (int k = 0; k < operation.ZCount; k++) {
+                    transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: k * operation.ZSpacing);
+                }
+            }
+        }
+
+        return UnifiedOperation.Apply(
+            input: transforms,
+            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                ApplyTransform(item: geometry, transform: xform)),
+            config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                Context = context,
+                ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
+                OperationName = meta.OperationName,
+            });
     }
 
     /// <summary>Execute polar array operation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<T>> ExecutePolarArray<T>(T geometry, Transformation.PolarArray operation, TransformationConfig.ArrayOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
-        operation.Count <= 0 || operation.Count > meta.MaxCount
+    private static Result<IReadOnlyList<T>> ExecutePolarArray<T>(T geometry, Transformation.PolarArray operation, TransformationConfig.ArrayOperationMetadata meta, IGeometryContext context) where T : GeometryBase {
+        if (operation.Count <= 0 || operation.Count > meta.MaxCount
             || operation.Axis.Length <= context.AbsoluteTolerance
-            || operation.TotalAngleRadians <= 0.0 || operation.TotalAngleRadians > RhinoMath.TwoPI
-                ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {operation.Count}, Axis: {operation.Axis.Length}, Angle: {operation.TotalAngleRadians}"))
-                : ((Func<Result<IReadOnlyList<T>>>)(() => {
-                    Transform[] transforms = new Transform[operation.Count];
-                    double angleStep = operation.TotalAngleRadians / operation.Count;
-                    for (int i = 0; i < operation.Count; i++) {
-                        transforms[i] = Transform.Rotation(angleRadians: angleStep * i, rotationAxis: operation.Axis, rotationCenter: operation.Center);
-                    }
-                    return UnifiedOperation.Apply(
-                        input: transforms,
-                        operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                            ApplyTransform(item: geometry, transform: xform)),
-                        config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                            Context = context,
-                            ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
-                            OperationName = meta.OperationName,
-                        });
-                }))();
+            || operation.TotalAngleRadians <= 0.0 || operation.TotalAngleRadians > RhinoMath.TwoPI) {
+            return ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {operation.Count}, Axis: {operation.Axis.Length}, Angle: {operation.TotalAngleRadians}"));
+        }
+
+        Transform[] transforms = new Transform[operation.Count];
+        double angleStep = operation.TotalAngleRadians / operation.Count;
+        for (int i = 0; i < operation.Count; i++) {
+            transforms[i] = Transform.Rotation(angleRadians: angleStep * i, rotationAxis: operation.Axis, rotationCenter: operation.Center);
+        }
+
+        return UnifiedOperation.Apply(
+            input: transforms,
+            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                ApplyTransform(item: geometry, transform: xform)),
+            config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                Context = context,
+                ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
+                OperationName = meta.OperationName,
+            });
+    }
 
     /// <summary>Execute linear array operation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<T>> ExecuteLinearArray<T>(T geometry, Transformation.LinearArray operation, TransformationConfig.ArrayOperationMetadata meta, IGeometryContext context) where T : GeometryBase {
         double dirLength = operation.Direction.Length;
-        return operation.Count <= 0 || operation.Count > meta.MaxCount
+        if (operation.Count <= 0 || operation.Count > meta.MaxCount
             || dirLength <= context.AbsoluteTolerance
-            || Math.Abs(operation.Spacing) <= context.AbsoluteTolerance
-                ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {operation.Count}, Direction: {dirLength}, Spacing: {operation.Spacing}"))
-                : ((Func<Result<IReadOnlyList<T>>>)(() => {
-                    Transform[] transforms = new Transform[operation.Count];
-                    Vector3d step = (operation.Direction / dirLength) * operation.Spacing;
-                    for (int i = 0; i < operation.Count; i++) {
-                        transforms[i] = Transform.Translation(step * i);
-                    }
-                    return UnifiedOperation.Apply(
-                        input: transforms,
-                        operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                            ApplyTransform(item: geometry, transform: xform)),
-                        config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                            Context = context,
-                            ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
-                            OperationName = meta.OperationName,
-                        });
-                }))();
+            || Math.Abs(operation.Spacing) <= context.AbsoluteTolerance) {
+            return ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Count: {operation.Count}, Direction: {dirLength}, Spacing: {operation.Spacing}"));
+        }
+
+        Transform[] transforms = new Transform[operation.Count];
+        Vector3d step = (operation.Direction / dirLength) * operation.Spacing;
+        for (int i = 0; i < operation.Count; i++) {
+            transforms[i] = Transform.Translation(step * i);
+        }
+
+        return UnifiedOperation.Apply(
+            input: transforms,
+            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                ApplyTransform(item: geometry, transform: xform)),
+            config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                Context = context,
+                ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
+                OperationName = meta.OperationName,
+            });
     }
 
     /// <summary>Execute path array operation.</summary>

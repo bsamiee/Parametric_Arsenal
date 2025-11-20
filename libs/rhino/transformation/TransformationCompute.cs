@@ -199,11 +199,11 @@ internal static class TransformationCompute {
         bool orientToPath,
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount || !path.IsValid || !geometry.IsValid) {
             return ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")));
+                    $"Count: {count}, Path: {path.IsValid}, Geometry: {geometry.IsValid}")));
         }
 
         double curveLength = path.GetLength();
@@ -255,15 +255,14 @@ internal static class TransformationCompute {
     private static Result<T> ApplyMorph<TMorph, T>(
         TMorph morph,
         T geometry) where TMorph : SpaceMorph where T : GeometryBase {
-        using (morph as IDisposable) {
-            if (!SpaceMorph.IsMorphable(geometry)) {
-                return ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
-            }
-
-            T duplicate = (T)geometry.Duplicate();
-            return morph.Morph(duplicate)
-                ? ResultFactory.Create(value: duplicate)
-                : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
+        using TMorph morphDisposable = morph;
+        if (!SpaceMorph.IsMorphable(geometry)) {
+            return ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
         }
+
+        T duplicate = (T)geometry.Duplicate();
+        return morph.Morph(duplicate)
+            ? ResultFactory.Create(value: duplicate)
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
     }
 }

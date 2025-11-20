@@ -89,10 +89,6 @@ public static class Transformation {
     /// <summary>Maelstrom vortex deformation.</summary>
     public sealed record Maelstrom(Point3d Center, Vector3d Axis, double Radius, double AngleRadians) : MorphOperation;
 
-    /// <summary>Result of array transformation with generated instances.</summary>
-    [DebuggerDisplay("Instances={Instances.Count}")]
-    public sealed record ArrayResult<T>(IReadOnlyList<T> Instances) where T : GeometryBase;
-
     /// <summary>Apply affine transformation operation to geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Apply<T>(T geometry, TransformOperation operation, IGeometryContext context) where T : GeometryBase =>
