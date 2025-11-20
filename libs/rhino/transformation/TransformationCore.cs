@@ -25,7 +25,7 @@ internal static class TransformationCore {
                 .Bind(xform => UnifiedOperation.Apply(
                     input: geometry,
                     operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
-                        ApplyTransformToGeometry(geometry: item, transform: xform)),
+                        ApplyTransform(geometry: item, transform: xform)),
                     config: new OperationConfig<T, T> {
                         Context = context,
                         ValidationMode = TransformationConfig.GeometryValidation.GetValueOrDefault(typeof(T), meta.ValidationMode),
@@ -200,7 +200,7 @@ internal static class TransformationCore {
 
     /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Result<IReadOnlyList<T>> ApplyTransformToGeometry<T>(
+    internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T geometry,
         Transform transform) where T : GeometryBase {
         GeometryBase normalized = geometry is Extrusion extrusion
@@ -228,7 +228,7 @@ internal static class TransformationCore {
         UnifiedOperation.Apply(
             input: transforms,
             operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                ApplyTransformToGeometry(geometry: geometry, transform: xform)),
+                ApplyTransform(geometry: geometry, transform: xform)),
             config: new OperationConfig<IReadOnlyList<Transform>, T> {
                 Context = context,
                 ValidationMode = meta.ValidationMode,
