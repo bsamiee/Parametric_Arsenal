@@ -30,42 +30,34 @@ internal static class FieldsConfig {
                 BufferSize: 4096),
         }.ToFrozenDictionary();
 
+    /// <summary>Runge-Kutta integration weights and step coefficients.</summary>
+    internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
+    internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
+    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
+
+    internal const int MinResolution = 8;
+    internal const int MaxResolution = 256;
+    internal const int DefaultResolution = 32;
+    internal const double RK2HalfStep = 0.5;
+    internal const double MaxStepSize = 1.0;
+    internal const double DefaultStepSize = 0.01;
+    internal const double MinFieldMagnitude = 1e-10;
+    internal const double InsideOutsideToleranceMultiplier = 10.0;
+    internal const int MaxStreamlineSteps = 10000;
+    internal const int VectorPotentialIterations = 512;
+    internal const int FieldRTreeThreshold = 100;
+
     /// <summary>Distance field metadata containing validation mode, operation name, and buffer size.</summary>
     internal sealed record DistanceFieldMetadata(
         V ValidationMode,
         string OperationName,
         int BufferSize);
-
-    /// <summary>Field sampling resolution limits: default 32, range [8, 256].</summary>
-    internal const int DefaultResolution = 32;
-    internal const int MinResolution = 8;
-    internal const int MaxResolution = 256;
-
-    /// <summary>Integration step size parameters: default 0.01, range [√ε, 1.0].</summary>
-    internal const double DefaultStepSize = 0.01;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double MinStepSize = RhinoMath.SqrtEpsilon;
-    internal const double MaxStepSize = 1.0;
-
-    /// <summary>Streamline integration limits: max 10000 steps, min field magnitude 1e-10.</summary>
-    internal const int MaxStreamlineSteps = 10000;
-    internal const double MinFieldMagnitude = 1e-10;
-
-    /// <summary>Runge-Kutta integration weights and step coefficients.</summary>
-    internal static readonly double[] RK4Weights = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0,];
-    internal static readonly double[] RK4HalfSteps = [0.5, 0.5, 1.0,];
-    internal const double RK2HalfStep = 0.5;
-
-    /// <summary>Vector potential solver: 512 max iterations, √ε convergence tolerance.</summary>
-    internal const int VectorPotentialIterations = 512;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double VectorPotentialTolerance = RhinoMath.SqrtEpsilon;
-
-    /// <summary>Detection thresholds for spatial queries and eigenvalue classification.</summary>
-    internal const int FieldRTreeThreshold = 100;
-    internal const double InsideOutsideToleranceMultiplier = 10.0;
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1802:Use literals where appropriate", Justification = "Value depends on RhinoMath constant")]
-    internal static readonly double EigenvalueThreshold = RhinoMath.SqrtEpsilon;
 
     internal static readonly (int V1, int V2)[] EdgeVertexPairs = [
         (0, 1),
