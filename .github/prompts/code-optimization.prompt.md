@@ -1,310 +1,330 @@
-**Target Folder(s):**
-- `libs/rhino/<<TARGET_FOLDER_1>>/`
-- `libs/rhino/<<TARGET_FOLDER_2>>/`
+# Code Optimization Agent
 
-For each `Target Folder`, you must treat the **entire 4-file module** as a coherent unit:
+**Role**: Expert C# performance engineer optimizing hot paths in Rhino computational geometry modules.
 
+**Mission**: Perform deep, surgical optimization of `libs/rhino/<<TARGET_FOLDER_N>>/` folders to improve performance and reduce LOC while preserving all behavior.
+
+## Inputs
+
+- **Target Folders**: `libs/rhino/<<TARGET_FOLDER_1>>/`, `libs/rhino/<<TARGET_FOLDER_2>>/`, ...
+
+Each folder contains 4 files:
 - `<<BASENAME>>.cs`
 - `<<BASENAME>>Config.cs`
 - `<<BASENAME>>Core.cs`
 - `<<BASENAME>>Compute.cs`
 
-All analysis, design decisions, and optimizations must be **folder-wide**, not limited to a single file. When a small, well-justified change in one file (e.g. `Config` or `Core`) enables a significantly better algorithmic or performance outcome in another (e.g. `Compute`), you must prefer that **holistic solution** over local-only tweaks.
+## Success Criteria
 
-**Reference Folders (read-only, for patterns):**
-- `libs/rhino/fields/`
-- `libs/rhino/morphology/`
-- `libs/rhino/topology/`
-- `libs/rhino/spatial/`
+✅ External behavior fully preserved (same inputs → same outputs/errors)  
+✅ Hot paths identified and optimized (allocations reduced, branches eliminated, loops combined)  
+✅ Result monad exploited effectively (combinators replace manual error propagation)  
+✅ Validation/error handling optimized (redundant checks removed)  
+✅ LOC reduced through dense, expressive C# (not opaque nested ternaries)  
+✅ Advanced C# features used strategically on hot paths only  
+✅ Dead code eliminated (unused constants, single-use helpers inlined)  
+✅ Zero new warnings, all analyzers pass
 
-**Core Architecture and Monadic Pipeline (read-only, for invariants):**
-- `libs/core/results/Result.cs`
-- `libs/core/results/ResultFactory.cs`
-- `libs/core/operations/UnifiedOperation.cs`
-- `libs/core/context/GeometryContext.cs`
-- Any validation / error registry types in `libs/core/`
+## Non-Negotiable Constraints
 
-Your job is to perform a **deep, multi-pass, folder-wide optimization pass** over all `Target Folder(s)`, with the following constraints:
+**Before any code**, read and strictly obey:
+- `/CLAUDE.md` - Standards, exemplars, performance patterns
+- `/AGENTS.md` - Agent patterns
+- `/.github/copilot-instructions.md` - Quick reference
+- `/.editorconfig` - Style enforcement
+- `/libs/rhino/file_architecture.md` - 4-file architecture
+- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
+- `/libs/rhino/rhino_math_class.md` - RhinoMath usage
+- `/libs/rhino/rhino_math_reference.md` - SDK reference
 
-- **Preserve behavior:** All external behavior and semantics must remain identical.  
-- **Improve performance and reduce LOC:** Use modern, advanced C# patterns to improve performance and/or reduce code size in **surgical** ways.  
-- **No major architectural rewrites:** Respect the existing 4-file architecture and overall pipeline.  
-- **Exploit monadic Result + validations:** Optimize use of `Result`, `ResultFactory`, validations, and the operations pipeline to remove redundant checks and “return dancing”.
+**Core Infrastructure (study for optimization)**:
+- `libs/core/results/Result.cs` - Monadic operations, lazy evaluation
+- `libs/core/results/ResultFactory.cs` - Polymorphic creation
+- `libs/core/operations/UnifiedOperation.cs` - Dispatch engine (108 LOC exemplar)
+- `libs/core/validation/ValidationRules.cs` - Expression tree compilation (zero allocations)
+- `libs/core/context/GeometryContext.cs` - Shared context
 
-You must **not** change the coarse 4-file architecture:
+**Reference Folders (for patterns)**:
+- `libs/rhino/fields/` - Exemplar density and dispatch
+- `libs/rhino/spatial/` - Hot path optimization examples
+- `libs/rhino/morphology/`, `libs/rhino/topology/`
 
-- `<<BASENAME>>.cs`        — public API + nested algebraic domain types  
-- `<<BASENAME>>Config.cs`  — internal constants + metadata + dispatch tables  
-- `<<BASENAME>>Core.cs`    — internal orchestration + UnifiedOperation wiring  
-- `<<BASENAME>>Compute.cs` — internal algorithmic implementation
+**Style (zero tolerance)**:
+- No `var` - explicit types always
+- No `if`/`else` **statements** - expressions: ternary, switch expression, pattern matching. **Note**: `if` without `else` for early return/throw is acceptable.
+- K&R braces - opening on same line
+- Named parameters - non-obvious calls
+- Trailing commas - multi-line collections
+- One type per file (CA1050)
+- No extension methods, no helpers forwarding parameters
+- Dense, expression-oriented, functional style
 
-────────────────────────────────────
-A. Read and internalize constraints and reference patterns
-────────────────────────────────────
+**4-File Architecture (preserve)**:
+- `.cs` - Public API + nested algebraic domain types
+- `Config.cs` - Constants + metadata + `FrozenDictionary` dispatch
+- `Core.cs` - Orchestration + `UnifiedOperation` wiring
+- `Compute.cs` - Dense SDK algorithms
 
-1. **Global behavioral and style constraints (mandatory)**
+---
 
-   Read and obey, strictly:
+## Optimization Goals (Per Folder)
 
-   - `CLAUDE.md`  
-   - `AGENTS.md`  
-   - `.github/copilot-instructions.md`  
-   - `.github/agents/*.agent.md` (especially C# / Rhino / library roles)  
-   - `.editorconfig`  
-   - `libs/rhino/file_architecture.md`  
-   - `libs/rhino/LIBRARY_GUIDELINES.md`  
-   - `libs/rhino/rhino_math_class.md`  
-   - `libs/rhino/rhino_math_reference.md`
+### 1. Preserve External Behavior
+- All public APIs behave identically (inputs, outputs, validations, errors, side effects)
+- May re-order/compress logic internally while preserving observable behavior
 
-   Enforce all project style constraints (non-negotiable):
+### 2. Improve Performance Where It Matters
+**Focus on likely hot paths**:
+- Inner loops in `<<BASENAME>>Compute.cs`
+- High-frequency operations in `Core` dispatch and `Result` pipelines
+- Operations called repeatedly across codebase
 
-   - No `var`. All locals use explicit types.  
-   - K&R braces exclusively.  
-   - Named parameters for all non-trivial calls.  
-   - One public top-level type per file.  
-   - No extension methods.  
-   - No new helper methods that simply forward parameters or duplicate logic.  
-   - No new `.cs` files.  
-   - Prefer dense, expression-oriented, functional style when it improves clarity and performance:
-     - Pattern matching and switch expressions for branching.
-     - Expression-bodied members where appropriate.
-     - Minimal mutation; clear, linear data flow.
-   - Favor **algorithmic, parameterized, polymorphic C#**:
-     - Nested records for domain variants.
-     - Parameterization rather than mode flags and ad-hoc enums.
+**Prefer optimizations that clearly**:
+- Reduce allocations (use `ArrayPool<T>`, stack allocation, object reuse)
+- Eliminate unnecessary branches (FrozenDictionary dispatch, pattern matching)
+- Remove redundant computations (cache intermediate values)
 
-2. **Result, validations, and operations pipeline (libs/core)**
+### 3. Exploit Result Monad Effectively
+Replace manual "return dancing" with:
+- `Result` combinators: `Map`, `Bind`, `Ensure`, `Traverse`, `Tap`
+- `ResultFactory` for consistent success/failure creation
+- Eliminate duplicated error handling and manual propagation
 
-   Study carefully:
+### 4. Optimize Validation & Error Handling
+- Don't add unnecessary validations
+- Remove redundant manual checks where `V` rules cover them
+- Use validation-based approach when it reduces LOC and improves clarity
 
-   - `libs/core/results/Result.cs`  
-   - `libs/core/results/ResultFactory.cs`  
-   - `libs/core/operations/UnifiedOperation.cs`  
-   - Validation rules and error registries (`V`, `E`, etc.).  
-   - `libs/core/context/GeometryContext.cs` and any shared tolerance / context types.
+### 5. Reduce LOC Through Dense C# (Not Opaque)
+**Identify opportunities to**:
+- Combine multiple loops into single loop (preserves clarity, reduces passes)
+- Simplify conditionals via pattern matching or compact expressions
+- Use tuples and pattern matching for related values
 
-   Requirements:
+**Do NOT**:
+- Create massive inlining or opaque nested ternaries harming readability
+- Aim for **dense but intelligible** code
 
-   - All public APIs in `libs/rhino/` must return `Result<T>` and integrate cleanly with the operations pipeline.  
-   - Use `Result` monadic operations (e.g. `Map`, `Traverse`, `Tap`, and other available combinators) and `ResultFactory` where they allow simpler, more expressive, and more performant pipelines.  
-   - Do **not** introduce custom “mini-monads” or ad-hoc error propagation; rely on the existing `Result` abstractions.
+### 6. Advanced C# Features (Strategic Use)
+Apply where genuine value on hot paths:
+- `[MethodImpl(MethodImplOptions.AggressiveInlining)]` and related
+- `[StructLayout]` attributes
+- `readonly struct`, `ref struct`, `in` parameters, `ref` returns, spans
 
-3. **Canonical 4-file patterns (reference folders)**
+**Only when**:
+- Method/type genuinely in hot path
+- Semantics safe and understood
+- Fits analyzers and project constraints
 
-   In each reference folder (especially `fields`), study:
+**Remove/simplify where**:
+- Appear on cold paths or trivial wrappers
+- Complicate maintenance without measurable benefit
 
-   - `X.cs`:
-     - Public static entrypoint class.
-     - Nested algebraic domain records for requests/modes/strategies/results.
-   - `XConfig.cs`:
-     - Small internal metadata record types.
-     - `FrozenDictionary` tables as the single source of truth for reusable per-operation configuration.
-   - `XCore.cs`:
-     - Orchestration from algebraic types → metadata → `UnifiedOperation` → `Result`.
-   - `XCompute.cs`:
-     - Dense, parameterized, algorithmic code using RhinoCommon and RhinoMath, minimal duplication.
+### 7. Eliminate Dead & Unnecessary Code
+Remove:
+- Unused constants, enums, static fields, configuration values
+- Single-use helper methods where logic clearer/shorter at call site
+- Components no longer serving purpose after optimization
 
-   Extract the patterns that define “good” code: dense, monadic, metadata-driven, parameterized, and SDK-aware.
+### 8. Strict Architectural Integrity
+- No new `.cs` files
+- No new helper functions forwarding parameters
+- No stylistic churn increasing LOC/complexity
+- Respect `.editorconfig`, analyzers, constraints from CLAUDE.md/AGENTS.md
 
-────────────────────────────────────
-B. Global optimization goals and success criteria
-────────────────────────────────────
+---
 
-For all `Target Folder(s)`, all optimizations must satisfy these goals:
+## Multi-Pass Procedure (Per Folder)
 
-1. **Preserve external behavior**
+**Use explicit passes** - do not collapse into single sweep.
 
-   - All public APIs must behave identically in terms of inputs, outputs, validations, errors, and side effects.  
-   - Refactors may re-order or compress logic internally, as long as the observable behavior and error conditions are preserved.
+### Pass 1: Inventory, Roles, Hot-Path Identification
+- Enumerate 4 files, confirm roles (`.cs`, `Config`, `Core`, `Compute`)
+- For folder:
+  - Summarize domain and main operations
+  - **Identify likely hot paths**:
+    - Tight loops over geometry collections
+    - High-frequency entrypoints
+    - Methods called repeatedly across codebase
+- Note existing advanced C# features (attributes, readonly structs, etc.)
 
-2. **Improve performance where it matters**
+### Pass 2: Result/Validation Pipeline Understanding
+For each public API in `<<BASENAME>>.cs`:
+- Trace flow: `API` → `Core` → `Config` → `Compute` → `Result<T>`
+- Identify where validations applied, where `ResultFactory` used
+- List `Result` combinators in use (`Map`, `Bind`, `Ensure`, etc.)
+- Identify manual error handling expressible with monadic API
+- Identify repeated argument checks covered by existing `V` rules or refactorable
 
-   - Focus on **likely hot paths**:
-     - Inner loops in `<<BASENAME>>Compute.cs`.
-     - High-frequency operations in `Core` dispatch and `Result` pipelines.  
-   - Prefer optimizations that clearly reduce allocations, unnecessary branches, or redundant computations.
+### Pass 3: Structural & LOC Reduction Opportunities
+Scan `<<BASENAME>>Compute.cs` and `Core` for:
+- Multiple loops over same data (single loop could handle all)
+- Repeated conditional patterns (express once, reuse)
+- Multi-step calculations (compact with tuples/pattern matching while readable)
+- Nested ternaries or deeply nested `if` chains (replace with cleaner pattern)
+- `for` vs `foreach` vs LINQ choices (reconsider for clarity/performance balance)
 
-3. **Exploit the Result monad and factory effectively**
+### Pass 4: Advanced C# Feature Audit
+For each advanced construct (`[MethodImpl]`, `[StructLayout]`, `readonly struct`, `ref`/`in`, spans):
+- Determine if usage on:
+  - Hot path (beneficial) **or**
+  - Cold/non-critical path (unnecessary)
 
-   - Replace manual “return dancing” and nested branching on error/success with:
-     - `Result` combinators (`Map`, `Traverse`, `Tap`, and their siblings).  
-     - `ResultFactory` helpers for constructing consistent success/failure instances.  
-   - Eliminate duplicated error handling and manual propagation when the monadic API can express it more succinctly and clearly.
+**Decide for each**:
+- Keep and tighten if beneficial
+- Remove if adds complexity without performance benefit
+- Introduce if hot path clearly benefits and semantics safe
 
-4. **Optimize validation and error handling**
+**Ensure**:
+- No speculative micro-optimizations without justification
+- No attributes contradicting analyzers/guidelines
 
-   - Do not add validations where not necessary.  
-   - Where existing validations and `V` rules already cover checks, remove redundant manual checks.  
-   - Where a validation can meaningfully replace repeated local checks and reduce LOC, prefer a validation-based approach, as long as behavior is preserved.
+### Pass 5: Result + Validation Optimization
+For each operation pipeline:
+- Replace manual multi-step error handling with `Result` combinators:
+  - `Map` to transform successful values
+  - `Bind` to chain Result-returning operations
+  - `Ensure` for validation predicates
+  - `Traverse` for sequences of Results
+  - `Tap` for side-effectful checks/metrics
+- Prefer `ResultFactory` over manual `new Result<T>`
+- Remove duplicate checks already enforced by validations
+- Remove redundant `if`/`else` error propagation where monadic chain works
 
-5. **Reduce LOC through dense, expressive C# (without sacrificing debuggability)**
+### Pass 6: Helper & Dead-Code Elimination
+**Identify all helper methods**:
+- Mark **single-use** helpers
+- For each single-use helper:
+  - Understand call site and helper logic
+  - Refactor call site to incorporate functionality directly (clearer, shorter)
+  - Remove helper once inlining complete
 
-   - Identify opportunities to:
-     - Combine multiple loops into a single loop when it does not harm clarity and preserves behavior.  
-     - Simplify conditionals via pattern matching or compact expressions.  
-     - Use tuples and double-parameter patterns to encapsulate related values.  
-   - Do **not** rely on massive inlining or opaque nested ternaries that harm readability; aim for **dense but intelligible** code.
+**Identify and remove**:
+- Unused constants, enums, static members
+- Unused internal types or configuration values
 
-6. **Advanced C# feature usage (and removal where inappropriate)**
+**Ensure**:
+- Not copy-pasting—**re-expressing** logic optimally at call site
 
-   - Audit and selectively apply advanced C# features where they have real value:
-     - `[MethodImpl(MethodImplOptions.AggressiveInlining)]` and related options.  
-     - `[StructLayout]` attributes.  
-     - `readonly struct`, `ref struct`, `in` parameters, `ref` returns, spans, and similar features.  
-   - Only apply these features when:
-     - The method/type is genuinely in a hot path.  
-     - The semantics are safe and understood.  
-     - They fit with existing analyzers and project constraints.  
-   - Remove or simplify these features where:
-     - They appear on cold paths or trivial wrappers.  
-     - They complicate maintenance without measurable benefit.
+### Pass 7: Algorithmic & Loop-Level Optimization
+For main compute methods:
+- **Combine loops** when:
+  - Combined loop still clear and maintainable
+  - Reduces passes over data
+  - Doesn't change observable behavior
 
-7. **Eliminate dead and unnecessary code**
+- **Simplify arithmetic**:
+  - Introduce well-named locals for repeated/important quantities
+  - Use tuples where grouping improves clarity and reduces duplication
 
-   - Identify and remove:
-     - Unused constants, enums, static fields, or configuration values.  
-     - Single-use helper methods where the logic is clearer and shorter at the call site.  
-     - Loose components that no longer serve any purpose after optimization.
+- **Choose iteration strategy**:
+  - `for`: Hot inner paths (avoid LINQ allocations)
+  - `foreach`: Clearer when performance negligible
+  - LINQ: When performance impact negligible and significantly clarifies logic
 
-8. **Strict architectural and style integrity**
+- Respect `.editorconfig` and analyzer rules
 
-   - No new `.cs` files.  
-   - No new helper functions that simply forward parameters.  
-   - No stylistic churn that increases LOC or complexity.  
-   - All changes must respect `.editorconfig`, analyzers, and the constraints from `CLAUDE.md`, `AGENTS.md`, and `copilot-instructions`.
+### Pass 8: Implementation of Surgical Changes
+Apply chosen optimizations respecting constraints:
+- No new helper methods
+- No new `.cs` files
+- Minimal LOC additions (justify by clear performance/clarity gains)
+- Prefer transformations that **reduce LOC and improve performance**
+- Keep changes local and well-scoped (no large sweeping rewrites)
 
-────────────────────────────────────
-C. Multi-pass optimization procedure per target folder
-────────────────────────────────────
+### Pass 9: Cross-Folder Coherence & Final Self-Check
+**Compare updated folders with reference folders**:
+- Similar patterns implemented in similarly optimized ways
+- Consistent `Result` and validation usage across ecosystem
 
-Use **explicit passes** for each `<<TARGET_FOLDER_NAME>>`. Do not collapse them into a single sweep.
+**For each modified method/pipeline**:
+- Re-read and verify:
+  - Behavior preserved (same inputs → same outputs/errors)
+  - Data flow clear
+  - Code denser but not opaque
+  - Result usage idiomatic, minimal "return dancing"
 
-1. **Pass 1 – Folder inventory, roles, and hot-path identification**
+**Confirm**:
+- Folder has exactly 4 files with roles intact
+- Repo builds with 0 new warnings
+- All analyzers and `.editorconfig` rules pass
+- No TODO markers or partial refactors
 
-   - Enumerate the four files and confirm roles:
-     - `<<BASENAME>>.cs` – API and algebraic domain types.  
-     - `<<BASENAME>>Config.cs` – constants + metadata + dispatch.  
-     - `<<BASENAME>>Core.cs` – orchestration and `UnifiedOperation` usage.  
-     - `<<BASENAME>>Compute.cs` – raw algorithms and loops.
-   - For the folder:
-     - Summarize the domain and the main operations.  
-     - Identify **likely hot paths**:
-       - Tight loops over geometry collections.  
-       - High-frequency entrypoints.  
-       - Any methods called repeatedly across the codebase.
-   - Note locations where advanced C# features are already used (attributes, readonly structs, etc.).
+---
 
-2. **Pass 2 – Result / validation pipeline understanding**
+## Editing Discipline
 
-   - For each public API in `<<BASENAME>>.cs`:
-     - Trace the flow into `Core`, `Config`, `Compute`, and back into `Result<T>`.  
-     - Identify where validations are applied and where `ResultFactory` is used (or not).
-   - For each major operation:
-     - List the `Result` combinators in use (e.g. `Map`, `Traverse`, `Tap`, etc.).  
-     - Identify manual error handling blocks that could be expressed more succinctly using the monadic API.  
-     - Identify repeated manual argument checks that might be covered by existing validation rules or could reasonably be refactored into them.
+✅ **Do**:
+- Be surgical—only change when clearly improves performance, reduces LOC, or simplifies Result/validation pipeline
+- Focus on hot paths first
+- Use profiling data if available
+- Test incrementally
+- Preserve clarity while increasing density
 
-3. **Pass 3 – Structural and LOC reduction opportunities**
+❌ **Don't**:
+- Introduce cosmetic changes or style churn
+- Add new `.cs` files or helper methods forwarding parameters
+- Regress behavior or API surface
+- Violate CLAUDE.md, AGENTS.md, `.editorconfig`, analyzers
 
-   - Scan `<<BASENAME>>Compute.cs` and `Core` for:
-     - Multiple loops over the same data where a single loop could handle all required work.  
-     - Repeated conditional patterns that can be expressed once and reused.  
-     - Multi-step calculations that can be expressed more compactly with tuples or double-parameter methods while remaining readable.
-   - Identify:
-     - Any nested ternaries or deeply nested `if` chains that can be replaced by a cleaner, still compact pattern (pattern matching, well-structured switch expressions, etc.).  
-     - Places where `for` vs `foreach` or LINQ vs explicit loops should be reconsidered for clarity/performance balance.
+---
 
-4. **Pass 4 – Advanced C# feature audit**
+## Performance Optimization Strategies (Priority Order)
 
-   - For each advanced construct (`[MethodImpl]`, `[StructLayout]`, `readonly struct`, `ref`/`in` parameters, spans, etc.):
-     - Determine whether the usage is:
-       - On a hot path and beneficial, or  
-       - On a cold/non-critical path, or unnecessary.
-   - Decide, for each:
-     - Keep and, if necessary, tighten (e.g., adjust `MethodImplOptions`).  
-     - Remove, if it adds complexity without performance benefit.  
-     - Introduce, if a hot path clearly benefits and the semantics are safe and clear.
-   - Ensure:
-     - No speculative micro-optimizations without justification.  
-     - No attributes that contradict analyzers or claude/agents guidelines.
+### 1. Algorithmic Improvements (Highest Impact)
+- Replace O(n²) with O(n log n) using spatial indexing (RTree)
+- Eliminate redundant calculations by caching intermediate values
+- Use FrozenDictionary dispatch instead of branching cascades
 
-5. **Pass 5 – Result + validation optimization**
+### 2. Memory & Allocation Reduction
+- Use `ArrayPool<T>` for temporary buffers in hot loops
+- Prefer `stackalloc` for small fixed-size allocations
+- Reuse collections instead of creating new ones
+- Use `ReadOnlySpan<T>` for slicing without allocation
 
-   - For each operation pipeline:
-     - Replace manual multi-step error handling with suitable `Result` combinators:
-       - Use `Map`/equivalents to transform successful values.  
-       - Use `Traverse`/equivalents where a sequence of Results or a Result of a sequence can be restructured more naturally.  
-       - Use `Tap`/equivalents for side-effectful checks/metrics that should not change the Result value.
-     - Prefer `ResultFactory` over manual `new Result<T>` or equivalent patterns.
-   - Remove:
-     - Duplicate checks that are already enforced by validations.  
-     - Redundant manual `if`/`else` error propagation where a monadic chain can express the same logic.
+### 3. Loop Optimization
+- Use `for` with index access (not `foreach`) in hot paths (2-3x faster)
+- Hoist invariant computations out of loops
+- Combine multiple loops over same data into single loop
+- Consider `Parallel.ForEach` for CPU-bound operations on large datasets (>10k items)
 
-6. **Pass 6 – Helper and dead-code elimination**
+### 4. Branch Reduction
+- Replace conditional chains with FrozenDictionary lookups
+- Use pattern matching over complex if/else trees
+- Exploit hardware branch prediction (predictable branches first)
 
-   - Identify all helper methods in the folder:
-     - Mark all **single-use** helpers.  
-     - For each single-use helper:
-       - Understand the call site and helper logic in detail.  
-       - Refactor the call site to incorporate the helper’s functionality directly, in a clearer and ideally shorter way, preserving behavior and performance.  
-       - Remove the helper once inlining is complete.
-   - Identify and remove:
-     - Unused constants, enums, and static members.  
-     - Unused internal types or configuration values.
-   - Ensure:
-     - You are not just copy-pasting helper bodies; you are **re-expressing** the logic at the call site in a more optimal form (less LOC, clearer data flow, same behavior).
+### 5. Inlining & Method Calls
+- Use `[MethodImpl(AggressiveInlining)]` on tiny hot-path methods (<10 LOC)
+- Inline single-use helpers at call sites
+- Reduce virtual calls and interface dispatch in tight loops
 
-7. **Pass 7 – Algorithmic and loop-level optimization**
+### 6. Data Structure Selection
+- `FrozenDictionary` for immutable lookups (fastest, zero allocation)
+- `Point3dList` over `List<Point3d>` for Rhino types
+- RTree for spatial queries instead of brute force
+- `ConditionalWeakTable` for caching (see ValidationRules.cs)
 
-   - For the main compute methods:
-     - Combine multiple loops into one when:
-       - The combined loop is still clear and maintainable.  
-       - It reduces total passes over the data.  
-       - It does not change observable behavior.
-     - Simplify arithmetic expressions by:
-       - Introducing well-named locals for repeated or conceptually important quantities.  
-       - Using tuples where grouping of related values improves clarity and reduces duplication.
-   - Carefully choose:
-     - `for` vs `foreach` vs LINQ based on performance and clarity:
-       - Prefer simple loops for hot inner paths to avoid LINQ allocations.  
-       - Use LINQ only when the performance impact is negligible and it significantly clarifies logic.
-   - Respect `.editorconfig` and analyzer rules throughout.
+---
 
-8. **Pass 8 – Implementation of surgical changes**
+## Anti-Patterns to Avoid
 
-   - Apply the chosen optimizations, respecting all constraints:
-     - No new helper methods.  
-     - No new `.cs` files.  
-     - Minimal LOC additions; additions must be justified by clear performance or clarity gains.  
-     - Prefer transformations that both **reduce LOC** and **improve performance** where possible.
-   - Keep changes local and well-scoped; avoid large sweeping rewrites.
+1. **Premature Optimization**: Optimizing cold paths or non-bottlenecks
+2. **Obfuscation**: Creating unreadable code for marginal gains
+3. **Over-Allocation**: Using heap when stack would suffice
+4. **Micro-Benchmarking Fallacy**: Optimizing toy examples that don't reflect real usage
+5. **Feature Speculation**: Keeping unused optimization infrastructure "just in case"
+6. **Unsafe Optimization**: Using `unsafe` or circumventing safety without strong justification
+7. **Parallel Overhead**: Using `Parallel.ForEach` on small datasets where overhead exceeds benefit
+8. **LINQ Overuse**: Using LINQ in tight loops causing unnecessary allocations
 
-9. **Pass 9 – Cross-folder coherence and final self-check**
+---
 
-   - Compare the updated `Target Folder(s)` with reference folders (`fields`, `topology`, `spatial`, `morphology`):
-     - Ensure similar patterns are implemented in similarly optimized ways.  
-     - Confirm consistent use of `Result` and validations across the ecosystem.
-   - For each modified method and pipeline:
-     - Re-read and verify:
-       - Behavior is preserved (same inputs → same outputs and errors).  
-       - Data flow is clear.  
-       - Code is denser but not opaque.  
-       - Result usage is idiomatic and minimal “return dancing” remains.
-   - Confirm:
-     - The folder still has exactly four files with their roles intact.  
-     - The repo builds with 0 new warnings.  
-     - All analyzers and `.editorconfig` rules pass.  
-     - No “TODO” markers or partial refactors remain.
+## Hot Path Indicators (Look For These)
 
-────────────────────────────────────
-D. Editing discipline
-────────────────────────────────────
-
-- You must be **surgical**:
-  - Only change code when it clearly improves performance, reduces LOC, or simplifies the Result/validation pipeline without changing behavior.  
-  - Do not introduce cosmetic changes or style churn that add noise to the diff.
-- You must respect these hard constraints:
-  - No new `.cs` files.  
-  - No new helper methods that simply forward or wrap other methods.  
-  - No regression in Behavior or API surface.  
-  - All code must remain consistent with `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `.editorconfig`, and existing analyzers.
+- Methods called inside loops over large geometry collections
+- Inner loops in `Compute.cs` with geometry calculations
+- Validation operations applied to thousands of objects
+- Distance/intersection calculations on mesh/Brep collections
+- Field evaluation over dense point grids
+- Spatial indexing build/query operations
+- Result pipeline operations on batch inputs

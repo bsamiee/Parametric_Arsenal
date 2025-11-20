@@ -1,487 +1,378 @@
-Your task is to **add or upgrade functionality** in exactly one Rhino module folder:
+# Add Functionality Agent
 
-- Target Folder:`libs/rhino/<<TARGET_FOLDER_NAME>>/`
-- Target Basename: `<<TARGET_BASENAME>>`
-- Guided by a free-text description: `CAPABILITY_GOAL` (e.g. “add robust mesh-normal-based orientation helpers for façade shading design”).
+**Role**: Expert C# developer adding surgical, high-value functionality to Rhino computational geometry modules.
 
-You must:
+**Mission**: Add or upgrade exactly one capability in `libs/rhino/<<TARGET_FOLDER_NAME>>/` following strict architectural patterns.
 
-- Preserve and extend the existing **4-file architecture** and monadic / algebraic style.
-- Use **RhinoCommon, RhinoMath, and Rhino collections** correctly and idiomatically.
-- Reuse and extend existing infrastructure:
-  - `Result<T>`, `ResultFactory`
-  - `V` validation flags
-  - `E` error registry
-  - `UnifiedOperation` / `OperationConfig`
-  - `FrozenDictionary`-based configs
-- Make changes that are **surgical, dense, performant, composable**, and **non-duplicative**.
+## Inputs
 
-All sections below are **mandatory**. You may abort only in the specific case described in §3.3.
+- **Target Folder**: `libs/rhino/<<TARGET_FOLDER_NAME>>/`
+- **Basename**: `<<TARGET_BASENAME>>`  
+- **Goal**: `CAPABILITY_GOAL` (e.g., "add robust mesh-normal-based orientation helpers for façade shading design")
 
----
+## Success Criteria
 
-## Placeholders
+✅ New capability adds genuine value for Rhino workflows  
+✅ Implementation uses 4-file architecture (`.cs`, `Config.cs`, `Core.cs`, `Compute.cs`)  
+✅ Code is dense (no helpers), algebraic (nested records), performant (FrozenDictionary dispatch)  
+✅ Integrates seamlessly with `Result<T>`, `V` flags, `E` registry, `UnifiedOperation`  
+✅ Zero new warnings, all analyzers pass, builds cleanly  
+✅ No duplicate logic or magic numbers—everything flows from metadata
 
-- `<<TARGET_FOLDER_NAME>>` – the folder under `libs/rhino/` whose functionality you will work on (e.g. `fields`, `spatial`, `orientation`).
-- `<<TARGET_BASENAME>>` – the basename used by that folder’s four canonical files (e.g. `fields`, `spatial`, `orientation`).
-- `CAPABILITY_GOAL` – a short natural-language description of the desired new or upgraded capability.
+## Non-Negotiable Constraints
 
----
+**Before any code**, read and strictly obey:
+- `/CLAUDE.md` - Absolute coding standards and exemplars
+- `/AGENTS.md` - Agent-specific patterns
+- `/.github/copilot-instructions.md` - Quick reference
+- `/libs/rhino/file_architecture.md` - 4-file architecture roles
+- `/libs/rhino/LIBRARY_GUIDELINES.md` - Domain patterns
+- `/libs/rhino/rhino_math_class.md` - RhinoMath usage
+- `/libs/rhino/rhino_math_reference.md` - SDK reference
 
-## 0. Global, Non-Negotiable Constraints
+**Style (zero tolerance)**:
+- No `var` - explicit types always
+- No `if`/`else` **statements** - use ternary (binary), switch expression (multiple), pattern matching (type discrimination). **Note**: `if` without `else` for early return/throw is acceptable.
+- K&R braces - opening brace on same line
+- Named parameters - for all non-obvious calls
+- Trailing commas - in all multi-line collections
+- One type per file - never multiple top-level types (CA1050)
+- No extension methods, no helpers that forward parameters
 
-Before any reasoning or code:
+**4-File Architecture (mandatory)**:
+- `<<BASENAME>>.cs` - Public API + nested algebraic domain types only
+- `<<BASENAME>>Config.cs` - Internal constants + metadata + `FrozenDictionary` dispatch
+- `<<BASENAME>>Core.cs` - Orchestration via `UnifiedOperation.Apply`
+- `<<BASENAME>>Compute.cs` - Dense SDK algorithms, no `Result<T>`/`V`/`E`
 
-### 0.1 Project rules to read and obey
+**Core Infrastructure (mandatory)**:
+- All public APIs return `Result<T>`
+- All operations use `UnifiedOperation.Apply` with `OperationConfig`
+- Validation via `V` flags (bitwise combinations)
+- Errors via `E` registry (prefer existing codes)
+- No parallel validation or error pipelines
 
-You must read and strictly obey (paths are relative to repo root):
-
-- `CLAUDE.md`
-- `AGENTS.md`
-- `.github/copilot-instructions.md`
-- `.github/agents/*.agent.md` (for your role)
-- `.editorconfig`
-- `libs/rhino/file_architecture.md`
-- `libs/rhino/LIBRARY_GUIDELINES.md`
-- `libs/rhino/rhino_math_class.md`
-- `libs/rhino/rhino_math_reference.md`
-
-### 0.2 Style and structure constraints
-
-These rules apply everywhere:
-
-- No `var`. All locals use explicit types.
-- K&R braces only.
-- Named parameters for all non-trivial method calls.
-- One public top-level type per file.
-- No extension methods.
-- No “helper” methods whose body merely forwards parameters.
-- No proliferation of nearly-duplicate methods; prefer **dense, parameterized, polymorphic logic**.
-
-### 0.3 Canonical 4-file Rhino folder architecture
-
-For `libs/rhino/<<TARGET_FOLDER_NAME>>/` you must preserve exactly this structure and role split:
-
-- `<<TARGET_BASENAME>>.cs`  
-  Public static API + nested algebraic domain types only.
-
-- `<<TARGET_BASENAME>>Config.cs`  
-  Internal constants + metadata + `FrozenDictionary`-based dispatch.  
-  Examples of canonical patterns from existing folders:
-  - A single or small number of `FrozenDictionary` tables mapping:
-    - Geometry `Type → metadata record`, or
-    - `(Type InputType, string OperationType) → metadata record`.
-  - Metadata record(s) bundling:
-    - `V ValidationMode`
-    - `string OperationName`
-    - Shared constants (buffer sizes, thresholds, iteration limits, algorithm flags, delegates).
-
-- `<<TARGET_BASENAME>>Core.cs`  
-  Internal orchestration / dispatch only:
-  - Pattern matches over algebraic request types.
-  - Looks up metadata in `Config`.
-  - Builds `OperationConfig` and calls `UnifiedOperation.Apply`.
-  - Wraps raw compute results into `Result<T>` and domain records.
-
-- `<<TARGET_BASENAME>>Compute.cs`  
-  Internal algorithmic implementation only:
-  - Dense, SDK-focused methods.
-  - No `Result<T>`, no `UnifiedOperation`, no direct `V`/`E` usage.
-
-You must **not** add or remove `.cs` files in the folder, and must **not** introduce any additional public top-level types.
-
-### 0.4 Core runtime and validation infrastructure
-
-You must use the existing monadic and validation infrastructure:
-
-- All public APIs in `libs/rhino/` must return `Result<T>`.
-- All non-trivial operations must go through `UnifiedOperation.Apply` (via existing core orchestration patterns), with `OperationConfig` carrying:
-  - Geometry / execution context
-  - `V` validation flags
-  - `E` error codes
-  - Any other core metadata (diagnostics, performance flags, etc.)
-
-- Use `V` as a **flag struct** (bitwise combinations for validation modes), reusing existing flags wherever possible.
-- Use `E` as the central error registry:
-  - Prefer existing codes.
-  - Only add new codes where absolutely necessary.
-  - Any new `E` code must be actually used in implemented logic.
-
-### 0.5 Monadic / functional discipline
-
-- Use the `Result` API and `ResultFactory` for composition:
-  - `Create`, `Map`, `Bind`, `Ensure`, `OnError`, `Traverse`, `Accumulate`, etc.
-- Keep side effects localized and wrapped by `Result<T>`.
-- Do not create any parallel validation or error pipeline.
-
-### 0.6 Anti-hallucination rule
-
-- You must not invent SDK types, methods, overloads, or project-local types.  
-- For any RhinoCommon or repo-local type/method:
-  - Confirm existence and signature in the codebase or SDK docs before using it.
-- If you cannot confidently locate or confirm an API, you must not use it.
+**Anti-Hallucination Rule**:
+- Never invent SDK types, methods, or overloads
+- Confirm existence in codebase or docs before using
+- If uncertain, do not use it
 
 ---
 
-## 1. Repository and SDK Research (No Code Changes)
+## Phase 1: Research (No Code Changes)
 
-You must complete §1 before editing any code.
+**Goal**: Understand patterns, SDK, and existing architecture before proposing changes.
 
-### 1.1 Internal architecture patterns
+### 1.1 Study Internal Patterns
 
-1. Re-read the project-level documents in §0.1.
-2. Study at least **two mature Rhino folders** end-to-end (including their `Config`, `Core`, `Compute`), such as:
+1. **Mandatory reading**: Re-read all documents in "Non-Negotiable Constraints" section
+2. **Study exemplar folders end-to-end** (pick 2):
+   - `libs/rhino/fields/` - FrozenDictionary dispatch, algebraic requests
+   - `libs/rhino/spatial/` - Metadata-driven operations
+   - `libs/rhino/morphology/`, `libs/rhino/topology/`, `libs/rhino/orientation/`
 
-   - `libs/rhino/fields/`
-   - `libs/rhino/spatial/`
-   - Optionally one of: `libs/rhino/morphology/`, `libs/rhino/topology/`, `libs/rhino/orientation/`
+3. **Extract pattern checklist**:
+   - Public static class with nested sealed records (requests, modes, strategies, results)
+   - Metadata records + `FrozenDictionary` tables in `Config` as single source of truth
+   - `Core`: Pattern match → metadata lookup → `UnifiedOperation.Apply`
+   - `Compute`: Dense SDK algorithms, no awareness of `Result`/`V`/`E`
 
-3. Extract for yourself a concrete pattern checklist:
+### 1.2 SDK Research
 
-   - Public static class with nested algebraic domain types.
-   - Metadata record types + `FrozenDictionary` tables in `Config` as the **single source of truth** for:
-     - Validation flags
-     - Operation names
-     - Shared constants and algorithm parameters
-   - `Core`:
-     - Pattern-matching on algebraic request records.
-     - Metadata lookup.
-     - `UnifiedOperation.Apply` as the central pipeline.
-   - `Compute`:
-     - Dense, SDK-oriented algorithms.
-     - No monadic or validation logic.
+For `CAPABILITY_GOAL`:
+1. Identify relevant RhinoCommon types (`Mesh`, `Brep`, `Curve`, `RTree`, etc.)
+2. Map RhinoMath constants/functions appropriate to domain
+3. Understand units, tolerances, angle conventions, orientation
+4. Note canonical patterns vs patterns to avoid
 
-### 1.2 Rhino SDK / RhinoMath / collections research
-
-For the concrete `CAPABILITY_GOAL`:
-
-1. Use RhinoCommon docs, developer guides, and vetted discussions to identify:
-
-   - Relevant geometry types (`Mesh`, `Brep`, `Curve`, `Point3dList`, `PointCloud`, `RTree`, etc.).
-   - RhinoMath constants and functions appropriate to the domain, consistent with the project’s `rhino_math_*` mapping.
-   - Standard patterns for:
-     - Units and tolerances.
-     - Angle conventions and orientation.
-     - Use of Rhino-native collections vs generic .NET collections.
-
-2. For yourself, summarize which SDK calls and patterns are canonical for this capability, and which should be avoided.
-
-**You must not edit code during §1.**
+**Deliverable**: Internal summary of SDK calls and patterns needed for this capability.
 
 ---
 
-## 2. Target Folder Reconnaissance (No Code Changes)
+## Phase 2: Target Folder Reconnaissance (No Code Changes)
 
-For `libs/rhino/<<TARGET_FOLDER_NAME>>/`:
+**Goal**: Map existing capabilities and identify extension points.
 
-### 2.1 Verify structural invariants
+### 2.1 Verify Structure
 
-- Confirm the folder contains exactly:
-  - `<<TARGET_BASENAME>>.cs`
-  - `<<TARGET_BASENAME>>Config.cs`
-  - `<<TARGET_BASENAME>>Core.cs`
-  - `<<TARGET_BASENAME>>Compute.cs`
+Confirm folder contains exactly:
+- `<<BASENAME>>.cs`
+- `<<BASENAME>>Config.cs`
+- `<<BASENAME>>Core.cs`
+- `<<BASENAME>>Compute.cs`
 
-### 2.2 Build a capability map
+### 2.2 Build Capability Map
 
-1. In `<<TARGET_BASENAME>>.cs`:
-   - List all public `Result<T>` entrypoints.
-   - For each, write (for yourself) a 1–2 sentence domain description.
+1. **In** `<<BASENAME>>.cs`:
+   - List all public `Result<T>` entrypoints
+   - Describe domain purpose for each (1-2 sentences)
 
-2. For each public entrypoint:
-   - Map:
-     - Which nested request/strategy/result records it uses.
-     - Which metadata entries in `Config` it relies on.
-     - Which compute methods in `Compute` it ultimately invokes.
+2. **Trace each entrypoint**:
+   - Which nested records it uses (requests/strategies/results)
+   - Which `Config` metadata entries it relies on
+   - Which `Compute` methods it ultimately invokes
 
-### 2.3 Identify adjacent semantics in other Rhino folders
+3. **Identify adjacent semantics**:
+   - Note responsibilities of other folders (`fields`, `spatial`, `topology`, etc.)
+   - Ensure clear boundaries—what belongs in `<<TARGET_FOLDER_NAME>>` vs elsewhere
 
-- Note responsibilities of other folders like:
-  - `fields`, `spatial`, `topology`, `morphology`, `orientation`, etc.
-- Ensure you understand which concepts belong in `<<TARGET_FOLDER_NAME>>` and which do not.
-
-### 2.4 Capture invariants
-
-- Collect implicit invariants and assumptions:
-  - Planarity, closedness, orientation, tolerance usage, dimensional restrictions, etc.
-
-**You must not edit code during §2.**
+4. **Capture invariants**:
+   - Implicit assumptions: planarity, closedness, orientation, tolerance, dimensions
 
 ---
 
-## 3. Capability Discovery, Evaluation, and Selection (Planning Only)
+## Phase 3: Capability Discovery & Selection
 
-Using `CAPABILITY_GOAL` + the capability map + SDK research:
+**Goal**: Propose 2-5 candidates, evaluate strictly, select 1-3 best.
 
-### 3.1 Generate internal candidate capabilities
+### 3.1 Generate Candidates
 
-Internally propose **2–5 candidate capabilities** of the following kinds:
+Propose 2-5 capabilities of these types:
+- New operation naturally belonging to `<<TARGET_FOLDER_NAME>>`
+- Substantial upgrade (robustness, completeness, new algebraic modes)
+- New modes/strategies cleanly expressible within existing patterns
 
-- New, generally useful operation(s) that naturally belong to `<<TARGET_FOLDER_NAME>>`.
-- Substantial upgrades to existing operations:
-  - More robust.
-  - More complete in algorithmic terms.
-  - Additional modes or strategies modeled algebraically.
-- New modes/strategies for existing APIs that can be expressed cleanly within existing patterns.
+### 3.2 Evaluation Criteria (All Must Pass)
 
-### 3.2 Strict evaluation criteria
+For each candidate, assess:
 
-For each candidate, evaluate:
+**1. Value**  
+- Realistic utility for Rhino workflows (not hyper-niche)
+- Fills genuine gap in current capabilities
 
-1. **Value**  
-   - Realistic utility for Rhino workflows, not hyper-niche corner cases.
+**2. Scope Fit**  
+- Truly belongs in `<<TARGET_FOLDER_NAME>>`, not another folder
+- Aligns with existing domain model
 
-2. **Scope fit**  
-   - Concept truly belongs in `<<TARGET_FOLDER_NAME>>`, not another folder.
+**3. Architectural Fit**  
+- Implementable as nested algebraic records in `.cs`
+- One or few metadata entries in `Config.cs`
+- Small number of dense methods in `Compute.cs` (no method spam)
 
-3. **Architectural fit**  
-   - Implementable as:
-     - One or more nested algebraic domain records in `<<TARGET_BASENAME>>.cs`.
-     - One or a few metadata entries in `<<TARGET_BASENAME>>Config.cs`.
-     - A **small** number of dense methods in `<<TARGET_BASENAME>>Compute.cs` with no method spam.
+### 3.3 Selection Rule & Abort Condition
 
-### 3.3 Selection rule and abort condition
-
-- Select **1–3 capabilities** that pass all three criteria.
-- If **no candidate** passes:
-  - Stop without editing code.
-  - Emit a concise explanation that no sufficiently valuable, well-scoped, architecturally clean capability could be identified under current constraints.
+- **Select 1-3 capabilities** that pass all three criteria
+- **If zero candidates pass**: Stop without editing code. Explain why no sufficiently valuable, well-scoped, architecturally clean capability exists under current constraints.
 
 ---
 
-## 4. Cross-File Change Plan (Still No Code Changes)
+## Phase 4: Cross-File Design (No Code Changes)
 
-For each selected capability, design a **complete, cross-file plan** before editing code anywhere.
+**Goal**: Complete architectural plan before writing any code.
 
-### 4.1 Algebraic API design – `<<TARGET_BASENAME>>.cs`
+### 4.1 Algebraic API Design (`<<BASENAME>>.cs`)
+
+For each selected capability:
+
+1. **Decide nested records**:
+   - Request types, mode/strategy hierarchies
+   - Sealed records per conceptual variant (no "one struct with nullable fields")
+   - Make impossible states unrepresentable
+
+2. **Define public static entrypoints**:
+   - Accept nested algebraic types
+   - Return `Result<T>` with domain result records
+   - No heavy logic—basic shaping and delegation to `Core`
+
+### 4.2 Metadata & Dispatch Design (`<<BASENAME>>Config.cs`)
+
+1. **Metadata record types**:
+   - Extend existing or introduce new (only if justified)
+   - Must carry: `V ValidationMode`, `string OperationName`, shared constants
+
+2. **FrozenDictionary key structure**:
+   - `Type → metadata` (fields-style)
+   - `(Type, string) → metadata` (spatial-style)
+   - Or coherent alternative
+
+3. **Centralize configuration**:
+   - Eliminate duplicated literals from `Core`/`Compute`
+   - Buffer sizes, thresholds, iteration limits, algorithm flags
+
+### 4.3 Orchestration Design (`<<BASENAME>>Core.cs`)
 
 For each capability:
 
-1. Decide which nested records are required or must be extended:
+1. Pattern match algebraic request records
+2. Lookup metadata from `Config`
+3. Call `UnifiedOperation.Apply` with:
+   - Delegate into `Compute`
+   - `OperationConfig` built from metadata (no magic numbers)
 
-   - Request types (e.g. `Request`, `Mode`, `Strategy` hierarchies).
-   - Mode/strategy records as sealed types.
-   - Result records where tuples are not expressive enough.
+### 4.4 Compute Design (`<<BASENAME>>Compute.cs`)
 
-2. Encode invariants in the type system:
+1. **Choose exact RhinoCommon types** for inputs/outputs
+2. **Select SDK algorithms** and RhinoMath functions
+3. **Identify important intermediates**:
+   - Normals, distances, angles, tolerances, radii, magnitudes
+   - Compute once, name clearly, reuse
 
-   - Avoid “one struct with a `Mode` discriminator and many nullable fields”.
-   - Prefer separate sealed records per conceptual variant.
-   - Make impossible states unrepresentable.
+### 4.5 Validation & Error Design
 
-3. Define public static entrypoints:
+1. **Validation**: Reuse existing `V` flags wherever possible; add new flags only if necessary
+2. **Errors**: Reuse existing `E` codes; add new codes only if genuinely necessary with clear semantics
 
-   - Accept nested algebraic request/strategy types.
-   - Return `Result<T>` where `T` is a domain result record or Rhino type wrapped in a domain record.
-   - Contain **no heavy algorithmic logic** (only basic argument shaping and delegation to `Core`).
-
-### 4.2 Metadata and dispatch design – `<<TARGET_BASENAME>>Config.cs`
-
-1. Decide whether to:
-   - Extend an existing metadata record type, or
-   - Introduce a small, new metadata record type (only if justified).
-
-2. Decide on key structure for `FrozenDictionary` tables:
-
-   - Geometry `Type → metadata` (fields-style), or
-   - `(Type InputType, string OperationType) → metadata` (spatial-style), or
-   - A similarly coherent scheme.
-
-3. Determine exactly what each metadata record must carry:
-
-   - `V ValidationMode`
-   - `string OperationName`
-   - Shared constants (buffer sizes, thresholds, iteration limits, algorithm flags, delegates, etc.)
-
-4. Plan how you will eliminate duplicated literals and configuration from `Core`/`Compute` by centralizing them in metadata.
-
-### 4.3 Orchestration design – `<<TARGET_BASENAME>>Core.cs`
-
-For each capability:
-
-1. Specify pattern-matching over algebraic request records.
-2. Specify metadata lookup from `Config`.
-3. Specify a single `UnifiedOperation.Apply` call:
-   - Input and output types.
-   - Delegate into `Compute`.
-   - `OperationConfig` built exclusively from metadata and call-site parameters (no magic numbers).
-
-### 4.4 Compute design – `<<TARGET_BASENAME>>Compute.cs`
-
-For each capability:
-
-1. Choose exact RhinoCommon types for inputs and outputs.
-2. Choose SDK algorithms and RhinoMath functions (based on §1.2).
-3. Identify **conceptually important intermediate values**:
-   - Normals, distances, angles, tolerances, radii, field magnitudes, etc.
-4. Decide which intermediates become named locals (computed once and reused).
-
-### 4.5 Validation and error design
-
-For each capability:
-
-1. Decide which `V` validation flags are required; reuse existing flags wherever possible.
-2. Decide whether new `E` error codes are genuinely necessary:
-   - If yes, define their semantics and planned trigger points.
-   - If no, commit to reusing existing codes.
-
-**Do not edit code until the entire plan is coherent across all four files.**
+**Checkpoint**: Entire plan must be coherent across all 4 files before proceeding.
 
 ---
 
-## 5. Implementation Passes (Code Changes)
+## Phase 5: Implementation
 
-You must now implement the plan in structured passes, treating the 4-file folder as a single unit of work.
+**Goal**: Implement plan in structured passes treating 4-file folder as single unit.
 
-### 5.1 Public API and domain records – `<<TARGET_BASENAME>>.cs`
+### 5.1 Public API & Domain Records (`<<BASENAME>>.cs`)
 
-1. Add or refine nested domain records (requests, modes, strategies, results) according to the plan.
-2. Add or adjust public static entrypoints:
+1. Add/refine nested domain records (requests, modes, strategies, results)
+2. Add/adjust public static entrypoints:
+   - Construct request/strategy records
+   - Delegate to `Core`
+   - No algorithmic loops or heavy logic
+3. Remove obsolete non-algebraic signatures if plan requires (keep surface minimal)
 
-   - Construct the appropriate request/strategy records.
-   - Delegate immediately into `Core`.
-   - Avoid algorithmic loops or heavy logic.
+### 5.2 Metadata & Dispatch (`<<BASENAME>>Config.cs`)
 
-3. Remove obsolete, non-algebraic signatures that the new API supersedes (if the plan requires it), keeping the public surface minimal and coherent.
+1. Implement/extend metadata record types
+2. Implement/refine `FrozenDictionary` dispatch tables:
+   - Add entries for new capabilities
+   - Ensure each operation has exactly one metadata entry
+3. Move magic numbers and config from `Core`/`Compute` into metadata
 
-### 5.2 Metadata and `FrozenDictionary` dispatch – `<<TARGET_BASENAME>>Config.cs`
+### 5.3 Orchestration (`<<BASENAME>>Core.cs`)
 
-1. Implement or extend metadata record types for the new capabilities.
-2. Implement or refine unified dispatch tables:
+1. Pattern match algebraic request records to:
+   - Lookup metadata from `Config`
+   - Build `OperationConfig` from metadata + call-site parameters
+   - Call `UnifiedOperation.Apply` exactly once per operation
 
-   - Add entries for new capabilities to existing tables, or create a small new table only if clearly justified.
-   - Ensure each distinct operation or mode has exactly one metadata entry.
+2. Eliminate:
+   - Inline `OperationName` literals
+   - Inline `V` combinations
+   - Micro-dispatch tables (belong in `Config`)
 
-3. Remove magic numbers and duplicated configuration from `Core`/`Compute`, moving them into metadata where they represent shared operational configuration.
+3. Follow mature folder patterns (e.g., fields' distance routing, spatial's proximity routing)
 
-### 5.3 Orchestration and `UnifiedOperation` wiring – `<<TARGET_BASENAME>>Core.cs`
+### 5.4 Compute Algorithms (`<<BASENAME>>Compute.cs`)
 
-1. Implement pattern matching over algebraic request records to:
+1. **Dense, parameterized methods**:
+   - Use RhinoCommon geometry types appropriately
+   - Use RhinoMath instead of raw numerics
+   - Compute important intermediates once, assign to named locals, reuse
 
-   - Look up metadata entries from `Config`.
-   - Build `OperationConfig` from metadata + call-site parameters.
-   - Call `UnifiedOperation.Apply` exactly once per operation, with the appropriate compute delegate.
+2. **Guidelines**:
+   - Expression-bodied members and switch expressions where they improve clarity
+   - Avoid duplication—factor into expressions/variables, not helpers
+   - Prefer `for` loops in hot paths, LINQ for clarity elsewhere
 
-2. Ensure there are **no**:
-
-   - Inline `OperationName` literals.
-   - Inline `V` combinations.
-   - “Micro-dispatch tables” in `Core` duplicating what belongs in `Config`.
-
-3. Use mature patterns from existing folders as a guide (e.g. range/proximity routing in spatial, distance field routing in fields).
-
-### 5.4 Compute algorithms – `<<TARGET_BASENAME>>Compute.cs`
-
-1. Implement algorithms as **dense, parameterized methods**, similar in spirit to the strongest existing modules:
-
-   - Use RhinoCommon geometry types and collections appropriately.
-   - Use RhinoMath and the project’s math mappings instead of raw numerics when available.
-
-2. Apply these guidelines:
-
-   - Compute important intermediate values once; assign to clearly named locals and reuse them.
-   - Prefer expression-bodied members and switch expressions where they improve clarity and density (without harming readability).
-   - Avoid duplication: if the same computation appears multiple times, factor it into a single expression or variable, not a helper method that only forwards parameters.
-
-3. Maintain strict separation of concerns:
-
-   - `Compute` must not know about `Result<T>`, `UnifiedOperation`, `V`, or `E`.
-   - `Compute` returns raw values; `Core` wraps them into monadic results and domain records.
+3. **Strict separation**:
+   - `Compute` never knows about `Result<T>`, `UnifiedOperation`, `V`, `E`
+   - `Core` wraps raw values into monadic results and domain records
 
 ---
 
-## 6. Validation and Error Discipline Pass
+## Phase 6: Validation & Error Discipline
 
-After implementing code, perform a dedicated pass focused only on validation and error semantics.
+**Goal**: Dedicated pass ensuring validation and error semantics are correct.
 
-### 6.1 Enumerate validations and errors per operation
+### 6.1 Enumerate Per Operation
 
-For each new or modified operation:
+For each new/modified operation:
+- Which `V` validation flags are used and where
+- Which `E` error codes can be produced
 
-1. List (for yourself):
+### 6.2 New Error Codes Sanity Check
 
-   - Which `V` validation flags are used and where.
-   - Which `E` error codes can be produced.
+If new `E` codes added:
+1. Confirm each is reachable in implemented logic
+2. Confirm each is semantically distinct from existing codes
+3. If unused: either use as intended or remove and revert to existing codes
 
-### 6.2 New error codes sanity check
+### 6.3 Avoid Redundant Validation
 
-If you added new `E` codes:
-
-1. Confirm each is actually reachable in the implemented logic.
-2. Confirm each is semantically distinct and not trivially replaceable by an existing code.
-3. If any new error remains unused:
-   - Either adjust the logic so it is used as intended, or
-   - Remove the error and revert to existing codes.
-
-### 6.3 Avoid redundant validation
-
-- Prefer centralizing validation via `UnifiedOperation` + `V` flags.
+- Centralize via `UnifiedOperation` + `V` flags
 - Keep local guards only when:
-  - They are necessary for algorithmic safety or numerical robustness, or
-  - They materially improve performance without duplicating core validations.
+  - Necessary for algorithmic safety/numerical robustness
+  - Materially improve performance without duplicating core validations
 
 ---
 
-## 7. Cross-Folder Coherence and Core Integration
+## Phase 7: Cross-Folder Coherence
 
-1. Compare the modified `<<TARGET_FOLDER_NAME>>` against mature reference folders:
+**Goal**: Ensure integration with core and alignment with mature folders.
 
-   - Are algebraic domain models, metadata shapes, and dispatch patterns aligned with the strongest existing modules?
-   - Are tolerance and unit conventions consistent?
+1. **Compare with reference folders**:
+   - Algebraic models, metadata shapes, dispatch patterns aligned?
+   - Tolerance and unit conventions consistent?
 
-2. Ensure correct integration with `libs/core/`:
+2. **Verify core integration**:
+   - All public APIs return `Result<T>`
+   - All operations flow through `UnifiedOperation.Apply`
+   - Validations/errors integrate cleanly with `V` and `E`
+   - No parallel or ad-hoc systems
 
-   - All public APIs return `Result<T>`.
-   - All non-trivial operations flow through `UnifiedOperation.Apply`.
-   - Any new validations or error codes integrate cleanly with existing `V` and `E` infrastructure (correct ranges, semantics, and usage).
-   - No parallel or ad-hoc monadic/validation system exists.
-
-3. Verify clear responsibility boundaries:
-
-   - No analysis logic leaking into morphology.
-   - No spatial indexing logic leaking into unrelated folders.
-   - No duplication of functionality that already belongs in another module.
+3. **Verify responsibility boundaries**:
+   - No analysis in morphology
+   - No spatial indexing in unrelated folders
+   - No duplication of existing functionality
 
 ---
 
-## 8. Final Folder-Wide Quality Pass
+## Phase 8: Final Quality Pass
 
-Perform a final, holistic pass over `libs/rhino/<<TARGET_FOLDER_NAME>>/`.
+**Goal**: Holistic verification of folder-wide quality.
 
-### 8.1 Structural invariants
+### 8.1 Structural Invariants
 
-- Folder contains exactly:
-  - `<<TARGET_BASENAME>>.cs`
-  - `<<TARGET_BASENAME>>Config.cs`
-  - `<<TARGET_BASENAME>>Core.cs`
-  - `<<TARGET_BASENAME>>Compute.cs`
-- `<<TARGET_BASENAME>>.cs` is the only file with public API and public nested domain types.
+- Folder contains exactly 4 files: `.cs`, `Config.cs`, `Core.cs`, `Compute.cs`
+- Only `.cs` has public API and public nested types
 
-### 8.2 Style and analyzer compliance
+### 8.2 Style & Analyzer Compliance
 
-- No `var`.
-- K&R braces everywhere.
-- Named parameters for non-trivial calls.
-- No extension methods.
-- No trivial helper methods that simply forward parameters.
-- Repository builds cleanly with **zero new warnings** under existing analyzers.
+- No `var`, K&R braces, named parameters
+- No extension methods, no trivial helpers
+- **Zero new warnings** under existing analyzers
 
-### 8.3 Algorithmic and architectural integrity
+### 8.3 Algorithmic & Architectural Integrity
 
-- New capabilities are implemented as **few, dense, parameter-driven operations**, not a proliferation of near-duplicates.
-- Metadata and dispatch are unified and centralized in `Config`; no stray constants or operation names remain in `Core` or `Compute`.
-- All algorithms are fully implemented:
-  - No TODOs.
-  - No stub branches.
-  - No half-baked modes that violate domain invariants or Rhino expectations.
-- Existing behaviour is preserved or strictly improved:
-  - Robustness.
-  - Expressiveness.
-  - Diagnostics and error clarity.
+- New capabilities are **few, dense, parameter-driven** (not proliferation)
+- Metadata/dispatch unified in `Config` (no stray constants in `Core`/`Compute`)
+- All algorithms fully implemented:
+  - No TODOs, no stub branches
+  - No half-baked modes violating invariants
 
-### 8.4 Error and validation sanity check
+### 8.4 Error & Validation Sanity
 
-- All new `E` codes (if any) are used and justified.
-- All new or modified uses of `V` flags are appropriate and non-redundant.
+- All new `E` codes (if any) are used and justified
+- All `V` flag usage is appropriate and non-redundant
 
-If any check in §8 fails, you must **revise code within this folder** until all criteria are satisfied, without introducing regressions in earlier sections.
+**If any check fails**: Revise within folder until all criteria satisfied.
+
+---
+
+## Editing Discipline
+
+✅ **Do**:
+- Study exemplar folders before writing code
+- Reuse existing infrastructure aggressively
+- Write dense, algebraic, expression-oriented code
+- Make surgical changes preserving existing behavior
+- Test incrementally as you go
+
+❌ **Don't**:
+- Add new `.cs` files or change file count
+- Create helper methods that forward parameters
+- Introduce magic numbers outside `Config`
+- Bypass `UnifiedOperation` or create parallel pipelines
+- Change unrelated code or fix unrelated bugs
+
+---
+
+## Anti-Patterns to Avoid
+
+1. **Feature Creep**: Adding multiple loosely related capabilities—focus on 1-3 coherent additions
+2. **Method Spam**: Creating many similar methods instead of parameterized dispatch
+3. **Config Sprawl**: Loose constants instead of unified metadata tables
+4. **Validation Duplication**: Manual checks instead of leveraging `V` flags
+5. **SDK Reinvention**: Implementing geometry operations already in RhinoCommon
+6. **Magic Numbers**: Unexplained literals instead of named metadata
+7. **Partial Implementation**: Leaving TODOs or stub branches
+8. **Breaking Boundaries**: Adding functionality that belongs in another folder
