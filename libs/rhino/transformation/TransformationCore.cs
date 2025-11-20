@@ -89,17 +89,41 @@ internal static class TransformationCore {
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
         int totalCount = xCount * yCount * zCount;
-        if (xCount <= 0 || yCount <= 0 || zCount <= 0
+        return xCount <= 0 || yCount <= 0 || zCount <= 0
             || totalCount > TransformationConfig.MaxArrayCount
             || Math.Abs(xSpacing) <= context.AbsoluteTolerance
             || Math.Abs(ySpacing) <= context.AbsoluteTolerance
-            || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
+            || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)
+            ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}")));
-        }
+                    $"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}")))
+            : RectangularArrayCore(
+                geometry: geometry,
+                xCount: xCount,
+                yCount: yCount,
+                zCount: zCount,
+                xSpacing: xSpacing,
+                ySpacing: ySpacing,
+                zSpacing: zSpacing,
+                totalCount: totalCount,
+                context: context,
+                enableDiagnostics: enableDiagnostics);
+    }
 
+    /// <summary>Core rectangular array implementation after validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> RectangularArrayCore<T>(
+        T geometry,
+        int xCount,
+        int yCount,
+        int zCount,
+        double xSpacing,
+        double ySpacing,
+        double zSpacing,
+        int totalCount,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase {
         Transform[] transforms = new Transform[totalCount];
         int index = 0;
 
@@ -136,16 +160,33 @@ internal static class TransformationCore {
         int count,
         double totalAngle,
         IGeometryContext context,
-        bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount
+        bool enableDiagnostics) where T : GeometryBase =>
+        count <= 0 || count > TransformationConfig.MaxArrayCount
             || axis.Length <= context.AbsoluteTolerance
-            || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
+            || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI
+            ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
-        }
+                    $"Count: {count}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")))
+            : PolarArrayCore(
+                geometry: geometry,
+                center: center,
+                axis: axis,
+                count: count,
+                totalAngle: totalAngle,
+                context: context,
+                enableDiagnostics: enableDiagnostics);
 
+    /// <summary>Core polar array implementation after validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> PolarArrayCore<T>(
+        T geometry,
+        Point3d center,
+        Vector3d axis,
+        int count,
+        double totalAngle,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase {
         Transform[] transforms = new Transform[count];
         double angleStep = totalAngle / count;
 
@@ -179,15 +220,33 @@ internal static class TransformationCore {
         IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
         double dirLength = direction.Length;
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount
+        return count <= 0 || count > TransformationConfig.MaxArrayCount
             || dirLength <= context.AbsoluteTolerance
-            || Math.Abs(spacing) <= context.AbsoluteTolerance) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
+            || Math.Abs(spacing) <= context.AbsoluteTolerance
+            ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Direction: {dirLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Spacing: {spacing.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
-        }
+                    $"Count: {count}, Direction: {dirLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Spacing: {spacing.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")))
+            : LinearArrayCore(
+                geometry: geometry,
+                direction: direction,
+                dirLength: dirLength,
+                count: count,
+                spacing: spacing,
+                context: context,
+                enableDiagnostics: enableDiagnostics);
+    }
 
+    /// <summary>Core linear array implementation after validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> LinearArrayCore<T>(
+        T geometry,
+        Vector3d direction,
+        double dirLength,
+        int count,
+        double spacing,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase {
         Transform[] transforms = new Transform[count];
         Vector3d step = (direction / dirLength) * spacing;
 

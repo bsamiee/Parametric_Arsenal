@@ -55,19 +55,19 @@ internal static class TransformationCompute {
                 geometry: geometry)
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
-    /// <summary>Bend geometry along spine.</summary>
+    /// <summary>Bend geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Bend<T>(
         T geometry,
-        Line spine,
+        Line axis,
         double angle,
         IGeometryContext context) where T : GeometryBase =>
-        spine.IsValid && Math.Abs(angle) <= TransformationConfig.MaxBendAngle && geometry.IsValid
+        axis.IsValid && Math.Abs(angle) <= TransformationConfig.MaxBendAngle && geometry.IsValid
             ? ApplyMorph(
                 morph: new BendSpaceMorph(
-                    start: spine.From,
-                    end: spine.To,
-                    point: spine.PointAt(0.5),
+                    start: axis.From,
+                    end: axis.To,
+                    point: axis.PointAt(0.5),
                     angle: angle,
                     straight: false,
                     symmetric: false) {
@@ -76,7 +76,7 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -171,15 +171,14 @@ internal static class TransformationCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Maelstrom<T>(
         T geometry,
-        Point3d center,
         Line axis,
         double radius,
         double angle,
         IGeometryContext context) where T : GeometryBase =>
-        center.IsValid && axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid && Math.Abs(angle) <= RhinoMath.TwoPI
+        axis.IsValid && radius > context.AbsoluteTolerance && geometry.IsValid && Math.Abs(angle) <= RhinoMath.TwoPI
             ? ApplyMorph(
                 morph: new MaelstromSpaceMorph(
-                    plane: new Plane(origin: center, normal: axis.Direction),
+                    plane: new Plane(origin: axis.From, normal: axis.Direction),
                     radius0: 0.0,
                     radius1: radius,
                     angle: angle) {
@@ -188,7 +187,7 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
 
     /// <summary>Array geometry along path curve with optional orientation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -198,22 +197,55 @@ internal static class TransformationCompute {
         int count,
         bool orientToPath,
         IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid
+            ? ResultFactory.Create<IReadOnlyList<T>>(
+                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")))
+            : PathArrayCore(
+                geometry: geometry,
+                path: path,
+                count: count,
+                orientToPath: orientToPath,
+                context: context,
+                enableDiagnostics: enableDiagnostics);
+
+    /// <summary>Core path array implementation after validation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> PathArrayCore<T>(
+        T geometry,
+        Curve path,
+        int count,
+        bool orientToPath,
+        IGeometryContext context,
         bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")));
-        }
-
         double curveLength = path.GetLength();
-        if (curveLength <= context.AbsoluteTolerance) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
+        return curveLength <= context.AbsoluteTolerance
+            ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, PathLength: {curveLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
-        }
+                    $"Count: {count}, PathLength: {curveLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")))
+            : PathArrayTransforms(
+                geometry: geometry,
+                path: path,
+                count: count,
+                curveLength: curveLength,
+                orientToPath: orientToPath,
+                context: context,
+                enableDiagnostics: enableDiagnostics);
+    }
 
+    /// <summary>Generate path array transforms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> PathArrayTransforms<T>(
+        T geometry,
+        Curve path,
+        int count,
+        double curveLength,
+        bool orientToPath,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase {
         double[] parameters = count == 1
             ? [path.LengthParameter(curveLength * 0.5, out double singleParameter) ? singleParameter : path.Domain.ParameterAt(0.5),]
             : path.DivideByCount(count - 1, includeEnds: true) is double[] divideParams && divideParams.Length == count
@@ -256,14 +288,20 @@ internal static class TransformationCompute {
         TMorph morph,
         T geometry) where TMorph : SpaceMorph where T : GeometryBase {
         using (morph as IDisposable) {
-            if (!SpaceMorph.IsMorphable(geometry)) {
-                return ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
-            }
-
-            T duplicate = (T)geometry.Duplicate();
-            return morph.Morph(duplicate)
-                ? ResultFactory.Create(value: duplicate)
-                : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
+            return !SpaceMorph.IsMorphable(geometry)
+                ? ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"))
+                : ApplyMorphCore(morph: morph, geometry: geometry);
         }
+    }
+
+    /// <summary>Core morph application after morphability check.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<T> ApplyMorphCore<TMorph, T>(
+        TMorph morph,
+        T geometry) where TMorph : SpaceMorph where T : GeometryBase {
+        T duplicate = (T)geometry.Duplicate();
+        return morph.Morph(duplicate)
+            ? ResultFactory.Create(value: duplicate)
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
     }
 }

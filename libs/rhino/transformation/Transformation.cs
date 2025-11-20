@@ -158,8 +158,6 @@ public static class Transformation {
         public Surface? SourceSurface { get; init; }
         /// <summary>Splop: target point on surface.</summary>
         public Point3d? TargetPoint { get; init; }
-        /// <summary>Maelstrom: vortex center.</summary>
-        public Point3d? Center { get; init; }
         /// <summary>Maelstrom: vortex radius.</summary>
         public double? Radius { get; init; }
 
@@ -193,8 +191,8 @@ public static class Transformation {
             new() { Operation = 7, SourceSurface = sourceSurface, TargetSurface = targetSurface, PreserveStructure = preserve };
         /// <summary>Create maelstrom morph specification.</summary>
         [Pure]
-        public static MorphSpec Maelstrom(Point3d center, Vector3d axis, double radius, double angle) =>
-            new() { Operation = 8, Center = center, Axis = new Line(center, axis), Radius = radius, Angle = angle };
+        public static MorphSpec Maelstrom(Line axis, double radius, double angle) =>
+            new() { Operation = 8, Axis = axis, Radius = radius, Angle = angle };
     }
 
     /// <summary>Apply transform specification to geometry.</summary>
@@ -219,7 +217,7 @@ public static class Transformation {
 
     /// <summary>Apply array transformation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<T>> ArrayTransform<T>(
+    public static Result<IReadOnlyList<T>> ApplyArray<T>(
         T geometry,
         ArraySpec spec,
         IGeometryContext context,
@@ -281,7 +279,7 @@ public static class Transformation {
                 context: context),
             3 => TransformationCompute.Bend(
                 geometry: geometry,
-                spine: spec.Axis!.Value,
+                axis: spec.Axis!.Value,
                 angle: spec.Angle,
                 context: context),
             4 => TransformationCompute.Taper(
@@ -308,7 +306,6 @@ public static class Transformation {
                 context: context),
             8 => TransformationCompute.Maelstrom(
                 geometry: geometry,
-                center: spec.Center!.Value,
                 axis: spec.Axis!.Value,
                 radius: spec.Radius!.Value,
                 angle: spec.Angle,
