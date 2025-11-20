@@ -123,10 +123,8 @@ internal static class AnalysisCore {
                 ? ((Func<Result<IReadOnlyList<Analysis.IResult>>>)(() => {
                     using AreaMassProperties? amp = AreaMassProperties.Compute(curve);
                     Vector3d[] derivatives = curve.DerivativeAt(param, derivativeOrder) is Vector3d[] d ? d : [];
-                    double[] frameParams = new double[AnalysisConfig.CurveFrameSampleCount];
-                    for (int i = 0; i < AnalysisConfig.CurveFrameSampleCount; i++) {
-                        frameParams[i] = curve.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5);
-                    }
+                    double[] frameParams = [.. Enumerable.Range(0, AnalysisConfig.CurveFrameSampleCount)
+                        .Select(i => curve.Domain.ParameterAt(AnalysisConfig.CurveFrameSampleCount > 1 ? i / (AnalysisConfig.CurveFrameSampleCount - 1.0) : 0.5)),];
                     Plane[] frames = curve.GetPerpendicularFrames(frameParams) is Plane[] pf ? pf : [];
                     return amp is not null
                         ? ResultFactory.Create(value: (IReadOnlyList<Analysis.IResult>)[new Analysis.CurveData(
