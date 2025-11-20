@@ -104,7 +104,7 @@ internal static class IntersectionConfig {
     internal const double StabilityPerturbationFactor = 0.001;
     internal const int StabilitySampleCount = 8;
     internal const double UnstableCountDeltaThreshold = 1.0;
-    internal const double GoldenRatio = 1.618033988749894848204586834365638117720309179805762862135;
+    internal const double GoldenRatio = 1.618033988749895;
 
     /// <summary>Minimum samples per Brep face for near-miss detection.</summary>
     internal const int MinSamplesPerFace = 3;
