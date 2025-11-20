@@ -1,217 +1,273 @@
-**Target Folder(s):**
-- `libs/rhino/<<TARGET_FOLDER_1>>/`
-- `libs/rhino/<<TARGET_FOLDER_2>>/`
+---
+version: 1.0
+last_updated: 2025-11-20
+category: organization
+difficulty: beginner
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+---
 
-For each `Target Folder`, you must treat each of the four standard files as a coherent unit:
+# Code Organization
 
+Reorder members within Rhino module folders to achieve consistent category-based organization with size-based ordering—purely organizational, no functional changes.
+
+## Task Description
+
+Enforce consistent, logical structure across module folders. Reorder members by category and size, consolidate duplicate documentation, adjust whitespace for grouping clarity. No signature, behavior, or logic changes allowed.
+
+## Inputs
+
+- **Target Folders**: `libs/rhino/<<TARGET_FOLDER_1>>/`, `libs/rhino/<<TARGET_FOLDER_2>>/`, ...
+
+Each folder contains 4 files:
 - `<<BASENAME>>.cs`
 - `<<BASENAME>>Config.cs`
 - `<<BASENAME>>Core.cs`
 - `<<BASENAME>>Compute.cs`
 
-The goal of this pass is **purely organizational**:
+## Success Criteria
 
-- Reorder existing members (fields, nested types, methods) to achieve a consistent, logical structure.
-- Within each category, **shorter members (fewer vertical lines) must appear before longer members**.
-- Keep **FrozenDictionary declarations at the top of the type** (when present).
-- Consolidate XML documentation and comments **only where it does not change meaning**, to form cleaner groupings.
-- **No functional behavior changes** are allowed.
+✅ Members reordered by consistent category structure  
+✅ Within categories, shorter members appear before longer (fewest lines first)  
+✅ FrozenDictionary fields at top of types (when present)  
+✅ XML documentation consolidated where duplicate/redundant  
+✅ No functional behavior changes whatsoever  
+✅ No signature, attribute, accessibility, namespace changes  
+✅ Zero new warnings, all analyzers pass
 
-You must **not**:
+## Constraints
 
-- Change method signatures, generic parameters, accessibility, attributes, or return types.
-- Introduce new methods, new types, or new `.cs` files.
-- Remove or add executable statements that alter behavior.
-- Change namespaces or using directives.
+Follow CLAUDE.md rules. This is a non-functional task—reordering and documentation consolidation only. No signature, behavior, or logic changes allowed.
 
-You **may**:
+**4-File Architecture**: Understand roles of `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
 
-- Reorder members inside a type.
-- Move existing XML comments to sit above a group instead of per-member, when grouping makes sense.
-- Delete/merge duplicate or trivially redundant XML comments when consolidating documentation for a group.
+## Organizational Principles
 
-────────────────────────────────────
-A. Read and internalize constraints and patterns
-────────────────────────────────────
+### Purpose
+Create **predictable, scannable code** where:
+- Developers quickly find members by category
+- Shorter members (higher variety) appear first, increasing visible density
+- Related members stay grouped (e.g., overloads, tightly coupled helpers)
+- Documentation consolidated for groups reduces noise
 
-1. **Global constraints (mandatory)**
+### Category Model
+Consistent categories across all files with vertical size ordering within each category.
 
-   Read and obey, strictly:
+**Vertical Size**: Number of lines from member declaration to closing brace/terminator (including attributes, nested blocks).
 
-   - `CLAUDE.md`
-   - `AGENTS.md`
-   - `.github/copilot-instructions.md`
-   - `.github/agents/*.agent.md` (all relevant roles)
-   - `.editorconfig`
-   - `libs/rhino/file_architecture.md`
-   - `libs/rhino/LIBRARY_GUIDELINES.md`
+---
 
-   Enforce all project style constraints (non-negotiable):
+## Category Ordering Rules
 
-   - No `var`.  
-   - K&R braces.  
-   - Named parameters.  
-   - One public top-level type per file.  
-   - No extension methods.  
-   - No new helper methods.  
-   - No functional code changes; this pass is **reordering and documentation grouping only**.
+### For Config Files (`<<BASENAME>>Config.cs`)
 
-2. **Understand file roles**
+**Category Order**:
+1. **FrozenDictionary fields** - At top, ordered by initializer size (shortest first)
+2. **Other static fields** - Non-FrozenDictionary statics, ordered by size
+3. **Constants** - Group related constants, order by size then name
+4. **Enums and small nested types** - Ordered by size then name
+5. **Methods** (if present) - Ordered by size then name
 
-   For each `<<BASENAME>>` in the target folder, confirm roles:
+**Rationale**: Configuration at top (FrozenDictionary is primary dispatch mechanism), followed by supporting data, then helper logic if any.
 
-   - `<<BASENAME>>.cs`        — public API + nested algebraic domain types.
-   - `<<BASENAME>>Config.cs`  — configuration: constants, metadata, `FrozenDictionary` tables.
-   - `<<BASENAME>>Core.cs`    — orchestration, `UnifiedOperation` wiring, no public API.
-   - `<<BASENAME>>Compute.cs` — dense algorithms and helper logic.
+### For Other Files (`.cs`, `Core.cs`, `Compute.cs`)
 
-   You are not changing any of these roles; you are only **reordering and grouping members within each file**.
+**Category Order**:
+1. **FrozenDictionary fields** - At very top (after attributes), ordered by initializer size
+2. **Other static fields** - Caches, comparers, etc., ordered by size
+3. **Nested types** - Interfaces, enums, records, structs. Group by role if evident, order by size then name
+4. **Public API methods** - In `.cs` only. Ordered by size then name. Keep related overloads adjacent.
+5. **Internal methods** - In `Core`/`Compute`. Group by logical role if evident, order by size then name
+6. **Private methods** - Private helpers. Group by role when possible, order by size then name
 
-────────────────────────────────────
-B. Category model and ordering rules
-────────────────────────────────────
+**Rationale**: Data structures first (especially dispatch tables), then type definitions, then operations (public → internal → private).
 
-You must adopt a **consistent category model** for all files, then order members within each category by **increasing vertical size (fewest lines first)**.
+### Special Cases
 
-Definitions:
+**Tightly Coupled Clusters**: When public method followed immediately by dedicated private helper existing only to support that method, treat as single unit for ordering purposes. Measure cluster size by combined vertical lines.
 
-- “Vertical size” means the number of lines from the member’s declaration to its closing brace/terminator (including nested blocks and attributes).
-- “Smaller” means fewer lines; ties may be broken by name (lexicographical order) to ensure deterministic ordering.
+**Overload Families**: Keep adjacent even if sizes differ. Order family by size of smallest member.
 
-All categories below refer to members inside the same top-level type (e.g. `internal static class TopologyCore`, `public static class Spatial`, etc.).
+## Methodology
 
-1. **Config files: `<<BASENAME>>Config.cs`**
+---
 
-   Inside the config type, use this category ordering:
+### Multi-Pass Procedure (Per File)
 
-   1. `FrozenDictionary` fields  
-      - All `FrozenDictionary<...>` fields (e.g. dispatch tables, metadata tables) at the top of the type.
-      - Order them by increasing vertical size of the initializer (shortest initializer first).
+**Pass 1: Member Inventory & Classification**
+- List all members inside top-level type:
+  - Static fields (FrozenDictionary vs other)
+  - Nested types (interfaces, enums, records, structs)
+  - Methods (public, internal, private)
+- For each member or tightly coupled cluster:
+  - Assign category per rules above
+  - Record vertical size (line count from declaration to closing brace)
+- Identify **obvious groups**:
+  - Sequential constants of same domain
+  - Families of related nested types (e.g., request records)
+  - Public method + dedicated private helper pairs (keep adjacent)
 
-   2. Other static fields (non-FrozenDictionary)  
-      - Static fields or properties that are not `FrozenDictionary`.
-      - Order by size.
+### Pass 2: Documentation & Grouping Plan (No Edits)
+**For constants and small nested types**:
+- Identify repeated XML comments describing essentially same group
+- Determine where **single group-level XML comment** can replace multiple duplicate member-level comments without losing meaning
 
-   3. Constants (`const` fields)  
-      - Group related constants together (e.g. same domain/purpose).
-      - Within each group, order by size, then by name.
+**For methods**:
+- Do not remove method-level documentation unless verbatim redundant with immediately preceding group-level doc
 
-   4. Enums and small nested types (e.g. internal enums, small records/structs)  
-      - Order by size, then by name.
+**Plan groupings**:
+- For each category, define sequence ordered by vertical size (smallest to largest)
+- Keep groupings and coupled clusters intact
 
-   No methods should be introduced here. If there are existing methods, treat them as a separate category between static fields and constants:
+### Pass 3: Reordering
+Within file, rearrange members per:
+- Category ordering (section above)
+- Size ordering within category (Pass 2 plan)
 
-   - Methods (if present), ordered by size, then name.
+**When reordering**:
+- Keep attributes attached to their members
+- Keep compiler directives (if any) with associated members
+- Preserve blank line structure reinforcing grouping
+- Allow minor adjustments to reflect new group boundaries
 
-2. **Non-config files: `<<BASENAME>>.cs`, `<<BASENAME>>Core.cs`, `<<BASENAME>>Compute.cs`**
+### Pass 4: Documentation Consolidation (Non-Functional Only)
+**For constants and nested types**:
+- Where multiple members share same conceptual description, replace repeated XML docs with single group-level XML doc on first member
+- Do not remove unique or semantically distinct documentation
 
-   Inside each type, use this category ordering:
+**For methods**:
+- Leave method-level documentation as-is unless clear verbatim duplication can be consolidated safely
 
-   1. `FrozenDictionary` fields  
-      - Any `FrozenDictionary<...>` fields must appear at the very top of the type (after attributes).
-      - Order by initializer size.
+**Do NOT**:
+- Introduce new documentation asserting behavior
+- Change meaning of existing comments—only delete duplicates or move to group-level
 
-   2. Other static fields  
-      - `static readonly` fields, caches, comparers, etc.
-      - Order by size.
+**Pass 5: Final Consistency & Safety Check**
+**Confirm for each file**:
+- All code identical aside from:
+  - Member ordering
+  - XML doc / comment consolidation
+  - Harmless whitespace/blank-line adjustments for groupings
+- No method/field/type signatures or attributes changed
+- No executable statements added or removed
 
-   3. Nested types (interfaces, enums, records, structs, marker types)  
-      - Group by role if it is evident (e.g. marker interfaces, small value types, domain result records, strategy records).
-      - Within each group, order nested types by size, then by name.
+**Verify**:
+- FrozenDictionary fields at top of type (if present)
+- Within each category, smaller members before larger
+- File still compiles under project rules and analyzers
 
-   4. Public API methods  
-      - In `<<BASENAME>>.cs`, these are the public static entrypoints.
-      - Order by size, then by name.
-      - Keep related overloads adjacent.
+## Verification
 
-   5. Internal methods  
-      - In `Core` and `Compute` files, group internal methods by logical role if evident (e.g. main operations vs helpers).
-      - Within each group, order by size, then by name.
+After organization:
+- Members reordered by category and size
+- FrozenDictionary fields at top
+- XML docs consolidated where duplicate
+- No functional changes
+- Zero new warnings
 
-   6. Private methods  
-      - Private helpers inside the type.
-      - Group by role when possible.
-      - Order by size, then by name.
+---
 
-Within each category, you must **not** split methods that are clearly related and intended to be read together (e.g. a public method followed immediately by a private helper that exists only to support that method). When this happens, treat the “cluster” as a single unit for vertical size ordering.
+## Editing Discipline
 
-────────────────────────────────────
-C. Multi-pass organizational procedure per file
-────────────────────────────────────
+✅ **Do**:
+- Reorder members within types to match category model
+- Consolidate duplicate XML docs/comments into clean group-level documentation
+- Adjust whitespace/blank lines to reinforce new groupings
+- Keep tightly coupled code (API method + dedicated helper) adjacent as cluster
 
-For each file in each `Target Folder`, follow these passes:
+❌ **Don't**:
+- Change any signatures, attributes, accessibility, namespaces, using directives
+- Add or remove executable statements
+- Introduce new methods, types, or `.cs` files
+- Change behavior in any way
+- Remove unique/meaningful documentation
+- Split tightly coupled method clusters just for size ordering
 
-1. **Pass 1 – Member inventory and classification**
+---
 
-   - List all members inside the top-level type:
-     - Static fields (FrozenDictionary vs other).
-     - Nested types (interfaces, enums, records, structs).
-     - Methods (public, internal, private).
-   - For each member (or tightly coupled cluster), record:
-     - Category according to Section B.
-     - Vertical size (approximate line count from declaration to closing brace/terminator).
-   - Identify any **obvious groups**:
-     - Sequential constants of same domain.
-     - Families of nested types (e.g. related records).
-     - Public method + dedicated private helper pairs that should remain adjacent.
+## Size Ordering Rationale
 
-2. **Pass 2 – Documentation and grouping plan (no edits yet)**
+**Why shorter members first?**
 
-   - For constants and small nested types:
-     - Identify repeated XML comments that describe essentially the same group of things.
-     - Determine where a **single group-level XML comment** can replace multiple duplicate member-level comments without losing meaning.
-   - For methods:
-     - Do not remove method-level documentation unless it is verbatim redundant with an immediately preceding group-level doc you introduce.
-   - Plan groupings:
-     - For each category, define the sequence of members ordered by vertical size (smallest to largest), while keeping groupings and coupled clusters intact.
+1. **Visual Density**: Smaller members let developers see more variety when scanning
+2. **Progressive Detail**: Overview before deep dive—constants/small types before complex methods
+3. **Predictability**: Consistent rule across all files/folders
+4. **Refactoring Signal**: If many large members cluster at bottom, signals potential for better algorithm
 
-3. **Pass 3 – Reordering**
+**Why not alphabetical?**
 
-   - Within the file, rearrange members according to:
-     - Category ordering (Section B).
-     - Size ordering within each category (Pass 2 plan).
-   - When reordering:
-     - Keep attributes attached to their members.
-     - Keep compiler directives (if any) with their associated members.
-     - Preserve blank line structure where it reinforces grouping, but allow minor adjustments to reflect new group boundaries (e.g., a blank line between categories).
+- Alphabetical ignores semantic importance and structural patterns
+- Size ordering naturally groups similar complexity levels
+- Combined with categories, provides both semantic (category) and complexity (size) organization
 
-4. **Pass 4 – Documentation consolidation (non-functional edits only)**
+---
 
-   - For constants and nested types:
-     - Where multiple members share the same conceptual description, replace repeated XML docs with a single group-level XML doc on the first member in the group.
-     - Do not remove unique or semantically distinct documentation.
-   - For methods:
-     - Leave method-level documentation as-is unless there is a clear, verbatim duplication you can consolidate safely.
-   - Do **not**:
-     - Introduce new documentation that asserts behavior.  
-     - Change the meaning of existing comments. You may only delete duplicates or move them to a group-level position.
+## Anti-Patterns to Avoid
 
-5. **Pass 5 – Final consistency and safety check**
+1. **Breaking Clusters**: Separating tightly coupled method + helper just for size ordering
+2. **Fragmented Overloads**: Scattering overload family members far apart
+3. **Documentation Spam**: Keeping verbose redundant XML comments on every constant
+4. **Blind Sorting**: Mechanically sorting without considering semantic groupings
+5. **Inconsistent Application**: Organizing some files but not others in same folder
+6. **Accidental Behavior Change**: Moving code between contexts where semantics differ (e.g., static field initialization order)
+7. **Over-Engineering Grouping**: Creating too many micro-categories that fragment code
 
-   - Confirm for each file:
-     - All code remains identical aside from:
-       - Member ordering.
-       - XML doc / comment consolidation.
-       - Harmless whitespace/blank-line adjustments necessary to reflect new groupings.
-     - No method/field/type signatures or attributes have changed.
-     - No executable statements were added or removed.
-   - Verify that:
-     - `FrozenDictionary` fields are at the top of the type in any file that has them.
-     - Within each category, smaller members appear before larger ones.
-     - The file still compiles under the project’s rules and analyzers (conceptually; do not introduce known violations).
+---
 
-────────────────────────────────────
-D. Editing discipline
-────────────────────────────────────
+## Edge Cases & Considerations
 
-- This pass is **organizational only**:
-  - Do not change behavior.
-  - Do not change any public surface (names, signatures, accessibility).
-  - Do not introduce or remove methods, types, or `.cs` files.
-- All changes must serve one of the following purposes:
-  - Consistent category-based ordering across the project.
-  - Smallest-to-largest ordering within categories to maximize visible variety of members when scanning.
-  - Consolidation of duplicate XML docs/comments into clean group-level documentation.
-- When in doubt:
-  - Prefer **no change** over a change that might affect behavior or semantics.
-  - Keep tightly coupled code (e.g. a public API method with its single supporting helper) adjacent as a cluster, ordered with respect to other clusters by cluster size.
+### Static Field Initialization Order
+**Critical**: C# static field initializers execute in declaration order. When reordering static fields:
+- Verify no field depends on another declared later
+- If dependency exists, respect initialization order over size ordering
+- Document any intentional exception to size ordering
+
+### Nested Type Dependencies
+If nested type A references nested type B:
+- Keep dependency order even if size ordering would swap them
+- Semantic correctness always trumps size ordering
+
+### Partial Classes
+If file contains partial class (rare in this codebase):
+- Organize each partial separately
+- Maintain consistency across all partials for same type
+
+### Preprocessor Directives
+If `#if DEBUG` or similar directives present:
+- Keep directive-controlled members with their controlling directive
+- Organize within directive-controlled sections separately
+- Don't split directive blocks for size ordering
+
+---
+
+## Visual Scanning Benefits (Example)
+
+**Before Organization** (random order):
+```csharp
+// 150 LOC method
+// 200 LOC method
+// 50 LOC method
+// 3 LOC constant
+// 180 LOC method
+// 5 LOC constant
+```
+→ Developer sees 2-3 large methods when opening file, must scroll to find constants
+
+**After Organization** (size-ordered):
+```csharp
+// Category: Constants
+// 3 LOC constant
+// 5 LOC constant
+
+// Category: Methods
+// 50 LOC method
+// 150 LOC method
+// 180 LOC method
+// 200 LOC method
+```
+→ Developer immediately sees constants, can quickly scan small methods, large methods grouped at bottom for deep work

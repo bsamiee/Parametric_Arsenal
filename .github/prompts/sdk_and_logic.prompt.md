@@ -1,332 +1,367 @@
-**Target Folder(s):**
-- `libs/rhino/<<TARGET_FOLDER_1>>/`
-- `libs/rhino/<<TARGET_FOLDER_2>>/`
+---
+version: 1.0
+last_updated: 2025-11-20
+category: sdk-audit
+difficulty: expert
+target: libs/rhino
+prerequisites:
+  - CLAUDE.md
+  - AGENTS.md
+  - copilot-instructions.md
+  - .editorconfig
+  - libs/rhino/file_architecture.md
+  - libs/rhino/LIBRARY_GUIDELINES.md
+  - libs/rhino/rhino_math_class.md
+  - libs/rhino/rhino_math_reference.md
+---
 
-For each `Target Folder`, you must treat the **entire 4-file module** as a coherent unit:
+# SDK & Logic Audit
 
+Perform deep, surgical audit and refactor focusing on algorithmic correctness, complete RhinoCommon/RhinoMath usage, unified dispatch, and cross-folder coherence.
+
+## Task Description
+
+Audit and refine mathematical correctness, SDK usage, and architectural patterns. Verify algorithms, eliminate incomplete implementations, ensure full RhinoCommon/RhinoMath usage, unify constants/dispatch, and enforce cross-folder coherence.
+
+## Inputs
+
+- **Target Folders**: `libs/rhino/<<TARGET_FOLDER_1>>/`, `libs/rhino/<<TARGET_FOLDER_2>>/`, ...
+
+Each folder contains 4 files:
 - `<<BASENAME>>.cs`
 - `<<BASENAME>>Config.cs`
 - `<<BASENAME>>Core.cs`
 - `<<BASENAME>>Compute.cs`
 
-All analysis, design decisions, and refactors must be **folder-wide**, not limited to a single file. When a small, well-justified change in one file (e.g. `Config` or `Core`) allows a significantly better algorithmic or architectural solution in another (e.g. `Compute`), you must prefer that **holistic solution** over local “hamfisted” fixes.
-
-**Reference Folders (read-only, for patterns):**
-- `libs/rhino/fields/`
-- `libs/rhino/morphology/`
-- `libs/rhino/topology/`
-- `libs/rhino/spatial/`
-
-**Core Architecture (read-only, for wiring and invariants):**
-- `libs/core/`
-- `libs/rhino/rhino_math_class.md`
-- `libs/rhino/rhino_math_reference.md`
-- `libs/rhino/file_architecture.md`
-- `libs/rhino/LIBRARY_GUIDELINES.md`
-
-Your job is to perform a **deep, multi-pass, folder-wide logic + SDK + dispatch audit and surgical refactor** for all `Target Folder(s)`, focusing on:
-
-- Mathematical / algorithmic correctness of all logic, especially in `<<BASENAME>>Compute.cs`
-- Full and consistent RhinoCommon / RhinoMath / Rhino collections usage
-- Strategic, unified constants and `FrozenDictionary`-based dispatch in `<<BASENAME>>Config.cs`
-- Correct `UnifiedOperation` wiring and validation in `<<BASENAME>>Core.cs`
-- Clean algebraic API and nested domain types in `<<BASENAME>>.cs`
-- Cross-folder coherence with the canonical patterns in the reference folders
-
-You must **not** change the coarse 4-file architecture:
-
-- `<<BASENAME>>.cs`        — public API + nested algebraic domain types  
-- `<<BASENAME>>Config.cs`  — internal constants + metadata + dispatch tables  
-- `<<BASENAME>>Core.cs`    — internal orchestration + UnifiedOperation wiring  
-- `<<BASENAME>>Compute.cs` — internal algorithmic implementation
-
-Only make changes that are **fully justified** by logic correctness, SDK/math correctness, dispatch/config discipline, or alignment with established patterns.
-
-────────────────────────────────────
-A. Read and internalize constraints and reference patterns
-────────────────────────────────────
-
-1. **Global behavioral and style constraints (mandatory)**
-
-   Read and obey, strictly:
-
-   - `CLAUDE.md`  
-   - `AGENTS.md`  
-   - `.github/copilot-instructions.md`  
-   - `.github/agents/*.agent.md` (all relevant roles)  
-   - `.editorconfig`  
-   - `libs/rhino/file_architecture.md`  
-   - `libs/rhino/LIBRARY_GUIDELINES.md`  
-   - `libs/rhino/rhino_math_class.md`  
-   - `libs/rhino/rhino_math_reference.md`
-
-   Enforce all project style constraints (non-negotiable):
-
-   - No `var`. All local variables use explicit types.  
-   - K&R braces exclusively.  
-   - Named parameters for all non-trivial method calls.  
-   - One public top-level type per file.  
-   - No extension methods.  
-   - No “helper” methods that simply forward parameters.  
-   - No proliferation of nearly-duplicate methods; prefer dense, parameterized logic.  
-   - Prefer **expression-oriented, functional style** when it improves clarity:
-     - Pattern matching and switch expressions for branching.
-     - Expression-bodied members where appropriate.
-     - Minimal mutation; favor immutable locals and clear data flow.
-   - Favor **algebraic, parameterized, polymorphic C#**:
-     - Nested records encoding closed sets of domain variants.
-     - Parameterization over mode flags and ad-hoc enums.
-     - Making impossible domain states unrepresentable via type design.
+## Success Criteria
+
+✅ All algorithms mathematically/geometrically correct (no logic errors, no half-implemented formulas)  
+✅ Full RhinoCommon/RhinoMath/Rhino collections usage (no SDK reinvention)  
+✅ Unified constants and FrozenDictionary dispatch in `Config` (no loose magic numbers)  
+✅ Correct `UnifiedOperation` wiring and validation in `Core`  
+✅ Clean algebraic API with nested domain types in `.cs`  
+✅ Cross-folder coherence with canonical patterns from reference folders  
+✅ Parameter-driven logic (no constant spam, reuse computed intermediates)  
+✅ Zero new warnings, all analyzers pass
+
+## Constraints
+
+Follow all rules in CLAUDE.md. Study core infrastructure (Result.cs, UnifiedOperation.cs, ValidationRules.cs, E.cs). Reference exemplar folders (fields/, spatial/) for patterns. Use RhinoMath constants (rhino_math_class.md).
+
+**4-File Architecture**: Preserve `.cs` (API), `Config.cs` (metadata), `Core.cs` (orchestration), `Compute.cs` (algorithms)
+
+## Audit Goals (Per Folder)
+
+### 1. No Incorrect Logic
+Algorithms, formulas, branching across folder—especially in `Compute.cs`—must be:
+- Mathematically and geometrically correct
+- Consistent with documented domain
+- Free of obvious and subtle math mistakes
+
+### 2. No Partial/Half-Implemented Algorithms
+Eliminate:
+- Half-baked, stub-like, or inconsistent implementations
+- TODO markers, unreachable branches, unused parameters, incomplete loops
+
+**Either**: Complete algorithm properly **or** remove/redesign so every public operation has fully realized, coherent implementation.
+
+### 3. Full RhinoCommon/RhinoMath/Rhino Collections Usage
+- Prefer Rhino types/collections/math over generic .NET where appropriate
+- Use RhinoMath constants (`SqrtTwo`, `TwoPi`, etc.) instead of ad-hoc numeric literals
+- Follow project's established mappings from `rhino_math_class.md` / `rhino_math_reference.md`
+- Ensure consistent units, angle conventions, tolerances with reference folders
+
+### 4. Strategic, Unified Constants & Dispatch
+- Check existing unified dispatch tables and config patterns in `Config.cs` before introducing new constants/types
+- Prefer augmenting existing metadata tables over adding "loose" constants, local enums, scattered thresholds
+- New reusable constants → `Config.cs`, wired into `FrozenDictionary` metadata dispatch
+
+### 5. Parameter/Variable-Driven Logic (Not Constant Spam)
+Design algorithms to:
+- **Reuse named parameters, intermediate variables, earlier outputs** instead of duplicating numeric expressions
+- When intermediate is conceptually important (radius, step size, normalized vector, tolerance from geometry), compute **once**, assign to clearly named local, reuse downstream
+- Avoid fragile magic-number logic—express relationships symbolically in terms of inputs and derived values
+- Favor algebraic and polymorphic designs over branching tangles hard-coding modes/strategies
+
+### 6. Folder-Level Architectural Integrity
+Preserve 4-file architecture in all folders:
+- No adding/removing `.cs` files
+- Maintain clean separation of responsibilities
+- Allow **small, justified cross-file adjustments** for better logic/architecture
+
+### 7. Cross-Folder Coherence
+For similar concepts (distance fields, sampling strategies, tolerance derivation, orientation):
+- Ensure coherence with canonical reference folders
+- Don't invent folder-local patterns contradicting better-established designs unless clear, documented reason
+
+## Methodology
+
+---
+
+### Multi-Pass Procedure (Per Folder)
+
+Use multiple explicit thinking passes treating entire 4-file module as unit of work. Do not collapse passes.
+
+**Pass 1: Folder Inventory & Roles**
+- Enumerate all files, confirm 4-file architecture intact
+- For folder as whole:
+  - Summarize conceptual domain (what module is about)
+  - Describe how each file participates (API, config, orchestration, compute)
+  - Identify inconsistencies with reference-folder patterns
+
+### Pass 2: Algorithm & Formula Understanding (No Edits)
+**For entire folder, emphasis on `Compute.cs` relating back to `Core` and `Config`:**
+
+For each `Compute` method:
+- **Read line by line twice**
+- Write (internally) brief, precise explanation:
+  - What method computes (mathematical/geometric terms)
+  - What intermediate quantities derived and why they matter
+- Explicitly note:
+  - All literal numeric constants
+  - Assumptions: angle units, orientation, tolerances, iteration counts, convergence
+  - All RhinoCommon/RhinoMath calls and relation to domain goal
+
+For `Core` and `Config`:
+- Map which public operations in `.cs` route to which compute methods via which metadata/validations
+- Identify how domain variants (requests/modes/strategies) encoded in nested types, metadata, dispatch
+
+**No edits in this pass** - pure understanding.
+
+### Pass 3: Logic & Completeness Audit (Folder-Wide, No Edits)
+For each compute method and surrounding orchestration:
+- Are all branches exhaustive for documented domain?
+- Edge cases handled (degenerate geometry, zero-length vectors, coincident points, empty collections, invalid inputs)?
+- All intermediate checks logically coherent (correct inequality directions, unit assumptions, robust comparisons)?
+
+**Identify across folder**:
+- Obvious math errors or suspicious formulas
+- "Half-done" algorithms (TODO markers, unreachable branches, unused parameters, incomplete loops, missing convergence)
+- Duplicated logic that should reuse computed intermediates or express through algebraic/polymorphic structures
+
+**Produce consolidated issue list** per folder, grouping:
+- Pure logic/math problems
+- Incomplete or inconsistent algorithms
+- Cross-file mismatches (API/Config/Core/Compute not aligned)
+
+### Pass 4: Formula Invariants & Domain Expectations
+For each major operation (geometry, fields, orientation, topology, analysis):
+
+**Restate key formulas symbolically**:
+- Units and dimensions
+- Behavior as parameters approach limits (0, ∞, very large/small geometry)
+- Symmetry, monotonicity, boundedness where applicable
+
+**Cross-check against**:
+- Reference folders' behavior
+- Domain expectations implicit in library guidelines or core types (ranges ensured by `E` and `V`)
+
+**Mark violations**: Non-symmetric where symmetry expected, divergence where convergence expected, unbounded where boundedness required.
+
+### Pass 5: RhinoCommon/RhinoMath Alignment
+For each `Compute` method and relevant `Core`/`Config` parts:
+
+- Cross-check all math against RhinoMath and Rhino math reference docs
+- Replace ad-hoc math with RhinoMath equivalents where available and appropriate
+- Ensure collections/geometry types use RhinoCommon idioms (`Point3dList`, `Mesh`, `Curve`, `Brep` utilities)
+- Confirm angle and unit consistency with reference folder patterns
+- Ensure consistent tolerance usage:
+  - Prefer deriving from shared configuration or GeometryContext-style mechanism
+  - Not ad-hoc literals
+
+### Pass 6: Constants, Metadata, Unified Dispatch Normalization
+For each `<<BASENAME>>`:
+
+**In `Config.cs`**:
+- Identify all constants, enums, metadata record types
+- Locate duplication of operation names, validation flags, thresholds, magic numbers across `Config`, `Core`, `Compute`
+- **Normalize into small internal metadata record types + FrozenDictionary tables** following canonical Fields pattern:
+  - Metadata carries: `V` flags, operation name, per-operation shared constants (buffer sizes, thresholds, iteration limits, codes, modes)
 
-2. **Core runtime / wiring patterns (libs/core)**
-
-   Study carefully:
-
-   - `Result` and `ResultFactory`  
-   - `UnifiedOperation` / `OperationConfig`  
-   - `ValidationRules` and `V` validation flags  
-   - `E` error registry and domain ranges  
-   - Any core algebraic types used for shared configuration or context
-
-   Requirements:
-
-   - All public APIs in `libs/rhino/` must return `Result<T>`.  
-   - All non-trivial operations must go through `UnifiedOperation.Apply` with `OperationConfig` using proper `V` flags and `E` error codes.  
-   - No ad-hoc validation paths or bypasses.
-
-3. **Canonical 4-file patterns (reference folders)**
-
-   In each reference folder (especially `fields`), study:
-
-   - `X.cs`:
-     - Public static entrypoint class.
-     - Nested algebraic domain records (requests, modes, strategies, results).
-   - `XConfig.cs`:
-     - Small internal metadata record types.
-     - One or a few `FrozenDictionary` tables as the **single source of truth** for operation metadata (validation modes, operation names, shared thresholds, etc.).
-   - `XCore.cs`:
-     - Orchestration layer that:
-       - Pattern matches on algebraic types.
-       - Looks up metadata from `XConfig`.
-       - Constructs `OperationConfig` and calls `UnifiedOperation.Apply`.
-   - `XCompute.cs`:
-     - Dense, algorithmic, parameter-driven code using RhinoCommon and RhinoMath.
-     - No `Result<T>`, no `UnifiedOperation`, no `V`/`E` knowledge.
-
-   Extract from these folders the concrete patterns that define “good” code in this repo:  
-   algebraic, metadata-driven, parameterized, SDK-aware, dense, and non-redundant.
-
-────────────────────────────────────
-B. Global goals and success criteria
-────────────────────────────────────
-
-For all `Target Folder(s)`, all changes must satisfy these goals:
-
-1. **No incorrect logic**
-
-   - Algorithms, formulas, and branching across the entire folder—especially in `<<BASENAME>>Compute.cs`—must be mathematically and geometrically correct, consistent with the documented domain, and free of both obvious and subtle math mistakes.
-
-2. **No partial / half-implemented formulas or algorithms**
-
-   - Identify and eliminate half-baked, stub-like, or inconsistent algorithmic implementations anywhere in the folder.  
-   - Either:
-     - Complete the algorithm properly, or  
-     - Remove / redesign it so that every public operation has a fully realized, coherent implementation.
-
-3. **Full, correct usage of RhinoCommon / RhinoMath / Rhino collections**
-
-   - Prefer Rhino types, collections, and math utilities over generic .NET ones where appropriate.  
-   - Use RhinoMath and the mapped constants from `rhino_math_class.md` / `rhino_math_reference.md` instead of ad-hoc numeric literals.  
-   - Be aware that RhinoMath exposes values like `SqrtTwo`, `TwoPi`, etc., instead of a generic `Pi`; use the project’s established mappings consistently.  
-   - Ensure consistent units, angle conventions, and tolerances with the rest of the project and reference folders.
-
-4. **Strategic, unified constants and dispatch**
-
-   - Before introducing any new constants or types, check existing unified dispatch tables and config patterns in `<<BASENAME>>Config.cs`.  
-   - Prefer augmenting existing metadata tables and config records over adding “loose” constants, local enums, or scattered thresholds.  
-   - New reusable constants must live in `<<BASENAME>>Config.cs` and be wired into `FrozenDictionary`-based metadata dispatch, not scattered in `Core` or `Compute`.
-
-5. **Parameter / variable-driven logic over constant spam**
-
-   - Design algorithms so that they **reuse named parameters, intermediate variables, and earlier outputs**, rather than duplicating numeric expressions or inlining the same arithmetic.  
-   - When an intermediate quantity is conceptually important (radius, step size, normalized vector, tolerance derived from geometry, etc.), compute it **once**, assign to a clearly named local, and reuse that variable downstream.  
-   - Avoid fragile magic-number logic; express relationships symbolically in terms of inputs and previously derived values wherever possible.  
-   - Favor algebraic and polymorphic designs over branching tangles that hard-code modes or strategies as bare constants.
-
-6. **Folder-level architectural integrity**
-
-   - Preserve the 4-file architecture in all `Target Folder(s)`:
-     - `<<BASENAME>>.cs` – public API + nested algebraic domain types.
-     - `<<BASENAME>>Config.cs` – internal constants + metadata + `FrozenDictionary` dispatch tables.
-     - `<<BASENAME>>Core.cs` – internal orchestration + `UnifiedOperation` wiring.
-     - `<<BASENAME>>Compute.cs` – internal algorithmic implementation.
-   - Do not add or remove `.cs` files in the folder.  
-   - Maintain a clean separation of responsibilities across the four files while allowing **small, justified cross-file adjustments** to achieve better logic and architecture.
-
-7. **Cross-folder coherence**
-
-   - For similar concepts (e.g., distance fields, sampling strategies, tolerance derivation, orientation logic), ensure that `Target Folder(s)` are coherent with the canonical reference folders.  
-   - Do not invent folder-local patterns that contradict better-established designs unless there is a clear, documented reason and benefit.
-
-────────────────────────────────────
-C. Multi-pass procedure per target folder (full-folder)
-────────────────────────────────────
-
-You must use **multiple explicit thinking passes** for each `<<TARGET_FOLDER_NAME>>` and treat the **entire 4-file module** as the unit of work. Do not collapse these passes into a single hybrid sweep.
-
-For each `<<TARGET_FOLDER_NAME>>` in `Target Folder(s)`, follow this exact sequence:
-
-1. **Pass 1 – Folder inventory and roles**
-
-   - Enumerate all files in the folder and confirm that the 4-file architecture is intact:
-     - `<<BASENAME>>.cs`
-     - `<<BASENAME>>Config.cs`
-     - `<<BASENAME>>Core.cs`
-     - `<<BASENAME>>Compute.cs`
-   - For the folder as a whole:
-     - Summarize the conceptual domain (what this module is about).  
-     - Describe how each file participates in that domain (API, config, orchestration, compute).  
-     - Identify any obvious inconsistencies between these roles and the reference-folder patterns.
-
-2. **Pass 2 – Algorithm + formula understanding (no edits yet)**
-
-   For the entire folder, with emphasis on `<<BASENAME>>Compute.cs` but relating back to `Core` and `Config`:
-
-   - For each `<<BASENAME>>Compute` method:
-     - Read the method **line by line twice**.  
-     - Write, for yourself, a brief and precise explanation of:
-       - What the method is supposed to compute in mathematical / geometric terms.  
-       - What intermediate quantities it derives and why they matter.  
-     - Explicitly note:
-       - All literal numeric constants.  
-       - Assumptions about angle units, orientation, tolerances, iteration counts, convergence criteria.  
-       - All RhinoCommon / RhinoMath calls and how they relate to the domain goal.
-   - For `<<BASENAME>>Core` and `<<BASENAME>>Config`:
-     - Map which public operations in `<<BASENAME>>.cs` route to which compute methods, via which metadata entries and validations.  
-     - Identify how domain variants (requests/modes/strategies) are encoded in nested types, metadata, and dispatch.
-
-   Do **not** edit code in this pass; this is pure understanding.
-
-3. **Pass 3 – Logic and completeness audit (folder-wide)**
-
-   Still without editing code:
-
-   - For each compute method and its surrounding orchestration:
-     - Are all branches exhaustive for the documented domain?  
-     - Are edge cases (degenerate geometry, zero-length vectors, coincident points, empty collections, invalid inputs) handled appropriately and consistently with reference folders?  
-     - Are all intermediate checks logically coherent (correct inequality directions, unit assumptions, robust comparisons)?
-   - Identify, across the folder:
-     - Obvious math errors or suspicious formulas.  
-     - “Half-done” algorithms (TODO markers, unreachable branches, unused parameters, incomplete loops, missing convergence checks) in any of the four files.  
-     - Duplicated logic that should instead reuse previously computed intermediate variables or be expressed through more algebraic, polymorphic structures.
-   - Produce a consolidated internal issue list per folder, grouping issues by:
-     - Pure logic/math problems.  
-     - Incomplete or inconsistent algorithms.  
-     - Cross-file mismatches (API/Config/Core/Compute not aligned).
-
-4. **Pass 4 – Formula invariants and domain expectations**
-
-   For each major operation (especially those involving geometry, fields, orientation, topology, or analysis):
-
-   - Restate key formulas **symbolically**, focusing on:
-     - Units and dimensions.  
-     - Behavior as parameters approach limiting values (0, ∞, very large/small geometry).  
-     - Symmetry, monotonicity, and boundedness where applicable.
-   - Cross-check these properties against:
-     - The reference folders’ behavior.  
-     - Any domain expectations implicit in library guidelines or core types (e.g., ranges ensured by `E` and `V` flags).
-   - Mark any algorithm that violates expected invariants (e.g., non-symmetric where symmetry is expected, divergence where convergence is expected, unbounded outputs where boundedness is required).
-
-5. **Pass 5 – RhinoCommon / RhinoMath alignment**
-
-   For each `<<BASENAME>>Compute` method and relevant parts of `Core`/`Config`:
-
-   - Cross-check all math against RhinoMath and your Rhino math reference docs.  
-   - Replace ad-hoc math with RhinoMath equivalents where available and appropriate.  
-   - Ensure collections and geometry types use RhinoCommon idioms (e.g., `Point3dList`, `Mesh`, `Curve`, `Brep` utilities) when these provide clearer or more robust implementations than raw .NET equivalents.  
-   - Confirm angle and unit consistency with established patterns in the reference folders.
-   - Ensure consistent use of tolerances:
-     - Prefer deriving tolerances from shared configuration or GeometryContext-style mechanism, not ad-hoc literals.
-
-6. **Pass 6 – Constants, metadata, and unified dispatch normalization**
-
-   For each `<<BASENAME>>`:
-
-   - In `<<BASENAME>>Config.cs`:
-     - Identify all constants, enums, and metadata record types.  
-     - Locate any duplication of operation names, validation flags, thresholds, or magic numbers across `Config`, `Core`, and `Compute`.  
-     - Normalize these into **small internal metadata record types plus one or a few `FrozenDictionary` tables**, following the canonical `Fields` pattern:
-       - Metadata should carry:
-         - `V` flags for validation.  
-         - Operation name string (for diagnostics/logging).  
-         - Any per-operation shared constants (buffer sizes, thresholds, iteration limits, codes, modes).
-   - In `<<BASENAME>>Core.cs`:
-     - Ensure all `UnifiedOperation` calls take `ValidationMode`, `OperationName`, and reusable thresholds from metadata in `<<BASENAME>>Config.cs`, not from inline literals.  
-     - Remove micro-dispatch tables embedded in `Core`; those mappings belong in metadata in `Config`.
-   - In `<<BASENAME>>Compute.cs`:
-     - Retain only **truly local** numeric constants that are purely algorithmic and not part of shared operation configuration.  
-     - Prefer local variables derived from inputs or metadata over repeated literals.
-
-   The goal is: **one coherent metadata + dispatch layer per folder**, no loose constants or duplicated metadata.
-
-7. **Pass 7 – Parameter-driven, algebraic refactor (full-folder)**
-
-   For each folder, and particularly for `<<BASENAME>>Compute.cs` and how it is called from `Core` and `<<BASENAME>>.cs`:
-
-   - Introduce clearly named local variables for any conceptually meaningful intermediate value that is:
-     - Used more than once, or  
-     - Important for understanding the algorithm (lengths, angles, tolerances, normalized factors, scaling parameters, field falloff rates, etc.).
-   - Rewrite formulas to derive values from parameters and earlier locals instead of:
-     - Repeating numeric constants, or  
-     - Recomputing the same expression multiple times.  
-   - Where appropriate, restructure logic to:
-     - Use nested algebraic records (in `<<BASENAME>>.cs`) to encode domain variants.  
-     - Use metadata lookups (in `Config`) rather than big `switch` statements on primitive IDs.  
-     - Use polymorphic / pattern-matching dispatch (in `Core`) rather than flag-heavy or mode-code-heavy branching.
-   - Ensure downstream steps reuse earlier outputs wherever appropriate, instead of recomputing or using hardcoded offsets.
-   - Maintain extremely dense and non-redundant code:
-     - No gratuitous helpers.  
-     - No cosmetic reshuffling without logical benefit.  
-     - Prefer polymorphic / algebraic parameterization over branching cascades.
-
-   When a **minor, well-contained change** to `<<BASENAME>>.cs`, `Config`, or `Core` enables a materially cleaner algorithm or dispatch pattern in `Compute`, you must take that full-folder approach rather than leaving a poor structure in place.
-
-8. **Pass 8 – Cross-folder coherence**
-
-   - Compare the final structure and behavior of the `Target Folder` against the reference folders:
-     - Are similar operations encoded in broadly similar ways (algebraic types, metadata shape, dispatch style)?  
-     - Are tolerances, iteration patterns, and error handling consistent with established practices?  
-   - Where reasonable, align the `Target Folder`’s patterns with the most mature reference (often `fields`), unless there is a clear, documented domain-specific reason to differ.
-
-9. **Pass 9 – Final integration and self-check**
-
-   - Confirm, per folder:
-     - The folder still has exactly the four files with their intended roles.  
-     - All public APIs remain in `<<BASENAME>>.cs` and return `Result<T>`.  
-     - All non-trivial operations go through `UnifiedOperation.Apply` using metadata from `Config`.  
-     - There are no new loose constants, stray enums, or per-operation magic numbers outside `Config`, unless they are truly local and clearly justified.
-   - For each modified `<<BASENAME>>Compute` method and its wiring:
-     - Re-read once more and verify:
-       - Logical correctness of branches and formulas.  
-       - Consistent, deliberate use of RhinoMath / RhinoCommon.  
-       - Parameter-driven structure (no unnecessary hard-coding or duplication).  
-       - Adherence to `.editorconfig` rules and project style (no `var`, K&R braces, named parameters, expression-based and algebraic where appropriate).
-   - Ensure:
-     - The repo builds with 0 new warnings under existing analyzers.  
-     - All changes are tightly scoped, fully justified, and improve correctness, robustness, or architectural clarity.  
-     - No `TODO` comments or partial refactors remain; each change is complete at the appropriate level of the chain of logic.
-
-────────────────────────────────────
-D. Editing discipline
-────────────────────────────────────
-
-- You must be **surgical**:
-  - Only change code when logic, completeness, SDK usage, or dispatch/constant discipline requires it.  
-  - Do not perform large stylistic rewrites that do not improve correctness, robustness, or architectural alignment.
-- When you change a method or type:
-  - Maintain or improve performance where reasonable.  
-  - Preserve the overall algebraic model and 4-file architecture.  
-  - If an API shape must change, it must be justified by domain clarity and remain consistent with patterns in the reference folders.
-- After all edits:
-  - The code must obey the constraints from `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, and `.editorconfig`.  
-  - The changes must make the folder’s logic, math, and architecture strictly better aligned with the project’s standards and goals.
+**In `Core.cs`**:
+- Ensure all `UnifiedOperation` calls take `ValidationMode`, `OperationName`, reusable thresholds from metadata in `Config.cs` (not inline literals)
+- Remove micro-dispatch tables embedded in `Core` (mappings belong in metadata in `Config`)
+
+**In `Compute.cs`**:
+- Retain only **truly local** numeric constants purely algorithmic and not part of shared operation config
+- Prefer local variables derived from inputs or metadata over repeated literals
+
+**Goal**: **One coherent metadata + dispatch layer per folder**, no loose constants or duplicated metadata.
+
+### Pass 7: Parameter-Driven, Algebraic Refactor (Full-Folder)
+For each folder, particularly `Compute.cs` and how called from `Core` and `.cs`:
+
+- Introduce clearly named local variables for conceptually meaningful intermediates:
+  - Used more than once **or**
+  - Important for understanding (lengths, angles, tolerances, normalized factors, scaling parameters, field falloff rates)
+
+- Rewrite formulas to derive from parameters and earlier locals instead of:
+  - Repeating numeric constants
+  - Recomputing same expression multiple times
+
+- Where appropriate, restructure logic to:
+  - Use nested algebraic records (in `.cs`) to encode domain variants
+  - Use metadata lookups (in `Config`) rather than big switch statements on primitive IDs
+  - Use polymorphic/pattern-matching dispatch (in `Core`) rather than flag-heavy or mode-code branching
+
+- Ensure downstream steps reuse earlier outputs (not recomputing or using hardcoded offsets)
+
+- Maintain extremely dense, non-redundant code:
+  - No gratuitous helpers
+  - No cosmetic reshuffling without logical benefit
+  - Prefer polymorphic/algebraic parameterization over branching cascades
+
+**When minor, well-contained change** to `.cs`, `Config`, or `Core` enables materially cleaner algorithm or dispatch in `Compute`, take full-folder approach.
+
+### Pass 8: Cross-Folder Coherence
+Compare final structure and behavior against reference folders:
+- Similar operations encoded in broadly similar ways (algebraic types, metadata shape, dispatch style)?
+- Tolerances, iteration patterns, error handling consistent with established practices?
+
+Where reasonable, align with most mature reference (often `fields`), unless clear documented domain-specific reason to differ.
+
+**Pass 9: Final Integration & Self-Check**
+**Confirm per folder**:
+- Folder has exactly 4 files with intended roles
+- All public APIs in `.cs` return `Result<T>`
+- All non-trivial operations go through `UnifiedOperation.Apply` using metadata from `Config`
+- No new loose constants, stray enums, per-operation magic numbers outside `Config` (unless truly local and justified)
+
+**For each modified `Compute` method and wiring**:
+- Re-read once more, verify:
+  - Logical correctness of branches and formulas
+  - Consistent, deliberate RhinoMath/RhinoCommon usage
+  - Parameter-driven structure (no unnecessary hard-coding or duplication)
+  - `.editorconfig` and project style adherence
+
+**Ensure**:
+- Repo builds with 0 new warnings under analyzers
+- Changes tightly scoped, fully justified, improve correctness/robustness/architectural clarity
+- No TODO comments or partial refactors
+
+## Verification
+
+After audit:
+- All algorithms mathematically/geometrically correct
+- Full RhinoCommon/RhinoMath usage (no SDK reinvention)
+- Unified constants and dispatch in Config
+- Correct UnifiedOperation wiring
+- Cross-folder coherence
+- Zero new warnings
+
+---
+
+## Editing Discipline
+
+✅ **Do**:
+- Be surgical—change only when logic, completeness, SDK usage, or dispatch/constant discipline requires
+- Maintain or improve performance where reasonable
+- Preserve overall algebraic model and 4-file architecture
+- If API shape must change, justify by domain clarity and remain consistent with reference patterns
+
+❌ **Don't**:
+- Perform large stylistic rewrites not improving correctness/robustness/architectural alignment
+- Change unrelated code or fix unrelated bugs
+- Add new `.cs` files
+- Create helper methods forwarding parameters
+- Break existing public APIs without strong justification
+
+**After all edits**:
+- Code must obey constraints from CLAUDE.md, AGENTS.md, `.editorconfig`
+- Changes make folder's logic, math, architecture strictly better aligned with project standards
+
+---
+
+## Algorithmic Correctness Checklist
+
+Use this for each compute method:
+
+**Mathematics**:
+- [ ] All arithmetic operations correct (no sign errors, order of operations)
+- [ ] Division by zero handled or proven impossible
+- [ ] Overflow/underflow considered for extreme inputs
+- [ ] Floating-point comparison uses appropriate epsilon/tolerance
+- [ ] Trigonometric functions use correct angle units (radians vs degrees)
+
+**Geometry**:
+- [ ] Vector operations correct (cross product handedness, normalization)
+- [ ] Distance calculations account for geometry type (Euclidean, geodesic)
+- [ ] Intersection logic handles all cases (parallel, coincident, skew)
+- [ ] Bounding box usage correct (tight vs loose, world vs local)
+- [ ] Tolerance-based comparisons use appropriate tolerance source
+
+**Logic**:
+- [ ] All branches reachable and correct
+- [ ] Loop termination guaranteed (no infinite loops)
+- [ ] Recursion has proper base case
+- [ ] Early returns don't skip necessary cleanup
+- [ ] Error conditions detected and propagated correctly
+
+**Edge Cases**:
+- [ ] Empty collections handled
+- [ ] Null/invalid inputs handled
+- [ ] Degenerate geometry (zero-length, coincident points) handled
+- [ ] Extreme values (very large/small) handled
+- [ ] Boundary conditions (first/last element, single element) correct
+
+---
+
+## Magic Number Resolution Priority (Strict)
+
+When encountering numeric literal in code:
+
+**Priority 1**: Check if RhinoMath or Rhino SDK provides constant
+- `RhinoMath.SqrtTwo`, `RhinoMath.TwoPi`, `RhinoMath.UnsetValue`, etc.
+- Rhino tolerance constants, unit conversion factors
+
+**Priority 2**: Check if belongs in existing `Config` metadata / FrozenDictionary table
+- Per-operation threshold, buffer size, iteration limit
+- Validation tolerance, convergence criterion
+- Algorithm mode/flag constant
+
+**Priority 3**: Introduce well-named constant in `Config.cs` (last resort)
+- Must be reusable across multiple operations
+- Must have clear semantic meaning
+- Must be wired into metadata dispatch
+
+**Acceptable**: Remain as literal only if:
+- Obviously local (loop bound derived from input length)
+- Self-explanatory mathematical constant in tight local scope (e.g., `/ 2.0` for midpoint)
+- Clearly justified by context
+
+---
+
+## Anti-Patterns to Avoid
+
+1. **SDK Reinvention**: Implementing geometry operations already in RhinoCommon
+2. **Magic Number Proliferation**: Unexplained literals instead of named metadata
+3. **Validation Duplication**: Manual checks instead of leveraging `V` flags
+4. **Config Sprawl**: Loose constants instead of unified metadata tables
+5. **Half-Baked Algorithms**: Leaving TODOs or stub branches
+6. **Formula Copy-Paste**: Recomputing same intermediate instead of variable reuse
+7. **Monolithic Branching**: Giant switch on primitive mode instead of algebraic dispatch
+8. **Tolerance Inconsistency**: Different ad-hoc tolerances across similar operations
+9. **Unit Confusion**: Mixing radians/degrees without clear conversion
+10. **Boundary Neglect**: Not handling empty collections, single elements, edge cases
+
+---
+
+## RhinoMath Quick Reference
+
+**Constants** (use these, not hand-rolled):
+- `RhinoMath.SqrtTwo`, `RhinoMath.SqrtThree`
+- `RhinoMath.TwoPi`, `RhinoMath.Pi` (note: not just `Pi`, also `TwoPi`)
+- `RhinoMath.UnsetValue`, `RhinoMath.UnsetIntIndex`
+- `RhinoMath.ZeroTolerance`, `RhinoMath.SqrtEpsilon`
+
+**Functions** (prefer over System.Math when equivalent):
+- Angle/trig operations with appropriate units
+- Clamping, interpolation utilities
+- Comparison with tolerance
+
+**Collections** (prefer Rhino-specific):
+- `Point3dList` over `List<Point3d>`
+- `RTree` for spatial indexing
+- Rhino-native collections for geometry workflows
+
+**Consult**: `/libs/rhino/rhino_math_class.md` and `/libs/rhino/rhino_math_reference.md` for complete mappings.
