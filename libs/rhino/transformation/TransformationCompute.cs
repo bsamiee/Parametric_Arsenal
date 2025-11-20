@@ -1,17 +1,17 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
-using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Morphs;
 
 namespace Arsenal.Rhino.Transformation;
 
-/// <summary>SpaceMorph deformation operations and curve-based array transformations.</summary>
+/// <summary>SpaceMorph deformation operations and transform generation.</summary>
 internal static class TransformationCompute {
     /// <summary>Flow geometry along base curve to target curve.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -32,7 +32,9 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidFlowCurves.WithContext($"Base: {baseCurve.IsValid}, Target: {targetCurve.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidFlowCurves.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Base: {baseCurve.IsValid}, Target: {targetCurve.IsValid}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Twist geometry around axis by angle.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -53,7 +55,9 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext($"Axis: {axis.IsValid}, Angle: {angleRadians.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTwistParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Axis: {axis.IsValid}, Angle: {angleRadians:F6}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Bend geometry along spine.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,7 +80,9 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext($"Spine: {spine.IsValid}, Angle: {angle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidBendParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Spine: {spine.IsValid}, Angle: {angle:F6}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Taper geometry along axis from start width to end width.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -103,7 +109,9 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext($"Axis: {axis.IsValid}, Start: {startWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {endWidth.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTaperParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Axis: {axis.IsValid}, Start: {startWidth:F6}, End: {endWidth:F6}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Stretch geometry along axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -116,13 +124,15 @@ internal static class TransformationCompute {
                 morph: new StretchSpaceMorph(
                     start: axis.From,
                     end: axis.To,
-                    length: axis.Length * 2.0) {
+                    point: axis.PointAt(0.5)) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, TransformationConfig.DefaultMorphTolerance),
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidStretchParameters.WithContext($"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidStretchParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Axis: {axis.IsValid}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Splop geometry from base plane to target surface point.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -145,7 +155,9 @@ internal static class TransformationCompute {
                     },
                     geometry: geometry)
                 : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext("Surface closest point failed"))
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext($"Plane: {basePlane.IsValid}, Surface: {targetSurface.IsValid}, Point: {targetPoint.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSplopParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Plane: {basePlane.IsValid}, Surface: {targetSurface.IsValid}, Point: {targetPoint.IsValid}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Sporph geometry from source surface to target surface.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -165,7 +177,9 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSporphParameters.WithContext($"Source: {sourceSurface.IsValid}, Target: {targetSurface.IsValid}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidSporphParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Source: {sourceSurface.IsValid}, Target: {targetSurface.IsValid}, Geometry: {geometry.IsValid}")));
 
     /// <summary>Maelstrom vortex deformation around axis.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -188,30 +202,121 @@ internal static class TransformationCompute {
                     QuickPreview = false,
                 },
                 geometry: geometry)
-            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext($"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Geometry: {geometry.IsValid}"));
+            : ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMaelstromParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Center: {center.IsValid}, Axis: {axis.IsValid}, Radius: {radius:F6}, Geometry: {geometry.IsValid}")));
 
-    /// <summary>Array geometry along path curve with optional orientation.</summary>
+    /// <summary>Generate rectangular grid array transforms.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> PathArray<T>(
-        T geometry,
+    internal static Result<IReadOnlyList<Transform>> BuildRectangularTransforms(
+        int xCount,
+        int yCount,
+        int zCount,
+        double xSpacing,
+        double ySpacing,
+        double zSpacing,
+        double tolerance) {
+        int totalCount = xCount * yCount * zCount;
+        if (xCount <= 0 || yCount <= 0 || zCount <= 0
+            || totalCount > TransformationConfig.MaxArrayCount
+            || Math.Abs(xSpacing) <= tolerance
+            || Math.Abs(ySpacing) <= tolerance
+            || (zCount > 1 && Math.Abs(zSpacing) <= tolerance)) {
+            return ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}")));
+        }
+
+        Transform[] transforms = new Transform[totalCount];
+        int index = 0;
+
+        for (int i = 0; i < xCount; i++) {
+            double dx = i * xSpacing;
+            for (int j = 0; j < yCount; j++) {
+                double dy = j * ySpacing;
+                for (int k = 0; k < zCount; k++) {
+                    double dz = k * zSpacing;
+                    transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: dz);
+                }
+            }
+        }
+
+        return ResultFactory.Create<IReadOnlyList<Transform>>(value: transforms);
+    }
+
+    /// <summary>Generate polar array transforms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Transform>> BuildPolarTransforms(
+        Point3d center,
+        Vector3d axis,
+        int count,
+        double totalAngle,
+        double tolerance) {
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount
+            || axis.Length <= tolerance
+            || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
+            return ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Count: {count}, Axis: {axis.Length:F6}, Angle: {totalAngle:F6}")));
+        }
+
+        Transform[] transforms = new Transform[count];
+        double angleStep = totalAngle / count;
+
+        for (int i = 0; i < count; i++) {
+            transforms[i] = Transform.Rotation(
+                angleRadians: angleStep * i,
+                rotationAxis: axis,
+                rotationCenter: center);
+        }
+
+        return ResultFactory.Create<IReadOnlyList<Transform>>(value: transforms);
+    }
+
+    /// <summary>Generate linear array transforms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Transform>> BuildLinearTransforms(
+        Vector3d direction,
+        int count,
+        double spacing,
+        double tolerance) {
+        double dirLength = direction.Length;
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount
+            || dirLength <= tolerance
+            || Math.Abs(spacing) <= tolerance) {
+            return ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Count: {count}, Direction: {dirLength:F6}, Spacing: {spacing:F6}")));
+        }
+
+        Transform[] transforms = new Transform[count];
+        Vector3d step = (direction / dirLength) * spacing;
+
+        for (int i = 0; i < count; i++) {
+            transforms[i] = Transform.Translation(step * i);
+        }
+
+        return ResultFactory.Create<IReadOnlyList<Transform>>(value: transforms);
+    }
+
+    /// <summary>Generate path array transforms with optional orientation.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Transform>> BuildPathTransforms(
         Curve path,
         int count,
         bool orientToPath,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true || !geometry.IsValid) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Path: {path?.IsValid ?? false}, Geometry: {geometry.IsValid}")));
+        double tolerance) {
+        if (count <= 0 || count > TransformationConfig.MaxArrayCount || path?.IsValid != true) {
+            return ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Count: {count}, Path: {path?.IsValid ?? false}")));
         }
 
         double curveLength = path.GetLength();
-        if (curveLength <= context.AbsoluteTolerance) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, PathLength: {curveLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
+        if (curveLength <= tolerance) {
+            return ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Count: {count}, PathLength: {curveLength:F6}")));
         }
 
         double[] parameters = count == 1
@@ -237,17 +342,7 @@ internal static class TransformationCompute {
                 : Transform.Translation(pt - Point3d.Origin);
         }
 
-        return UnifiedOperation.Apply(
-            input: transforms,
-            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                TransformationCore.ApplyTransform(item: geometry, transform: xform)),
-            config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                Context = context,
-                ValidationMode = V.None,
-                AccumulateErrors = false,
-                OperationName = "Transformation.PathArray",
-                EnableDiagnostics = enableDiagnostics,
-            });
+        return ResultFactory.Create<IReadOnlyList<Transform>>(value: transforms);
     }
 
     /// <summary>Apply SpaceMorph to geometry with duplication.</summary>
@@ -257,13 +352,17 @@ internal static class TransformationCompute {
         T geometry) where TMorph : SpaceMorph where T : GeometryBase {
         using (morph as IDisposable) {
             if (!SpaceMorph.IsMorphable(geometry)) {
-                return ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext($"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}"));
+                return ResultFactory.Create<T>(error: E.Geometry.Transformation.GeometryNotMorphable.WithContext(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Geometry: {typeof(T).Name}, Morph: {typeof(TMorph).Name}")));
             }
 
             T duplicate = (T)geometry.Duplicate();
             return morph.Morph(duplicate)
                 ? ResultFactory.Create(value: duplicate)
-                : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
+                : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Morph type: {typeof(TMorph).Name}")));
         }
     }
 }

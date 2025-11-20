@@ -1,63 +1,269 @@
-using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
-using Rhino;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Transformation;
 
-/// <summary>Transform matrix construction, validation, and application.</summary>
+/// <summary>Orchestration layer for transformation operations via UnifiedOperation.</summary>
 internal static class TransformationCore {
-    private static readonly FrozenDictionary<byte, (Func<Transformation.TransformSpec, IGeometryContext, (bool Valid, string Context)> Validate, Func<Transformation.TransformSpec, Transform> Build, SystemError Error)> _builders =
-        new Dictionary<byte, (Func<Transformation.TransformSpec, IGeometryContext, (bool, string)>, Func<Transformation.TransformSpec, Transform>, SystemError)> {
-            [1] = ((s, c) => (s.Matrix is Transform m && m.IsValid && Math.Abs(m.Determinant) > c.AbsoluteTolerance, $"Valid: {s.Matrix?.IsValid ?? false}, Det: {(s.Matrix?.Determinant ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => s.Matrix!.Value, E.Geometry.Transformation.InvalidTransformMatrix),
-            [2] = ((s, _) => (s.UniformScale is (Point3d anchor, double f) && f is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor, $"Factor: {(s.UniformScale?.Factor ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => Transform.Scale(s.UniformScale!.Value.Anchor, s.UniformScale.Value.Factor), E.Geometry.Transformation.InvalidScaleFactor),
-            [3] = ((s, _) => (s.NonUniformScale is (Plane p, double x, double y, double z) && p.IsValid && x is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor && y is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor && z is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor, $"Plane: {s.NonUniformScale?.Plane.IsValid ?? false}, X: {(s.NonUniformScale?.X ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Y: {(s.NonUniformScale?.Y ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Z: {(s.NonUniformScale?.Z ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => Transform.Scale(s.NonUniformScale!.Value.Plane, s.NonUniformScale.Value.X, s.NonUniformScale.Value.Y, s.NonUniformScale.Value.Z), E.Geometry.Transformation.InvalidScaleFactor),
-            [4] = ((s, c) => (s.Rotation is (double angle, Vector3d a, Point3d center) && a.Length > c.AbsoluteTolerance, $"Axis: {(s.Rotation?.Axis.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => s.Rotation is { } rot
-                    ? Transform.Rotation(rot.Angle, rot.Axis, rot.Center)
-                    : Transform.Identity, E.Geometry.Transformation.InvalidRotationAxis),
-            [5] = ((s, c) => (s.RotationVectors is (Vector3d st, Vector3d en, Point3d center) && st.Length > c.AbsoluteTolerance && en.Length > c.AbsoluteTolerance, $"Start: {(s.RotationVectors?.Start.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, End: {(s.RotationVectors?.End.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => Transform.Rotation(s.RotationVectors!.Value.Start, s.RotationVectors.Value.End, s.RotationVectors.Value.Center), E.Geometry.Transformation.InvalidRotationAxis),
-            [6] = ((s, _) => (s.MirrorPlane is Plane p && p.IsValid, string.Empty),
-                s => Transform.Mirror(s.MirrorPlane!.Value), E.Geometry.Transformation.InvalidMirrorPlane),
-            [7] = ((s, _) => (s.Translation is Vector3d, string.Empty),
-                s => Transform.Translation(s.Translation!.Value), E.Geometry.Transformation.InvalidTransformSpec),
-            [8] = ((s, c) => (s.Shear is (Plane p, Vector3d d, double angle) && p.IsValid && d.Length > c.AbsoluteTolerance && p.ZAxis.IsParallelTo(d, c.AngleToleranceRadians * TransformationConfig.AngleToleranceMultiplier) == 0, $"Plane: {s.Shear?.Plane.IsValid ?? false}, Dir: {(s.Shear?.Direction.Length ?? 0).ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"),
-                s => Transform.Shear(s.Shear!.Value.Plane, s.Shear.Value.Direction * Math.Tan(s.Shear.Value.Angle), Vector3d.Zero, Vector3d.Zero), E.Geometry.Transformation.InvalidShearParameters),
-            [9] = ((s, _) => (s.ProjectionPlane is Plane p && p.IsValid, string.Empty),
-                s => Transform.PlanarProjection(s.ProjectionPlane!.Value), E.Geometry.Transformation.InvalidProjectionPlane),
-            [10] = ((s, _) => (s.ChangeBasis is (Plane f, Plane t) && f.IsValid && t.IsValid, $"From: {s.ChangeBasis?.From.IsValid ?? false}, To: {s.ChangeBasis?.To.IsValid ?? false}"),
-                s => Transform.ChangeBasis(s.ChangeBasis!.Value.From, s.ChangeBasis.Value.To), E.Geometry.Transformation.InvalidBasisPlanes),
-            [11] = ((s, _) => (s.PlaneToPlane is (Plane f, Plane t) && f.IsValid && t.IsValid, $"From: {s.PlaneToPlane?.From.IsValid ?? false}, To: {s.PlaneToPlane?.To.IsValid ?? false}"),
-                s => Transform.PlaneToPlane(s.PlaneToPlane!.Value.From, s.PlaneToPlane.Value.To), E.Geometry.Transformation.InvalidBasisPlanes),
-        }.ToFrozenDictionary();
-
-    /// <summary>Build transform matrix from specification.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Transform> BuildTransform(
-        Transformation.TransformSpec spec,
-        IGeometryContext context) {
-        byte mode = spec switch { { Matrix: not null } => 1, { UniformScale: not null } => 2, { NonUniformScale: not null } => 3, { Rotation: not null } => 4, { RotationVectors: not null } => 5, { MirrorPlane: not null } => 6, { Translation: not null } => 7, { Shear: not null } => 8, { ProjectionPlane: not null } => 9, { ChangeBasis: not null } => 10, { PlaneToPlane: not null } => 11,
-            _ => 0,
-        };
-        return mode is > 0 && _builders.TryGetValue(mode, out (Func<Transformation.TransformSpec, IGeometryContext, (bool Valid, string Context)> validate, Func<Transformation.TransformSpec, Transform> build, SystemError error) entry)
-            ? entry.validate(spec, context) switch {
-                (true, _) => ResultFactory.Create(value: entry.build(spec)),
-                (false, string ctx) => ResultFactory.Create<Transform>(error: entry.error.WithContext(ctx)),
-            }
-            : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec);
-    }
+    internal static Result<T> ExecuteTransform<T>(
+        T geometry,
+        Transformation.TransformRequest request,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        !TransformationConfig.Transformations.TryGetValue(request.GetType(), out TransformationConfig.TransformMetadata? meta)
+            ? ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidTransformSpec)
+            : BuildTransform(request: request, context: context, meta: meta)
+                .Bind(xform => UnifiedOperation.Apply(
+                    input: geometry,
+                    operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                        ApplyTransform(item: item, transform: xform)),
+                    config: new OperationConfig<T, T> {
+                        Context = context,
+                        ValidationMode = meta.ValidationMode | TransformationConfig.GetGeometryValidation(typeof(T)),
+                        OperationName = meta.OperationName,
+                        EnableDiagnostics = enableDiagnostics,
+                    }))
+                .Map(static r => r[0]);
 
-    /// <summary>Apply transform to geometry with Extrusion conversion.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<T>> ExecuteArray<T>(
+        T geometry,
+        Transformation.ArrayRequest request,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        !TransformationConfig.Arrays.TryGetValue(request.GetType(), out TransformationConfig.ArrayMetadata? meta)
+            ? ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.InvalidArrayMode)
+            : BuildArrayTransforms(request: request, context: context)
+                .Bind(transforms => ApplyArrayTransforms(
+                    geometry: geometry,
+                    transforms: transforms,
+                    meta: meta,
+                    context: context,
+                    enableDiagnostics: enableDiagnostics));
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<T> ExecuteMorph<T>(
+        T geometry,
+        Transformation.MorphRequest request,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        !TransformationConfig.Morphs.TryGetValue(request.GetType(), out TransformationConfig.MorphMetadata? meta)
+            ? ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMorphOperation)
+            : UnifiedOperation.Apply(
+                input: geometry,
+                operation: (Func<T, Result<IReadOnlyList<T>>>)(item =>
+                    ExecuteMorphInternal(item: item, request: request, context: context)
+                        .Map(result => (IReadOnlyList<T>)[result,])),
+                config: new OperationConfig<T, T> {
+                    Context = context,
+                    ValidationMode = meta.ValidationMode | TransformationConfig.GetGeometryValidation(typeof(T)),
+                    OperationName = meta.OperationName,
+                    EnableDiagnostics = enableDiagnostics,
+                })
+                .Map(static r => r[0]);
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Transform> BuildTransform(
+        Transformation.TransformRequest request,
+        IGeometryContext context,
+        TransformationConfig.TransformMetadata meta) =>
+        request switch {
+            Transformation.MatrixTransform matrix =>
+                matrix.Matrix.IsValid && Math.Abs(matrix.Matrix.Determinant) > context.AbsoluteTolerance
+                    ? ResultFactory.Create(value: matrix.Matrix)
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Valid: {matrix.Matrix.IsValid}, Det: {matrix.Matrix.Determinant:F6}"))),
+            Transformation.UniformScaleTransform uniform =>
+                uniform.Factor is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor
+                    ? ResultFactory.Create(value: Transform.Scale(uniform.Anchor, uniform.Factor))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Factor: {uniform.Factor:F6}"))),
+            Transformation.NonUniformScaleTransform nonUniform =>
+                nonUniform.Plane.IsValid
+                && nonUniform.XScale is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor
+                && nonUniform.YScale is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor
+                && nonUniform.ZScale is >= TransformationConfig.MinScaleFactor and <= TransformationConfig.MaxScaleFactor
+                    ? ResultFactory.Create(value: Transform.Scale(
+                        plane: nonUniform.Plane,
+                        xScale: nonUniform.XScale,
+                        yScale: nonUniform.YScale,
+                        zScale: nonUniform.ZScale))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Plane: {nonUniform.Plane.IsValid}, X: {nonUniform.XScale:F6}, Y: {nonUniform.YScale:F6}, Z: {nonUniform.ZScale:F6}"))),
+            Transformation.AxisRotationTransform rotation =>
+                rotation.Axis.Length > context.AbsoluteTolerance
+                    ? ResultFactory.Create(value: Transform.Rotation(
+                        angleRadians: rotation.AngleRadians,
+                        rotationAxis: rotation.Axis,
+                        rotationCenter: rotation.Center))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Axis: {rotation.Axis.Length:F6}"))),
+            Transformation.DirectionRotationTransform vectors =>
+                vectors.Start.Length > context.AbsoluteTolerance && vectors.End.Length > context.AbsoluteTolerance
+                    ? ResultFactory.Create(value: Transform.Rotation(
+                        startDirection: vectors.Start,
+                        endDirection: vectors.End,
+                        rotationCenter: vectors.Center))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Start: {vectors.Start.Length:F6}, End: {vectors.End.Length:F6}"))),
+            Transformation.MirrorTransform mirror =>
+                mirror.Plane.IsValid
+                    ? ResultFactory.Create(value: Transform.Mirror(mirror.Plane))
+                    : ResultFactory.Create<Transform>(error: meta.Error),
+            Transformation.TranslationTransform translation =>
+                ResultFactory.Create(value: Transform.Translation(translation.Motion)),
+            Transformation.ShearTransform shear =>
+                shear.Plane.IsValid
+                && shear.Direction.Length > context.AbsoluteTolerance
+                && shear.Plane.ZAxis.IsParallelTo(
+                    other: shear.Direction,
+                    angleTolerance: context.AngleToleranceRadians * TransformationConfig.AngleToleranceMultiplier) == 0
+                    ? ResultFactory.Create(value: Transform.Shear(
+                        plane: shear.Plane,
+                        xShear: shear.Direction * Math.Tan(shear.AngleRadians),
+                        yShear: Vector3d.Zero,
+                        zShear: Vector3d.Zero))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"Plane: {shear.Plane.IsValid}, Dir: {shear.Direction.Length:F6}"))),
+            Transformation.ProjectionTransform projection =>
+                projection.Plane.IsValid
+                    ? ResultFactory.Create(value: Transform.PlanarProjection(projection.Plane))
+                    : ResultFactory.Create<Transform>(error: meta.Error),
+            Transformation.ChangeBasisTransform basis =>
+                basis.From.IsValid && basis.To.IsValid
+                    ? ResultFactory.Create(value: Transform.ChangeBasis(basis.From, basis.To))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"From: {basis.From.IsValid}, To: {basis.To.IsValid}"))),
+            Transformation.PlaneToPlaneTransform planeToPlane =>
+                planeToPlane.From.IsValid && planeToPlane.To.IsValid
+                    ? ResultFactory.Create(value: Transform.PlaneToPlane(planeToPlane.From, planeToPlane.To))
+                    : ResultFactory.Create<Transform>(error: meta.Error.WithContext(string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"From: {planeToPlane.From.IsValid}, To: {planeToPlane.To.IsValid}"))),
+            _ => ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<T>> ApplyArrayTransforms<T>(
+        T geometry,
+        IReadOnlyList<Transform> transforms,
+        TransformationConfig.ArrayMetadata meta,
+        IGeometryContext context,
+        bool enableDiagnostics) where T : GeometryBase =>
+        UnifiedOperation.Apply(
+            input: transforms,
+            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
+                ApplyTransform(item: geometry, transform: xform)),
+            config: new OperationConfig<IReadOnlyList<Transform>, T> {
+                Context = context,
+                ValidationMode = meta.ValidationMode,
+                AccumulateErrors = false,
+                OperationName = meta.OperationName,
+                EnableDiagnostics = enableDiagnostics,
+            });
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<IReadOnlyList<Transform>> BuildArrayTransforms(
+        Transformation.ArrayRequest request,
+        IGeometryContext context) =>
+        request switch {
+            Transformation.RectangularArray rectangular => TransformationCompute.BuildRectangularTransforms(
+                xCount: rectangular.XCount,
+                yCount: rectangular.YCount,
+                zCount: rectangular.ZCount,
+                xSpacing: rectangular.XSpacing,
+                ySpacing: rectangular.YSpacing,
+                zSpacing: rectangular.ZSpacing,
+                tolerance: context.AbsoluteTolerance),
+            Transformation.PolarArray polar => TransformationCompute.BuildPolarTransforms(
+                center: polar.Center,
+                axis: polar.Axis,
+                count: polar.Count,
+                totalAngle: polar.TotalAngle,
+                tolerance: context.AbsoluteTolerance),
+            Transformation.LinearArray linear => TransformationCompute.BuildLinearTransforms(
+                direction: linear.Direction,
+                count: linear.Count,
+                spacing: linear.Spacing,
+                tolerance: context.AbsoluteTolerance),
+            Transformation.PathArray path => TransformationCompute.BuildPathTransforms(
+                path: path.Path,
+                count: path.Count,
+                orientToPath: path.OrientToPath,
+                tolerance: context.AbsoluteTolerance),
+            _ => ResultFactory.Create<IReadOnlyList<Transform>>(error: E.Geometry.Transformation.InvalidArrayMode),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<T> ExecuteMorphInternal<T>(
+        T item,
+        Transformation.MorphRequest request,
+        IGeometryContext context) where T : GeometryBase =>
+        request switch {
+            Transformation.FlowMorph flow => TransformationCompute.Flow(
+                geometry: item,
+                baseCurve: flow.BaseCurve,
+                targetCurve: flow.TargetCurve,
+                preserveStructure: flow.PreserveStructure,
+                context: context),
+            Transformation.TwistMorph twist => TransformationCompute.Twist(
+                geometry: item,
+                axis: twist.Axis,
+                angleRadians: twist.AngleRadians,
+                infinite: twist.Infinite,
+                context: context),
+            Transformation.BendMorph bend => TransformationCompute.Bend(
+                geometry: item,
+                spine: bend.Spine,
+                angle: bend.AngleRadians,
+                context: context),
+            Transformation.TaperMorph taper => TransformationCompute.Taper(
+                geometry: item,
+                axis: taper.Axis,
+                startWidth: taper.StartWidth,
+                endWidth: taper.EndWidth,
+                context: context),
+            Transformation.StretchMorph stretch => TransformationCompute.Stretch(
+                geometry: item,
+                axis: stretch.Axis,
+                context: context),
+            Transformation.SplopMorph splop => TransformationCompute.Splop(
+                geometry: item,
+                basePlane: splop.BasePlane,
+                targetSurface: splop.TargetSurface,
+                targetPoint: splop.TargetPoint,
+                context: context),
+            Transformation.SporphMorph sporph => TransformationCompute.Sporph(
+                geometry: item,
+                sourceSurface: sporph.SourceSurface,
+                targetSurface: sporph.TargetSurface,
+                preserveStructure: sporph.PreserveStructure,
+                context: context),
+            Transformation.MaelstromMorph maelstrom => TransformationCompute.Maelstrom(
+                geometry: item,
+                center: maelstrom.Center,
+                axis: maelstrom.Axis,
+                radius: maelstrom.Radius,
+                angle: maelstrom.AngleRadians,
+                context: context),
+            _ => ResultFactory.Create<T>(error: E.Geometry.Transformation.InvalidMorphOperation),
+        };
+
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
@@ -74,137 +280,5 @@ internal static class TransformationCore {
         (!result.IsSuccess ? duplicate : null)?.Dispose();
 
         return result;
-    }
-
-    /// <summary>Generate rectangular grid array transforms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> RectangularArray<T>(
-        T geometry,
-        int xCount,
-        int yCount,
-        int zCount,
-        double xSpacing,
-        double ySpacing,
-        double zSpacing,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : GeometryBase {
-        int totalCount = xCount * yCount * zCount;
-        if (xCount <= 0 || yCount <= 0 || zCount <= 0
-            || totalCount > TransformationConfig.MaxArrayCount
-            || Math.Abs(xSpacing) <= context.AbsoluteTolerance
-            || Math.Abs(ySpacing) <= context.AbsoluteTolerance
-            || (zCount > 1 && Math.Abs(zSpacing) <= context.AbsoluteTolerance)) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"XCount: {xCount}, YCount: {yCount}, ZCount: {zCount}, Total: {totalCount}")));
-        }
-
-        Transform[] transforms = new Transform[totalCount];
-        int index = 0;
-
-        for (int i = 0; i < xCount; i++) {
-            double dx = i * xSpacing;
-            for (int j = 0; j < yCount; j++) {
-                double dy = j * ySpacing;
-                for (int k = 0; k < zCount; k++) {
-                    double dz = k * zSpacing;
-                    transforms[index++] = Transform.Translation(dx: dx, dy: dy, dz: dz);
-                }
-            }
-        }
-
-        return UnifiedOperation.Apply(
-            input: transforms,
-            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                ApplyTransform(item: geometry, transform: xform)),
-            config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                Context = context,
-                ValidationMode = V.None,
-                AccumulateErrors = false,
-                OperationName = "Transformation.RectangularArray",
-                EnableDiagnostics = enableDiagnostics,
-            });
-    }
-
-    /// <summary>Generate polar array transforms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> PolarArray<T>(
-        T geometry,
-        Point3d center,
-        Vector3d axis,
-        int count,
-        double totalAngle,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : GeometryBase {
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount
-            || axis.Length <= context.AbsoluteTolerance
-            || totalAngle <= 0.0 || totalAngle > RhinoMath.TwoPI) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Axis: {axis.Length.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Angle: {totalAngle.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
-        }
-
-        Transform[] transforms = new Transform[count];
-        double angleStep = totalAngle / count;
-
-        for (int i = 0; i < count; i++) {
-            transforms[i] = Transform.Rotation(
-                angleRadians: angleStep * i,
-                rotationAxis: axis,
-                rotationCenter: center);
-        }
-
-        return UnifiedOperation.Apply(
-            input: transforms,
-            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                ApplyTransform(item: geometry, transform: xform)),
-            config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                Context = context,
-                ValidationMode = V.None,
-                AccumulateErrors = false,
-                OperationName = "Transformation.PolarArray",
-                EnableDiagnostics = enableDiagnostics,
-            });
-    }
-
-    /// <summary>Generate linear array transforms.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<IReadOnlyList<T>> LinearArray<T>(
-        T geometry,
-        Vector3d direction,
-        int count,
-        double spacing,
-        IGeometryContext context,
-        bool enableDiagnostics) where T : GeometryBase {
-        double dirLength = direction.Length;
-        if (count <= 0 || count > TransformationConfig.MaxArrayCount
-            || dirLength <= context.AbsoluteTolerance
-            || Math.Abs(spacing) <= context.AbsoluteTolerance) {
-            return ResultFactory.Create<IReadOnlyList<T>>(
-                error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $"Count: {count}, Direction: {dirLength.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, Spacing: {spacing.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}")));
-        }
-
-        Transform[] transforms = new Transform[count];
-        Vector3d step = (direction / dirLength) * spacing;
-
-        for (int i = 0; i < count; i++) {
-            transforms[i] = Transform.Translation(step * i);
-        }
-
-        return UnifiedOperation.Apply(
-            input: transforms,
-            operation: (Func<Transform, Result<IReadOnlyList<T>>>)(xform =>
-                ApplyTransform(item: geometry, transform: xform)),
-            config: new OperationConfig<IReadOnlyList<Transform>, T> {
-                Context = context,
-                ValidationMode = V.None,
-                AccumulateErrors = false,
-                OperationName = "Transformation.LinearArray",
-                EnableDiagnostics = enableDiagnostics,
-            });
     }
 }
