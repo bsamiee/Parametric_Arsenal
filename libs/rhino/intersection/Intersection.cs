@@ -52,7 +52,6 @@ public static class Intersection {
 
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
     /// <remarks>Consumers must dispose Curves collection elements as they implement IDisposable.</remarks>
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     [DebuggerDisplay("Points={Points.Count}, Curves={Curves.Count}")]
     public readonly record struct IntersectionOutput(
         IReadOnlyList<Point3d> Points,
@@ -93,7 +92,7 @@ public static class Intersection {
         IntersectionCore.ExecuteRequest(request: request, context: context);
 
     /// <summary>Classifies intersection type (tangent/transverse/unknown) via approach angle analysis.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     public static Result<ClassificationResult> Classify(
         IntersectionOutput output,
         GeometryBase geometryA,
@@ -106,7 +105,7 @@ public static class Intersection {
             context: context);
 
     /// <summary>Finds near-miss locations within tolerance band via closest point sampling.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     public static Result<NearMissResult> FindNearMisses(
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -119,7 +118,7 @@ public static class Intersection {
             context: context);
 
     /// <summary>Analyzes intersection stability via spherical perturbation sampling.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     public static Result<StabilityResult> AnalyzeStability(
         IntersectionOutput baseIntersection,
         GeometryBase geometryA,
