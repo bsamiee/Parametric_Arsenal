@@ -128,31 +128,29 @@ internal static class OrientationConfig {
                 : ResultFactory.Create(value: new Plane(brep.GetBoundingBox(accurate: false).Center, normal));
     }
 
-    private static Result<Plane> ExtractExtrusionPlane(GeometryBase geometry) {
-        Extrusion extrusion = (Extrusion)geometry;
-        return extrusion.IsSolid
-            ? ((Func<Result<Plane>>)(() => {
-                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(extrusion);
-                using LineCurve? path = extrusion.PathLineCurve();
+    private static Result<Plane> ExtractExtrusionPlane(GeometryBase geometry) =>
+        ((Extrusion)geometry) switch {
+            Extrusion e when e.IsSolid => ((Func<Result<Plane>>)(() => {
+                using VolumeMassProperties? vmp = VolumeMassProperties.Compute(e);
+                using LineCurve? path = e.PathLineCurve();
                 return vmp is not null && path is not null
                     ? ResultFactory.Create(value: new Plane(vmp.Centroid, path.TangentAtStart))
                     : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-            }))()
-            : extrusion.IsClosed(0) && extrusion.IsClosed(1)
-                ? ((Func<Result<Plane>>)(() => {
-                    using AreaMassProperties? amp = AreaMassProperties.Compute(extrusion);
-                    using LineCurve? path = extrusion.PathLineCurve();
-                    return amp is not null && path is not null
-                        ? ResultFactory.Create(value: new Plane(amp.Centroid, path.TangentAtStart))
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-                }))()
-                : ((Func<Result<Plane>>)(() => {
-                    using LineCurve? path = extrusion.PathLineCurve();
-                    return path is not null
-                        ? ResultFactory.Create(value: new Plane(extrusion.GetBoundingBox(accurate: false).Center, path.TangentAtStart))
-                        : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
-                }))();
-    }
+            }))(),
+            Extrusion e when e.IsClosed(0) && e.IsClosed(1) => ((Func<Result<Plane>>)(() => {
+                using AreaMassProperties? amp = AreaMassProperties.Compute(e);
+                using LineCurve? path = e.PathLineCurve();
+                return amp is not null && path is not null
+                    ? ResultFactory.Create(value: new Plane(amp.Centroid, path.TangentAtStart))
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
+            Extrusion e => ((Func<Result<Plane>>)(() => {
+                using LineCurve? path = e.PathLineCurve();
+                return path is not null
+                    ? ResultFactory.Create(value: new Plane(e.GetBoundingBox(accurate: false).Center, path.TangentAtStart))
+                    : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed);
+            }))(),
+        };
 
     private static Result<Plane> ExtractMeshPlane(GeometryBase geometry) {
         Mesh mesh = (Mesh)geometry;

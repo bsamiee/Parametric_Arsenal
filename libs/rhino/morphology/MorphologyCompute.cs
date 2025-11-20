@@ -148,16 +148,17 @@ internal static class MorphologyCompute {
                     (int, int)[] edges = [(Math.Min(a, b), Math.Max(a, b)), (Math.Min(b, c), Math.Max(b, c)), (Math.Min(c, a), Math.Max(c, a)),];
                     int[] midIndices = new int[3];
                     for (int e = 0; e < 3; e++) {
-                        if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
-                            midIndices[e] = existingMidIdx;
-                        } else {
-                            Vector3d edgeSum = (originalVerts[edges[e].Item1] - Point3d.Origin) + (originalVerts[edges[e].Item2] - Point3d.Origin);
-                            Vector3d faceSum = (originalVerts[a] - Point3d.Origin) + (originalVerts[b] - Point3d.Origin) + (originalVerts[c] - Point3d.Origin);
-                            Vector3d oppositeSum = faceSum - edgeSum;
-                            Point3d midpoint = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * edgeSum) + (MorphologyConfig.LoopEdgeOppositeWeight * oppositeSum);
-                            midIndices[e] = subdivided.Vertices.Add(midpoint);
-                            edgeMidpoints[edges[e]] = midIndices[e];
-                        }
+                        midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
+                            ? existingMidIdx
+                            : ((Func<int>)(() => {
+                                (int v1, int v2) = edges[e];
+                                Vector3d edgeSum = (originalVerts[v1] - Point3d.Origin) + (originalVerts[v2] - Point3d.Origin);
+                                Vector3d faceSum = (originalVerts[a] - Point3d.Origin) + (originalVerts[b] - Point3d.Origin) + (originalVerts[c] - Point3d.Origin);
+                                Point3d midpoint = Point3d.Origin + (MorphologyConfig.LoopEdgeMidpointWeight * edgeSum) + (MorphologyConfig.LoopEdgeOppositeWeight * (faceSum - edgeSum));
+                                int idx = subdivided.Vertices.Add(midpoint);
+                                edgeMidpoints[edges[e]] = idx;
+                                return idx;
+                            }))();
                     }
                     _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
                     _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
@@ -189,42 +190,40 @@ internal static class MorphologyCompute {
                     (int, int)[] edges = [(Math.Min(a, b), Math.Max(a, b)), (Math.Min(b, c), Math.Max(b, c)), (Math.Min(c, a), Math.Max(c, a)),];
                     int[] midIndices = new int[3];
                     for (int e = 0; e < 3; e++) {
-                        if (edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)) {
-                            midIndices[e] = existingMidIdx;
-                        } else {
-                            (int v1, int v2) = (edges[e].Item1, edges[e].Item2);
-                            Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
-                            int t1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
-                            int t2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
-                            int[] v1Neighbors = t1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(t1) : [];
-                            int[] v2Neighbors = t2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(t2) : [];
-                            (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4 ? FindButterflyOpposites(mesh, v1, v2) : (-1, -1);
-
-                            Point3d midpoint = mid;
-                            if (opposite1 >= 0 && opposite2 >= 0) {
-                                Vector3d oppositeContrib = MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin));
-                                Vector3d wingContrib = Vector3d.Zero;
-                                int wingCount = 0;
-                                for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
-                                    int n = v1Neighbors[i];
-                                    if (n != default && n != v2 && n != opposite1 && n != opposite2) {
-                                        wingContrib -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin);
-                                        wingCount++;
-                                    }
-                                }
-                                for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
-                                    int n = v2Neighbors[i];
-                                    if (n != default && n != v1 && n != opposite1 && n != opposite2) {
-                                        wingContrib -= MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin);
-                                        wingCount++;
-                                    }
-                                }
-                                midpoint = Point3d.Origin + (mid - Point3d.Origin) + oppositeContrib + wingContrib;
-                            }
-
-                            midIndices[e] = subdivided.Vertices.Add(midpoint);
-                            edgeMidpoints[edges[e]] = midIndices[e];
-                        }
+                        midIndices[e] = edgeMidpoints.TryGetValue(edges[e], out int existingMidIdx)
+                            ? existingMidIdx
+                            : ((Func<int>)(() => {
+                                (int v1, int v2) = edges[e];
+                                Point3d mid = MorphologyConfig.ButterflyMidpointWeight * (originalVerts[v1] + originalVerts[v2]);
+                                int t1 = mesh.TopologyVertices.TopologyVertexIndex(v1);
+                                int t2 = mesh.TopologyVertices.TopologyVertexIndex(v2);
+                                int[] v1Neighbors = t1 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(t1) : [];
+                                int[] v2Neighbors = t2 >= 0 ? mesh.TopologyVertices.ConnectedTopologyVertices(t2) : [];
+                                (int opposite1, int opposite2) = v1Neighbors.Length >= 4 && v2Neighbors.Length >= 4 ? FindButterflyOpposites(mesh, v1, v2) : (-1, -1);
+                                Point3d midpoint = opposite1 < 0 || opposite2 < 0
+                                    ? mid
+                                    : ((Func<Point3d>)(() => {
+                                        Vector3d oppositeContrib = MorphologyConfig.ButterflyOppositeWeight * ((originalVerts[opposite1] - Point3d.Origin) + (originalVerts[opposite2] - Point3d.Origin));
+                                        Vector3d wingContrib = Vector3d.Zero;
+                                        int wingCount = 0;
+                                        for (int i = 0; i < v1Neighbors.Length && wingCount < 2; i++) {
+                                            int n = v1Neighbors[i];
+                                            (wingContrib, wingCount) = n != default && n != v2 && n != opposite1 && n != opposite2
+                                                ? (wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin)), wingCount + 1)
+                                                : (wingContrib, wingCount);
+                                        }
+                                        for (int i = 0; i < v2Neighbors.Length && wingCount < 4; i++) {
+                                            int n = v2Neighbors[i];
+                                            (wingContrib, wingCount) = n != default && n != v1 && n != opposite1 && n != opposite2
+                                                ? (wingContrib - (MorphologyConfig.ButterflyWingWeight * (originalVerts[mesh.TopologyVertices.MeshVertexIndices(n)[0]] - Point3d.Origin)), wingCount + 1)
+                                                : (wingContrib, wingCount);
+                                        }
+                                        return Point3d.Origin + (mid - Point3d.Origin) + oppositeContrib + wingContrib;
+                                    }))();
+                                int idx = subdivided.Vertices.Add(midpoint);
+                                edgeMidpoints[edges[e]] = idx;
+                                return idx;
+                            }))();
                     }
                     _ = subdivided.Faces.AddFace(a, midIndices[0], midIndices[2]);
                     _ = subdivided.Faces.AddFace(midIndices[0], b, midIndices[1]);
@@ -321,20 +320,15 @@ internal static class MorphologyCompute {
         double distance,
         bool bothSides,
         IGeometryContext __) =>
-        Math.Abs(distance) switch {
-            double abs when !RhinoMath.IsValidDouble(distance) || abs < MorphologyConfig.MinOffsetDistance =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}"))),
-            double abs when abs > MorphologyConfig.MaxOffsetDistance =>
-                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}"))),
-            _ => ((Func<Result<Mesh>>)(() => {
-                Mesh? offset = mesh.Offset(distance: distance, solidify: bothSides);
-                return offset?.IsValid is true
+        !RhinoMath.IsValidDouble(distance) || Math.Abs(distance) < MorphologyConfig.MinOffsetDistance
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Distance: {distance:F6}")))
+            : Math.Abs(distance) > MorphologyConfig.MaxOffsetDistance
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.OffsetDistanceInvalid.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Max: {MorphologyConfig.MaxOffsetDistance}")))
+                : mesh.Offset(distance: distance, solidify: bothSides) is { IsValid: true } offset
                     ? ResultFactory.Create(value: offset)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext(offset is null ? "Offset operation returned null" : "Generated offset mesh is invalid"));
-            }))(),
-        };
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext("Offset operation returned null or invalid mesh"));
 
     [Pure]
     internal static Result<Mesh> ReduceMesh(
@@ -466,30 +460,24 @@ internal static class MorphologyCompute {
         }))();
 
     [Pure]
-    internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) {
-        (double[] _, double[] aspectRatios, double[] minAngles) = MorphologyCore.ComputeMeshMetrics(mesh, context);
-        int aspectCount = aspectRatios.Length;
-        int angleCount = minAngles.Length;
-        if (aspectCount == 0 || angleCount == 0) {
-            return ResultFactory.Create(value: mesh);
-        }
-
-        (double maxAspect, double minAngle) = (aspectRatios.Max(), minAngles.Min());
-        return maxAspect > MorphologyConfig.AspectRatioThreshold
-            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {maxAspect:F2}")))
-            : minAngle < MorphologyConfig.MinAngleRadiansThreshold
-                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
-                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngle):F1}°")))
-                : ResultFactory.Create(value: mesh);
-    }
+    internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
+        MorphologyCore.ComputeMeshMetrics(mesh, context) switch {
+            (_, [], _) or (_, _, []) => ResultFactory.Create(value: mesh),
+            (_, double[] aspectRatios, double[] minAngles) when aspectRatios.Max() > MorphologyConfig.AspectRatioThreshold =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MaxAspect: {aspectRatios.Max():F2}"))),
+            (_, _, double[] minAngles) when minAngles.Min() < MorphologyConfig.MinAngleRadiansThreshold =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshQualityDegraded.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"MinAngle: {RhinoMath.ToDegrees(minAngles.Min()):F1}°"))),
+            _ => ResultFactory.Create(value: mesh),
+        };
 
     [Pure]
     internal static Result<Mesh> RepairMesh(
         Mesh mesh,
         byte flags,
         double weldTolerance,
-        IGeometryContext _) =>
+        IGeometryContext __) =>
         (weldTolerance, mesh.DuplicateMesh()) switch {
             ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.WeldToleranceInvalid.WithContext(
@@ -497,7 +485,6 @@ internal static class MorphologyCompute {
             (_, null) or (_, { IsValid: false }) =>
                 ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Mesh duplication failed")),
             (double tol, Mesh repaired) => ((Func<Result<Mesh>>)(() => {
-                List<MorphologyConfig.MorphologyOperationMetadata?> repairMetasList = [];
                 byte[] repairFlags = [
                     MorphologyConfig.RepairFillHoles,
                     MorphologyConfig.RepairUnifyNormals,
@@ -507,17 +494,7 @@ internal static class MorphologyCompute {
                 ];
                 for (int i = 0; i < repairFlags.Length; i++) {
                     byte flag = repairFlags[i];
-                    MorphologyConfig.MorphologyOperationMetadata? meta =
-                        (flags & flag) != 0
-                            ? MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)
-                            : null;
-                    if (meta is not null) {
-                        repairMetasList.Add(meta);
-                    }
-                }
-                MorphologyConfig.MorphologyOperationMetadata?[] repairMetas = [.. repairMetasList];
-                for (int i = 0; i < repairMetas.Length; i++) {
-                    bool applied = repairMetas[i]?.RepairAction?.Invoke(repaired, tol) ?? false;
+                    _ = (flags & flag) != 0 && (MorphologyConfig.RepairFlagToMetadata.GetValueOrDefault(flag)?.RepairAction?.Invoke(repaired, tol) ?? false);
                 }
                 return repaired.Normals.ComputeNormals()
                     ? ResultFactory.Create(value: repaired)
@@ -527,34 +504,29 @@ internal static class MorphologyCompute {
 
     [Pure]
     internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
-        mesh switch { { DisjointMeshCount: <= 0 } => ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid")),
-            Mesh m => ((Func<Result<Mesh[]>>)(() => {
-                Mesh[] components = m.SplitDisjointPieces();
-                return (components is not { Length: > 0 })
-                    ? ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed"))
-                    : ResultFactory.Create(value: components);
-            }))(),
-        };
+        mesh.DisjointMeshCount <= 0
+            ? ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid"))
+            : mesh.SplitDisjointPieces() is { Length: > 0 } components
+                ? ResultFactory.Create(value: components)
+                : ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed"));
 
     [Pure]
     internal static Result<Mesh> WeldMeshVertices(
         Mesh mesh,
         double tolerance,
         bool weldNormals,
-        IGeometryContext _) =>
-        (tolerance < MorphologyConfig.MinWeldTolerance || tolerance > MorphologyConfig.MaxWeldTolerance) switch {
-            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {tolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
-            false => ((Func<Result<Mesh>>)(() => {
-                Mesh welded = mesh.DuplicateMesh();
-                return !welded.IsValid
-                    ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed"))
-                    : ((Func<Result<Mesh>>)(() => {
-                        bool combined = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
-                        return weldNormals && !welded.Normals.ComputeNormals()
-                            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed"))
-                            : ResultFactory.Create(value: welded);
-                    }))();
+        IGeometryContext __) =>
+        (tolerance, mesh.DuplicateMesh()) switch {
+            ( < MorphologyConfig.MinWeldTolerance, _) or ( > MorphologyConfig.MaxWeldTolerance, _) =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Tolerance: {tolerance:E2}, Range: [{MorphologyConfig.MinWeldTolerance:E2}, {MorphologyConfig.MaxWeldTolerance:E2}]"))),
+            (_, null) or (_, { IsValid: false }) =>
+                ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Mesh duplication failed")),
+            (double tol, Mesh welded) => ((Func<Result<Mesh>>)(() => {
+                _ = welded.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                return !weldNormals || welded.Normals.ComputeNormals()
+                    ? ResultFactory.Create(value: welded)
+                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshWeldFailed.WithContext("Normal recomputation failed"));
             }))(),
         };
 
@@ -566,29 +538,25 @@ internal static class MorphologyCompute {
         IGeometryContext __) =>
         meshParams is null
             ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshingParametersInvalid.WithContext("Parameters cannot be null"))
-            : ((Func<Result<Mesh>>)(() => {
-                Mesh[]? meshes = Mesh.CreateFromBrep(brep: brep, meshingParameters: meshParams);
-                return (meshes is null || meshes.Length == 0) switch {
-                    true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext(
-                        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Brep face count: {brep.Faces.Count}"))),
-                    false => ((Func<Result<Mesh>>)(() => {
-                        Mesh result = joinMeshes && meshes.Length > 1
-                            ? ((Func<Mesh>)(() => {
-                                Mesh joined = new();
-                                joined.Append(meshes);
-                                return joined;
-                            }))()
-                            : meshes[0];
-                        _ = result.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
-                        _ = result.Faces.CullDegenerateFaces();
-                        _ = result.Normals.ComputeNormals();
-                        _ = result.Compact();
-                        return result.IsValid
-                            ? ResultFactory.Create(value: result)
-                            : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext("Result mesh invalid"));
-                    }))(),
-                };
-            }))();
+            : Mesh.CreateFromBrep(brep: brep, meshingParameters: meshParams) is not { Length: > 0 } meshes
+                ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext(
+                    string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Brep face count: {brep.Faces.Count}")))
+                : ((Func<Result<Mesh>>)(() => {
+                    Mesh result = joinMeshes && meshes.Length > 1
+                        ? ((Func<Mesh>)(() => {
+                            Mesh joined = new();
+                            joined.Append(meshes);
+                            return joined;
+                        }))()
+                        : meshes[0];
+                    _ = result.Vertices.CombineIdentical(ignoreNormals: true, ignoreAdditional: true);
+                    _ = result.Faces.CullDegenerateFaces();
+                    _ = result.Normals.ComputeNormals();
+                    _ = result.Compact();
+                    return result.IsValid
+                        ? ResultFactory.Create(value: result)
+                        : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext("Result mesh invalid"));
+                }))();
 
     [Pure]
     internal static Result<Mesh> ThickenMesh(
@@ -597,16 +565,12 @@ internal static class MorphologyCompute {
         bool solidify,
         Vector3d direction,
         IGeometryContext _) =>
-        (!RhinoMath.IsValidDouble(thickness) || Math.Abs(thickness) < MorphologyConfig.MinThickenDistance || Math.Abs(thickness) > MorphologyConfig.MaxThickenDistance) switch {
-            true => ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
-                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Thickness: {thickness:F6}, Range: [{MorphologyConfig.MinThickenDistance:F6}, {MorphologyConfig.MaxThickenDistance:F6}]"))),
-            false => ((Func<Result<Mesh>>)(() => {
-                Mesh? thickened = mesh.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? _);
-                return thickened?.IsValid is true
-                    ? ResultFactory.Create(value: thickened)
-                    : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(thickened is null ? "Offset operation returned null" : "Generated mesh is invalid"));
-            }))(),
-        };
+        !RhinoMath.IsValidDouble(thickness) || Math.Abs(thickness) < MorphologyConfig.MinThickenDistance || Math.Abs(thickness) > MorphologyConfig.MaxThickenDistance
+            ? ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Thickness: {thickness:F6}, Range: [{MorphologyConfig.MinThickenDistance:F6}, {MorphologyConfig.MaxThickenDistance:F6}]")))
+            : mesh.Offset(distance: thickness, solidify: solidify, direction: direction, wallFacesOut: out List<int>? _) is { IsValid: true } thickened
+                ? ResultFactory.Create(value: thickened)
+                : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext("Offset operation returned null or invalid mesh"));
 
     [Pure]
     internal static Result<Mesh> UnwrapMesh(
