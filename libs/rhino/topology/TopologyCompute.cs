@@ -18,21 +18,18 @@ internal static class TopologyCompute {
             ? ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.MassProperties,])
-                .Map<(int V, int E, int F, bool Solid, IReadOnlyList<(int LoopIndex, bool IsHole)> Loops)>(validBrep => (
-                    V: validBrep.Vertices.Count,
-                    E: validBrep.Edges.Count,
-                    F: validBrep.Faces.Count,
-                    Solid: validBrep.IsSolid && validBrep.IsManifold,
-                    Loops: [.. validBrep.Loops.Select((l, i) => {
-                        using Curve? loopCurve = l.To3dCurve();
-                        return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
-                    }),
-                    ]))
-                .Bind(data => data switch {
-                    (int v, int e, int f, bool solid, IReadOnlyList<(int LoopIndex, bool IsHole)> loops) when v > 0 && e > 0 && f > 0 => (solid, Numerator: e - v - f + 2) switch {
-                        (true, int numerator) when numerator >= 0 && (numerator & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: numerator / 2, Loops: loops, IsSolid: solid, HandleCount: numerator / 2)),
-                        (true, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
-                        (false, _) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: solid, HandleCount: 0)),
+                .Bind(validBrep => (validBrep.Vertices.Count, validBrep.Edges.Count, validBrep.Faces.Count) switch {
+                    (int v, int e, int f) when v > 0 && e > 0 && f > 0 => (
+                        IsSolid: validBrep.IsSolid && validBrep.IsManifold,
+                        Numerator: e - v - f + 2,
+                        Loops: [.. validBrep.Loops.Select((l, i) => {
+                            using Curve? loopCurve = l.To3dCurve();
+                            return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > Math.Max(context.AbsoluteTolerance, TopologyConfig.MinLoopLength));
+                        }),
+                        ]) switch {
+                        (true, int numerator, IReadOnlyList<(int, bool)> loops) when numerator >= 0 && (numerator & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: numerator / 2, Loops: loops, IsSolid: true, HandleCount: numerator / 2)),
+                        (true, _, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
+                        (false, _, IReadOnlyList<(int, bool)> loops) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: false, HandleCount: 0)),
                     },
                     _ => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
                 });
@@ -45,7 +42,7 @@ internal static class TopologyCompute {
                 error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology | V.BrepGranular,])
-                .Bind(validBrep => ((Func<Result<Topology.TopologyDiagnosis>>)(() => {
+                .Map(validBrep => {
                     (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, validBrep.Edges.Count)
                         .Where(i => validBrep.Edges[i].Valence == EdgeAdjacency.Naked && validBrep.Edges[i].EdgeCurve is not null)
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
@@ -84,8 +81,8 @@ internal static class TopologyCompute {
                         _ => [],
                     };
 
-                    return ResultFactory.Create(value: new Topology.TopologyDiagnosis(EdgeGaps: gaps, NearMisses: nearMisses, SuggestedStrategies: repairs));
-                }))());
+                    return new Topology.TopologyDiagnosis(EdgeGaps: gaps, NearMisses: nearMisses, SuggestedStrategies: repairs);
+                });
 
     internal static Result<Topology.HealingResult> Heal(
         Brep brep,
@@ -95,7 +92,7 @@ internal static class TopologyCompute {
             ? ResultFactory.Create<Topology.HealingResult>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid before healing: {topologyLog}"))
             : ResultFactory.Create(value: brep)
                 .Validate(args: [context, V.Standard | V.Topology,])
-                .Bind(validBrep => ((Func<Result<Topology.HealingResult>>)(() => {
+                .Bind(validBrep => {
                     int originalNakedEdges = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.Naked);
                     Brep? bestHealed = null;
                     Topology.Strategy? bestStrategy = null;
@@ -163,5 +160,5 @@ internal static class TopologyCompute {
                     return bestHealed is Brep healed && bestStrategy is Topology.Strategy strategy
                         ? ResultFactory.Create(value: new Topology.HealingResult(Healed: healed, AppliedStrategy: strategy, Success: bestNakedEdges < originalNakedEdges))
                         : ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
-                }))());
+                });
 }
