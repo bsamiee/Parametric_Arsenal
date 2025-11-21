@@ -52,7 +52,7 @@ internal static class TopologyCompute {
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
                     ];
 
-                    IReadOnlyList<double> gaps = nakedEdges.Length is > 0 and < maxEdgeThreshold
+                    IReadOnlyList<double> gaps = nakedEdges.Length > 0 && nakedEdges.Length < maxEdgeThreshold
                         ? [.. (from e1 in nakedEdges
                                from e2 in nakedEdges
                                where e1.Index != e2.Index

@@ -64,7 +64,7 @@ internal static class TopologyCore {
     internal static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology,
             operation: g => g switch {
-                Mesh mesh => [.. Enumerable.Range(0, mesh.Ngons.Count).Select(index => {
+                Mesh mesh => ((IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[]) [.. Enumerable.Range(0, mesh.Ngons.Count).Select(index => {
                     MeshNgon ngon = mesh.Ngons.GetNgon(index);
                     uint[]? faceList = ngon.FaceIndexList();
                     uint[]? boundaryVerts = ngon.BoundaryVertexIndexList();
@@ -221,7 +221,6 @@ internal static class TopologyCore {
                         EdgeAdjacency.Interior => brep.Edges[i] switch {
                             BrepEdge e when e.IsSmoothManifoldEdge(angleToleranceRadians: threshold) && e.EdgeCurve is Curve crv && (crv.IsContinuous(continuityType: Continuity.G2_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G2_locus_continuous, t: crv.Domain.Mid)) => Topology.EdgeContinuityType.Curvature,
                             BrepEdge e when e.IsSmoothManifoldEdge(angleToleranceRadians: threshold) && minContinuity < Continuity.G2_continuous => Topology.EdgeContinuityType.Smooth,
-                            BrepEdge e when e.IsSmoothManifoldEdge(angleToleranceRadians: threshold) && e.EdgeCurve is Curve crv && (crv.IsContinuous(continuityType: Continuity.G1_continuous, t: crv.Domain.Mid) || crv.IsContinuous(continuityType: Continuity.G1_locus_continuous, t: crv.Domain.Mid)) && minContinuity < Continuity.G2_continuous => Topology.EdgeContinuityType.Smooth,
                             _ when minContinuity >= Continuity.G1_continuous => Topology.EdgeContinuityType.Sharp,
                             _ => Topology.EdgeContinuityType.Interior,
                         },
