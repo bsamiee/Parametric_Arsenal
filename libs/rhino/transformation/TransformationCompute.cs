@@ -23,7 +23,7 @@ internal static class TransformationCompute {
             ? ResultFactory.Create(value: duplicate)
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
 
-        (!result.IsSuccess ? duplicate : null)?.Dispose();
+        (result.IsSuccess ? null : duplicate)?.Dispose();
 
         return result;
     }
