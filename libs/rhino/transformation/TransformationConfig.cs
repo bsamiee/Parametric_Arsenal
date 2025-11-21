@@ -79,19 +79,19 @@ internal static class TransformationConfig {
     /// <summary>Maximum array count to prevent memory exhaustion.</summary>
     internal const int MaxArrayCount = 10000;
 
-    /// <summary>Angular tolerance multiplier for vector parallelism checks.</summary>
+    /// <summary>Angular tolerance multiplier for vector parallelism checks (10x looser for perpendicularity validation).</summary>
     internal const double AngleToleranceMultiplier = 10.0;
 
-    /// <summary>Maximum twist angle in radians.</summary>
+    /// <summary>Maximum twist angle in radians (10 full revolutions, allows complex helical morphs).</summary>
     internal const double MaxTwistAngle = RhinoMath.TwoPI * 10.0;
 
-    /// <summary>Maximum bend angle in radians.</summary>
+    /// <summary>Maximum bend angle in radians (1 full revolution, typical geometric limit).</summary>
     internal const double MaxBendAngle = RhinoMath.TwoPI;
 
-    /// <summary>Default tolerance for morph operations.</summary>
+    /// <summary>Default tolerance for morph operations (1mm in most unit systems).</summary>
     internal const double DefaultMorphTolerance = 0.001;
 
-    /// <summary>Maximum compound transform composition depth.</summary>
+    /// <summary>Maximum compound transform composition depth (prevents stack overflow from deeply nested compounds).</summary>
     internal const int MaxCompoundDepth = 100;
 
     /// <summary>Tolerance for orthogonality check in decomposition.</summary>

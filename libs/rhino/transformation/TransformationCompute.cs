@@ -67,8 +67,7 @@ internal static class TransformationCompute {
                 morph: new FlowSpaceMorph(
                     curve0: operation.BaseCurve,
                     curve1: operation.TargetCurve,
-                    preventStretching: !operation.PreserveStructure) {
-                    PreserveStructure = operation.PreserveStructure,
+                    preventStretching: operation.PreserveStructure) {
                     Tolerance = Math.Max(context.AbsoluteTolerance, meta.Tolerance),
                     QuickPreview = false,
                 },
@@ -126,7 +125,7 @@ internal static class TransformationCompute {
                 morph: new StretchSpaceMorph(
                     start: operation.Axis.From,
                     end: operation.Axis.To,
-                    length: operation.Axis.Length * 2.0) {
+                    length: operation.Axis.Length) {
                     PreserveStructure = false,
                     Tolerance = Math.Max(context.AbsoluteTolerance, meta.Tolerance),
                     QuickPreview = false,
@@ -164,7 +163,7 @@ internal static class TransformationCompute {
         operation.Axis.IsValid && operation.Radius > context.AbsoluteTolerance && geometry.IsValid && Math.Abs(operation.AngleRadians) <= RhinoMath.TwoPI
             ? ApplyMorph(
                 morph: new MaelstromSpaceMorph(
-                    plane: new Plane(origin: operation.Axis.From, normal: operation.Axis.Direction),
+                    plane: new Plane(origin: operation.Axis.From, normal: operation.Axis.UnitTangent),
                     radius0: 0.0,
                     radius1: operation.Radius,
                     angle: operation.AngleRadians) {
@@ -383,62 +382,6 @@ internal static class TransformationCompute {
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
                 }));
 
-    /// <summary>Interpolate between two transforms using SLERP for rotation and LERP for translation/scale.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static Result<Transform> InterpolateTransforms(
-        Transform start,
-        Transform end,
-        double t,
-        IGeometryContext context) =>
-        DecomposeTransformInternal(matrix: start, context: context)
-            .Bind(startDecomp => DecomposeTransformInternal(matrix: end, context: context)
-                .Bind(endDecomp => {
-                    double clampedT = Math.Clamp(t, 0.0, 1.0);
-                    Vector3d translation = (startDecomp.Translation * (1.0 - clampedT)) + (endDecomp.Translation * clampedT);
-                    Vector3d scale = (startDecomp.Scale * (1.0 - clampedT)) + (endDecomp.Scale * clampedT);
-                    Quaternion rotation = Quaternion.Slerp(startDecomp.Rotation, endDecomp.Rotation, clampedT);
-
-                    double w = rotation.A;
-                    double x = rotation.B;
-                    double y = rotation.C;
-                    double z = rotation.D;
-                    double xx = x * x;
-                    double yy = y * y;
-                    double zz = z * z;
-                    double xy = x * y;
-                    double xz = x * z;
-                    double yz = y * z;
-                    double wx = w * x;
-                    double wy = w * y;
-                    double wz = w * z;
-
-                    Transform result = Transform.Identity;
-                    result.M00 = 1.0 - (2.0 * (yy + zz));
-                    result.M01 = 2.0 * (xy - wz);
-                    result.M02 = 2.0 * (xz + wy);
-                    result.M03 = translation.X;
-                    result.M10 = 2.0 * (xy + wz);
-                    result.M11 = 1.0 - (2.0 * (xx + zz));
-                    result.M12 = 2.0 * (yz - wx);
-                    result.M13 = translation.Y;
-                    result.M20 = 2.0 * (xz - wy);
-                    result.M21 = 2.0 * (yz + wx);
-                    result.M22 = 1.0 - (2.0 * (xx + yy));
-                    result.M23 = translation.Z;
-                    result.M00 *= scale.X;
-                    result.M10 *= scale.X;
-                    result.M20 *= scale.X;
-                    result.M01 *= scale.Y;
-                    result.M11 *= scale.Y;
-                    result.M21 *= scale.Y;
-                    result.M02 *= scale.Z;
-                    result.M12 *= scale.Z;
-                    result.M22 *= scale.Z;
-
-                    return result.IsValid && result.Determinant > context.AbsoluteTolerance
-                        ? ResultFactory.Create(value: result)
-                        : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext("Interpolation produced invalid matrix"));
-                }));
 
     /// <summary>Decompose transform matrix into TRS components using polar decomposition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

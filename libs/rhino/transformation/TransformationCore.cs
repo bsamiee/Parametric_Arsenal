@@ -158,7 +158,7 @@ internal static class TransformationCore {
         bool enableDiagnostics) where T : GeometryBase =>
         operation.Count <= 0 || operation.Count > meta.MaxCount
             || operation.Axis.Length <= context.AbsoluteTolerance
-            || operation.TotalAngleRadians <= 0.0 || operation.TotalAngleRadians > RhinoMath.TwoPI
+            || operation.TotalAngleRadians <= 0.0
             ? ResultFactory.Create<IReadOnlyList<T>>(
                 error: E.Geometry.Transformation.InvalidArrayParameters.WithContext(string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -326,11 +326,9 @@ internal static class TransformationCore {
         IGeometryContext context) =>
         parameter is < 0.0 or > 1.0
             ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidScaleFactor.WithContext($"Interpolation parameter: {parameter.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
-            : BuildTransformMatrix(operation: start, context: context)
-                .Bind(m1 => BuildTransformMatrix(operation: end, context: context)
-                    .Bind(m2 => TransformationCompute.InterpolateTransforms(start: m1, end: m2, t: parameter, context: context)));
+            : BuildBlendedMatrix(first: start, second: end, blendFactor: parameter, context: context);
 
-    /// <summary>Core polar array implementation after validation.</summary>
+    /// <summary>Core polar array implementation after validation. Note: Division by Count (not Count-1) creates gap for full-circle arrays.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<T>> PolarArrayCore<T>(
         T geometry,
