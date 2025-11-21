@@ -290,9 +290,20 @@ internal static class TransformationCore {
     private static Result<Transform> BuildCompoundMatrix(
         Transformation.TransformOperation[] operations,
         IGeometryContext context) =>
-        operations.Length is 0 or > TransformationConfig.MaxCompoundDepth
-            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Operation count: {operations.Length}, Max: {TransformationConfig.MaxCompoundDepth}"))
-            : TransformationCompute.ComposeTransforms(operations: operations, context: context);
+        operations.Length is 0
+            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec.WithContext("Compound transform requires at least one operation"))
+            : CountCompoundDepth(operations: operations, depth: 0) > TransformationConfig.MaxCompoundDepth
+                ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec.WithContext($"Compound transform depth exceeds maximum ({TransformationConfig.MaxCompoundDepth})"))
+                : TransformationCompute.ComposeTransforms(operations: operations, context: context);
+
+    /// <summary>Count total recursive depth of compound transforms.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int CountCompoundDepth(Transformation.TransformOperation[] operations, int depth) =>
+        operations.Aggregate(
+            seed: depth + 1,
+            func: (maxDepth, op) => op is Transformation.CompoundTransform ct
+                ? Math.Max(maxDepth, CountCompoundDepth(operations: ct.Operations, depth: depth + 1))
+                : maxDepth);
 
     /// <summary>Build blended transform with weighted interpolation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -302,7 +313,7 @@ internal static class TransformationCore {
         double blendFactor,
         IGeometryContext context) =>
         blendFactor is < 0.0 or > 1.0
-            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Blend factor: {blendFactor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
+            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidScaleFactor.WithContext($"Blend factor: {blendFactor.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
             : BuildTransformMatrix(operation: first, context: context)
                 .Bind(m1 => BuildTransformMatrix(operation: second, context: context)
                     .Bind(m2 => TransformationCompute.BlendTransforms(first: m1, second: m2, factor: blendFactor, context: context)));
@@ -315,7 +326,7 @@ internal static class TransformationCore {
         double parameter,
         IGeometryContext context) =>
         parameter is < TransformationConfig.MinInterpolationParameter or > TransformationConfig.MaxInterpolationParameter
-            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidArrayParameters.WithContext($"Parameter: {parameter.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
+            ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidScaleFactor.WithContext($"Interpolation parameter: {parameter.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
             : BuildTransformMatrix(operation: start, context: context)
                 .Bind(m1 => BuildTransformMatrix(operation: end, context: context)
                     .Bind(m2 => TransformationCompute.InterpolateTransforms(start: m1, end: m2, t: parameter, context: context)));

@@ -347,7 +347,7 @@ internal static class TransformationCompute {
                     Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
                     Transform result = translationMatrix * rotationMatrix * scaleMatrix;
 
-                    return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
+                    return result.IsValid && result.Determinant > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
                 }));
@@ -372,7 +372,7 @@ internal static class TransformationCompute {
                     Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
                     Transform result = translationMatrix * rotationMatrix * scaleMatrix;
 
-                    return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
+                    return result.IsValid && result.Determinant > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext("Interpolation produced invalid matrix"));
                 }));
@@ -421,7 +421,7 @@ internal static class TransformationCompute {
         double scaleZ = Math.Sqrt(m02 * m02 + m12 * m12 + m22 * m22);
         double minScale = Math.Min(scaleX, Math.Min(scaleY, scaleZ));
 
-        bool hasShear = maxCrossTerm > minScale * 0.01;
+        bool hasShear = maxCrossTerm > Math.Max(minScale * TransformationConfig.ShearDetectionThreshold, context.AbsoluteTolerance);
 
         return hasShear
             ? PolarDecompositionWithShear(m00: m00, m01: m01, m02: m02, m10: m10, m11: m11, m12: m12, m20: m20, m21: m21, m22: m22, translation: translation, context: context)
@@ -496,7 +496,7 @@ internal static class TransformationCompute {
         double m20, double m21, double m22,
         Vector3d translation,
         IGeometryContext context) =>
-        Enumerable.Range(0, 10).Aggregate(
+        Enumerable.Range(0, TransformationConfig.MaxNewtonSchulzIterations).Aggregate(
             seed: (q00: m00, q01: m01, q02: m02, q10: m10, q11: m11, q12: m12, q20: m20, q21: m21, q22: m22, converged: false),
             func: (state, _) => state.converged ? state : IterateNewtonSchulz(state.q00, state.q01, state.q02, state.q10, state.q11, state.q12, state.q20, state.q21, state.q22, context: context),
             resultSelector: final => ExtractScaleAndBuildResult(
@@ -512,6 +512,19 @@ internal static class TransformationCompute {
         double q20, double q21, double q22,
         IGeometryContext context) {
         double det = q00 * (q11 * q22 - q12 * q21) - q01 * (q10 * q22 - q12 * q20) + q02 * (q10 * q21 - q11 * q20);
+        return Math.Abs(det) < context.AbsoluteTolerance
+            ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, true)
+            : IterateNewtonSchulzCore(q00: q00, q01: q01, q02: q02, q10: q10, q11: q11, q12: q12, q20: q20, q21: q21, q22: q22, det: det, context: context);
+    }
+
+    /// <summary>Core Newton-Schulz iteration after determinant check.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (double q00, double q01, double q02, double q10, double q11, double q12, double q20, double q21, double q22, bool converged) IterateNewtonSchulzCore(
+        double q00, double q01, double q02,
+        double q10, double q11, double q12,
+        double q20, double q21, double q22,
+        double det,
+        IGeometryContext context) {
         double invDet = 1.0 / det;
         double inv00 = (q11 * q22 - q12 * q21) * invDet;
         double inv01 = (q02 * q21 - q01 * q22) * invDet;
@@ -538,7 +551,7 @@ internal static class TransformationCompute {
             Math.Max(Math.Max(Math.Abs(next10 - q10), Math.Max(Math.Abs(next11 - q11), Math.Abs(next12 - q12))),
                 Math.Max(Math.Abs(next20 - q20), Math.Max(Math.Abs(next21 - q21), Math.Abs(next22 - q22)))));
 
-        return (next00, next01, next02, next10, next11, next12, next20, next21, next22, maxDiff < context.AbsoluteTolerance * 10.0);
+        return (next00, next01, next02, next10, next11, next12, next20, next21, next22, maxDiff < context.AbsoluteTolerance * TransformationConfig.NewtonSchulzToleranceMultiplier);
     }
 
     /// <summary>Extract scale from M = Q·S and build final decomposition result.</summary>
@@ -556,22 +569,36 @@ internal static class TransformationCompute {
         double s11 = q01 * m01 + q11 * m11 + q21 * m21;
         double s22 = q02 * m02 + q12 * m12 + q22 * m22;
 
+        double sign0 = s00 < 0.0 ? -1.0 : 1.0;
+        double sign1 = s11 < 0.0 ? -1.0 : 1.0;
+        double sign2 = s22 < 0.0 ? -1.0 : 1.0;
+
         Vector3d scale = new(
-            Math.Abs(s00) > context.AbsoluteTolerance ? s00 : 1.0,
-            Math.Abs(s11) > context.AbsoluteTolerance ? s11 : 1.0,
-            Math.Abs(s22) > context.AbsoluteTolerance ? s22 : 1.0);
+            Math.Abs(s00) > context.AbsoluteTolerance ? Math.Abs(s00) : 1.0,
+            Math.Abs(s11) > context.AbsoluteTolerance ? Math.Abs(s11) : 1.0,
+            Math.Abs(s22) > context.AbsoluteTolerance ? Math.Abs(s22) : 1.0);
 
-        double trace = q00 + q11 + q22;
+        double rq00 = q00 * sign0;
+        double rq01 = q01 * sign1;
+        double rq02 = q02 * sign2;
+        double rq10 = q10 * sign0;
+        double rq11 = q11 * sign1;
+        double rq12 = q12 * sign2;
+        double rq20 = q20 * sign0;
+        double rq21 = q21 * sign1;
+        double rq22 = q22 * sign2;
+
+        double trace = rq00 + rq11 + rq22;
         Quaternion rotation = trace > 0.0
-            ? QuaternionFromPositiveTrace(r00: q00, r11: q11, r22: q22, r01: q01, r02: q02, r10: q10, r12: q12, r20: q20, r21: q21, trace: trace)
-            : QuaternionFromNegativeTrace(r00: q00, r11: q11, r22: q22, r01: q01, r02: q02, r10: q10, r12: q12, r20: q20, r21: q21);
+            ? QuaternionFromPositiveTrace(r00: rq00, r11: rq11, r22: rq22, r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21, trace: trace)
+            : QuaternionFromNegativeTrace(r00: rq00, r11: rq11, r22: rq22, r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21);
 
-        double dot0 = q00 * q00 + q10 * q10 + q20 * q20;
-        double dot1 = q01 * q01 + q11 * q11 + q21 * q21;
-        double dot2 = q02 * q02 + q12 * q12 + q22 * q22;
-        double cross01 = q00 * q01 + q10 * q11 + q20 * q21;
-        double cross02 = q00 * q02 + q10 * q12 + q20 * q22;
-        double cross12 = q01 * q02 + q11 * q12 + q21 * q22;
+        double dot0 = rq00 * rq00 + rq10 * rq10 + rq20 * rq20;
+        double dot1 = rq01 * rq01 + rq11 * rq11 + rq21 * rq21;
+        double dot2 = rq02 * rq02 + rq12 * rq12 + rq22 * rq22;
+        double cross01 = rq00 * rq01 + rq10 * rq11 + rq20 * rq21;
+        double cross02 = rq00 * rq02 + rq10 * rq12 + rq20 * rq22;
+        double cross12 = rq01 * rq02 + rq11 * rq12 + rq21 * rq22;
 
         double orthogonalityError = Math.Max(
             Math.Max(Math.Abs(dot0 - 1.0), Math.Abs(dot1 - 1.0)),

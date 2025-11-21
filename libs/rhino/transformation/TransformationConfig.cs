@@ -103,6 +103,15 @@ internal static class TransformationConfig {
     /// <summary>Tolerance for orthogonality check in decomposition.</summary>
     internal const double OrthogonalityTolerance = 1e-6;
 
+    /// <summary>Shear detection threshold: ratio of max column cross-term to min scale.</summary>
+    internal const double ShearDetectionThreshold = 0.01;
+
+    /// <summary>Maximum Newton-Schulz iterations for polar decomposition with shear.</summary>
+    internal const int MaxNewtonSchulzIterations = 10;
+
+    /// <summary>Tolerance multiplier for Newton-Schulz convergence detection.</summary>
+    internal const double NewtonSchulzToleranceMultiplier = 10.0;
+
     /// <summary>Transform operation metadata: validation mode and operation name.</summary>
     internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);
 
