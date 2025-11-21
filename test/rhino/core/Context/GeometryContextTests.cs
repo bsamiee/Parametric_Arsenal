@@ -20,7 +20,7 @@ public sealed class GeometryContextTests {
                 relativeTolerance: 0.0,
                 angleToleranceRadians: 0.017453292519943295,
                 units: UnitSystem.Meters);
-            Test.Success(result, ctx => ctx.AbsoluteTolerance == 0.01);
+            Test.Success(result, ctx => Math.Abs(ctx.AbsoluteTolerance - 0.01) < 1e-9);
         },
         () => ContextGenerators.ValidToleranceGen.Run((double tol) => {
             Result<GeometryContext> result = GeometryContext.Create(
