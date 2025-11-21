@@ -500,10 +500,9 @@ internal static class TransformationCompute {
         double scaleX, double scaleY, double scaleZ,
         Vector3d translation,
         IGeometryContext context) {
-        Vector3d scale = new(
-            scaleX > context.AbsoluteTolerance ? scaleX : 1.0,
-            scaleY > context.AbsoluteTolerance ? scaleY : 1.0,
-            scaleZ > context.AbsoluteTolerance ? scaleZ : 1.0);
+        double safeScaleX = scaleX > context.AbsoluteTolerance ? scaleX : 1.0;
+        double safeScaleY = scaleY > context.AbsoluteTolerance ? scaleY : 1.0;
+        double safeScaleZ = scaleZ > context.AbsoluteTolerance ? scaleZ : 1.0;
 
         double r00 = scaleX > context.AbsoluteTolerance ? m00 / scaleX : 1.0;
         double r01 = scaleY > context.AbsoluteTolerance ? m01 / scaleY : 0.0;
@@ -514,6 +513,35 @@ internal static class TransformationCompute {
         double r20 = scaleX > context.AbsoluteTolerance ? m20 / scaleX : 0.0;
         double r21 = scaleY > context.AbsoluteTolerance ? m21 / scaleY : 0.0;
         double r22 = scaleZ > context.AbsoluteTolerance ? m22 / scaleZ : 1.0;
+
+        double rotationDeterminant = (r00 * ((r11 * r22) - (r12 * r21))) - (r01 * ((r10 * r22) - (r12 * r20))) + (r02 * ((r10 * r21) - (r11 * r20)));
+        bool requiresReflectionFix = rotationDeterminant < 0.0;
+        double absScaleX = Math.Abs(safeScaleX);
+        double absScaleY = Math.Abs(safeScaleY);
+        double absScaleZ = Math.Abs(safeScaleZ);
+        int reflectionAxis = !requiresReflectionFix
+            ? -1
+            : absScaleX <= absScaleY && absScaleX <= absScaleZ
+                ? 0
+                : absScaleY <= absScaleZ
+                    ? 1
+                    : 2;
+
+        double signX = reflectionAxis == 0 ? -1.0 : 1.0;
+        double signY = reflectionAxis == 1 ? -1.0 : 1.0;
+        double signZ = reflectionAxis == 2 ? -1.0 : 1.0;
+
+        Vector3d scale = new(safeScaleX * signX, safeScaleY * signY, safeScaleZ * signZ);
+
+        r00 *= signX;
+        r01 *= signY;
+        r02 *= signZ;
+        r10 *= signX;
+        r11 *= signY;
+        r12 *= signZ;
+        r20 *= signX;
+        r21 *= signY;
+        r22 *= signZ;
 
         double trace = r00 + r11 + r22;
         Quaternion rotation = trace > 0.0
@@ -665,36 +693,72 @@ internal static class TransformationCompute {
         double s11 = (q01 * m01) + (q11 * m11) + (q21 * m21);
         double s22 = (q02 * m02) + (q12 * m12) + (q22 * m22);
 
-        double sign0 = s00 < 0.0 ? -1.0 : 1.0;
-        double sign1 = s11 < 0.0 ? -1.0 : 1.0;
-        double sign2 = s22 < 0.0 ? -1.0 : 1.0;
+        double safeScaleX = Math.Abs(s00) > context.AbsoluteTolerance
+            ? s00
+            : s00 < 0.0
+                ? -1.0
+                : 1.0;
+        double safeScaleY = Math.Abs(s11) > context.AbsoluteTolerance
+            ? s11
+            : s11 < 0.0
+                ? -1.0
+                : 1.0;
+        double safeScaleZ = Math.Abs(s22) > context.AbsoluteTolerance
+            ? s22
+            : s22 < 0.0
+                ? -1.0
+                : 1.0;
 
-        Vector3d scale = new(
-            Math.Abs(s00) > context.AbsoluteTolerance ? Math.Abs(s00) : 1.0,
-            Math.Abs(s11) > context.AbsoluteTolerance ? Math.Abs(s11) : 1.0,
-            Math.Abs(s22) > context.AbsoluteTolerance ? Math.Abs(s22) : 1.0);
+        double r00 = q00;
+        double r01 = q01;
+        double r02 = q02;
+        double r10 = q10;
+        double r11 = q11;
+        double r12 = q12;
+        double r20 = q20;
+        double r21 = q21;
+        double r22 = q22;
 
-        double rq00 = q00 * sign0;
-        double rq01 = q01 * sign1;
-        double rq02 = q02 * sign2;
-        double rq10 = q10 * sign0;
-        double rq11 = q11 * sign1;
-        double rq12 = q12 * sign2;
-        double rq20 = q20 * sign0;
-        double rq21 = q21 * sign1;
-        double rq22 = q22 * sign2;
+        double rotationDeterminant = (r00 * ((r11 * r22) - (r12 * r21))) - (r01 * ((r10 * r22) - (r12 * r20))) + (r02 * ((r10 * r21) - (r11 * r20)));
+        bool requiresReflectionFix = rotationDeterminant < 0.0;
+        double absScaleX = Math.Abs(safeScaleX);
+        double absScaleY = Math.Abs(safeScaleY);
+        double absScaleZ = Math.Abs(safeScaleZ);
+        int reflectionAxis = !requiresReflectionFix
+            ? -1
+            : absScaleX <= absScaleY && absScaleX <= absScaleZ
+                ? 0
+                : absScaleY <= absScaleZ
+                    ? 1
+                    : 2;
 
-        double trace = rq00 + rq11 + rq22;
+        double signX = reflectionAxis == 0 ? -1.0 : 1.0;
+        double signY = reflectionAxis == 1 ? -1.0 : 1.0;
+        double signZ = reflectionAxis == 2 ? -1.0 : 1.0;
+
+        Vector3d scale = new(safeScaleX * signX, safeScaleY * signY, safeScaleZ * signZ);
+
+        r00 *= signX;
+        r01 *= signY;
+        r02 *= signZ;
+        r10 *= signX;
+        r11 *= signY;
+        r12 *= signZ;
+        r20 *= signX;
+        r21 *= signY;
+        r22 *= signZ;
+
+        double trace = r00 + r11 + r22;
         Quaternion rotation = trace > 0.0
-            ? QuaternionFromPositiveTrace(r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21, trace: trace)
-            : QuaternionFromNegativeTrace(r00: rq00, r11: rq11, r22: rq22, r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21);
+            ? QuaternionFromPositiveTrace(r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21, trace: trace)
+            : QuaternionFromNegativeTrace(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21);
 
-        double dot0 = (rq00 * rq00) + (rq10 * rq10) + (rq20 * rq20);
-        double dot1 = (rq01 * rq01) + (rq11 * rq11) + (rq21 * rq21);
-        double dot2 = (rq02 * rq02) + (rq12 * rq12) + (rq22 * rq22);
-        double cross01 = (rq00 * rq01) + (rq10 * rq11) + (rq20 * rq21);
-        double cross02 = (rq00 * rq02) + (rq10 * rq12) + (rq20 * rq22);
-        double cross12 = (rq01 * rq02) + (rq11 * rq12) + (rq21 * rq22);
+        double dot0 = (r00 * r00) + (r10 * r10) + (r20 * r20);
+        double dot1 = (r01 * r01) + (r11 * r11) + (r21 * r21);
+        double dot2 = (r02 * r02) + (r12 * r12) + (r22 * r22);
+        double cross01 = (r00 * r01) + (r10 * r11) + (r20 * r21);
+        double cross02 = (r00 * r02) + (r10 * r12) + (r20 * r22);
+        double cross12 = (r01 * r02) + (r11 * r12) + (r21 * r22);
 
         double orthogonalityError = Math.Max(
             Math.Max(Math.Abs(dot0 - 1.0), Math.Abs(dot1 - 1.0)),
