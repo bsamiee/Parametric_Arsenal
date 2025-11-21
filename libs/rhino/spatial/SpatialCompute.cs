@@ -429,6 +429,7 @@ internal static class SpatialCompute {
     private static bool IsInCircumcircle(Point3d a, Point3d b, Point3d c, Point3d p, IGeometryContext context) {
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+        // Check for degenerate triangle: if orientation is near zero, the points are collinear and the incircle predicate is not meaningful.
         if (Math.Abs(orientation) <= orientationTolerance) {
             return false;
         }
@@ -440,6 +441,7 @@ internal static class SpatialCompute {
         double cx = c.X - p.X;
         double cy = c.Y - p.Y;
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
+        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
         double adjustedDet = orientation > 0.0 ? det : -det;
         double determinantTolerance = orientationTolerance * orientationTolerance;
         return adjustedDet > determinantTolerance;
