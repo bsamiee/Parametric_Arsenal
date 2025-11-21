@@ -50,24 +50,31 @@ internal static class TopologyCompute {
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
                     ];
 
-                    IReadOnlyList<double> gaps = nakedEdges.Length is > 0 and < TopologyConfig.MaxEdgesForNearMissAnalysis
-                        ? [.. (from e1 in nakedEdges
-                               from e2 in nakedEdges
-                               where e1.Index != e2.Index
-                               from dist in new[] { e1.Start.DistanceTo(e2.Start), e1.Start.DistanceTo(e2.End), e1.End.DistanceTo(e2.Start), e1.End.DistanceTo(e2.End), }
-                               where dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
-                               select dist),
+                    double tolerance = context.AbsoluteTolerance;
+                    double nearMissThreshold = tolerance * TopologyConfig.NearMissMultiplier;
+                    bool analyzePairs = nakedEdges.Length > 1 && nakedEdges.Length <= TopologyConfig.MaxEdgesForNearMissAnalysis;
+
+                    IReadOnlyList<double> gaps = analyzePairs
+                        ? [.. (from i in Enumerable.Range(0, nakedEdges.Length - 1)
+                               from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
+                               let edgeI = validBrep.Edges[nakedEdges[i].Index].EdgeCurve
+                               let edgeJ = validBrep.Edges[nakedEdges[j].Index].EdgeCurve
+                               let distance = edgeI is Curve ci && edgeJ is Curve cj && ci.ClosestPoints(cj, out Point3d ptA, out Point3d ptB)
+                                   ? ptA.DistanceTo(ptB)
+                                   : double.MaxValue
+                               where distance > tolerance && distance < nearMissThreshold
+                               select distance),
                         ]
                         : [];
 
                     int nonManifoldEdgeCount = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
-                    IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = nakedEdges.Length < TopologyConfig.MaxEdgesForNearMissAnalysis
+                    IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = analyzePairs
                         ? [.. (from i in Enumerable.Range(0, nakedEdges.Length)
                                from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
                                let edgeI = validBrep.Edges[nakedEdges[i].Index]
                                let edgeJ = validBrep.Edges[nakedEdges[j].Index]
                                let dist = edgeI.EdgeCurve.ClosestPoints(edgeJ.EdgeCurve, out Point3d ptA, out Point3d ptB) ? ptA.DistanceTo(ptB) : double.MaxValue
-                               where dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier && dist > context.AbsoluteTolerance
+                               where dist < nearMissThreshold && dist > tolerance
                                select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: dist)),
                         ]
                         : [];
