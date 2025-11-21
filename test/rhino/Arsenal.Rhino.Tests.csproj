@@ -5,6 +5,14 @@
     <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
     <TestFramework>NUnit</TestFramework>
+    <!-- Ensure explicit target framework for test host -->
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Required for Rhino.Testing - use latest runtime patch -->
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+    <!-- Disable app host for library-style test project -->
+    <UseAppHost>false</UseAppHost>
+    <!-- Roll forward to allow net7.0 Rhino.Testing on net8.0 runtime -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,10 +24,12 @@
 
   <ItemGroup>
     <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
+    <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Rhino.Testing.Configs.xml" CopyToOutputDirectory="always" />
+    <None Update=".runsettings" CopyToOutputDirectory="always" />
   </ItemGroup>
 
 </Project>

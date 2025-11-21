@@ -150,7 +150,6 @@
   <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'xUnit'">
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
-    <PackageReference Include="CsCheck" Version="4.4.1" Condition="'$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'" />
   </ItemGroup>
 
   <!-- NUnit Test Framework & Rhino Testing -->
@@ -158,6 +157,11 @@
     <PackageReference Include="NUnit" Version="4.4.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" />
     <PackageReference Include="Rhino.Testing" Version="8.0.17-beta" />
+  </ItemGroup>
+
+  <!-- CsCheck for Property-Based Testing (All Test Projects) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
+    <PackageReference Include="CsCheck" Version="4.4.1" />
   </ItemGroup>
 
   <!-- Rhino Testing Configuration (NUnit) -->
