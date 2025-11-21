@@ -154,12 +154,11 @@ internal static class TopologyCore {
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NakedEdges,
             operation: g => g switch {
                 Brep { Edges.Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
-                Brep brep when brep.DuplicateNakedEdgeCurves(nakedOuter: true, nakedInner: true) is null => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
-                    new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: 0.0),
-                ]),
-                Brep brep => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
-                    Curve[] nakedCurves = brep.DuplicateNakedEdgeCurves(nakedOuter: true, nakedInner: true) ?? [];
-                    return ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+                Brep brep => brep.DuplicateNakedEdgeCurves(nakedOuter: true, nakedInner: true) switch {
+                    null => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
+                        new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: brep.Edges.Count, TotalLength: 0.0),
+                    ]),
+                    Curve[] nakedCurves => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[
                         new Topology.NakedEdgeData(
                             EdgeCurves: nakedCurves,
                             EdgeIndices: [.. Enumerable.Range(0, brep.Edges.Count).Where(i => brep.Edges[i].Valence == EdgeAdjacency.Naked),],
@@ -167,8 +166,8 @@ internal static class TopologyCore {
                             IsOrdered: orderLoops,
                             TotalEdgeCount: brep.Edges.Count,
                             TotalLength: nakedCurves.Sum(static c => c.GetLength())),
-                    ]);
-                }))(),
+                    ]),
+                },
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.NakedEdgeData>>>)(() => {
                     (int Index, Curve Curve, double Length)[] edges = [.. Enumerable.Range(0, mesh.TopologyEdges.Count)
                         .Where(i => mesh.TopologyEdges.GetConnectedFaces(i).Length == 1)
