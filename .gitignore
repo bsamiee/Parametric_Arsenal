@@ -8,105 +8,240 @@
 # files while *not* ignoring domain assets that should go through Git LFS
 # (e.g., *.3dm, *.gh, *.ghuser).
 
-# --- General -------------------------------------------------------------------
-.claude/
-gemini.md
-.kiro/
-.kiro/steering
-tmp/
-.uv_cache/
-artifacts/
-
-# --- macOS & Editor cruft -----------------------------------------------------
+# --- OS & System --------------------------------------------------------------
 .DS_Store
 .DS_Store?
+._*
 .AppleDouble
 .LSOverride
+Icon
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
-# --- Vim / Emacs / VS Code swap files -----------------------------------------
-*~ # vim backup files
+# --- IDE & Editors ------------------------------------------------------------
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+*.sln.DotSettings.user
+launchSettings.json
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.sln.iml
+*.iml
+.idea_modules/
+
+# Vim / Emacs / Other
+*~
 *.swp
 *.swo
-*.tmp
+*.swn
+.*.swp
 *.bak
+*.tmp
 *.orig
+*.rej
+\#*\#
+.\#*
+.netrwhist
 
-# --- Python artifacts ---------------------------------------------------------
+# --- C# / .NET Build Artifacts ------------------------------------------------
+
+# Build outputs
+**/bin/
+**/obj/
+artifacts/
+*.dll.config
+*.exe.config
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+
+# MSBuild
+*.msbuild.log
+*.msbuild.wrn
+*.msbuild.err
+*.binlog
+project.lock.json
+project.fragment.lock.json
+
+# .NET Core
+*.dotnet/
+.dotnetcli/
+
+# --- Python Artifacts ---------------------------------------------------------
+
+# Byte-compiled / Optimized
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
+*.so
 
-# --- Virtual environments -----------------------------------------------------
+# Virtual Environments
 .env
 .env/
 .venv/
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+.pdm-python
+.pdm-build/
 
-# --- Packaging ----------------------------------------------------------------
+# Packaging
 build/
+develop-eggs/
 dist/
-wheelhouse/
+downloads/
+eggs/
 .eggs/
-*.egg-info/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+wheelhouse/
 pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
 
-# --- Caches & reports ---------------------------------------------------------
-.cache/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.pre-commit-cache/
-.coverage
-.nox/
-.hypothesis/
-.benchmarks/
-coverage.xml
-htmlcov/
+# --- Testing & Quality --------------------------------------------------------
 
-# --- .NET / Visual Studio / Rider artifacts -----------------------------------
-
-# --- Build outputs --------------------------
-**/bin/
-**/obj/
-
-# --- VS & Rider -----------------------------
-.vscode/
-.idea/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-
-# --- Test results & coverage ----------------
+# Test Results
 TestResults/
+*.trx
 *.coverage
 *.coveragexml
 *.testresults
+*.coverage.cobertura.xml
+*.coverage.info
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+test-results.xml
+junit.xml
 
-# --- Documentation build outputs ---------------------------------------------
+# Benchmarks
+BenchmarkDotNet.Artifacts/
+.benchmarks/
+*.etl
+
+# Static Analysis Cache
+.cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.pytype/
+.pyre/
+.pyright/
+
+# --- Development Tools --------------------------------------------------------
+
+# UV (Python package manager)
+.cache/uv/
+
+# Pre-commit
+.pre-commit-cache/
+.pre-commit-config.yaml.local
+
+# Claude AI / AI Assistants
+.claude/
+.kiro/
+
+# Local configuration
+*.local
+*.local.*
+local.settings.json
+
+# --- Documentation ------------------------------------------------------------
 _site/
+_build/
+docs/_build/
+api/
+site/
+.docfx/
+*.chm
+*.pdf
 
-# --- Node (occasionally used for docs scripts) --------------------------------
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# --- Logs ---------------------------------------------------------------------
+# --- Logs & Temporary Files ---------------------------------------------------
 *.log
+*.log.*
+logs/
+*.pid
+*.seed
+*.pid.lock
+tmp/
+temp/
+.tmp/
+.temp/
 
-# --- Rhino/Grasshopper temporary files ----------------------------------------
+# --- Security & Sensitive Files -----------------------------------------------
+*.pfx
+*.snk
+*.key
+*.pem
+*.p12
+*.cer
+*.crt
+secrets.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+.env.local
+.env.*.local
+
+# --- Rhino/Grasshopper Development --------------------------------------------
+
+# Temporary/Backup Files
 *.3dmbak
 *.rhl
 *.rws
 *.rws.data
+*.gh.lock
+
+# Rhino Plugin Installers (if generated locally)
+*.rhi
+*.yak
+
+# Grasshopper autosave
+*.ghx.autosave
+*.gh.autosave
 
 # ------------------------------------------------------------------------------
-# Leave Rhino / Grasshopper assets *tracked* via Git LFS
-#   *.3dm
-#   *.gh
-#   *.ghx
-#   *.ghdata
-#   *.ghuser
+# IMPORTANT: Domain assets tracked via Git LFS (DO NOT IGNORE)
+#   *.3dm   - Rhino models
+#   *.gh    - Grasshopper definitions
+#   *.ghx   - Grasshopper XML definitions
+#   *.ghdata - Grasshopper data files
+#   *.ghuser - Grasshopper user objects
 # (Handled by .gitattributes - do NOT ignore them here)
