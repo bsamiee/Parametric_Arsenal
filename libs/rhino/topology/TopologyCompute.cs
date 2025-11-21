@@ -201,11 +201,9 @@ internal static class TopologyCompute {
             componentIds[seed] = componentCount;
             while (queue.Count > 0) {
                 int faceIdx = queue.Dequeue();
-                foreach (int adjFace in getAdjacent(faceIdx)) {
-                    if (componentIds[adjFace] == -1) {
-                        componentIds[adjFace] = componentCount;
-                        queue.Enqueue(adjFace);
-                    }
+                foreach (int adjFace in getAdjacent(faceIdx).Where(f => componentIds[f] == -1)) {
+                    componentIds[adjFace] = componentCount;
+                    queue.Enqueue(adjFace);
                 }
             }
             componentCount++;
