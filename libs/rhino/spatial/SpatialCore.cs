@@ -92,9 +92,7 @@ internal static class SpatialCore {
             double dist = toGeom.Length;
             double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
             double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-            if (weightedDist <= request.MaxDistance) {
-                results.Add(new Spatial.ProximityFieldResult(args.Id, dist, angle, weightedDist));
-            }
+            _ = weightedDist <= request.MaxDistance && ((Func<bool>)(() => { results.Add(new Spatial.ProximityFieldResult(args.Id, dist, angle, weightedDist)); return true; }))();
         }
         _ = tree.Search(searchSphere, CollectResults);
         return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.WeightedDistance),]);
@@ -110,24 +108,25 @@ internal static class SpatialCore {
                     Spatial.BoundingBoxRange b => b.Box,
                     _ => null,
                 };
-                int bufferSize = request.BufferSize ?? defaultBuffer;
-                if (queryShape is null) {
-                    return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"));
-                }
-                int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-                int count = 0;
-                try {
-                    void Collect(object? sender, RTreeEventArgs args) =>
-                        _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
-                    _ = queryShape switch {
-                        Sphere sphere => tree.Search(sphere, Collect),
-                        BoundingBox box => tree.Search(box, Collect),
-                        _ => false,
-                    };
-                    return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
-                } finally {
-                    ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
-                }
+                return queryShape is null
+                    ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"))
+                    : ((Func<Result<IReadOnlyList<int>>>)(() => {
+                        int bufferSize = request.BufferSize ?? defaultBuffer;
+                        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+                        int count = 0;
+                        try {
+                            void Collect(object? sender, RTreeEventArgs args) =>
+                                _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
+                            _ = queryShape switch {
+                                Sphere sphere => tree.Search(sphere, Collect),
+                                BoundingBox box => tree.Search(box, Collect),
+                                _ => false,
+                            };
+                            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+                        } finally {
+                            ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
+                        }
+                    }))();
             }),
             config: new OperationConfig<TInput, int> {
                 Context = context,
