@@ -104,14 +104,14 @@ internal static class TopologyCompute {
 
                     foreach (Topology.Strategy currentStrategy in strategies) {
                         Brep copy = validBrep.DuplicateBrep();
-                        double toleranceMultiplier = TopologyConfig.StrategyMetadata.TryGetValue(currentStrategy.GetType(), out TopologyConfig.HealingStrategyMetadata? meta) ? meta.ToleranceMultiplier : 1.0;
+                        double toleranceMultiplier = TopologyConfig.StrategyMetadata[currentStrategy.GetType()].ToleranceMultiplier;
                         bool success = currentStrategy switch {
                             Topology.ConservativeRepairStrategy => copy.Repair(toleranceMultiplier * context.AbsoluteTolerance),
                             Topology.ModerateJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
                             Topology.AggressiveJoinStrategy => copy.JoinNakedEdges(toleranceMultiplier * context.AbsoluteTolerance) > 0,
                             Topology.CombinedStrategy => ((Func<bool>)(() => {
-                                double repairTolerance = TopologyConfig.StrategyMetadata.TryGetValue(typeof(Topology.ConservativeRepairStrategy), out TopologyConfig.HealingStrategyMetadata? conservativeMeta) ? conservativeMeta.ToleranceMultiplier * context.AbsoluteTolerance : 0.1 * context.AbsoluteTolerance;
-                                double joinTolerance = TopologyConfig.StrategyMetadata.TryGetValue(typeof(Topology.ModerateJoinStrategy), out TopologyConfig.HealingStrategyMetadata? moderateMeta) ? moderateMeta.ToleranceMultiplier * context.AbsoluteTolerance : context.AbsoluteTolerance;
+                                double repairTolerance = TopologyConfig.StrategyMetadata[typeof(Topology.ConservativeRepairStrategy)].ToleranceMultiplier * context.AbsoluteTolerance;
+                                double joinTolerance = TopologyConfig.StrategyMetadata[typeof(Topology.ModerateJoinStrategy)].ToleranceMultiplier * context.AbsoluteTolerance;
                                 return copy.Repair(repairTolerance) && copy.JoinNakedEdges(joinTolerance) > 0;
                             }))(),
                             Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
