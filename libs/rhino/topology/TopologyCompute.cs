@@ -14,8 +14,7 @@ namespace Arsenal.Rhino.Topology;
 internal static class TopologyCompute {
     internal static Result<Topology.TopologicalFeatures> ExtractFeatures(
         Brep validBrep,
-        IGeometryContext context,
-        double minLoopLength) =>
+        IGeometryContext context) =>
         (validBrep.Vertices.Count, validBrep.Edges.Count, validBrep.Faces.Count) switch {
             (int v, int e, int f) when v > 0 && e > 0 && f > 0 => ((Func<Result<Topology.TopologicalFeatures>>)(() => {
                 bool isSolid = validBrep.IsSolid && validBrep.IsManifold;
@@ -46,30 +45,22 @@ internal static class TopologyCompute {
             .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
         ];
 
-        IReadOnlyList<double> gaps = nakedEdges.Length > 1 && nakedEdges.Length <= maxEdgeThreshold
-            ? [.. (from i in Enumerable.Range(0, nakedEdges.Length - 1)
-                   from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
-                   let edgeI = validBrep.Edges[nakedEdges[i].Index].EdgeCurve
-                   let edgeJ = validBrep.Edges[nakedEdges[j].Index].EdgeCurve
-                   let distance = edgeI is Curve ci && edgeJ is Curve cj && ci.ClosestPoints(cj, out Point3d ptA, out Point3d ptB)
-                       ? ptA.DistanceTo(ptB)
-                       : double.MaxValue
-                   where distance > tolerance && distance < nearMissThreshold
-                   select distance),
-            ]
-            : [];
-
         int nonManifoldEdgeCount = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
-        IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = nakedEdges.Length > 1 && nakedEdges.Length <= maxEdgeThreshold
+        (int EdgeA, int EdgeB, double Distance)[] computedPairs = nakedEdges.Length > 1 && nakedEdges.Length <= maxEdgeThreshold
             ? [.. (from i in Enumerable.Range(0, nakedEdges.Length - 1)
                    from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
                    let edgeI = validBrep.Edges[nakedEdges[i].Index]
                    let edgeJ = validBrep.Edges[nakedEdges[j].Index]
-                   let dist = edgeI.EdgeCurve.ClosestPoints(edgeJ.EdgeCurve, out Point3d ptA, out Point3d ptB) ? ptA.DistanceTo(ptB) : double.MaxValue
-                   where dist < nearMissThreshold && dist > tolerance
-                   select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: dist)),
+                   let distance = edgeI.EdgeCurve is Curve ci && edgeJ.EdgeCurve is Curve cj && ci.ClosestPoints(cj, out Point3d ptA, out Point3d ptB)
+                       ? ptA.DistanceTo(ptB)
+                       : double.MaxValue
+                   where distance > tolerance && distance < nearMissThreshold
+                   select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: distance)),
             ]
             : [];
+
+        IReadOnlyList<double> gaps = [.. computedPairs.Select(p => p.Distance),];
+        IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = computedPairs;
 
         IReadOnlyList<Topology.Strategy> repairs = (nakedEdges.Length, nonManifoldEdgeCount, nearMisses.Count) switch {
             ( > 0, > 0, > 0) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.AggressiveJoin, Topology.Strategy.Combined,],
@@ -95,20 +86,20 @@ internal static class TopologyCompute {
         Brep bestHealed = validBrep.DuplicateBrep();
         int bestNakedEdges = originalNakedEdges;
         double baseTolerance = context.AbsoluteTolerance;
-        double conservativeMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(typeof(Topology.ConservativeRepairStrategy), out HealingStrategyMetadata conservMeta) ? conservMeta.ToleranceMultiplier : 0.1;
-        double moderateMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(typeof(Topology.ModerateJoinStrategy), out HealingStrategyMetadata modMeta) ? modMeta.ToleranceMultiplier : 1.0;
-        double conservativeTolerance = conservativeMultiplier * baseTolerance;
-        double moderateTolerance = moderateMultiplier * baseTolerance;
 
         foreach (Topology.Strategy currentStrategy in strategies) {
             Brep copy = validBrep.DuplicateBrep();
-            double toleranceMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(currentStrategy.GetType(), out HealingStrategyMetadata meta) ? meta.ToleranceMultiplier : 1.0;
+            double toleranceMultiplier = TopologyConfig.StrategyToleranceMultipliers.TryGetValue(currentStrategy.GetType(), out double mult) ? mult : 1.0;
             double strategyTolerance = toleranceMultiplier * baseTolerance;
             bool success = currentStrategy switch {
                 Topology.ConservativeRepairStrategy => copy.Repair(strategyTolerance),
                 Topology.ModerateJoinStrategy => copy.JoinNakedEdges(strategyTolerance) > 0,
                 Topology.AggressiveJoinStrategy => copy.JoinNakedEdges(strategyTolerance) > 0,
-                Topology.CombinedStrategy => copy.Repair(conservativeTolerance) && copy.JoinNakedEdges(moderateTolerance) > 0,
+                Topology.CombinedStrategy => ((Func<bool>)(() => {
+                    double conservativeTolerance = (TopologyConfig.StrategyToleranceMultipliers.TryGetValue(typeof(Topology.ConservativeRepairStrategy), out double cMult) ? cMult : 0.1) * baseTolerance;
+                    double moderateTolerance = (TopologyConfig.StrategyToleranceMultipliers.TryGetValue(typeof(Topology.ModerateJoinStrategy), out double mMult) ? mMult : 1.0) * baseTolerance;
+                    return copy.Repair(conservativeTolerance) && copy.JoinNakedEdges(moderateTolerance) > 0;
+                }))(),
                 Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
                     double threshold = strategyTolerance;
                     bool joinedAny = false;
@@ -122,11 +113,8 @@ internal static class TopologyCompute {
                                     ? (true, copy.Edges[idxA], copy.Edges[idxB])
                                     : (false, null, null);
                                 bool bothNaked = validIndices && eA is not null && eB is not null && eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked;
-                                double minDist = bothNaked
-                                    ? Math.Min(
-                                        Math.Min(eA!.PointAtStart.DistanceTo(eB!.PointAtStart), eA.PointAtStart.DistanceTo(eB.PointAtEnd)),
-                                        Math.Min(eA.PointAtEnd.DistanceTo(eB.PointAtStart), eA.PointAtEnd.DistanceTo(eB.PointAtEnd))
-                                    )
+                                double minDist = bothNaked && eA!.EdgeCurve is Curve cA && eB!.EdgeCurve is Curve cB && cA.ClosestPoints(cB, out Point3d ptA, out Point3d ptB)
+                                    ? ptA.DistanceTo(ptB)
                                     : double.MaxValue;
                                 joinedThisPass = (bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)) || joinedThisPass;
                             }
@@ -139,7 +127,7 @@ internal static class TopologyCompute {
                 }))(),
                 Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
                     Brep[] components = copy.GetConnectedComponents() ?? [];
-                    return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: baseTolerance) switch {
+                    return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) switch {
                         null or { Length: 0 } => false,
                         Brep[] { Length: 1 } joined => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
                         Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),

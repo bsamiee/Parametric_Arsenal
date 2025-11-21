@@ -9,14 +9,14 @@ namespace Arsenal.Rhino.Topology;
 [Pure]
 internal static class TopologyConfig {
     /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
-    internal static readonly FrozenDictionary<Type, HealingStrategyMetadata> StrategyToleranceMultipliers =
-        new Dictionary<Type, HealingStrategyMetadata> {
-            [typeof(Topology.ConservativeRepairStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.ConservativeRepair", ToleranceMultiplier: 0.1),
-            [typeof(Topology.ModerateJoinStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.ModerateJoin", ToleranceMultiplier: 1.0),
-            [typeof(Topology.AggressiveJoinStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.AggressiveJoin", ToleranceMultiplier: 10.0),
-            [typeof(Topology.CombinedStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.Combined", ToleranceMultiplier: 1.0),
-            [typeof(Topology.TargetedJoinStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.TargetedJoin", ToleranceMultiplier: 10.0),
-            [typeof(Topology.ComponentJoinStrategy)] = new HealingStrategyMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal.ComponentJoin", ToleranceMultiplier: 1.0),
+    internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
+        new Dictionary<Type, double> {
+            [typeof(Topology.ConservativeRepairStrategy)] = 0.1,
+            [typeof(Topology.ModerateJoinStrategy)] = 1.0,
+            [typeof(Topology.AggressiveJoinStrategy)] = 10.0,
+            [typeof(Topology.CombinedStrategy)] = 1.0,
+            [typeof(Topology.TargetedJoinStrategy)] = 10.0,
+            [typeof(Topology.ComponentJoinStrategy)] = 1.0,
         }.ToFrozenDictionary();
 
     /// <summary>Operation metadata: (Type, OpType) to (ValidationMode, Name) mapping.</summary>
@@ -48,7 +48,7 @@ internal static class TopologyConfig {
     /// <summary>Feature extraction operation metadata configurations.</summary>
     internal static readonly FrozenDictionary<string, FeaturesMetadata> FeaturesOps =
         new Dictionary<string, FeaturesMetadata> {
-            ["ExtractFeatures"] = new FeaturesMetadata(ValidationMode: V.Standard | V.Topology | V.MassProperties, OpName: "Topology.ExtractFeatures", MinLoopLength: 0.0),
+            ["ExtractFeatures"] = new FeaturesMetadata(ValidationMode: V.Standard | V.Topology | V.MassProperties, OpName: "Topology.ExtractFeatures"),
         }.ToFrozenDictionary();
 
     /// <summary>Healing operation metadata configurations.</summary>
@@ -62,20 +62,17 @@ internal static class TopologyConfig {
     internal const int MaxEdgesForNearMissAnalysis = 100;
 
     /// <summary>Topology operation types for dispatch lookup.</summary>
-    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7, Diagnose = 8, ExtractFeatures = 9, Heal = 10 }
+    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
+
+    /// <summary>Base operation metadata with validation mode and operation name.</summary>
+    internal sealed record OperationMetadata(V ValidationMode, string OpName);
+
+    /// <summary>Diagnostic operation metadata with near-miss configuration.</summary>
+    internal sealed record DiagnosticMetadata(V ValidationMode, string OpName, double NearMissMultiplier, int MaxEdgeThreshold);
+
+    /// <summary>Feature extraction metadata.</summary>
+    internal sealed record FeaturesMetadata(V ValidationMode, string OpName);
+
+    /// <summary>Healing operation metadata with iteration limits and tolerance configuration.</summary>
+    internal sealed record HealingMetadata(V ValidationMode, string OpName, int MaxTargetedJoinIterations);
 }
-
-/// <summary>Base operation metadata with validation mode and operation name.</summary>
-internal sealed record OperationMetadata(V ValidationMode, string OpName);
-
-/// <summary>Diagnostic operation metadata with near-miss configuration.</summary>
-internal sealed record DiagnosticMetadata(V ValidationMode, string OpName, double NearMissMultiplier, int MaxEdgeThreshold);
-
-/// <summary>Feature extraction metadata with minimum loop length threshold.</summary>
-internal sealed record FeaturesMetadata(V ValidationMode, string OpName, double MinLoopLength);
-
-/// <summary>Healing operation metadata with iteration limits and tolerance configuration.</summary>
-internal sealed record HealingMetadata(V ValidationMode, string OpName, int MaxTargetedJoinIterations);
-
-/// <summary>Healing strategy metadata with tolerance multiplier.</summary>
-internal sealed record HealingStrategyMetadata(V ValidationMode, string OpName, double ToleranceMultiplier);
