@@ -325,7 +325,7 @@ internal static class TransformationCore {
         Transformation.TransformOperation end,
         double parameter,
         IGeometryContext context) =>
-        parameter is < TransformationConfig.MinInterpolationParameter or > TransformationConfig.MaxInterpolationParameter
+        parameter is < 0.0 or > 1.0
             ? ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidScaleFactor.WithContext($"Interpolation parameter: {parameter.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)} (must be ∈ [0,1])"))
             : BuildTransformMatrix(operation: start, context: context)
                 .Bind(m1 => BuildTransformMatrix(operation: end, context: context)

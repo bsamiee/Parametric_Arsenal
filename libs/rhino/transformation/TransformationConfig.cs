@@ -94,12 +94,6 @@ internal static class TransformationConfig {
     /// <summary>Maximum compound transform composition depth.</summary>
     internal const int MaxCompoundDepth = 100;
 
-    /// <summary>Minimum interpolation parameter.</summary>
-    internal const double MinInterpolationParameter = 0.0;
-
-    /// <summary>Maximum interpolation parameter.</summary>
-    internal const double MaxInterpolationParameter = 1.0;
-
     /// <summary>Tolerance for orthogonality check in decomposition.</summary>
     internal const double OrthogonalityTolerance = 1e-6;
 
