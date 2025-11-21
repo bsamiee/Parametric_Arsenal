@@ -68,7 +68,6 @@ internal static class TransformationCompute {
                     curve0: operation.BaseCurve,
                     curve1: operation.TargetCurve,
                     preventStretching: operation.PreserveStructure) {
-                    PreserveStructure = operation.PreserveStructure,
                     Tolerance = Math.Max(context.AbsoluteTolerance, meta.Tolerance),
                     QuickPreview = false,
                 },
