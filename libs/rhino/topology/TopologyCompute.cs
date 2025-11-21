@@ -162,10 +162,11 @@ internal static class TopologyCompute {
                 }))(),
                 _ => false,
             };
-            string validationLog = string.Empty;
-            (bool isValid, int nakedEdges) = success && copy.IsValidTopology(out validationLog)
-                ? (true, copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked))
-                : ((Func<(bool, int)>)(() => { System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}"); return (false, int.MaxValue); }))();
+            bool isValid = success && copy.IsValidTopology(out string validationLog);
+            int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
+            if (!isValid) {
+                System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}");
+            }
             bool isImprovement = isValid && nakedEdges < bestNakedEdges;
 
             Brep? toDispose = isImprovement ? bestHealed : copy;
@@ -176,9 +177,11 @@ internal static class TopologyCompute {
         }
 
         bool healedSuccessfully = bestNakedEdges < originalNakedEdges || originalNakedEdges == 0;
-        return healedSuccessfully
-            ? ResultFactory.Create(value: new Topology.HealingResult(Healed: bestHealed, AppliedStrategy: bestStrategy, Success: true))
-            : ((Func<Result<Topology.HealingResult>>)(() => { bestHealed.Dispose(); return ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed")); }))();
+        if (!healedSuccessfully) {
+            bestHealed.Dispose();
+            return ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
+        }
+        return ResultFactory.Create(value: new Topology.HealingResult(Healed: bestHealed, AppliedStrategy: bestStrategy, Success: true));
     }
 
     internal static Result<IReadOnlyList<Topology.ConnectivityData>> ComputeConnectivity<TGeometry>(
