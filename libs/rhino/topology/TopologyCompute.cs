@@ -190,21 +190,22 @@ internal static class TopologyCompute {
         int[] componentIds = new int[faceCount];
         Array.Fill(componentIds, -1);
         int componentCount = 0;
+        Queue<int> queue = new();
         for (int seed = 0; seed < faceCount; seed++) {
-            componentCount = componentIds[seed] != -1
-                ? componentCount
-                : ((Func<int>)(() => {
-                    Queue<int> queue = new([seed,]);
-                    componentIds[seed] = componentCount;
-                    while (queue.Count > 0) {
-                        int faceIdx = queue.Dequeue();
-                        foreach (int adjFace in getAdjacent(faceIdx).Where(f => componentIds[f] == -1)) {
-                            componentIds[adjFace] = componentCount;
-                            queue.Enqueue(adjFace);
-                        }
+            if (componentIds[seed] != -1) { continue; }
+            queue.Clear();
+            queue.Enqueue(seed);
+            componentIds[seed] = componentCount;
+            while (queue.Count > 0) {
+                int faceIdx = queue.Dequeue();
+                foreach (int adjFace in getAdjacent(faceIdx)) {
+                    if (componentIds[adjFace] == -1) {
+                        componentIds[adjFace] = componentCount;
+                        queue.Enqueue(adjFace);
                     }
-                    return componentCount;
-                }))() + 1;
+                }
+            }
+            componentCount++;
         }
         IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
         IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => getBounds(fIdx) switch {
