@@ -58,8 +58,6 @@ internal static class TopologyConfig {
         }.ToFrozenDictionary();
 
     internal const double CurvatureThresholdRatio = 0.1;
-    internal const double NearMissMultiplier = 100.0;
-    internal const int MaxEdgesForNearMissAnalysis = 100;
 
     /// <summary>Topology operation types for dispatch lookup.</summary>
     internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
