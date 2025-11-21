@@ -230,7 +230,7 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
         int n = pts.Length;
         int[] assignments = [.. Enumerable.Range(0, n),];
