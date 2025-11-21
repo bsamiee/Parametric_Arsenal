@@ -17,60 +17,60 @@
   <!-- Language & Platform Configuration            -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>                                  <!-- Target .NET 8.0 framework -->
-    <LangVersion>preview</LangVersion>                                         <!-- Use latest C# preview features -->
-    <Nullable>enable</Nullable>                                                <!-- Enable nullable reference types -->
-    <ImplicitUsings>enable</ImplicitUsings>                                    <!-- Enable implicit global usings -->
-    <Features>strict</Features>                                                <!-- Enable strict language features -->
-    <PlatformTarget>AnyCPU</PlatformTarget>                                    <!-- Build for any CPU architecture -->
-    <Prefer32Bit>false</Prefer32Bit>                                           <!-- Prefer 64-bit execution -->
+    <TargetFramework>net8.0</TargetFramework>                                     <!-- Target .NET 8.0 framework -->
+    <LangVersion>preview</LangVersion>                                            <!-- Use latest C# preview features -->
+    <Nullable>enable</Nullable>                                                   <!-- Enable nullable reference types -->
+    <ImplicitUsings>enable</ImplicitUsings>                                       <!-- Enable implicit global usings -->
+    <Features>strict</Features>                                                   <!-- Enable strict language features -->
+    <PlatformTarget>AnyCPU</PlatformTarget>                                       <!-- Build for any CPU architecture -->
+    <Prefer32Bit>false</Prefer32Bit>                                              <!-- Prefer 64-bit execution -->
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Build Configuration                          -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <IsPackable>false</IsPackable>                                             <!-- Not a NuGet package -->
-    <IsPublishable>false</IsPublishable>                                       <!-- Not for standalone publishing -->
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>            <!-- Use package lock for deterministic restore -->
+    <IsPackable>false</IsPackable>                                                <!-- Not a NuGet package -->
+    <IsPublishable>false</IsPublishable>                                          <!-- Not for standalone publishing -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>               <!-- Use package lock for deterministic restore -->
     <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder> <!-- No fallback package folder -->
-    <Deterministic>true</Deterministic>                                        <!-- Enable deterministic builds -->
-    <DebugType>portable</DebugType>                                            <!-- Use portable PDB format -->
-    <DebugSymbols>true</DebugSymbols>                                          <!-- Generate debug symbols -->
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>          <!-- Auto-generate binding redirects -->
+    <Deterministic>true</Deterministic>                                           <!-- Enable deterministic builds -->
+    <DebugType>portable</DebugType>                                               <!-- Use portable PDB format -->
+    <DebugSymbols>true</DebugSymbols>                                             <!-- Generate debug symbols -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>             <!-- Auto-generate binding redirects -->
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType> <!-- Generate for output type -->
-    <DisableRAR1001Warning>true</DisableRAR1001Warning>                        <!-- Disable assembly reference warnings -->
+    <DisableRAR1001Warning>true</DisableRAR1001Warning>                           <!-- Disable assembly reference warnings -->
   </PropertyGroup>
 
   <!-- Debug Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <Optimize>false</Optimize>                                                 <!-- Disable optimizations for debugging -->
-    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>                <!-- Check arithmetic overflow in Debug -->
+    <Optimize>false</Optimize>                                                    <!-- Disable optimizations for debugging -->
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>                   <!-- Check arithmetic overflow in Debug -->
   </PropertyGroup>
 
   <!-- Release Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <Optimize>true</Optimize>                                                  <!-- Enable compiler optimizations -->
-    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>               <!-- No overflow checks for performance -->
-    <ConcurrentBuild>true</ConcurrentBuild>                                    <!-- Build projects in parallel -->
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>              <!-- Optimize for CI environment -->
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>                  <!-- Generate reference assemblies -->
-    <TieredCompilation>true</TieredCompilation>                                <!-- Enable tiered JIT compilation -->
+    <Optimize>true</Optimize>                                                     <!-- Enable compiler optimizations -->
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>                  <!-- No overflow checks for performance -->
+    <ConcurrentBuild>true</ConcurrentBuild>                                       <!-- Build projects in parallel -->
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>                 <!-- Optimize for CI environment -->
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>                     <!-- Generate reference assemblies -->
+    <TieredCompilation>true</TieredCompilation>                                   <!-- Enable tiered JIT compilation -->
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Code Analysis Configuration                  -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>                              <!-- Enable .NET code analyzers -->
-    <AnalysisLevel>latest-all</AnalysisLevel>                                  <!-- Use latest analyzer version with all rules -->
-    <AnalysisMode>All</AnalysisMode>                                           <!-- Enable all analysis categories -->
-    <RunAnalyzers>true</RunAnalyzers>                                          <!-- Run analyzers during compilation -->
-    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>      <!-- Run analyzers in IDE during editing -->
-    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>                    <!-- Run analyzers during build -->
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>                    <!-- Enforce code style rules at build time -->
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>                        <!-- Treat all warnings as errors -->
-    <ReportAnalyzer>true</ReportAnalyzer>                                      <!-- Report all analyzer diagnostics -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>                                 <!-- Enable .NET code analyzers -->
+    <AnalysisLevel>latest-all</AnalysisLevel>                                     <!-- Use latest analyzer version with all rules -->
+    <AnalysisMode>All</AnalysisMode>                                              <!-- Enable all analysis categories -->
+    <RunAnalyzers>true</RunAnalyzers>                                             <!-- Run analyzers during compilation -->
+    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>         <!-- Run analyzers in IDE during editing -->
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>                       <!-- Run analyzers during build -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>                       <!-- Enforce code style rules at build time -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>                           <!-- Treat all warnings as errors -->
+    <ReportAnalyzer>true</ReportAnalyzer>                                         <!-- Report all analyzer diagnostics -->
   </PropertyGroup>
 
   <!-- ============================================ -->
