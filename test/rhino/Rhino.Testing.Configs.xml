@@ -3,17 +3,17 @@
 <!-- Headless configuration for automated CI/CD testing -->
 <!-- https://github.com/mcneel/Rhino.Testing -->
 <Settings>
-  <!-- Rhino installation path (auto-detected by setup-rhino3d action) -->
-  <RhinoSystemDirectory Condition="'$(OS)' == 'Windows_NT'">C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
-  
+  <!-- Rhino installation path (Windows CI) -->
+  <RhinoSystemDirectory>C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
+
   <!-- Headless mode configuration -->
   <CreateRhinoDoc>false</CreateRhinoDoc>
   <CreateRhinoView>false</CreateRhinoView>
-  
+
   <!-- Disable UI components for headless execution -->
   <LoadEto>false</LoadEto>
   <LoadRDK>false</LoadRDK>
-  
+
   <!-- Optional: Load Grasshopper if testing GH components -->
   <!-- <LoadGrasshopper>false</LoadGrasshopper> -->
 </Settings>

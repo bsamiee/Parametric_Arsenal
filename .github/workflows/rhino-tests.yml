@@ -39,7 +39,7 @@ jobs:
         run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
 
       - name: Run Rhino Tests
-        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --verbosity normal --logger "console;verbosity=detailed" --settings test/rhino/.runsettings
+        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
         env:
           RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
 
