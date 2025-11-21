@@ -106,6 +106,12 @@ internal static class TransformationConfig {
     /// <summary>Tolerance multiplier for Newton-Schulz convergence detection.</summary>
     internal const double NewtonSchulzToleranceMultiplier = 10.0;
 
+    /// <summary>Stretch morph influence length multiplier: extends influence region beyond axis endpoints.</summary>
+    internal const double StretchLengthMultiplier = 2.0;
+
+    /// <summary>Maelstrom inner radius: vortex starts from axis center.</summary>
+    internal const double MaelstromInnerRadius = 0.0;
+
     /// <summary>Transform operation metadata: validation mode and operation name.</summary>
     internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);
 
@@ -114,18 +120,4 @@ internal static class TransformationConfig {
 
     /// <summary>Morph operation metadata: validation mode, operation name, and tolerance.</summary>
     internal sealed record MorphOperationMetadata(V ValidationMode, string OperationName, double Tolerance);
-
-    /// <summary>Get validation mode for geometry type with inheritance fallback.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static V GetValidationMode(Type geometryType) =>
-        GeometryValidation.TryGetValue(geometryType, out V mode)
-            ? mode
-            : GeometryValidation
-                .Where(kv => kv.Key.IsAssignableFrom(geometryType))
-                .Aggregate(
-                    ((V?)null, (Type?)null),
-                    (best, kv) => best.Item2?.IsAssignableFrom(kv.Key) != false
-                        ? (kv.Value, kv.Key)
-                        : best)
-                .Item1 ?? V.Standard;
 }
