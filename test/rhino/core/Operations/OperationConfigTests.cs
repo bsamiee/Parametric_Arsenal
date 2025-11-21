@@ -222,7 +222,6 @@ public sealed class OperationConfigTests {
     [Test]
     public void GenericTypeParameters() => Test.RunAll(
         () => {
-            OperationConfig<string, int> config = new() { Context = TestContext };
             Assert.That(typeof(OperationConfig<string, int>).GetGenericArguments()[0], Is.EqualTo(typeof(string)));
             Assert.That(typeof(OperationConfig<string, int>).GetGenericArguments()[1], Is.EqualTo(typeof(int)));
         },
