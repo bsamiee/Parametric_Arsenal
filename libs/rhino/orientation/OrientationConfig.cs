@@ -7,17 +7,14 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Orientation;
 
-/// <summary>Unified metadata, constants, and dispatch tables for orientation operations.</summary>
 [Pure]
 internal static class OrientationConfig {
-    /// <summary>Centroid mode validation modes.</summary>
     internal static readonly FrozenDictionary<Type, V> CentroidModeValidation =
         new Dictionary<Type, V> {
             [typeof(Orientation.BoundingBoxCentroid)] = V.BoundingBox,
             [typeof(Orientation.MassCentroid)] = V.MassProperties,
         }.ToFrozenDictionary();
 
-    /// <summary>Canonical mode validation modes.</summary>
     internal static readonly FrozenDictionary<Type, V> CanonicalModeValidation =
         new Dictionary<Type, V> {
             [typeof(Orientation.WorldXY)] = V.BoundingBox,
@@ -27,7 +24,6 @@ internal static class OrientationConfig {
             [typeof(Orientation.VolumeCentroid)] = V.MassProperties,
         }.ToFrozenDictionary();
 
-    /// <summary>Plane extraction dispatch table by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, PlaneExtractorMetadata> PlaneExtractors =
         new Dictionary<Type, PlaneExtractorMetadata> {
             [typeof(Curve)] = new(g => ((Curve)g).FrameAt(((Curve)g).Domain.Mid, out Plane frame) && frame.IsValid
@@ -44,7 +40,6 @@ internal static class OrientationConfig {
                 : ResultFactory.Create<Plane>(error: E.Geometry.FrameExtractionFailed)),
         }.ToFrozenDictionary();
 
-    /// <summary>Singular unified operations dispatch table: operation type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, OrientationOperationMetadata> Operations =
         new Dictionary<Type, OrientationOperationMetadata> {
             [typeof(Orientation.ToPlane)] = new(V.Standard, "Orientation.ToPlane"),
@@ -58,7 +53,6 @@ internal static class OrientationConfig {
             [typeof(Orientation.ToSurfaceFrame)] = new(V.Standard | V.UVDomain, "Orientation.ToSurfaceFrame"),
         }.ToFrozenDictionary();
 
-    /// <summary>Geometry-specific validation modes.</summary>
     internal static readonly FrozenDictionary<Type, V> GeometryValidation =
         new Dictionary<Type, V> {
             [typeof(Curve)] = V.Standard | V.Degeneracy,
@@ -72,42 +66,24 @@ internal static class OrientationConfig {
             [typeof(PointCloud)] = V.Standard,
         }.ToFrozenDictionary();
 
-    /// <summary>Optimization operation metadata.</summary>
     internal static readonly OrientationOperationMetadata OptimizationMetadata = new(
         ValidationMode: V.Standard | V.Topology | V.BoundingBox | V.MassProperties,
         OperationName: "Orientation.Optimize");
 
-    /// <summary>Unified operation metadata for all orientation transforms.</summary>
     internal sealed record OrientationOperationMetadata(
         V ValidationMode,
         string OperationName);
 
-    /// <summary>Plane extractor metadata with validation and extraction function.</summary>
     internal sealed record PlaneExtractorMetadata(
         Func<GeometryBase, Result<Plane>> Extractor);
 
-    /// <summary>Best-fit plane minimum point count.</summary>
     internal const int BestFitMinPoints = 3;
-
-    /// <summary>Pattern detection minimum instance count.</summary>
     internal const int PatternMinInstances = 3;
-
-    /// <summary>Optimization test plane configurations.</summary>
     internal const int MaxDegeneracyDimensions = 3;
-
-    /// <summary>Rotation symmetry sample count for curve analysis.</summary>
     internal const int RotationSymmetrySampleCount = 36;
-
-    /// <summary>Pattern anomaly detection threshold multiplier.</summary>
     internal const double PatternAnomalyThreshold = 0.5;
-
-    /// <summary>Best-fit plane RMS residual threshold.</summary>
     internal const double BestFitResidualThreshold = 1e-3;
-
-    /// <summary>Low-profile aspect ratio threshold for canonical scoring.</summary>
     internal const double LowProfileAspectRatio = 0.25;
-
-    /// <summary>Canonical orientation scoring weights.</summary>
     internal const double OrientationScoreWeight1 = 0.4;
     internal const double OrientationScoreWeight2 = 0.4;
     internal const double OrientationScoreWeight3 = 0.2;
