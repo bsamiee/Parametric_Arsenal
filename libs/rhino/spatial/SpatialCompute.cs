@@ -113,13 +113,12 @@ internal static class SpatialCompute {
                 centroids[i] = sum <= tol || sum <= 0.0 ? pts[rng.Next(pts.Length)] : ((Func<Point3d>)(() => {
                     double target = rng.NextDouble() * sum;
                     double cumulative = 0.0;
-                    for (int j = 0; j < pts.Length; j++) {
+                    Point3d? selected = null;
+                    for (int j = 0; j < pts.Length && selected is null; j++) {
                         cumulative += distSq[j];
-                        if (cumulative >= target) {
-                            return pts[j];
-                        }
+                        selected = cumulative >= target ? pts[j] : null;
                     }
-                    return pts[^1];
+                    return selected ?? pts[^1];
                 }))();
             }
 
