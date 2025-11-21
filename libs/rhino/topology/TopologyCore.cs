@@ -64,19 +64,15 @@ internal static class TopologyCore {
     internal static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology,
             operation: g => g switch {
-                Mesh mesh => ((Func<(IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[]>)(() => {
-                    (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] data = new (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[mesh.Ngons.Count];
-                    for (int index = 0; index < mesh.Ngons.Count; index++) {
-                        MeshNgon ngon = mesh.Ngons.GetNgon(index);
-                        uint[]? faceList = ngon.FaceIndexList();
-                        uint[]? boundaryVerts = ngon.BoundaryVertexIndexList();
-                        Point3d center = mesh.Ngons.GetNgonCenter(index);
-                        IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
-                        IReadOnlyList<int> boundaries = [.. (boundaryVerts is uint[] bv ? bv : []).Select(vert => unchecked((int)vert)),];
-                        data[index] = (boundaries, faces, center.IsValid ? center : Point3d.Origin, boundaries.Count);
-                    }
-                    return data;
-                }))() switch {
+                Mesh mesh => [.. Enumerable.Range(0, mesh.Ngons.Count).Select(index => {
+                    MeshNgon ngon = mesh.Ngons.GetNgon(index);
+                    uint[]? faceList = ngon.FaceIndexList();
+                    uint[]? boundaryVerts = ngon.BoundaryVertexIndexList();
+                    Point3d center = mesh.Ngons.GetNgonCenter(index);
+                    IReadOnlyList<int> faces = [.. (faceList is uint[] fl ? fl : []).Select(face => unchecked((int)face)),];
+                    IReadOnlyList<int> boundaries = [.. (boundaryVerts is uint[] bv ? bv : []).Select(vert => unchecked((int)vert)),];
+                    return (boundaries, faces, center.IsValid ? center : Point3d.Origin, boundaries.Count);
+                }),] switch {
                     (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] { Length: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData([], [], [], [], [], 0, mesh.Faces.Count),]),
                     (IReadOnlyList<int>, IReadOnlyList<int>, Point3d, int)[] data => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData(
                         NgonIndices: [.. Enumerable.Range(0, data.Length),],
