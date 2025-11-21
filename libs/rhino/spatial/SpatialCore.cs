@@ -30,9 +30,9 @@ internal static class SpatialCore {
     internal static Result<IReadOnlyList<int>> Analyze(Spatial.AnalysisRequest request, IGeometryContext context) =>
         request switch {
             null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Request cannot be null")),
-            Spatial.RangeAnalysis<Point3d[]> r => RunRangeWithLookup(r, typeof(Point3d[]), BuildPointArrayTree, context),
-            Spatial.RangeAnalysis<PointCloud> r => RunRangeWithLookup(r, typeof(PointCloud), BuildPointCloudTree, context),
-            Spatial.RangeAnalysis<Mesh> r => RunRangeWithLookup(r, typeof(Mesh), BuildMeshTree, context),
+            Spatial.RangeAnalysis<Point3d[]> r => RunRangeWithLookup(r, typeof(Point3d[]), static pts => RTree.CreateFromPointArray(pts) ?? new RTree(), context),
+            Spatial.RangeAnalysis<PointCloud> r => RunRangeWithLookup(r, typeof(PointCloud), static cloud => RTree.CreatePointCloudTree(cloud) ?? new RTree(), context),
+            Spatial.RangeAnalysis<Mesh> r => RunRangeWithLookup(r, typeof(Mesh), static mesh => RTree.CreateMeshFaceTree(mesh) ?? new RTree(), context),
             Spatial.RangeAnalysis<Curve[]> r => RunRangeWithLookup(r, typeof(Curve[]), BuildGeometryArrayTree, context),
             Spatial.RangeAnalysis<Surface[]> r => RunRangeWithLookup(r, typeof(Surface[]), BuildGeometryArrayTree, context),
             Spatial.RangeAnalysis<Brep[]> r => RunRangeWithLookup(r, typeof(Brep[]), BuildGeometryArrayTree, context),
@@ -61,82 +61,84 @@ internal static class SpatialCore {
         };
 
     /// <summary>Algebraic ProximityField dispatcher.</summary>
-    internal static Result<Spatial.ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) =>
-        (geometry.Length, request) switch {
-            (0, _) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
-            (_, null) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDirection.WithContext("Request cannot be null")),
-            (_, { Direction.Length: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.ZeroLengthDirection),
-            (_, { MaxDistance: <= 0.0 }) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must be positive")),
-            _ => ((Func<Result<Spatial.ProximityFieldResult[]>>)(() => {
-                using RTree tree = new();
-                BoundingBox bounds = BoundingBox.Empty;
-                Point3d[] centers = new Point3d[geometry.Length];
-                for (int i = 0; i < geometry.Length; i++) {
-                    BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
-                    _ = tree.Insert(bbox, i);
-                    bounds.Union(bbox);
-                    centers[i] = bbox.Center;
-                }
-                Vector3d dir = request.Direction / request.Direction.Length;
-                Point3d origin = bounds.Center;
-                Sphere searchSphere = new(origin, request.MaxDistance);
-                List<Spatial.ProximityFieldResult> results = [];
-                void CollectResults(object? sender, RTreeEventArgs args) {
-                    Vector3d toGeom = centers[args.Id] - origin;
-                    double dist = toGeom.Length;
-                    double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
-                    double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
-                    if (weightedDist <= request.MaxDistance) {
-                        results.Add(new Spatial.ProximityFieldResult(args.Id, dist, angle, weightedDist));
-                    }
-                }
-                _ = tree.Search(searchSphere, CollectResults);
-                return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.WeightedDistance),]);
-            }))(),
-        };
-
-    private static Result<IReadOnlyList<int>> RunRangeAnalysis<TInput>(Spatial.RangeAnalysis<TInput> request, Func<TInput, RTree> factory, V validationMode, int defaultBuffer, string operationName, IGeometryContext context) where TInput : notnull {
-        Result<IReadOnlyList<int>> Operation(TInput input) {
-            using RTree tree = factory(input);
-            object? queryShape = request.Shape switch {
-                Spatial.SphereRange s => s.Sphere,
-                Spatial.BoundingBoxRange b => b.Box,
-                _ => null,
-            };
-            int bufferSize = request.BufferSize ?? defaultBuffer;
-            if (queryShape is null) {
-                return ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"));
-            }
-            int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
-            int count = 0;
-            try {
-                void Collect(object? sender, RTreeEventArgs args) =>
-                    _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
-                _ = queryShape switch {
-                    Sphere sphere => tree.Search(sphere, Collect),
-                    BoundingBox box => tree.Search(box, Collect),
-                    _ => false,
-                };
-                return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
-            } finally {
-                ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
-            }
+    internal static Result<Spatial.ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) {
+        if (geometry.Length is 0) {
+            return ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry"));
         }
+        if (request is null) {
+            return ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDirection.WithContext("Request cannot be null"));
+        }
+        if (request.Direction.Length <= 0.0) {
+            return ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.ZeroLengthDirection);
+        }
+        if (request.MaxDistance <= 0.0) {
+            return ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Spatial.InvalidDistance.WithContext("MaxDistance must be positive"));
+        }
+        using RTree tree = new();
+        BoundingBox bounds = BoundingBox.Empty;
+        Point3d[] centers = new Point3d[geometry.Length];
+        for (int i = 0; i < geometry.Length; i++) {
+            BoundingBox bbox = geometry[i].GetBoundingBox(accurate: true);
+            _ = tree.Insert(bbox, i);
+            bounds.Union(bbox);
+            centers[i] = bbox.Center;
+        }
+        Vector3d dir = request.Direction / request.Direction.Length;
+        Point3d origin = bounds.Center;
+        Sphere searchSphere = new(origin, request.MaxDistance);
+        List<Spatial.ProximityFieldResult> results = [];
+        void CollectResults(object? sender, RTreeEventArgs args) {
+            Vector3d toGeom = centers[args.Id] - origin;
+            double dist = toGeom.Length;
+            double angle = dist > context.AbsoluteTolerance ? Vector3d.VectorAngle(dir, toGeom / dist) : 0.0;
+            double weightedDist = dist * (1.0 + (request.AngleWeight * angle));
+            _ = weightedDist <= request.MaxDistance && ((Func<bool>)(() => { results.Add(new Spatial.ProximityFieldResult(args.Id, dist, angle, weightedDist)); return true; }))();
+        }
+        _ = tree.Search(searchSphere, CollectResults);
+        return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.WeightedDistance),]);
+    }
 
-        return UnifiedOperation.Apply(
+    private static Result<IReadOnlyList<int>> RunRangeAnalysis<TInput>(Spatial.RangeAnalysis<TInput> request, Func<TInput, RTree> factory, V validationMode, int defaultBuffer, string operationName, IGeometryContext context) where TInput : notnull =>
+        UnifiedOperation.Apply(
             input: request.Input,
-            operation: (Func<TInput, Result<IReadOnlyList<int>>>)Operation,
+            operation: (Func<TInput, Result<IReadOnlyList<int>>>)(input => {
+                using RTree tree = factory(input);
+                object? queryShape = request.Shape switch {
+                    Spatial.SphereRange s => s.Sphere,
+                    Spatial.BoundingBoxRange b => b.Box,
+                    _ => null,
+                };
+                return queryShape is null
+                    ? ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported shape: {request.Shape?.GetType().Name ?? "null"}"))
+                    : ((Func<Result<IReadOnlyList<int>>>)(() => {
+                        int bufferSize = request.BufferSize ?? defaultBuffer;
+                        int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
+                        int count = 0;
+                        try {
+                            void Collect(object? sender, RTreeEventArgs args) =>
+                                _ = count < buffer.Length ? (buffer[count++] = args.Id) : default;
+                            _ = queryShape switch {
+                                Sphere sphere => tree.Search(sphere, Collect),
+                                BoundingBox box => tree.Search(box, Collect),
+                                _ => false,
+                            };
+                            return ResultFactory.Create<IReadOnlyList<int>>(value: count > 0 ? [.. buffer[..count]] : []);
+                        } finally {
+                            ArrayPool<int>.Shared.Return(array: buffer, clearArray: true);
+                        }
+                    }))();
+            }),
             config: new OperationConfig<TInput, int> {
                 Context = context,
                 ValidationMode = validationMode,
                 OperationName = operationName,
                 EnableDiagnostics = false,
             });
-    }
 
-    private static Result<IReadOnlyList<int>> RunProximityAnalysis<TInput>(Spatial.ProximityAnalysis<TInput> request, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, V validationMode, string operationName, IGeometryContext context) where TInput : notnull {
-        Result<IReadOnlyList<int>> Operation(TInput input) {
-            return request.Query switch {
+    private static Result<IReadOnlyList<int>> RunProximityAnalysis<TInput>(Spatial.ProximityAnalysis<TInput> request, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, V validationMode, string operationName, IGeometryContext context) where TInput : notnull =>
+        UnifiedOperation.Apply(
+            input: request.Input,
+            operation: (Func<TInput, Result<IReadOnlyList<int>>>)(input => request.Query switch {
                 null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed.WithContext("Query cannot be null")),
                 Spatial.KNearestProximity { Count: <= 0 } => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidK),
                 Spatial.DistanceLimitedProximity { Distance: <= 0.0 } => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.InvalidDistance),
@@ -147,27 +149,21 @@ internal static class SpatialCore {
                     ? ResultFactory.Create<IReadOnlyList<int>>(value: [.. results.SelectMany(static indices => indices),])
                     : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed),
                 _ => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.ProximityFailed.WithContext($"Unsupported query: {request.Query.GetType().Name}")),
-            };
-        }
-
-        return UnifiedOperation.Apply(
-            input: request.Input,
-            operation: (Func<TInput, Result<IReadOnlyList<int>>>)Operation,
+            }),
             config: new OperationConfig<TInput, int> {
                 Context = context,
                 ValidationMode = validationMode,
                 OperationName = operationName,
                 EnableDiagnostics = false,
             });
-    }
 
     private static Result<IReadOnlyList<int>> RunMeshOverlapAnalysis(Spatial.MeshOverlapAnalysis request, IGeometryContext context) =>
         SpatialConfig.Operations.TryGetValue((typeof(Mesh), SpatialConfig.OperationTypeOverlap), out SpatialConfig.SpatialOperationMetadata? meta)
             ? UnifiedOperation.Apply(
                 input: request.First,
                 operation: (Func<Mesh, Result<IReadOnlyList<int>>>)(first => {
-                    using RTree tree1 = BuildMeshTree(first);
-                    using RTree tree2 = BuildMeshTree(request.Second);
+                    using RTree tree1 = RTree.CreateMeshFaceTree(first) ?? new RTree();
+                    using RTree tree2 = RTree.CreateMeshFaceTree(request.Second) ?? new RTree();
                     double tolerance = context.AbsoluteTolerance + request.AdditionalTolerance;
                     int bufferSize = request.BufferSize ?? meta.BufferSize;
                     int[] buffer = ArrayPool<int>.Shared.Rent(bufferSize);
@@ -192,15 +188,6 @@ internal static class SpatialCore {
                     EnableDiagnostics = false,
                 })
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Mesh overlap operation not configured"));
-
-    private static RTree BuildPointArrayTree(Point3d[] points) =>
-        RTree.CreateFromPointArray(points) ?? new RTree();
-
-    private static RTree BuildPointCloudTree(PointCloud cloud) =>
-        RTree.CreatePointCloudTree(cloud) ?? new RTree();
-
-    private static RTree BuildMeshTree(Mesh mesh) =>
-        RTree.CreateMeshFaceTree(mesh) ?? new RTree();
 
     private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
         SpatialConfig.Operations.TryGetValue((inputType, SpatialConfig.OperationTypeRange), out SpatialConfig.SpatialOperationMetadata? meta)

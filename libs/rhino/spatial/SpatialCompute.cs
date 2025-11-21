@@ -71,22 +71,25 @@ internal static class SpatialCompute {
         for (int i = 0; i < allPoints.Length; i++) {
             memberLists[assignments[i]].Add(i);
         }
-        // Compute results with dense expression-oriented pattern
-        return [.. Enumerable.Range(0, clusterCount).Select(c => memberLists[c].Count is 0
-            ? (Point3d.Origin, Array.Empty<double>())
-            : ((Func<(Point3d, double[])>)(() => {
-                Vector3d sum = Vector3d.Zero;
-                for (int mi = 0; mi < memberLists[c].Count; mi++) {
-                    sum += new Vector3d(allPoints[memberLists[c][mi]]);
-                }
-                Point3d centroid = Point3d.Origin + (sum / memberLists[c].Count);
-                double[] radii = new double[memberLists[c].Count];
-                for (int mi = 0; mi < memberLists[c].Count; mi++) {
-                    radii[mi] = allPoints[memberLists[c][mi]].DistanceTo(centroid);
-                }
-                return (centroid, radii);
-            }))()),
-        ];
+        (Point3d Centroid, double[] Radii)[] results = new (Point3d, double[])[clusterCount];
+        for (int c = 0; c < clusterCount; c++) {
+            results[c] = memberLists[c].Count is 0
+                ? (Point3d.Origin, [])
+                : ((Func<(Point3d, double[])>)(() => {
+                    Vector3d sum = Vector3d.Zero;
+                    int count = memberLists[c].Count;
+                    for (int mi = 0; mi < count; mi++) {
+                        sum += new Vector3d(allPoints[memberLists[c][mi]]);
+                    }
+                    Point3d centroid = Point3d.Origin + (sum / count);
+                    double[] radii = new double[count];
+                    for (int mi = 0; mi < count; mi++) {
+                        radii[mi] = allPoints[memberLists[c][mi]].DistanceTo(centroid);
+                    }
+                    return (centroid, radii);
+                }))();
+        }
+        return results;
     }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
@@ -109,17 +112,18 @@ internal static class SpatialCompute {
                     distSq[j] = minDist * minDist;
                     sum += distSq[j];
                 }
-
-                centroids[i] = sum <= tol || sum <= 0.0 ? pts[rng.Next(pts.Length)] : ((Func<Point3d>)(() => {
-                    double target = rng.NextDouble() * sum;
-                    double cumulative = 0.0;
-                    Point3d? selected = null;
-                    for (int j = 0; j < pts.Length && selected is null; j++) {
-                        cumulative += distSq[j];
-                        selected = cumulative >= target ? pts[j] : null;
-                    }
-                    return selected ?? pts[^1];
-                }))();
+                centroids[i] = sum <= tol || sum <= 0.0
+                    ? pts[rng.Next(pts.Length)]
+                    : ((Func<Point3d>)(() => {
+                        double target = rng.NextDouble() * sum;
+                        double cumulative = 0.0;
+                        Point3d? selected = null;
+                        for (int j = 0; j < pts.Length && selected is null; j++) {
+                            cumulative += distSq[j];
+                            selected = cumulative >= target ? pts[j] : null;
+                        }
+                        return selected ?? pts[^1];
+                    }))();
             }
 
             // Lloyd's algorithm - reset then assign with inline accumulation
@@ -170,11 +174,7 @@ internal static class SpatialCompute {
         int[] GetNeighbors(int idx) => tree is not null
             ? ((Func<int[]>)(() => {
                 List<int> buffer = [];
-                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
-                    if (args.Id != idx) {
-                        buffer.Add(args.Id);
-                    }
-                });
+                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => _ = args.Id != idx && ((Func<bool>)(() => { buffer.Add(args.Id); return true; }))());
                 return [.. buffer,];
             }))()
             : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
@@ -223,7 +223,7 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
         int n = pts.Length;
         int[] assignments = [.. Enumerable.Range(0, n),];
@@ -313,31 +313,32 @@ internal static class SpatialCompute {
     /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
     [Pure]
     internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
-        points.Length < 3 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
-            : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
-                ? ((Func<Result<Point3d[]>>)(() => {
-                    Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-                    double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-                    List<Point3d> lower = [];
-                    for (int i = 0; i < pts.Length; i++) {
-                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
-                            lower.RemoveAt(lower.Count - 1);
-                        }
-                        lower.Add(pts[i]);
-                    }
-                    List<Point3d> upper = [];
-                    for (int i = pts.Length - 1; i >= 0; i--) {
-                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= crossProductTolerance) {
-                            upper.RemoveAt(upper.Count - 1);
-                        }
-                        upper.Add(pts[i]);
-                    }
-                    Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
-                    return result.Length >= 3
-                        ? ResultFactory.Create(value: result)
-                        : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
-                }))()
-                : ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"));
+        points.Length < 3
+            ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
+            : points.Length > 1 && points[0].Z is double z0 && !points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
+                ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"))
+                : ((Func<Result<Point3d[]>>)(() => {
+        Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+        double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+        List<Point3d> lower = [];
+        for (int i = 0; i < pts.Length; i++) {
+            while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
+                lower.RemoveAt(lower.Count - 1);
+            }
+            lower.Add(pts[i]);
+        }
+        List<Point3d> upper = [];
+        for (int i = pts.Length - 1; i >= 0; i--) {
+            while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= crossProductTolerance) {
+                upper.RemoveAt(upper.Count - 1);
+            }
+            upper.Add(pts[i]);
+        }
+        Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
+        return result.Length >= 3
+            ? ResultFactory.Create(value: result)
+            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+    }))();
 
     /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
     [Pure]
@@ -460,7 +461,7 @@ internal static class SpatialCompute {
     internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
-            : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => ((Func<Result<Point3d[][]>>)(() => {
+            : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => {
                 Point3d[] circumcenters = new Point3d[triangles.Length];
                 for (int ti = 0; ti < triangles.Length; ti++) {
                     (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
@@ -483,13 +484,11 @@ internal static class SpatialCompute {
                 for (int i = 0; i < points.Length; i++) {
                     List<Point3d> cell = [];
                     for (int ti = 0; ti < triangles.Length; ti++) {
-                        if (circumcenters[ti].IsValid && triangles[ti].Contains(i)) {
-                            cell.Add(circumcenters[ti]);
-                        }
+                        _ = circumcenters[ti].IsValid && triangles[ti].Contains(i) && ((Func<bool>)(() => { cell.Add(circumcenters[ti]); return true; }))();
                     }
-
-                    cells[i] = cell.Count > 0
-                        ? ((Func<Point3d[]>)(() => {
+                    cells[i] = cell.Count is 0
+                        ? []
+                        : ((Func<Point3d[]>)(() => {
                             double centerX = 0.0;
                             double centerY = 0.0;
                             for (int ci = 0; ci < cell.Count; ci++) {
@@ -499,9 +498,8 @@ internal static class SpatialCompute {
                             centerX /= cell.Count;
                             centerY /= cell.Count;
                             return [.. cell.OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX)),];
-                        }))()
-                        : [];
+                        }))();
                 }
                 return ResultFactory.Create(value: cells);
-            }))());
+            });
 }
