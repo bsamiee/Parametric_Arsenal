@@ -9,11 +9,6 @@ namespace Arsenal.Rhino.Extraction;
 /// <summary>Unified metadata, constants, and dispatch tables for extraction operations.</summary>
 [Pure]
 internal static class ExtractionConfig {
-    /// <summary>Unified operation metadata for all extraction transforms.</summary>
-    internal sealed record ExtractionOperationMetadata(
-        V ValidationMode,
-        string OperationName);
-
     /// <summary>Point operation validation modes.</summary>
     internal static readonly FrozenDictionary<Type, ExtractionOperationMetadata> PointOperations =
         new Dictionary<Type, ExtractionOperationMetadata> {
@@ -69,14 +64,14 @@ internal static class ExtractionConfig {
         ValidationMode: V.Standard | V.BoundingBox,
         OperationName: "Extraction.Patterns");
 
-    /// <summary>Fillet detection thresholds.</summary>
-    internal const double FilletCurvatureVariationThreshold = 0.15;
-    internal const int FilletCurvatureSampleCount = 5;
-
     /// <summary>Edge classification thresholds.</summary>
     internal static readonly double SharpEdgeAngleThreshold = RhinoMath.ToRadians(20.0);
     internal static readonly double SmoothEdgeAngleThreshold = RhinoMath.ToRadians(170.0);
     internal static readonly double FeatureEdgeAngleThreshold = RhinoMath.ToRadians(30.0);
+
+    /// <summary>Fillet detection thresholds.</summary>
+    internal const double FilletCurvatureVariationThreshold = 0.15;
+    internal const int FilletCurvatureSampleCount = 5;
 
     /// <summary>Hole detection parameters.</summary>
     internal const int MinHolePolySides = 16;
@@ -100,6 +95,11 @@ internal static class ExtractionConfig {
     internal const int MaxIsocurveCount = 100;
     internal const int DefaultOsculatingFrameCount = 10;
     internal const int BoundaryIsocurveCount = 5;
+
+    /// <summary>Unified operation metadata for all extraction transforms.</summary>
+    internal sealed record ExtractionOperationMetadata(
+        V ValidationMode,
+        string OperationName);
 
     /// <summary>Gets validation mode with geometry-specific refinements.</summary>
     internal static V GetValidationMode(Type _, Type geometryType, V baseMode) =>
