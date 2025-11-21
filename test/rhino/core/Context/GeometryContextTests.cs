@@ -76,7 +76,8 @@ public sealed class GeometryContextTests {
                 relativeTolerance: -0.5,
                 angleToleranceRadians: 0.017453292519943295,
                 units: UnitSystem.Meters);
-            Test.Success(result, ctx => ctx.RelativeTolerance == 0.0);
+            const double epsilon = 1e-9;
+            Test.Success(result, ctx => Math.Abs(ctx.RelativeTolerance) < epsilon);
         });
 
     /// <summary>Verifies Create() normalizes zero tolerances to defaults.</summary>
