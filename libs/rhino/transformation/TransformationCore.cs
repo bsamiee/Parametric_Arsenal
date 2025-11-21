@@ -16,15 +16,11 @@ internal static class TransformationCore {
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(
         T item,
         Transform transform) where T : GeometryBase {
-        GeometryBase normalized = item is Extrusion extrusion
-            ? extrusion.ToBrep(splitKinkyFaces: true)
-            : item;
-        T duplicate = (T)normalized.Duplicate();
+        T duplicate = (T)item.Duplicate();
         Result<IReadOnlyList<T>> result = duplicate.Transform(transform)
             ? ResultFactory.Create<IReadOnlyList<T>>(value: [duplicate,])
             : ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.Transformation.TransformApplicationFailed);
 
-        (item is Extrusion ? normalized : null)?.Dispose();
         (!result.IsSuccess ? duplicate : null)?.Dispose();
 
         return result;
