@@ -438,18 +438,20 @@ internal static class SpatialCompute {
         double by = b.Y - p.Y;
         double cx = c.X - p.X;
         double cy = c.Y - p.Y;
-        double orientation = (bx * cy) - (by * cx) + (cx * ay) - (cy * ax) + (ax * by) - (ay * bx);
+        // Compute twice the signed area of triangle (a,b,c) to check for degeneracy
+        double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+        // Check for degenerate triangle: if orientation is near zero, the points are collinear and the incircle predicate is not meaningful.
         if (Math.Abs(orientation) <= orientationTolerance) {
             return false;
         }
 
-        double axSq = (ax * ax) + (ay * ay);
-        double bxSq = (bx * bx) + (by * by);
-        double cxSq = (cx * cx) + (cy * cy);
-        double det = (axSq * ((bx * cy) - (by * cx))) + (bxSq * ((cx * ay) - (cy * ax))) + (cxSq * ((ax * by) - (ay * bx)));
+        // Incircle determinant test using squared distances
+        double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
+        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
         double adjustedDet = orientation > 0.0 ? det : -det;
-        return adjustedDet > (orientationTolerance * orientationTolerance);
+        double determinantTolerance = orientationTolerance * orientationTolerance;
+        return adjustedDet > determinantTolerance;
     }
 
     /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>
@@ -495,9 +497,7 @@ internal static class SpatialCompute {
                             }
                             centerX /= cell.Count;
                             centerY /= cell.Count;
-                            double cx = centerX;
-                            double cy = centerY;
-                            return [.. cell.OrderBy(p => Math.Atan2(p.Y - cy, p.X - cx)),];
+                            return [.. cell.OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX)),];
                         }))()
                         : [];
                 }
