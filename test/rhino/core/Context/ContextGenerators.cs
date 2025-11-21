@@ -4,7 +4,7 @@ using Arsenal.Core.Results;
 using CsCheck;
 using Rhino;
 
-namespace Arsenal.Core.Tests.Context;
+namespace Arsenal.Rhino.Tests.Core.Context;
 
 /// <summary>Context generators with zero-allocation static lambdas.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Test generators used for property-based testing")]

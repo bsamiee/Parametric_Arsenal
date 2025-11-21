@@ -6,12 +6,13 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Arsenal.Tests.Common;
 using CsCheck;
+using NUnit.Framework;
 using Rhino;
-using Xunit;
 
-namespace Arsenal.Core.Tests.Operations;
+namespace Arsenal.Rhino.Tests.Core.Operations;
 
 /// <summary>Tests UnifiedOperation polymorphic dispatch, validation, caching, and parallelism.</summary>
+[TestFixture]
 public sealed class UnifiedOperationTests {
     private static readonly IGeometryContext TestContext = new GeometryContext(
         AbsoluteTolerance: 0.01,
@@ -20,7 +21,7 @@ public sealed class UnifiedOperationTests {
         Units: UnitSystem.Meters);
 
     /// <summary>Verifies polymorphic dispatch for Func operation types.</summary>
-    [Fact]
+    [Test]
     public void PolymorphicDispatchFuncOperations() => Test.RunAll(
         () => Gen.Int.Run((int value) => {
             Func<int, Result<IReadOnlyList<int>>> op = x => ResultFactory.Create(value: (IReadOnlyList<int>)[x * 2]);
@@ -36,7 +37,7 @@ public sealed class UnifiedOperationTests {
         }));
 
     /// <summary>Verifies deferred operation with validation mode parameter.</summary>
-    [Fact]
+    [Test]
     public void DeferredOperationWithValidationMode() => Gen.Int.Run((int value) => {
         Func<int, V, Result<IReadOnlyList<int>>> deferred = (x, mode) =>
             mode == V.None
@@ -48,7 +49,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies nested Result flattening.</summary>
-    [Fact]
+    [Test]
     public void NestedResultFlattening() => Gen.Int.Run((int value) => {
         Func<int, Result<Result<IReadOnlyList<int>>>> nested = x =>
             ResultFactory.Create(value: ResultFactory.Create(value: (IReadOnlyList<int>)[x * 3]));
@@ -58,7 +59,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies list of operations with error accumulation.</summary>
-    [Fact]
+    [Test]
     public void ListOperationsErrorAccumulation() => Test.RunAll(
         () => Gen.Int.Run((int value) => {
             Result<int> Op1(int x) => ResultFactory.Create(value: x + 1);
@@ -80,7 +81,7 @@ public sealed class UnifiedOperationTests {
         }));
 
     /// <summary>Verifies conditional operation based on predicate.</summary>
-    [Fact]
+    [Test]
     public void ConditionalOperationPredicate() => Test.RunAll(
         () => Gen.Int.Run((int value) => {
             (Func<int, bool> pred, Func<int, Result<IReadOnlyList<int>>> op) conditional = (
@@ -92,16 +93,16 @@ public sealed class UnifiedOperationTests {
         }));
 
     /// <summary>Verifies validation integration with V.None skipping validation.</summary>
-    [Fact]
+    [Test]
     public void ValidationIntegrationNoneSkipsValidation() => Gen.Int.Run((int value) => {
         Func<int, Result<IReadOnlyList<int>>> op = x => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         OperationConfig<int, int> config = new() { Context = TestContext, ValidationMode = V.None };
         Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: value, operation: op, config: config);
-        Assert.True(result.IsSuccess);
+        Assert.That(result.IsSuccess, Is.True);
     });
 
     /// <summary>Verifies internal caching behavior with repeated calls.</summary>
-    [Fact]
+    [Test]
     public void InternalCachingBehavior() => Gen.Int.Run((int value) => {
         int executionCount = 0;
         Result<IReadOnlyList<int>> Op(int x) {
@@ -114,13 +115,13 @@ public sealed class UnifiedOperationTests {
         Result<IReadOnlyList<int>> result1 = UnifiedOperation.Apply(input: value, operation: operation, config: config);
         Result<IReadOnlyList<int>> result2 = UnifiedOperation.Apply(input: value, operation: operation, config: config);
 
-        Assert.True(result1.IsSuccess && result2.IsSuccess);
-        Assert.Equal(result1.Value[0], result2.Value[0]);
-        Assert.Equal(1, executionCount);
+        Assert.That(result1.IsSuccess && result2.IsSuccess, Is.True);
+        Assert.That(result2.Value[0], Is.EqualTo(result1.Value[0]));
+        Assert.That(executionCount, Is.EqualTo(1));
     });
 
     /// <summary>Verifies external cache dictionary usage.</summary>
-    [Fact]
+    [Test]
     public void ExternalCacheDictionary() => Gen.Int.Run((int value) => {
         int executionCount = 0;
         Result<IReadOnlyList<int>> Op(int x) {
@@ -134,12 +135,12 @@ public sealed class UnifiedOperationTests {
         Result<IReadOnlyList<int>> result1 = UnifiedOperation.Apply(input: value, operation: operation, config: config, externalCache: externalCache);
         Result<IReadOnlyList<int>> result2 = UnifiedOperation.Apply(input: value, operation: operation, config: config, externalCache: externalCache);
 
-        Assert.True(result1.IsSuccess && result2.IsSuccess);
-        Assert.Equal(1, executionCount);
+        Assert.That(result1.IsSuccess && result2.IsSuccess, Is.True);
+        Assert.That(executionCount, Is.EqualTo(1));
     });
 
     /// <summary>Verifies parallelism with EnableParallel flag.</summary>
-    [Fact]
+    [Test]
     public void ParallelismEnabledFlag() => Gen.Int.List[10, 50].Run((List<int> values) => {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x * 2]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
@@ -149,7 +150,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies MaxDegreeOfParallelism parameter.</summary>
-    [Fact]
+    [Test]
     public void MaxDegreeOfParallelismParameter() => Gen.Int.List[10, 50].Run((List<int> values) => {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
@@ -159,7 +160,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies error accumulation vs short-circuit behavior.</summary>
-    [Fact]
+    [Test]
     public void ErrorAccumulationVsShortCircuit() => Test.RunAll(
         () => {
             IReadOnlyList<int> values = [1, 2, 3, 4, 5];
@@ -185,18 +186,18 @@ public sealed class UnifiedOperationTests {
         });
 
     /// <summary>Verifies InputFilter predicate filtering.</summary>
-    [Fact]
+    [Test]
     public void InputFilterPredicate() => Gen.Int.Run((int value) => {
         Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         bool Filter(int x) => x > 0;
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<int, int> config = new() { Context = TestContext, InputFilter = Filter };
         Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: value, operation: operation, config: config);
-        Assert.Equal(value > 0, result.IsSuccess);
+        Assert.That(result.IsSuccess, Is.EqualTo(value > 0));
     });
 
     /// <summary>Verifies OutputFilter predicate filtering.</summary>
-    [Fact]
+    [Test]
     public void OutputFilterPredicate() => Gen.Int.List[5, 10].Run((List<int> values) => {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x, x + 1, x + 2]);
         static bool Filter(int x) => x % 2 == 0;
@@ -207,7 +208,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies PreTransform applied before operation.</summary>
-    [Fact]
+    [Test]
     public void PreTransformBeforeOperation() => Gen.Int.Run((int value) => {
         Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Result<int> Transform(int x) => ResultFactory.Create(value: x * 10);
@@ -221,7 +222,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies PostTransform applied after operation.</summary>
-    [Fact]
+    [Test]
     public void PostTransformAfterOperation() => Gen.Int.Run((int value) => {
         Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x, x + 1]);
         Result<int> Transform(int x) => ResultFactory.Create(value: x * 2);
@@ -235,7 +236,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies SkipInvalid behavior with failed validations.</summary>
-    [Fact]
+    [Test]
     public void SkipInvalidBehavior() {
         IReadOnlyList<int> values = [1, 2, 3, 4, 5];
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
@@ -251,7 +252,7 @@ public sealed class UnifiedOperationTests {
     }
 
     /// <summary>Verifies empty collection input returns empty result.</summary>
-    [Fact]
+    [Test]
     public void EmptyCollectionReturnsEmpty() {
         IReadOnlyList<int> empty = [];
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
@@ -262,7 +263,7 @@ public sealed class UnifiedOperationTests {
     }
 
     /// <summary>Verifies single-item collection optimization.</summary>
-    [Fact]
+    [Test]
     public void SingleItemCollectionOptimization() => Gen.Int.Run((int value) => {
         IReadOnlyList<int> single = [value];
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x * 2]);
@@ -273,7 +274,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies unsupported operation type returns error.</summary>
-    [Fact]
+    [Test]
     public void UnsupportedOperationTypeError() => Gen.Int.Run((int value) => {
         const string invalidOp = "not a valid operation";
         OperationConfig<int, int> config = new() { Context = TestContext };
@@ -282,7 +283,7 @@ public sealed class UnifiedOperationTests {
     });
 
     /// <summary>Verifies property-based invariant: output count never exceeds input count for single-to-single ops.</summary>
-    [Fact]
+    [Test]
     public void PropertyBasedOutputCountInvariant() => Gen.Int.List[1, 20].Run((List<int> values) => {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;

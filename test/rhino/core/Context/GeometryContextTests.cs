@@ -3,15 +3,16 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Tests.Common;
 using CsCheck;
+using NUnit.Framework;
 using Rhino;
-using Xunit;
 
-namespace Arsenal.Core.Tests.Context;
+namespace Arsenal.Rhino.Tests.Core.Context;
 
 /// <summary>Tests GeometryContext creation, validation, tolerance methods, and unit conversion.</summary>
+[TestFixture]
 public sealed class GeometryContextTests {
     /// <summary>Verifies Create() with valid tolerances.</summary>
-    [Fact]
+    [Test]
     public void CreateWithValidTolerances() => Test.RunAll(
         () => {
             Result<GeometryContext> result = GeometryContext.Create(
@@ -31,7 +32,7 @@ public sealed class GeometryContextTests {
         }));
 
     /// <summary>Verifies Create() returns errors for invalid tolerances.</summary>
-    [Fact]
+    [Test]
     public void CreateWithInvalidTolerances() => Test.RunAll(
         () => {
             Result<GeometryContext> result = GeometryContext.Create(
@@ -59,7 +60,7 @@ public sealed class GeometryContextTests {
         });
 
     /// <summary>Verifies Create() normalizes negative tolerances to defaults.</summary>
-    [Fact]
+    [Test]
     public void CreateNormalizesNegativeTolerances() => Test.RunAll(
         () => {
             Result<GeometryContext> result = GeometryContext.Create(
@@ -79,7 +80,7 @@ public sealed class GeometryContextTests {
         });
 
     /// <summary>Verifies Create() normalizes zero tolerances to defaults.</summary>
-    [Fact]
+    [Test]
     public void CreateNormalizesZeroTolerances() {
         Result<GeometryContext> result = GeometryContext.Create(
             absoluteTolerance: 0.0,
@@ -90,26 +91,26 @@ public sealed class GeometryContextTests {
     }
 
     /// <summary>Verifies CreateWithDefaults() returns valid context.</summary>
-    [Fact]
+    [Test]
     public void CreateWithDefaultsReturnsValidContext() => ContextGenerators.UnitSystemGen.Run((UnitSystem units) => {
         Result<GeometryContext> result = GeometryContext.CreateWithDefaults(units: units);
         Test.Success(result, ctx => {
-            Assert.Equal(0.01, ctx.AbsoluteTolerance);
-            Assert.Equal(0.0, ctx.RelativeTolerance);
-            Assert.Equal(units, ctx.Units);
+            Assert.That(ctx.AbsoluteTolerance, Is.EqualTo(0.01));
+            Assert.That(ctx.RelativeTolerance, Is.EqualTo(0.0));
+            Assert.That(ctx.Units, Is.EqualTo(units));
             return true;
         });
     });
 
     /// <summary>Verifies FromDocument() with null returns error.</summary>
-    [Fact]
+    [Test]
     public void FromDocumentNullReturnsError() {
         Result<GeometryContext> result = GeometryContext.FromDocument(doc: null);
         Test.Failure(result, errors => errors.Any(e => e.Code == E.Results.NoValueProvided.Code));
     }
 
     /// <summary>Verifies IsWithinAbsoluteTolerance() for values within and outside tolerance.</summary>
-    [Fact]
+    [Test]
     public void IsWithinAbsoluteToleranceMethod() => Test.RunAll(
         () => {
             Result<GeometryContext> contextResult = GeometryContext.Create(
@@ -118,8 +119,8 @@ public sealed class GeometryContextTests {
                 angleToleranceRadians: 0.017453292519943295,
                 units: UnitSystem.Meters);
             Test.Success(contextResult, ctx => {
-                Assert.True(ctx.IsWithinAbsoluteTolerance(1.0, 1.005));
-                Assert.False(ctx.IsWithinAbsoluteTolerance(1.0, 1.05));
+                Assert.That(ctx.IsWithinAbsoluteTolerance(1.0, 1.005), Is.True);
+                Assert.That(ctx.IsWithinAbsoluteTolerance(1.0, 1.05), Is.False);
                 return true;
             });
         },
@@ -130,14 +131,14 @@ public sealed class GeometryContextTests {
                 angleToleranceRadians: 0.017453292519943295,
                 units: UnitSystem.Meters);
             Test.Success(contextResult, ctx => {
-                Assert.True(ctx.IsWithinAbsoluteTolerance(value, value));
-                Assert.True(ctx.IsWithinAbsoluteTolerance(value, value + (tol / 2.0)));
+                Assert.That(ctx.IsWithinAbsoluteTolerance(value, value), Is.True);
+                Assert.That(ctx.IsWithinAbsoluteTolerance(value, value + (tol / 2.0)), Is.True);
                 return true;
             });
         }));
 
     /// <summary>Verifies IsWithinSquaredTolerance() for squared distance checks.</summary>
-    [Fact]
+    [Test]
     public void IsWithinSquaredToleranceMethod() {
         Result<GeometryContext> contextResult = GeometryContext.Create(
             absoluteTolerance: 0.1,
@@ -145,14 +146,14 @@ public sealed class GeometryContextTests {
             angleToleranceRadians: 0.017453292519943295,
             units: UnitSystem.Meters);
         Test.Success(contextResult, ctx => {
-            Assert.True(ctx.IsWithinSquaredTolerance(0.005));
-            Assert.False(ctx.IsWithinSquaredTolerance(0.02));
+            Assert.That(ctx.IsWithinSquaredTolerance(0.005), Is.True);
+            Assert.That(ctx.IsWithinSquaredTolerance(0.02), Is.False);
             return true;
         });
     }
 
     /// <summary>Verifies IsWithinAngleTolerance() for angular comparisons.</summary>
-    [Fact]
+    [Test]
     public void IsWithinAngleToleranceMethod() {
         Result<GeometryContext> contextResult = GeometryContext.Create(
             absoluteTolerance: 0.01,
@@ -160,14 +161,14 @@ public sealed class GeometryContextTests {
             angleToleranceRadians: 0.017453292519943295,
             units: UnitSystem.Meters);
         Test.Success(contextResult, ctx => {
-            Assert.True(ctx.IsWithinAngleTolerance(0.0, 0.01));
-            Assert.False(ctx.IsWithinAngleTolerance(0.0, 0.1));
+            Assert.That(ctx.IsWithinAngleTolerance(0.0, 0.01), Is.True);
+            Assert.That(ctx.IsWithinAngleTolerance(0.0, 0.1), Is.False);
             return true;
         });
     }
 
     /// <summary>Verifies AbsoluteToleranceSquared computed property.</summary>
-    [Fact]
+    [Test]
     public void AbsoluteToleranceSquaredProperty() => ContextGenerators.ValidToleranceGen.Run((double tol) => {
         Result<GeometryContext> result = GeometryContext.Create(
             absoluteTolerance: tol,
@@ -181,7 +182,7 @@ public sealed class GeometryContextTests {
     });
 
     /// <summary>Verifies AngleToleranceDegrees computed property.</summary>
-    [Fact]
+    [Test]
     public void AngleToleranceDegreesProperty() {
         Result<GeometryContext> result = GeometryContext.Create(
             absoluteTolerance: 0.01,
@@ -195,7 +196,7 @@ public sealed class GeometryContextTests {
     }
 
     /// <summary>Verifies GetLengthScale() for same units returns 1.0.</summary>
-    [Fact]
+    [Test]
     public void GetLengthScaleSameUnitsReturnsOne() => ContextGenerators.UnitSystemGen.Run((UnitSystem units) => {
         Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: units);
         Test.Success(contextResult, ctx => {
@@ -206,7 +207,7 @@ public sealed class GeometryContextTests {
     });
 
     /// <summary>Verifies GetLengthScale() for different units returns valid scale.</summary>
-    [Fact]
+    [Test]
     public void GetLengthScaleDifferentUnitsReturnsScale() => Test.RunAll(
         () => {
             Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: UnitSystem.Meters);
@@ -232,7 +233,7 @@ public sealed class GeometryContextTests {
         });
 
     /// <summary>Verifies ConvertLength() for same units returns same value.</summary>
-    [Fact]
+    [Test]
     public void ConvertLengthSameUnitsReturnsSameValue() => Gen.Double.Select(ContextGenerators.UnitSystemGen).Run((double value, UnitSystem units) => {
         double validValue = RhinoMath.IsValidDouble(value) ? value : 1.0;
         Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: units);
@@ -244,7 +245,7 @@ public sealed class GeometryContextTests {
     });
 
     /// <summary>Verifies ConvertLength() for different units performs conversion.</summary>
-    [Fact]
+    [Test]
     public void ConvertLengthDifferentUnitsPerformsConversion() => Test.RunAll(
         () => {
             Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: UnitSystem.Meters);
@@ -270,7 +271,7 @@ public sealed class GeometryContextTests {
         });
 
     /// <summary>Verifies ConvertLength() with invalid value returns error.</summary>
-    [Fact]
+    [Test]
     public void ConvertLengthInvalidValueReturnsError() => Test.RunAll(
         () => {
             Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: UnitSystem.Meters);
@@ -290,7 +291,7 @@ public sealed class GeometryContextTests {
         });
 
     /// <summary>Verifies property-based tolerance transitivity.</summary>
-    [Fact]
+    [Test]
     public void PropertyBasedToleranceTransitivity() => Gen.Double[0.0, 10.0].Select(Gen.Double[0.0, 10.0], Gen.Double[0.0, 10.0]).Run((double a, double b, double c) => {
         Result<GeometryContext> contextResult = GeometryContext.Create(
             absoluteTolerance: 0.1,
@@ -301,13 +302,13 @@ public sealed class GeometryContextTests {
             bool abWithin = ctx.IsWithinAbsoluteTolerance(a, b);
             bool bcWithin = ctx.IsWithinAbsoluteTolerance(b, c);
             bool acWithin = ctx.IsWithinAbsoluteTolerance(a, c);
-            Assert.True(!abWithin || !bcWithin || acWithin || (Math.Abs(a - c) <= (ctx.AbsoluteTolerance * 2.0)));
+            Assert.That(!abWithin || !bcWithin || acWithin || (Math.Abs(a - c) <= (ctx.AbsoluteTolerance * 2.0)), Is.True);
             return true;
         });
     });
 
     /// <summary>Verifies property-based unit conversion round-trips.</summary>
-    [Fact]
+    [Test]
     public void PropertyBasedUnitConversionRoundTrips() => Gen.Double[0.1, 1000.0].Select(ContextGenerators.UnitSystemGen, ContextGenerators.UnitSystemGen).Run((double value, UnitSystem units1, UnitSystem units2) => {
         Result<GeometryContext> ctx1Result = GeometryContext.CreateWithDefaults(units: units1);
         Result<GeometryContext> ctx2Result = GeometryContext.CreateWithDefaults(units: units2);
@@ -329,7 +330,7 @@ public sealed class GeometryContextTests {
     });
 
     /// <summary>Verifies property-based scale composition.</summary>
-    [Fact]
+    [Test]
     public void PropertyBasedScaleComposition() => ContextGenerators.UnitSystemGen.Select(ContextGenerators.UnitSystemGen, ContextGenerators.UnitSystemGen).Run((UnitSystem u1, UnitSystem u2, UnitSystem u3) => {
         Result<GeometryContext> ctx1 = GeometryContext.CreateWithDefaults(units: u1);
         Result<GeometryContext> ctx2 = GeometryContext.CreateWithDefaults(units: u2);
@@ -362,22 +363,22 @@ public sealed class GeometryContextTests {
     });
 
     /// <summary>Verifies record equality and hash consistency.</summary>
-    [Fact]
+    [Test]
     public void RecordEqualityAndHashConsistency() => ContextGenerators.GeometryContextGen.Run((GeometryContext ctx) => {
         GeometryContext copy = new(
             AbsoluteTolerance: ctx.AbsoluteTolerance,
             RelativeTolerance: ctx.RelativeTolerance,
             AngleToleranceRadians: ctx.AngleToleranceRadians,
             Units: ctx.Units);
-        Assert.Equal(ctx, copy);
-        Assert.Equal(ctx.GetHashCode(), copy.GetHashCode());
+        Assert.That(copy, Is.EqualTo(ctx));
+        Assert.That(copy.GetHashCode(), Is.EqualTo(ctx.GetHashCode()));
     });
 
     /// <summary>Verifies DebuggerDisplay format contains key tolerance values.</summary>
-    [Fact]
+    [Test]
     public void DebuggerDisplayFormat() => ContextGenerators.GeometryContextGen.Run((GeometryContext ctx) => {
         string display = ctx.ToString();
-        Assert.NotNull(display);
-        Assert.NotEmpty(display);
+        Assert.That(display, Is.Not.Null);
+        Assert.That(display, Is.Not.Empty);
     });
 }

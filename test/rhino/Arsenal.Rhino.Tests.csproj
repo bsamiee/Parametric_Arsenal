@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
+    <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
