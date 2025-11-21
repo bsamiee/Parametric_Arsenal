@@ -382,7 +382,6 @@ internal static class TransformationCompute {
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
                 }));
 
-
     /// <summary>Decompose transform matrix into TRS components using polar decomposition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transformation.DecomposedTransform> DecomposeTransform(
