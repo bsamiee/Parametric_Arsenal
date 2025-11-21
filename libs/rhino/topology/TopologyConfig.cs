@@ -40,27 +40,27 @@ internal static class TopologyConfig {
         }.ToFrozenDictionary();
 
     /// <summary>Diagnostic operation metadata configurations.</summary>
-    internal static readonly FrozenDictionary<string, DiagnosticMetadata> DiagnosticOps =
-        new Dictionary<string, DiagnosticMetadata> {
-            ["Diagnose"] = new DiagnosticMetadata(ValidationMode: V.Standard | V.Topology | V.BrepGranular, OpName: "Topology.Diagnose", NearMissMultiplier: 100.0, MaxEdgeThreshold: 100),
+    internal static readonly FrozenDictionary<OpType, DiagnosticMetadata> DiagnosticOps =
+        new Dictionary<OpType, DiagnosticMetadata> {
+            [OpType.Diagnose] = new DiagnosticMetadata(ValidationMode: V.Standard | V.Topology | V.BrepGranular, OpName: "Topology.Diagnose", NearMissMultiplier: 100.0, MaxEdgeThreshold: 100),
         }.ToFrozenDictionary();
 
     /// <summary>Feature extraction operation metadata configurations.</summary>
-    internal static readonly FrozenDictionary<string, FeaturesMetadata> FeaturesOps =
-        new Dictionary<string, FeaturesMetadata> {
-            ["ExtractFeatures"] = new FeaturesMetadata(ValidationMode: V.Standard | V.Topology | V.MassProperties, OpName: "Topology.ExtractFeatures"),
+    internal static readonly FrozenDictionary<OpType, FeaturesMetadata> FeaturesOps =
+        new Dictionary<OpType, FeaturesMetadata> {
+            [OpType.ExtractFeatures] = new FeaturesMetadata(ValidationMode: V.Standard | V.Topology | V.MassProperties, OpName: "Topology.ExtractFeatures"),
         }.ToFrozenDictionary();
 
     /// <summary>Healing operation metadata configurations.</summary>
-    internal static readonly FrozenDictionary<string, HealingMetadata> HealingOps =
-        new Dictionary<string, HealingMetadata> {
-            ["Heal"] = new HealingMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal", MaxTargetedJoinIterations: 100),
+    internal static readonly FrozenDictionary<OpType, HealingMetadata> HealingOps =
+        new Dictionary<OpType, HealingMetadata> {
+            [OpType.Heal] = new HealingMetadata(ValidationMode: V.Standard | V.Topology, OpName: "Topology.Heal", MaxTargetedJoinIterations: 100),
         }.ToFrozenDictionary();
 
     internal const double CurvatureThresholdRatio = 0.1;
 
     /// <summary>Topology operation types for dispatch lookup.</summary>
-    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7 }
+    internal enum OpType { NakedEdges = 0, BoundaryLoops = 1, NonManifold = 2, Connectivity = 3, EdgeClassification = 4, Adjacency = 5, VertexData = 6, NgonTopology = 7, Diagnose = 8, ExtractFeatures = 9, Heal = 10 }
 
     /// <summary>Base operation metadata with validation mode and operation name.</summary>
     internal sealed record OperationMetadata(V ValidationMode, string OpName);

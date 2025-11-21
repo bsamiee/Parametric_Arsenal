@@ -129,7 +129,7 @@ internal static class SpatialCompute {
                 for (int i = 0; i < k; i++) {
                     clusters[i] = (Vector3d.Zero, 0);
                 }
-                
+
                 // Assign points to nearest centroid with inline accumulation
                 for (int i = 0; i < pts.Length; i++) {
                     int nearest = 0;

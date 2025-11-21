@@ -77,10 +77,11 @@
   <!-- Code Analyzers                               -->
   <!-- ============================================ -->
   <ItemGroup>
-    <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" />
+    <!-- IDisposableAnalyzers 4.0.8 causes stack overflow with complex lambda expressions - disabled until fix available -->
+    <!-- <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" /> -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.250" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.254" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.100" PrivateAssets="all" />
     <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" />
     <PackageReference Include="ReflectionAnalyzers" Version="0.3.1" PrivateAssets="all" />
     <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581" PrivateAssets="all" />

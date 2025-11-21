@@ -1,3 +1,4 @@
+using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Tests.Common;
 using CsCheck;
@@ -105,7 +106,7 @@ public sealed class SharedUtilitiesTests {
     /// <summary>Verifies Test.Law category theory functor identity.</summary>
     [Fact]
     public void TestLaw_Verify_ChecksFunctorIdentity() {
-        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(Errors.E.Results.NoValueProvided.WithContext("test")), successWeight: 1, failureWeight: 0);
+        Gen<Result<int>> gen = Gen.Int.ToResult(Gen.Const(E.Results.NoValueProvided.WithContext("test")), successWeight: 1, failureWeight: 0);
         Test.Law<int>("FunctorIdentity", gen, 50);
     }
 

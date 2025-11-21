@@ -4,7 +4,6 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Morphs;
@@ -338,14 +337,46 @@ internal static class TransformationCompute {
             .Bind(firstDecomp => DecomposeTransformInternal(matrix: second, context: context)
                 .Bind(secondDecomp => {
                     double t = Math.Clamp(factor, 0.0, 1.0);
-                    Vector3d translation = firstDecomp.Translation * (1.0 - t) + secondDecomp.Translation * t;
-                    Vector3d scale = firstDecomp.Scale * (1.0 - t) + secondDecomp.Scale * t;
+                    Vector3d translation = (firstDecomp.Translation * (1.0 - t)) + (secondDecomp.Translation * t);
+                    Vector3d scale = (firstDecomp.Scale * (1.0 - t)) + (secondDecomp.Scale * t);
                     Quaternion rotation = Quaternion.Slerp(firstDecomp.Rotation, secondDecomp.Rotation, t);
 
-                    Transform translationMatrix = Transform.Translation(motion: translation);
-                    Transform rotationMatrix = Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin);
-                    Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
-                    Transform result = translationMatrix * rotationMatrix * scaleMatrix;
+                    double w = rotation.A;
+                    double x = rotation.B;
+                    double y = rotation.C;
+                    double z = rotation.D;
+                    double xx = x * x;
+                    double yy = y * y;
+                    double zz = z * z;
+                    double xy = x * y;
+                    double xz = x * z;
+                    double yz = y * z;
+                    double wx = w * x;
+                    double wy = w * y;
+                    double wz = w * z;
+
+                    Transform result = Transform.Identity;
+                    result.M00 = 1.0 - (2.0 * (yy + zz));
+                    result.M01 = 2.0 * (xy - wz);
+                    result.M02 = 2.0 * (xz + wy);
+                    result.M03 = translation.X;
+                    result.M10 = 2.0 * (xy + wz);
+                    result.M11 = 1.0 - (2.0 * (xx + zz));
+                    result.M12 = 2.0 * (yz - wx);
+                    result.M13 = translation.Y;
+                    result.M20 = 2.0 * (xz - wy);
+                    result.M21 = 2.0 * (yz + wx);
+                    result.M22 = 1.0 - (2.0 * (xx + yy));
+                    result.M23 = translation.Z;
+                    result.M00 *= scale.X;
+                    result.M10 *= scale.X;
+                    result.M20 *= scale.X;
+                    result.M01 *= scale.Y;
+                    result.M11 *= scale.Y;
+                    result.M21 *= scale.Y;
+                    result.M02 *= scale.Z;
+                    result.M12 *= scale.Z;
+                    result.M22 *= scale.Z;
 
                     return result.IsValid && result.Determinant > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
@@ -363,14 +394,46 @@ internal static class TransformationCompute {
             .Bind(startDecomp => DecomposeTransformInternal(matrix: end, context: context)
                 .Bind(endDecomp => {
                     double clampedT = Math.Clamp(t, 0.0, 1.0);
-                    Vector3d translation = startDecomp.Translation * (1.0 - clampedT) + endDecomp.Translation * clampedT;
-                    Vector3d scale = startDecomp.Scale * (1.0 - clampedT) + endDecomp.Scale * clampedT;
+                    Vector3d translation = (startDecomp.Translation * (1.0 - clampedT)) + (endDecomp.Translation * clampedT);
+                    Vector3d scale = (startDecomp.Scale * (1.0 - clampedT)) + (endDecomp.Scale * clampedT);
                     Quaternion rotation = Quaternion.Slerp(startDecomp.Rotation, endDecomp.Rotation, clampedT);
 
-                    Transform translationMatrix = Transform.Translation(motion: translation);
-                    Transform rotationMatrix = Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin);
-                    Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
-                    Transform result = translationMatrix * rotationMatrix * scaleMatrix;
+                    double w = rotation.A;
+                    double x = rotation.B;
+                    double y = rotation.C;
+                    double z = rotation.D;
+                    double xx = x * x;
+                    double yy = y * y;
+                    double zz = z * z;
+                    double xy = x * y;
+                    double xz = x * z;
+                    double yz = y * z;
+                    double wx = w * x;
+                    double wy = w * y;
+                    double wz = w * z;
+
+                    Transform result = Transform.Identity;
+                    result.M00 = 1.0 - (2.0 * (yy + zz));
+                    result.M01 = 2.0 * (xy - wz);
+                    result.M02 = 2.0 * (xz + wy);
+                    result.M03 = translation.X;
+                    result.M10 = 2.0 * (xy + wz);
+                    result.M11 = 1.0 - (2.0 * (xx + zz));
+                    result.M12 = 2.0 * (yz - wx);
+                    result.M13 = translation.Y;
+                    result.M20 = 2.0 * (xz - wy);
+                    result.M21 = 2.0 * (yz + wx);
+                    result.M22 = 1.0 - (2.0 * (xx + yy));
+                    result.M23 = translation.Z;
+                    result.M00 *= scale.X;
+                    result.M10 *= scale.X;
+                    result.M20 *= scale.X;
+                    result.M01 *= scale.Y;
+                    result.M11 *= scale.Y;
+                    result.M21 *= scale.Y;
+                    result.M02 *= scale.Z;
+                    result.M12 *= scale.Z;
+                    result.M22 *= scale.Z;
 
                     return result.IsValid && result.Determinant > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
@@ -411,14 +474,14 @@ internal static class TransformationCompute {
         double m21 = matrix.M21;
         double m22 = matrix.M22;
 
-        double col0DotCol1 = m00 * m01 + m10 * m11 + m20 * m21;
-        double col0DotCol2 = m00 * m02 + m10 * m12 + m20 * m22;
-        double col1DotCol2 = m01 * m02 + m11 * m12 + m21 * m22;
+        double col0DotCol1 = (m00 * m01) + (m10 * m11) + (m20 * m21);
+        double col0DotCol2 = (m00 * m02) + (m10 * m12) + (m20 * m22);
+        double col1DotCol2 = (m01 * m02) + (m11 * m12) + (m21 * m22);
         double maxCrossTerm = Math.Max(Math.Abs(col0DotCol1), Math.Max(Math.Abs(col0DotCol2), Math.Abs(col1DotCol2)));
 
-        double scaleX = Math.Sqrt(m00 * m00 + m10 * m10 + m20 * m20);
-        double scaleY = Math.Sqrt(m01 * m01 + m11 * m11 + m21 * m21);
-        double scaleZ = Math.Sqrt(m02 * m02 + m12 * m12 + m22 * m22);
+        double scaleX = Math.Sqrt((m00 * m00) + (m10 * m10) + (m20 * m20));
+        double scaleY = Math.Sqrt((m01 * m01) + (m11 * m11) + (m21 * m21));
+        double scaleZ = Math.Sqrt((m02 * m02) + (m12 * m12) + (m22 * m22));
         double minScale = Math.Min(scaleX, Math.Min(scaleY, scaleZ));
 
         bool hasShear = maxCrossTerm > Math.Max(minScale * TransformationConfig.ShearDetectionThreshold, context.AbsoluteTolerance);
@@ -454,30 +517,63 @@ internal static class TransformationCompute {
 
         double trace = r00 + r11 + r22;
         Quaternion rotation = trace > 0.0
-            ? QuaternionFromPositiveTrace(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21, trace: trace)
+            ? QuaternionFromPositiveTrace(r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21, trace: trace)
             : QuaternionFromNegativeTrace(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21);
 
-        double dot0 = r00 * r00 + r10 * r10 + r20 * r20;
-        double dot1 = r01 * r01 + r11 * r11 + r21 * r21;
-        double dot2 = r02 * r02 + r12 * r12 + r22 * r22;
-        double cross01 = r00 * r01 + r10 * r11 + r20 * r21;
-        double cross02 = r00 * r02 + r10 * r12 + r20 * r22;
-        double cross12 = r01 * r02 + r11 * r12 + r21 * r22;
+        double dot0 = (r00 * r00) + (r10 * r10) + (r20 * r20);
+        double dot1 = (r01 * r01) + (r11 * r11) + (r21 * r21);
+        double dot2 = (r02 * r02) + (r12 * r12) + (r22 * r22);
+        double cross01 = (r00 * r01) + (r10 * r11) + (r20 * r21);
+        double cross02 = (r00 * r02) + (r10 * r12) + (r20 * r22);
+        double cross12 = (r01 * r02) + (r11 * r12) + (r21 * r22);
 
         double orthogonalityError = Math.Max(
             Math.Max(Math.Abs(dot0 - 1.0), Math.Abs(dot1 - 1.0)),
             Math.Max(Math.Abs(dot2 - 1.0), Math.Max(Math.Abs(cross01), Math.Max(Math.Abs(cross02), Math.Abs(cross12)))));
 
-        Transform reconstructed = Transform.Translation(motion: translation)
-            * Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin)
-            * Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
+        double w = rotation.A;
+        double x = rotation.B;
+        double y = rotation.C;
+        double z = rotation.D;
+        double xx = x * x;
+        double yy = y * y;
+        double zz = z * z;
+        double xy = x * y;
+        double xz = x * z;
+        double yz = y * z;
+        double wx = w * x;
+        double wy = w * y;
+        double wz = w * z;
+
+        Transform reconstructed = Transform.Identity;
+        reconstructed.M00 = (1.0 - (2.0 * (yy + zz))) * scale.X;
+        reconstructed.M01 = (2.0 * (xy - wz)) * scale.Y;
+        reconstructed.M02 = (2.0 * (xz + wy)) * scale.Z;
+        reconstructed.M03 = translation.X;
+        reconstructed.M10 = (2.0 * (xy + wz)) * scale.X;
+        reconstructed.M11 = (1.0 - (2.0 * (xx + zz))) * scale.Y;
+        reconstructed.M12 = (2.0 * (yz - wx)) * scale.Z;
+        reconstructed.M13 = translation.Y;
+        reconstructed.M20 = (2.0 * (xz - wy)) * scale.X;
+        reconstructed.M21 = (2.0 * (yz + wx)) * scale.Y;
+        reconstructed.M22 = (1.0 - (2.0 * (xx + yy))) * scale.Z;
+        reconstructed.M23 = translation.Z;
 
         bool hasInverse = reconstructed.TryGetInverse(out Transform inv);
-        Transform residual = new(
-            m00: m00, m01: m01, m02: m02, m03: translation.X,
-            m10: m10, m11: m11, m12: m12, m13: translation.Y,
-            m20: m20, m21: m21, m22: m22, m23: translation.Z,
-            m30: 0.0, m31: 0.0, m32: 0.0, m33: 1.0) * (hasInverse ? inv : Transform.Identity);
+        Transform originalMatrix = Transform.Identity;
+        originalMatrix.M00 = m00;
+        originalMatrix.M01 = m01;
+        originalMatrix.M02 = m02;
+        originalMatrix.M03 = translation.X;
+        originalMatrix.M10 = m10;
+        originalMatrix.M11 = m11;
+        originalMatrix.M12 = m12;
+        originalMatrix.M13 = translation.Y;
+        originalMatrix.M20 = m20;
+        originalMatrix.M21 = m21;
+        originalMatrix.M22 = m22;
+        originalMatrix.M23 = translation.Z;
+        Transform residual = originalMatrix * (hasInverse ? inv : Transform.Identity);
 
         return ResultFactory.Create(value: new Transformation.DecomposedTransform(
             Translation: translation,
@@ -511,7 +607,7 @@ internal static class TransformationCompute {
         double q10, double q11, double q12,
         double q20, double q21, double q22,
         IGeometryContext context) {
-        double det = q00 * (q11 * q22 - q12 * q21) - q01 * (q10 * q22 - q12 * q20) + q02 * (q10 * q21 - q11 * q20);
+        double det = (q00 * ((q11 * q22) - (q12 * q21))) - (q01 * ((q10 * q22) - (q12 * q20))) + (q02 * ((q10 * q21) - (q11 * q20)));
         return Math.Abs(det) < context.AbsoluteTolerance
             ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, true)
             : IterateNewtonSchulzCore(q00: q00, q01: q01, q02: q02, q10: q10, q11: q11, q12: q12, q20: q20, q21: q21, q22: q22, det: det, context: context);
@@ -526,15 +622,15 @@ internal static class TransformationCompute {
         double det,
         IGeometryContext context) {
         double invDet = 1.0 / det;
-        double inv00 = (q11 * q22 - q12 * q21) * invDet;
-        double inv01 = (q02 * q21 - q01 * q22) * invDet;
-        double inv02 = (q01 * q12 - q02 * q11) * invDet;
-        double inv10 = (q12 * q20 - q10 * q22) * invDet;
-        double inv11 = (q00 * q22 - q02 * q20) * invDet;
-        double inv12 = (q02 * q10 - q00 * q12) * invDet;
-        double inv20 = (q10 * q21 - q11 * q20) * invDet;
-        double inv21 = (q01 * q20 - q00 * q21) * invDet;
-        double inv22 = (q00 * q11 - q01 * q10) * invDet;
+        double inv00 = ((q11 * q22) - (q12 * q21)) * invDet;
+        double inv01 = ((q02 * q21) - (q01 * q22)) * invDet;
+        double inv02 = ((q01 * q12) - (q02 * q11)) * invDet;
+        double inv10 = ((q12 * q20) - (q10 * q22)) * invDet;
+        double inv11 = ((q00 * q22) - (q02 * q20)) * invDet;
+        double inv12 = ((q02 * q10) - (q00 * q12)) * invDet;
+        double inv20 = ((q10 * q21) - (q11 * q20)) * invDet;
+        double inv21 = ((q01 * q20) - (q00 * q21)) * invDet;
+        double inv22 = ((q00 * q11) - (q01 * q10)) * invDet;
 
         double next00 = 0.5 * (q00 + inv00);
         double next01 = 0.5 * (q01 + inv01);
@@ -565,9 +661,9 @@ internal static class TransformationCompute {
         double q20, double q21, double q22,
         Vector3d translation,
         IGeometryContext context) {
-        double s00 = q00 * m00 + q10 * m10 + q20 * m20;
-        double s11 = q01 * m01 + q11 * m11 + q21 * m21;
-        double s22 = q02 * m02 + q12 * m12 + q22 * m22;
+        double s00 = (q00 * m00) + (q10 * m10) + (q20 * m20);
+        double s11 = (q01 * m01) + (q11 * m11) + (q21 * m21);
+        double s22 = (q02 * m02) + (q12 * m12) + (q22 * m22);
 
         double sign0 = s00 < 0.0 ? -1.0 : 1.0;
         double sign1 = s11 < 0.0 ? -1.0 : 1.0;
@@ -590,30 +686,63 @@ internal static class TransformationCompute {
 
         double trace = rq00 + rq11 + rq22;
         Quaternion rotation = trace > 0.0
-            ? QuaternionFromPositiveTrace(r00: rq00, r11: rq11, r22: rq22, r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21, trace: trace)
+            ? QuaternionFromPositiveTrace(r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21, trace: trace)
             : QuaternionFromNegativeTrace(r00: rq00, r11: rq11, r22: rq22, r01: rq01, r02: rq02, r10: rq10, r12: rq12, r20: rq20, r21: rq21);
 
-        double dot0 = rq00 * rq00 + rq10 * rq10 + rq20 * rq20;
-        double dot1 = rq01 * rq01 + rq11 * rq11 + rq21 * rq21;
-        double dot2 = rq02 * rq02 + rq12 * rq12 + rq22 * rq22;
-        double cross01 = rq00 * rq01 + rq10 * rq11 + rq20 * rq21;
-        double cross02 = rq00 * rq02 + rq10 * rq12 + rq20 * rq22;
-        double cross12 = rq01 * rq02 + rq11 * rq12 + rq21 * rq22;
+        double dot0 = (rq00 * rq00) + (rq10 * rq10) + (rq20 * rq20);
+        double dot1 = (rq01 * rq01) + (rq11 * rq11) + (rq21 * rq21);
+        double dot2 = (rq02 * rq02) + (rq12 * rq12) + (rq22 * rq22);
+        double cross01 = (rq00 * rq01) + (rq10 * rq11) + (rq20 * rq21);
+        double cross02 = (rq00 * rq02) + (rq10 * rq12) + (rq20 * rq22);
+        double cross12 = (rq01 * rq02) + (rq11 * rq12) + (rq21 * rq22);
 
         double orthogonalityError = Math.Max(
             Math.Max(Math.Abs(dot0 - 1.0), Math.Abs(dot1 - 1.0)),
             Math.Max(Math.Abs(dot2 - 1.0), Math.Max(Math.Abs(cross01), Math.Max(Math.Abs(cross02), Math.Abs(cross12)))));
 
-        Transform reconstructed = Transform.Translation(motion: translation)
-            * Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin)
-            * Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
+        double w = rotation.A;
+        double x = rotation.B;
+        double y = rotation.C;
+        double z = rotation.D;
+        double xx = x * x;
+        double yy = y * y;
+        double zz = z * z;
+        double xy = x * y;
+        double xz = x * z;
+        double yz = y * z;
+        double wx = w * x;
+        double wy = w * y;
+        double wz = w * z;
+
+        Transform reconstructed = Transform.Identity;
+        reconstructed.M00 = (1.0 - (2.0 * (yy + zz))) * scale.X;
+        reconstructed.M01 = (2.0 * (xy - wz)) * scale.Y;
+        reconstructed.M02 = (2.0 * (xz + wy)) * scale.Z;
+        reconstructed.M03 = translation.X;
+        reconstructed.M10 = (2.0 * (xy + wz)) * scale.X;
+        reconstructed.M11 = (1.0 - (2.0 * (xx + zz))) * scale.Y;
+        reconstructed.M12 = (2.0 * (yz - wx)) * scale.Z;
+        reconstructed.M13 = translation.Y;
+        reconstructed.M20 = (2.0 * (xz - wy)) * scale.X;
+        reconstructed.M21 = (2.0 * (yz + wx)) * scale.Y;
+        reconstructed.M22 = (1.0 - (2.0 * (xx + yy))) * scale.Z;
+        reconstructed.M23 = translation.Z;
 
         bool hasInverse = reconstructed.TryGetInverse(out Transform inv);
-        Transform residual = new(
-            m00: m00, m01: m01, m02: m02, m03: translation.X,
-            m10: m10, m11: m11, m12: m12, m13: translation.Y,
-            m20: m20, m21: m21, m22: m22, m23: translation.Z,
-            m30: 0.0, m31: 0.0, m32: 0.0, m33: 1.0) * (hasInverse ? inv : Transform.Identity);
+        Transform originalMatrix = Transform.Identity;
+        originalMatrix.M00 = m00;
+        originalMatrix.M01 = m01;
+        originalMatrix.M02 = m02;
+        originalMatrix.M03 = translation.X;
+        originalMatrix.M10 = m10;
+        originalMatrix.M11 = m11;
+        originalMatrix.M12 = m12;
+        originalMatrix.M13 = translation.Y;
+        originalMatrix.M20 = m20;
+        originalMatrix.M21 = m21;
+        originalMatrix.M22 = m22;
+        originalMatrix.M23 = translation.Z;
+        Transform residual = originalMatrix * (hasInverse ? inv : Transform.Identity);
 
         return ResultFactory.Create(value: new Transformation.DecomposedTransform(
             Translation: translation,
@@ -627,9 +756,6 @@ internal static class TransformationCompute {
     /// <summary>Construct quaternion from rotation matrix with positive trace.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Quaternion QuaternionFromPositiveTrace(
-        double r00,
-        double r11,
-        double r22,
         double r01,
         double r02,
         double r10,

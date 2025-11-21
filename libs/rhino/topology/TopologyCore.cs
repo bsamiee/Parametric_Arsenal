@@ -5,7 +5,6 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino;
 using Rhino.Geometry;
 
@@ -15,29 +14,29 @@ namespace Arsenal.Rhino.Topology;
 [Pure]
 internal static class TopologyCore {
     internal static Result<Topology.TopologyDiagnosis> ExecuteDiagnose(Brep input, IGeometryContext context) =>
-        TopologyConfig.DiagnosticOps.TryGetValue("Diagnose", out TopologyConfig.DiagnosticMetadata diagMeta)
+        TopologyConfig.DiagnosticOps.TryGetValue(TopologyConfig.OpType.Diagnose, out TopologyConfig.DiagnosticMetadata? diagMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
-                    .Validate(args: [context, diagMeta.ValidationMode,])
-                    .Bind(validBrep => TopologyCompute.Diagnose(validBrep: validBrep, context: context, nearMissMultiplier: diagMeta.NearMissMultiplier, maxEdgeThreshold: diagMeta.MaxEdgeThreshold))
+                    .Validate(args: [context, diagMeta!.ValidationMode,])
+                    .Bind(validBrep => TopologyCompute.Diagnose(validBrep: validBrep, context: context, nearMissMultiplier: diagMeta!.NearMissMultiplier, maxEdgeThreshold: diagMeta!.MaxEdgeThreshold))
                 : ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
             : ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Diagnose"));
 
     internal static Result<Topology.TopologicalFeatures> ExecuteExtractFeatures(Brep input, IGeometryContext context) =>
-        TopologyConfig.FeaturesOps.TryGetValue("ExtractFeatures", out TopologyConfig.FeaturesMetadata featuresMeta)
+        TopologyConfig.FeaturesOps.TryGetValue(TopologyConfig.OpType.ExtractFeatures, out TopologyConfig.FeaturesMetadata? featuresMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
-                    .Validate(args: [context, featuresMeta.ValidationMode,])
+                    .Validate(args: [context, featuresMeta!.ValidationMode,])
                     .Bind(validBrep => TopologyCompute.ExtractFeatures(validBrep: validBrep, context: context))
                 : ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
             : ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: ExtractFeatures"));
 
     internal static Result<Topology.HealingResult> ExecuteHeal(Brep input, IReadOnlyList<Topology.Strategy> strategies, IGeometryContext context) =>
-        TopologyConfig.HealingOps.TryGetValue("Heal", out TopologyConfig.HealingMetadata healMeta)
+        TopologyConfig.HealingOps.TryGetValue(TopologyConfig.OpType.Heal, out TopologyConfig.HealingMetadata? healMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
-                    .Validate(args: [context, healMeta.ValidationMode,])
-                    .Bind(validBrep => TopologyCompute.Heal(validBrep: validBrep, strategies: strategies, context: context, maxTargetedJoinIterations: healMeta.MaxTargetedJoinIterations))
+                    .Validate(args: [context, healMeta!.ValidationMode,])
+                    .Bind(validBrep => TopologyCompute.Heal(validBrep: validBrep, strategies: strategies, context: context, maxTargetedJoinIterations: healMeta!.MaxTargetedJoinIterations))
                 : ResultFactory.Create<Topology.HealingResult>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid before healing: {topologyLog}"))
             : ResultFactory.Create<Topology.HealingResult>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Heal"));
 
@@ -323,7 +322,7 @@ internal static class TopologyCore {
             });
 
     private static Result<TResult> Execute<T, TResult>(T input, IGeometryContext context, TopologyConfig.OpType opType, Func<T, Result<IReadOnlyList<TResult>>> operation) where T : notnull =>
-        TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out TopologyConfig.OperationMetadata meta)
-            ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta.ValidationMode, OperationName = meta.OpName, EnableDiagnostics = false }).Map(results => results[0])
+        TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out TopologyConfig.OperationMetadata? meta)
+            ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta!.ValidationMode, OperationName = meta!.OpName, EnableDiagnostics = false }).Map(results => results[0])
             : ResultFactory.Create<TResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}, Operation: {opType}"));
 }

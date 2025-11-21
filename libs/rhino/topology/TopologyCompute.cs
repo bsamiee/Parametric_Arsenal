@@ -4,7 +4,6 @@ using System.Globalization;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
-using Arsenal.Core.Validation;
 using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Topology;
@@ -162,7 +161,8 @@ internal static class TopologyCompute {
                 }))(),
                 _ => false,
             };
-            bool isValid = success && copy.IsValidTopology(out string validationLog);
+            string validationLog = string.Empty;
+            bool isValid = success && copy.IsValidTopology(out validationLog);
             int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
             if (!isValid) {
                 System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}");
