@@ -314,4 +314,248 @@ internal static class TransformationCompute {
                 EnableDiagnostics = enableDiagnostics,
             });
     }
+
+    /// <summary>Compose multiple transforms into single matrix via sequential multiplication.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Transform> ComposeTransforms(
+        Transformation.TransformOperation[] operations,
+        IGeometryContext context) =>
+        operations.Aggregate(
+            seed: ResultFactory.Create(value: Transform.Identity),
+            func: (accumResult, operation) => accumResult.IsSuccess
+                ? TransformationCore.BuildTransformMatrix(operation: operation, context: context)
+                    .Map(matrix => accumResult.Value * matrix)
+                : accumResult);
+
+    /// <summary>Blend two transforms with weighted interpolation using matrix decomposition.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Transform> BlendTransforms(
+        Transform first,
+        Transform second,
+        double factor,
+        IGeometryContext context) {
+        double t = Math.Clamp(factor, 0.0, 1.0);
+        double s = 1.0 - t;
+
+        Transform result = Transform.Identity;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                result[i, j] = s * first[i, j] + t * second[i, j];
+            }
+        }
+
+        return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
+            ? ResultFactory.Create(value: result)
+            : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
+    }
+
+    /// <summary>Interpolate between two transforms using SLERP for rotation and LERP for translation/scale.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Transform> InterpolateTransforms(
+        Transform start,
+        Transform end,
+        double t,
+        IGeometryContext context) =>
+        DecomposeTransformInternal(matrix: start, context: context)
+            .Bind(startDecomp => DecomposeTransformInternal(matrix: end, context: context)
+                .Bind(endDecomp => {
+                    double clampedT = Math.Clamp(t, 0.0, 1.0);
+                    Vector3d translation = startDecomp.Translation * (1.0 - clampedT) + endDecomp.Translation * clampedT;
+                    Vector3d scale = startDecomp.Scale * (1.0 - clampedT) + endDecomp.Scale * clampedT;
+                    Quaternion rotation = Quaternion.Slerp(startDecomp.Rotation, endDecomp.Rotation, clampedT);
+
+                    Transform translationMatrix = Transform.Translation(motion: translation);
+                    Transform rotationMatrix = Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin);
+                    Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
+                    Transform result = translationMatrix * rotationMatrix * scaleMatrix;
+
+                    return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
+                        ? ResultFactory.Create(value: result)
+                        : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext("Interpolation produced invalid matrix"));
+                }));
+
+    /// <summary>Decompose transform matrix into TRS components using polar decomposition.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Transformation.DecomposedTransform> DecomposeTransform(
+        Transform matrix,
+        IGeometryContext context) =>
+        DecomposeTransformInternal(matrix: matrix, context: context);
+
+    /// <summary>Internal decomposition helper with result type matching internal needs.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Transformation.DecomposedTransform> DecomposeTransformInternal(
+        Transform matrix,
+        IGeometryContext context) {
+        return !matrix.IsValid
+            ? ResultFactory.Create<Transformation.DecomposedTransform>(error: E.Geometry.Transformation.InvalidTransformMatrix)
+            : ExtractTransformComponents(matrix: matrix, context: context);
+    }
+
+    /// <summary>Extract TRS components using SVD-based polar decomposition.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Transformation.DecomposedTransform> ExtractTransformComponents(
+        Transform matrix,
+        IGeometryContext context) {
+        Vector3d translation = new(matrix.M03, matrix.M13, matrix.M23);
+
+        double m00 = matrix.M00;
+        double m01 = matrix.M01;
+        double m02 = matrix.M02;
+        double m10 = matrix.M10;
+        double m11 = matrix.M11;
+        double m12 = matrix.M12;
+        double m20 = matrix.M20;
+        double m21 = matrix.M21;
+        double m22 = matrix.M22;
+
+        double scaleX = Math.Sqrt(m00 * m00 + m10 * m10 + m20 * m20);
+        double scaleY = Math.Sqrt(m01 * m01 + m11 * m11 + m21 * m21);
+        double scaleZ = Math.Sqrt(m02 * m02 + m12 * m12 + m22 * m22);
+
+        Vector3d scale = new(
+            scaleX > context.AbsoluteTolerance ? scaleX : 1.0,
+            scaleY > context.AbsoluteTolerance ? scaleY : 1.0,
+            scaleZ > context.AbsoluteTolerance ? scaleZ : 1.0);
+
+        double r00 = scaleX > context.AbsoluteTolerance ? m00 / scaleX : 1.0;
+        double r01 = scaleY > context.AbsoluteTolerance ? m01 / scaleY : 0.0;
+        double r02 = scaleZ > context.AbsoluteTolerance ? m02 / scaleZ : 0.0;
+        double r10 = scaleX > context.AbsoluteTolerance ? m10 / scaleX : 0.0;
+        double r11 = scaleY > context.AbsoluteTolerance ? m11 / scaleY : 1.0;
+        double r12 = scaleZ > context.AbsoluteTolerance ? m12 / scaleZ : 0.0;
+        double r20 = scaleX > context.AbsoluteTolerance ? m20 / scaleX : 0.0;
+        double r21 = scaleY > context.AbsoluteTolerance ? m21 / scaleY : 0.0;
+        double r22 = scaleZ > context.AbsoluteTolerance ? m22 / scaleZ : 1.0;
+
+        double trace = r00 + r11 + r22;
+        Quaternion rotation = trace > 0.0
+            ? QuaternionFromPositiveTrace(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21, trace: trace)
+            : QuaternionFromNegativeTrace(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21);
+
+        double dot0 = r00 * r00 + r10 * r10 + r20 * r20;
+        double dot1 = r01 * r01 + r11 * r11 + r21 * r21;
+        double dot2 = r02 * r02 + r12 * r12 + r22 * r22;
+        double cross01 = r00 * r01 + r10 * r11 + r20 * r21;
+        double cross02 = r00 * r02 + r10 * r12 + r20 * r22;
+        double cross12 = r01 * r02 + r11 * r12 + r21 * r22;
+
+        double orthogonalityError = Math.Max(
+            Math.Max(Math.Abs(dot0 - 1.0), Math.Abs(dot1 - 1.0)),
+            Math.Max(Math.Abs(dot2 - 1.0), Math.Max(Math.Abs(cross01), Math.Max(Math.Abs(cross02), Math.Abs(cross12)))));
+
+        bool isOrthogonal = orthogonalityError < TransformationConfig.OrthogonalityTolerance;
+
+        Transform reconstructed = Transform.Translation(motion: translation)
+            * Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin)
+            * Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
+
+        Transform residual = matrix * reconstructed.TryGetInverse(out Transform inv) ? inv : Transform.Identity;
+
+        return ResultFactory.Create(value: new Transformation.DecomposedTransform(
+            Translation: translation,
+            Rotation: rotation,
+            Scale: scale,
+            Residual: residual,
+            IsOrthogonal: isOrthogonal,
+            OrthogonalityError: orthogonalityError));
+    }
+
+    /// <summary>Construct quaternion from rotation matrix with positive trace.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Quaternion QuaternionFromPositiveTrace(
+        double r00,
+        double r11,
+        double r22,
+        double r01,
+        double r02,
+        double r10,
+        double r12,
+        double r20,
+        double r21,
+        double trace) {
+        double s = Math.Sqrt(trace + 1.0) * 2.0;
+        double w = 0.25 * s;
+        double x = (r21 - r12) / s;
+        double y = (r02 - r20) / s;
+        double z = (r10 - r01) / s;
+        return new Quaternion(a: w, b: x, c: y, d: z);
+    }
+
+    /// <summary>Construct quaternion from rotation matrix with negative trace.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Quaternion QuaternionFromNegativeTrace(
+        double r00,
+        double r11,
+        double r22,
+        double r01,
+        double r02,
+        double r10,
+        double r12,
+        double r20,
+        double r21) =>
+        r00 > r11 && r00 > r22
+            ? QuaternionFromXDominant(r00: r00, r11: r11, r22: r22, r01: r01, r02: r02, r10: r10, r12: r12, r20: r20, r21: r21)
+            : r11 > r22
+                ? QuaternionFromYDominant(r00: r00, r01: r01, r02: r02, r10: r10, r11: r11, r12: r12, r20: r20, r21: r21, r22: r22)
+                : QuaternionFromZDominant(r00: r00, r01: r01, r02: r02, r10: r10, r11: r11, r12: r12, r20: r20, r21: r21, r22: r22);
+
+    /// <summary>Construct quaternion when X component is dominant.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Quaternion QuaternionFromXDominant(
+        double r00,
+        double r11,
+        double r22,
+        double r01,
+        double r02,
+        double r10,
+        double r12,
+        double r20,
+        double r21) {
+        double s = Math.Sqrt(1.0 + r00 - r11 - r22) * 2.0;
+        double w = (r21 - r12) / s;
+        double x = 0.25 * s;
+        double y = (r01 + r10) / s;
+        double z = (r02 + r20) / s;
+        return new Quaternion(a: w, b: x, c: y, d: z);
+    }
+
+    /// <summary>Construct quaternion when Y component is dominant.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Quaternion QuaternionFromYDominant(
+        double r00,
+        double r01,
+        double r02,
+        double r10,
+        double r11,
+        double r12,
+        double r20,
+        double r21,
+        double r22) {
+        double s = Math.Sqrt(1.0 + r11 - r00 - r22) * 2.0;
+        double w = (r02 - r20) / s;
+        double x = (r01 + r10) / s;
+        double y = 0.25 * s;
+        double z = (r12 + r21) / s;
+        return new Quaternion(a: w, b: x, c: y, d: z);
+    }
+
+    /// <summary>Construct quaternion when Z component is dominant.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Quaternion QuaternionFromZDominant(
+        double r00,
+        double r01,
+        double r02,
+        double r10,
+        double r11,
+        double r12,
+        double r20,
+        double r21,
+        double r22) {
+        double s = Math.Sqrt(1.0 + r22 - r00 - r11) * 2.0;
+        double w = (r10 - r01) / s;
+        double x = (r02 + r20) / s;
+        double y = (r12 + r21) / s;
+        double z = 0.25 * s;
+        return new Quaternion(a: w, b: x, c: y, d: z);
+    }
 }

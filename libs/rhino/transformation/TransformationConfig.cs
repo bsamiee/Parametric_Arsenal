@@ -23,6 +23,9 @@ internal static class TransformationConfig {
             [typeof(Transformation.ProjectionTransform)] = new(V.Standard, "Transformation.ProjectionTransform"),
             [typeof(Transformation.BasisChange)] = new(V.Standard, "Transformation.BasisChange"),
             [typeof(Transformation.PlaneTransform)] = new(V.Standard, "Transformation.PlaneTransform"),
+            [typeof(Transformation.CompoundTransform)] = new(V.Standard, "Transformation.CompoundTransform"),
+            [typeof(Transformation.BlendedTransform)] = new(V.Standard, "Transformation.BlendedTransform"),
+            [typeof(Transformation.InterpolatedTransform)] = new(V.Standard, "Transformation.InterpolatedTransform"),
         }.ToFrozenDictionary();
 
     /// <summary>Unified array operations dispatch table: operation type → metadata.</summary>
@@ -87,6 +90,18 @@ internal static class TransformationConfig {
 
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;
+
+    /// <summary>Maximum compound transform composition depth.</summary>
+    internal const int MaxCompoundDepth = 100;
+
+    /// <summary>Minimum interpolation parameter.</summary>
+    internal const double MinInterpolationParameter = 0.0;
+
+    /// <summary>Maximum interpolation parameter.</summary>
+    internal const double MaxInterpolationParameter = 1.0;
+
+    /// <summary>Tolerance for orthogonality check in decomposition.</summary>
+    internal const double OrthogonalityTolerance = 1e-6;
 
     /// <summary>Transform operation metadata: validation mode and operation name.</summary>
     internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);
