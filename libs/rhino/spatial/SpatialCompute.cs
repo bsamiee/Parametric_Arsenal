@@ -258,6 +258,12 @@ internal static class SpatialCompute {
             _ = activeClusters.Remove(cluster2);
         }
 
+        // Normalize cluster IDs to [0, k-1] to prevent gaps that cause empty clusters in ComputeClusterResults.
+        int[] uniqueClusters = [.. activeClusters.Order(),];
+        for (int i = 0; i < n; i++) {
+            assignments[i] = Array.IndexOf(uniqueClusters, assignments[i]);
+        }
+
         return assignments;
     }
 
