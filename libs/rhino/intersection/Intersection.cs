@@ -29,7 +29,7 @@ public static class Intersection {
         GeometryBase[] Targets,
         int MaxHits = 1) : Request;
 
-    /// <summary>Settings controlling tolerance and output formatting.</summary>
+    /// <summary>Settings for tolerance, projection, and output formatting.</summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly record struct IntersectionSettings(
         double? Tolerance = null,
@@ -51,7 +51,7 @@ public static class Intersection {
         }
     }
 
-    /// <summary>Intersection results with points, curves, parameters, and indices. Curves implement IDisposable.</summary>
+    /// <summary>Intersection results. Consumers must dispose Curves collection elements.</summary>
     [DebuggerDisplay("Points={Points.Count}, Curves={Curves.Count}")]
     public readonly record struct IntersectionOutput(
         IReadOnlyList<Point3d> Points,
