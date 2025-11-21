@@ -327,26 +327,30 @@ internal static class TransformationCompute {
                     .Map(matrix => accumResult.Value * matrix)
                 : accumResult);
 
-    /// <summary>Blend two transforms with weighted interpolation using matrix decomposition.</summary>
+    /// <summary>Blend two transforms with TRS decomposition and quaternion interpolation.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> BlendTransforms(
         Transform first,
         Transform second,
         double factor,
-        IGeometryContext context) {
-        double t = Math.Clamp(factor, 0.0, 1.0);
-        double s = 1.0 - t;
+        IGeometryContext context) =>
+        DecomposeTransformInternal(matrix: first, context: context)
+            .Bind(firstDecomp => DecomposeTransformInternal(matrix: second, context: context)
+                .Bind(secondDecomp => {
+                    double t = Math.Clamp(factor, 0.0, 1.0);
+                    Vector3d translation = firstDecomp.Translation * (1.0 - t) + secondDecomp.Translation * t;
+                    Vector3d scale = firstDecomp.Scale * (1.0 - t) + secondDecomp.Scale * t;
+                    Quaternion rotation = Quaternion.Slerp(firstDecomp.Rotation, secondDecomp.Rotation, t);
 
-        Transform result = new(
-            m00: s * first.M00 + t * second.M00, m01: s * first.M01 + t * second.M01, m02: s * first.M02 + t * second.M02, m03: s * first.M03 + t * second.M03,
-            m10: s * first.M10 + t * second.M10, m11: s * first.M11 + t * second.M11, m12: s * first.M12 + t * second.M12, m13: s * first.M13 + t * second.M13,
-            m20: s * first.M20 + t * second.M20, m21: s * first.M21 + t * second.M21, m22: s * first.M22 + t * second.M22, m23: s * first.M23 + t * second.M23,
-            m30: s * first.M30 + t * second.M30, m31: s * first.M31 + t * second.M31, m32: s * first.M32 + t * second.M32, m33: s * first.M33 + t * second.M33);
+                    Transform translationMatrix = Transform.Translation(motion: translation);
+                    Transform rotationMatrix = Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin);
+                    Transform scaleMatrix = Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
+                    Transform result = translationMatrix * rotationMatrix * scaleMatrix;
 
-        return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
-            ? ResultFactory.Create(value: result)
-            : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
-    }
+                    return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
+                        ? ResultFactory.Create(value: result)
+                        : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
+                }));
 
     /// <summary>Interpolate between two transforms using SLERP for rotation and LERP for translation/scale.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -390,7 +394,7 @@ internal static class TransformationCompute {
             : ExtractTransformComponents(matrix: matrix, context: context);
     }
 
-    /// <summary>Extract TRS components using SVD-based polar decomposition.</summary>
+    /// <summary>Extract TRS components using column norm-based polar decomposition.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Transformation.DecomposedTransform> ExtractTransformComponents(
         Transform matrix,
@@ -448,7 +452,8 @@ internal static class TransformationCompute {
             * Transform.Rotation(quaternion: rotation, rotationCenter: Point3d.Origin)
             * Transform.Scale(plane: Plane.WorldXY, xScaleFactor: scale.X, yScaleFactor: scale.Y, zScaleFactor: scale.Z);
 
-        Transform residual = matrix * reconstructed.TryGetInverse(out Transform inv) ? inv : Transform.Identity;
+        bool hasInverse = reconstructed.TryGetInverse(out Transform inv);
+        Transform residual = matrix * (hasInverse ? inv : Transform.Identity);
 
         return ResultFactory.Create(value: new Transformation.DecomposedTransform(
             Translation: translation,
