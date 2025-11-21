@@ -23,6 +23,9 @@ internal static class TransformationConfig {
             [typeof(Transformation.ProjectionTransform)] = new(V.Standard, "Transformation.ProjectionTransform"),
             [typeof(Transformation.BasisChange)] = new(V.Standard, "Transformation.BasisChange"),
             [typeof(Transformation.PlaneTransform)] = new(V.Standard, "Transformation.PlaneTransform"),
+            [typeof(Transformation.CompoundTransform)] = new(V.Standard, "Transformation.CompoundTransform"),
+            [typeof(Transformation.BlendedTransform)] = new(V.Standard, "Transformation.BlendedTransform"),
+            [typeof(Transformation.InterpolatedTransform)] = new(V.Standard, "Transformation.InterpolatedTransform"),
         }.ToFrozenDictionary();
 
     /// <summary>Unified array operations dispatch table: operation type → metadata.</summary>
@@ -87,6 +90,21 @@ internal static class TransformationConfig {
 
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;
+
+    /// <summary>Maximum compound transform composition depth.</summary>
+    internal const int MaxCompoundDepth = 100;
+
+    /// <summary>Tolerance for orthogonality check in decomposition.</summary>
+    internal const double OrthogonalityTolerance = 1e-6;
+
+    /// <summary>Shear detection threshold: ratio of max column cross-term to min scale.</summary>
+    internal const double ShearDetectionThreshold = 0.01;
+
+    /// <summary>Maximum Newton-Schulz iterations for polar decomposition with shear.</summary>
+    internal const int MaxNewtonSchulzIterations = 10;
+
+    /// <summary>Tolerance multiplier for Newton-Schulz convergence detection.</summary>
+    internal const double NewtonSchulzToleranceMultiplier = 10.0;
 
     /// <summary>Transform operation metadata: validation mode and operation name.</summary>
     internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);

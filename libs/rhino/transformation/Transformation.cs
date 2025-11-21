@@ -90,6 +90,24 @@ public static class Transformation {
     /// <summary>Rectangular grid array in XYZ directions.</summary>
     public sealed record RectangularArray(int XCount, int YCount, int ZCount, double XSpacing, double YSpacing, double ZSpacing) : ArrayOperation;
 
+    /// <summary>Sequential composition of multiple transforms.</summary>
+    public sealed record CompoundTransform(TransformOperation[] Operations) : TransformOperation;
+
+    /// <summary>Weighted blend between two transforms.</summary>
+    public sealed record BlendedTransform(TransformOperation First, TransformOperation Second, double BlendFactor) : TransformOperation;
+
+    /// <summary>Interpolated transform between start and end with parameter t ∈ [0,1].</summary>
+    public sealed record InterpolatedTransform(TransformOperation Start, TransformOperation End, double Parameter) : TransformOperation;
+
+    /// <summary>Result of transform decomposition into TRS components.</summary>
+    public sealed record DecomposedTransform(
+        Vector3d Translation,
+        Quaternion Rotation,
+        Vector3d Scale,
+        Transform Residual,
+        bool IsOrthogonal,
+        double OrthogonalityError);
+
     /// <summary>Mirror geometry across plane.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<T> Mirror<T>(
@@ -227,4 +245,39 @@ public static class Transformation {
         Point3d center,
         IGeometryContext context) where T : GeometryBase =>
         Apply(geometry: geometry, operation: new VectorRotation(Start: startDirection, End: endDirection, Center: center), context: context);
+
+    /// <summary>Apply sequential composition of multiple transform operations.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Compound<T>(
+        T geometry,
+        TransformOperation[] operations,
+        IGeometryContext context) where T : GeometryBase =>
+        Apply(geometry: geometry, operation: new CompoundTransform(Operations: operations), context: context);
+
+    /// <summary>Apply weighted blend between two transform operations.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Blend<T>(
+        T geometry,
+        TransformOperation first,
+        TransformOperation second,
+        double blendFactor,
+        IGeometryContext context) where T : GeometryBase =>
+        Apply(geometry: geometry, operation: new BlendedTransform(First: first, Second: second, BlendFactor: blendFactor), context: context);
+
+    /// <summary>Apply interpolated transform between start and end operations with parameter t ∈ [0,1].</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<T> Interpolate<T>(
+        T geometry,
+        TransformOperation start,
+        TransformOperation end,
+        double parameter,
+        IGeometryContext context) where T : GeometryBase =>
+        Apply(geometry: geometry, operation: new InterpolatedTransform(Start: start, End: end, Parameter: parameter), context: context);
+
+    /// <summary>Decompose transform matrix into translation, rotation, scale components (TRS).</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<DecomposedTransform> Decompose(
+        Transform matrix,
+        IGeometryContext context) =>
+        TransformationCompute.DecomposeTransform(matrix: matrix, context: context);
 }
