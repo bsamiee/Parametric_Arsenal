@@ -202,7 +202,7 @@ public sealed class GeometryContextTests {
         Result<GeometryContext> contextResult = GeometryContext.CreateWithDefaults(units: units);
         Test.Success(contextResult, ctx => {
             Result<double> scaleResult = ctx.GetLengthScale(targetUnits: units);
-            Test.Success(scaleResult, scale => Test.EqualWithin(scale, 1.0, tolerance: 1e-10));
+            Test.Success(scaleResult, scale => { Test.EqualWithin(scale, 1.0, tolerance: 1e-10); return true; });
             return true;
         });
     });
