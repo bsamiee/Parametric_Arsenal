@@ -5,6 +5,8 @@
     <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
     <TestFramework>NUnit</TestFramework>
+    <!-- Ensure explicit target framework for test host -->
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +23,7 @@
 
   <ItemGroup>
     <None Update="Rhino.Testing.Configs.xml" CopyToOutputDirectory="always" />
+    <None Update=".runsettings" CopyToOutputDirectory="always" />
   </ItemGroup>
 
 </Project>
