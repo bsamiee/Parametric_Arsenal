@@ -14,16 +14,13 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Orchestration layer for intersection operations via UnifiedOperation.</summary>
 [Pure]
 internal static class IntersectionCore {
-    /// <summary>Intersection strategy metadata.</summary>
     internal readonly record struct IntersectionStrategy(
         Func<object, object, double, Intersection.IntersectionSettings, IGeometryContext, Result<Intersection.IntersectionOutput>> Executor,
         V ModeA,
         V ModeB);
 
-    /// <summary>Execute intersection request with algebraic dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.IntersectionOutput> ExecuteRequest(Intersection.Request request, IGeometryContext context) =>
         request switch {
@@ -149,7 +146,6 @@ internal static class IntersectionCore {
             : ResultFactory.Create<Intersection.IntersectionOutput>(
                 error: E.Geometry.InvalidMaxHits.WithContext(maxHits.ToString(CultureInfo.InvariantCulture)));
 
-    /// <summary>Builds intersection result from bool/arrays tuple using pattern matching discrimination.</summary>
     private static readonly Func<(bool, Curve[]?, Point3d[]?), Result<Intersection.IntersectionOutput>> ArrayResultBuilder = static tuple => tuple switch {
         (true, { Length: > 0 } curves, { Length: > 0 } points) => ResultFactory.Create(value: new Intersection.IntersectionOutput(points, curves, [], [], [], [])),
         (true, { Length: > 0 } curves, _) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], curves, [], [], [], [])),
@@ -157,7 +153,6 @@ internal static class IntersectionCore {
         (true, _, _) or (false, _, _) => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
-    /// <summary>Processes CurveIntersections into output with points, overlap curves, and parameters.</summary>
     private static readonly Func<CurveIntersections?, Curve, Result<Intersection.IntersectionOutput>> IntersectionProcessor = static (results, source) => results switch { { Count: > 0 } =>
         ResultFactory.Create(value: new Intersection.IntersectionOutput(
             [.. results.Select(static entry => entry.PointA)],
@@ -168,7 +163,6 @@ internal static class IntersectionCore {
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
-    /// <summary>Handles two-point intersection results with distance threshold validation and deduplication.</summary>
     private static readonly Func<int, Point3d, Point3d, double, double[]?, Result<Intersection.IntersectionOutput>> TwoPointHandler = static (count, first, second, tolerance, parameters) =>
         (count, first.DistanceTo(second) > tolerance) switch {
             ( > 1, true) => ResultFactory.Create(value: new Intersection.IntersectionOutput([first, second,], [], parameters ?? [], [], [], [])),
@@ -176,15 +170,12 @@ internal static class IntersectionCore {
             _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
         };
 
-    /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
-    /// <remarks>ArcCurve instances in result are IDisposable and must be disposed by consumer.</remarks>
     private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = static (type, circle) => (type, circle) switch {
         (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc),], [], [], [], [])),
         (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center,], [], [], [], [], [])),
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
-    /// <summary>Processes polyline arrays flattening points while preserving original polyline structures.</summary>
     private static readonly Func<Polyline[]?, Result<Intersection.IntersectionOutput>> PolylineProcessor = static polylines
     => polylines switch { { Length: > 0 } nonNullPolylines => ResultFactory.Create(value: new Intersection.IntersectionOutput(
                               [.. nonNullPolylines.SelectMany(static polyline => polyline)],
@@ -193,7 +184,6 @@ internal static class IntersectionCore {
         _ => ResultFactory.Create(value: Intersection.IntersectionOutput.Empty),
     };
 
-    /// <summary>Handles mesh intersections dispatching between sorted and unsorted RhinoCommon methods.</summary>
     private static readonly Func<Mesh, object, bool, (Func<Point3d[]?, int[]?, Result<Intersection.IntersectionOutput>>, Func<Point3d[]?, Result<Intersection.IntersectionOutput>>), Result<Intersection.IntersectionOutput>> MeshIntersectionHandler =
         static (mesh, target, sorted, handlers) => sorted switch {
             true => target switch {
@@ -208,7 +198,6 @@ internal static class IntersectionCore {
             },
         };
 
-    /// <summary>FrozenDictionary mapping type pairs to intersection strategies with validation modes.</summary>
     private static readonly FrozenDictionary<(Type, Type), IntersectionStrategy> _strategies =
         new ((Type, Type) Key, Func<object, object, double, Intersection.IntersectionSettings, IGeometryContext, Result<Intersection.IntersectionOutput>> Executor)[] {
             ((typeof(Curve), typeof(Curve)), (first, second, tolerance, _, _) => {
@@ -315,7 +304,6 @@ internal static class IntersectionCore {
             return new IntersectionStrategy(entry.Executor, ModeA, ModeB);
         });
 
-    /// <summary>Resolves intersection strategy for type pair using inheritance chain and interface traversal.</summary>
     [Pure]
     internal static Result<(IntersectionStrategy Strategy, bool Swapped)> ResolveStrategy(Type typeA, Type typeB) {
         static Type[] getTypeChain(Type type) {
@@ -337,7 +325,6 @@ internal static class IntersectionCore {
             };
     }
 
-    /// <summary>Normalizes intersection settings validating tolerance with context defaults.</summary>
     [Pure]
     internal static Result<(double Tolerance, Intersection.IntersectionSettings Settings)> NormalizeSettings(Intersection.IntersectionSettings settings, IGeometryContext context) =>
         ResultFactory.Create(value: settings)
@@ -347,7 +334,6 @@ internal static class IntersectionCore {
                 return (tolerance, new Intersection.IntersectionSettings(tolerance, opt.Sorted));
             });
 
-    /// <summary>Executes intersection with normalized settings resolving strategy and validating inputs.</summary>
     [Pure]
     internal static Result<Intersection.IntersectionOutput> ExecuteWithSettings(
         object geometryA,

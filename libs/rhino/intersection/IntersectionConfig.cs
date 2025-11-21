@@ -6,10 +6,8 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Unified metadata, constants, and dispatch tables for intersection operations.</summary>
 [Pure]
 internal static class IntersectionConfig {
-    /// <summary>Singular unified intersection pair dispatch table: (TypeA, TypeB) → metadata.</summary>
     internal static readonly FrozenDictionary<(Type, Type), IntersectionPairMetadata> PairOperations =
         new (Type TypeA, Type TypeB, V ModeA, V ModeB, string OpName)[] {
             (typeof(Curve), typeof(Curve), V.Standard | V.Degeneracy, V.Standard | V.Degeneracy, "Intersection.Curve.Curve"),
@@ -60,56 +58,38 @@ internal static class IntersectionConfig {
                 ])
         .ToFrozenDictionary();
 
-    /// <summary>Unified operation metadata for all intersection operations.</summary>
     internal sealed record IntersectionPairMetadata(
         V ValidationModeA,
         V ValidationModeB,
         string OperationName);
 
-    /// <summary>Angle thresholds for intersection classification.</summary>
     internal static readonly double TangentAngleThreshold = RhinoMath.ToRadians(5.0);
     internal static readonly double GrazingAngleThreshold = RhinoMath.ToRadians(15.0);
 
-    /// <summary>Classification operation metadata.</summary>
     internal static readonly IntersectionPairMetadata ClassificationOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.Classify");
 
-    /// <summary>Near-miss operation metadata.</summary>
     internal static readonly IntersectionPairMetadata NearMissOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.NearMiss");
 
-    /// <summary>Stability operation metadata.</summary>
     internal static readonly IntersectionPairMetadata StabilityOperation = new(
         ValidationModeA: V.Standard,
         ValidationModeB: V.Standard,
         OperationName: "Intersection.Stability");
 
-    /// <summary>Tolerance multiplier for near-miss detection threshold.</summary>
     internal const double NearMissToleranceMultiplier = 10.0;
-
-    /// <summary>Minimum sample count for curve near-miss detection.</summary>
     internal const int MinCurveNearMissSamples = 3;
-
-    /// <summary>Minimum sample count for Brep near-miss detection.</summary>
     internal const int MinBrepNearMissSamples = 8;
-
-    /// <summary>Maximum vertex sample count for mesh near-miss detection.</summary>
     internal const int MaxNearMissSamples = 1000;
-
-    /// <summary>Stability analysis parameters.</summary>
     internal const double StabilityPerturbationFactor = 0.001;
     internal const int StabilitySampleCount = 8;
     internal const double UnstableCountDeltaThreshold = 1.0;
     internal const double GoldenRatio = 1.618033988749895;
-
-    /// <summary>Minimum samples per Brep face for near-miss detection.</summary>
     internal const int MinSamplesPerFace = 3;
-
-    /// <summary>Blend quality scores for intersection types.</summary>
     internal const double TangentBlendScore = 1.0;
     internal const double PerpendicularBlendScore = 0.5;
     internal const double CurveSurfaceTangentBlendScore = 0.8;

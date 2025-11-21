@@ -9,20 +9,14 @@ using Rhino.Geometry;
 
 namespace Arsenal.Rhino.Intersection;
 
-/// <summary>Dense intersection analysis algorithms.</summary>
 [Pure]
 internal static class IntersectionCompute {
-    /// <summary>Validates geometry with mode or returns success if mode is None.</summary>
     [Pure]
     private static Result<T> Validate<T>(T geometry, IGeometryContext context, V mode) where T : notnull =>
         mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [context, mode,]);
 
-    /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure]
     internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
-        // Curve-surface: angle between curve tangent and surface normal
-        // Parallel (0° or 180°) → tangent intersection (smooth blend)
-        // Perpendicular (90°) → transverse intersection (sharp meeting)
         static Result<(Intersection.IntersectionType, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
             static double minAngleToParallel(double angle) => Math.Min(Math.Abs(angle), Math.Abs(Math.PI - angle));
             double averageDeviation = angles.Sum(minAngleToParallel) / angles.Length;
@@ -81,7 +75,6 @@ internal static class IntersectionCompute {
                 });
     }
 
-    /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
     [Pure]
     internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
         static (Point3d[], Point3d[], double[]) unpackPairs((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
@@ -201,7 +194,6 @@ internal static class IntersectionCompute {
                     });
     }
 
-    /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
     [Pure]
     internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersection.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
