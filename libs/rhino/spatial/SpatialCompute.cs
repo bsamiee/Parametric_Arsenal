@@ -249,16 +249,12 @@ internal static class SpatialCompute {
                     }
 
                     double dist = pts[repr1].DistanceTo(pts[repr2]);
-                    if (dist < minDist) {
-                        (cluster1, cluster2, minDist) = (c1, c2, dist);
-                    }
+                    (cluster1, cluster2, minDist) = dist < minDist ? (c1, c2, dist) : (cluster1, cluster2, minDist);
                 }
             }
 
             for (int i = 0; i < n; i++) {
-                if (assignments[i] == cluster2) {
-                    assignments[i] = cluster1;
-                }
+                assignments[i] = assignments[i] == cluster2 ? cluster1 : assignments[i];
             }
             _ = activeClusters.Remove(cluster2);
         }
