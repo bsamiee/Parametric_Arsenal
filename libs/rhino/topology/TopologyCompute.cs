@@ -50,13 +50,18 @@ internal static class TopologyCompute {
                         .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
                     ];
 
+                    double nearMissThreshold = context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier;
+
                     IReadOnlyList<double> gaps = nakedEdges.Length is > 0 and < TopologyConfig.MaxEdgesForNearMissAnalysis
-                        ? [.. (from e1 in nakedEdges
-                               from e2 in nakedEdges
-                               where e1.Index != e2.Index
-                               from dist in new[] { e1.Start.DistanceTo(e2.Start), e1.Start.DistanceTo(e2.End), e1.End.DistanceTo(e2.Start), e1.End.DistanceTo(e2.End), }
-                               where dist > context.AbsoluteTolerance && dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier
-                               select dist),
+                        ? [.. Enumerable.Range(0, nakedEdges.Length)
+                            .SelectMany(i => Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
+                                .SelectMany(j => new[] {
+                                    nakedEdges[i].Start.DistanceTo(nakedEdges[j].Start),
+                                    nakedEdges[i].Start.DistanceTo(nakedEdges[j].End),
+                                    nakedEdges[i].End.DistanceTo(nakedEdges[j].Start),
+                                    nakedEdges[i].End.DistanceTo(nakedEdges[j].End),
+                                }))
+                            .Where(dist => dist > context.AbsoluteTolerance && dist < nearMissThreshold),
                         ]
                         : [];
 
@@ -67,7 +72,7 @@ internal static class TopologyCompute {
                                let edgeI = validBrep.Edges[nakedEdges[i].Index]
                                let edgeJ = validBrep.Edges[nakedEdges[j].Index]
                                let dist = edgeI.EdgeCurve.ClosestPoints(edgeJ.EdgeCurve, out Point3d ptA, out Point3d ptB) ? ptA.DistanceTo(ptB) : double.MaxValue
-                               where dist < context.AbsoluteTolerance * TopologyConfig.NearMissMultiplier && dist > context.AbsoluteTolerance
+                               where dist < nearMissThreshold && dist > context.AbsoluteTolerance
                                select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: dist)),
                         ]
                         : [];
