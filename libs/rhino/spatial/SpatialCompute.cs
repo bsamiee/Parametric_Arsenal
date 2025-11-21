@@ -308,7 +308,7 @@ internal static class SpatialCompute {
             : points.Length > 1 && points[0].Z is double z0 && points.Skip(1).All(p => Math.Abs(p.Z - z0) < context.AbsoluteTolerance)
                 ? ((Func<Result<Point3d[]>>)(() => {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-                    double areaTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+                    double areaTolerance = context.AbsoluteToleranceSquared;
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
                         while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= areaTolerance) {
@@ -445,7 +445,7 @@ internal static class SpatialCompute {
         double adjustedDet = orientation > 0.0 ? det : -det;
         // Scale tolerance to match determinant dimension (length⁴): use squared tolerance × max squared norm.
         double maxNormSq = Math.Max(Math.Max(aNormSq, bNormSq), cNormSq);
-        double scaledTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance * maxNormSq;
+        double scaledTolerance = context.AbsoluteToleranceSquared * maxNormSq;
         return adjustedDet > scaledTolerance;
     }
 
