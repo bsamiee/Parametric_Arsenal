@@ -226,7 +226,6 @@ public sealed class OperationConfigTests {
             Assert.That(typeof(OperationConfig<string, int>).GetGenericArguments()[1], Is.EqualTo(typeof(int)));
         },
         () => {
-            OperationConfig<double, string> config = new() { Context = TestContext };
             Assert.That(typeof(OperationConfig<double, string>).GetGenericArguments()[0], Is.EqualTo(typeof(double)));
             Assert.That(typeof(OperationConfig<double, string>).GetGenericArguments()[1], Is.EqualTo(typeof(string)));
         });
