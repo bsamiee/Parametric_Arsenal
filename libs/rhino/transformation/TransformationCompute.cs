@@ -563,29 +563,33 @@ internal static class TransformationCompute {
         Vector3d translation,
         IGeometryContext context) =>
         Enumerable.Range(0, TransformationConfig.MaxNewtonSchulzIterations).Aggregate(
-            seed: (q00: m00, q01: m01, q02: m02, q10: m10, q11: m11, q12: m12, q20: m20, q21: m21, q22: m22, converged: false),
-            func: (state, _) => state.converged ? state : IterateNewtonSchulz(state.q00, state.q01, state.q02, state.q10, state.q11, state.q12, state.q20, state.q21, state.q22, context: context),
-            resultSelector: final => ExtractScaleAndBuildResult(
-                m00: m00, m01: m01, m02: m02, m10: m10, m11: m11, m12: m12, m20: m20, m21: m21, m22: m22,
-                q00: final.q00, q01: final.q01, q02: final.q02, q10: final.q10, q11: final.q11, q12: final.q12, q20: final.q20, q21: final.q21, q22: final.q22,
-                translation: translation, context: context));
+            seed: (q00: m00, q01: m01, q02: m02, q10: m10, q11: m11, q12: m12, q20: m20, q21: m21, q22: m22, converged: false, singular: false),
+            func: (state, _) => state.converged
+                ? state
+                : IterateNewtonSchulz(state.q00, state.q01, state.q02, state.q10, state.q11, state.q12, state.q20, state.q21, state.q22, context: context),
+            resultSelector: final => final.singular || !final.converged
+                ? ResultFactory.Create<Transformation.DecomposedTransform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext("Polar decomposition failed to converge"))
+                : ExtractScaleAndBuildResult(
+                    m00: m00, m01: m01, m02: m02, m10: m10, m11: m11, m12: m12, m20: m20, m21: m21, m22: m22,
+                    q00: final.q00, q01: final.q01, q02: final.q02, q10: final.q10, q11: final.q11, q12: final.q12, q20: final.q20, q21: final.q21, q22: final.q22,
+                    translation: translation, context: context));
 
     /// <summary>Single Newton-Schulz iteration: Q_next = 0.5(Q + Q^(-1)).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static (double q00, double q01, double q02, double q10, double q11, double q12, double q20, double q21, double q22, bool converged) IterateNewtonSchulz(
+    private static (double q00, double q01, double q02, double q10, double q11, double q12, double q20, double q21, double q22, bool converged, bool singular) IterateNewtonSchulz(
         double q00, double q01, double q02,
         double q10, double q11, double q12,
         double q20, double q21, double q22,
         IGeometryContext context) {
         double det = (q00 * ((q11 * q22) - (q12 * q21))) - (q01 * ((q10 * q22) - (q12 * q20))) + (q02 * ((q10 * q21) - (q11 * q20)));
         return Math.Abs(det) < context.AbsoluteTolerance
-            ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, true)
+            ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, true, true)
             : IterateNewtonSchulzCore(q00: q00, q01: q01, q02: q02, q10: q10, q11: q11, q12: q12, q20: q20, q21: q21, q22: q22, det: det, context: context);
     }
 
     /// <summary>Core Newton-Schulz iteration after determinant check.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static (double q00, double q01, double q02, double q10, double q11, double q12, double q20, double q21, double q22, bool converged) IterateNewtonSchulzCore(
+    private static (double q00, double q01, double q02, double q10, double q11, double q12, double q20, double q21, double q22, bool converged, bool singular) IterateNewtonSchulzCore(
         double q00, double q01, double q02,
         double q10, double q11, double q12,
         double q20, double q21, double q22,
@@ -617,7 +621,7 @@ internal static class TransformationCompute {
             Math.Max(Math.Max(Math.Abs(next10 - q10), Math.Max(Math.Abs(next11 - q11), Math.Abs(next12 - q12))),
                 Math.Max(Math.Abs(next20 - q20), Math.Max(Math.Abs(next21 - q21), Math.Abs(next22 - q22)))));
 
-        return (next00, next01, next02, next10, next11, next12, next20, next21, next22, maxDiff < context.AbsoluteTolerance * TransformationConfig.NewtonSchulzToleranceMultiplier);
+        return (next00, next01, next02, next10, next11, next12, next20, next21, next22, maxDiff < context.AbsoluteTolerance * TransformationConfig.NewtonSchulzToleranceMultiplier, false);
     }
 
     /// <summary>Extract scale from M = Q·S and build final decomposition result.</summary>
