@@ -3,13 +3,15 @@ name: Rhino Tests
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   test-rhino:
-    name: Rhino Tests
+    name: Rhino Headless Tests
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
 
@@ -26,6 +28,9 @@ jobs:
         uses: mcneel/setup-rhino3d@v2
         with:
           email-address: ${{ secrets.RHINO_EMAIL }}
+          release-version: latest
+        env:
+          RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
 
       - name: Restore Dependencies
         run: dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj
@@ -34,13 +39,24 @@ jobs:
         run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
 
       - name: Run Rhino Tests
-        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --verbosity normal --logger "console;verbosity=detailed"
         env:
           RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rhino-test-results
+          path: |
+            **/TestResults/**/*.trx
+            **/TestResults/**/*.xml
+          retention-days: 30
 
       - name: Summary
         if: success()
         run: |
-          echo "Rhino tests completed successfully"
-          echo "Test Framework: NUnit + Rhino.Testing v8.0.17-beta"
+          echo "✅ Rhino tests completed successfully"
+          echo "Test Framework: NUnit 4.4.0 + Rhino.Testing v8.0.17-beta"
           echo "Headless Mode: Enabled"
+          echo "Platform: Windows with RhinoCommon"
