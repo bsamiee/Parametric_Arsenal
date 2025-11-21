@@ -18,17 +18,17 @@ internal static class TopologyCompute {
         (validBrep.Vertices.Count, validBrep.Edges.Count, validBrep.Faces.Count) switch {
             (int v, int e, int f) when v > 0 && e > 0 && f > 0 => ((Func<Result<Topology.TopologicalFeatures>>)(() => {
                 bool isSolid = validBrep.IsSolid && validBrep.IsManifold;
-                int numerator = e - v - f + 2;
+                int eulerCharacteristic = e - v - f + 2;
                 (int, bool)[] loops = [.. validBrep.Loops.Select((l, i) => {
                     using Curve? loopCurve = l.To3dCurve();
                     return (LoopIndex: i, IsHole: l.LoopType == BrepLoopType.Inner && (loopCurve?.GetLength() ?? 0.0) > context.AbsoluteTolerance);
                 }),
                 ];
-                return (isSolid, numerator, loops) switch {
-                    (true, int num, (int, bool)[] lps) when num >= 0 && (num & 1) == 0 => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: num / 2, Loops: lps, IsSolid: true, HandleCount: num / 2)),
-                    (true, _, _) => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep")),
-                    (false, _, (int, bool)[] lps) => ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: lps, IsSolid: false, HandleCount: 0)),
-                };
+                return isSolid && eulerCharacteristic >= 0 && (eulerCharacteristic & 1) == 0
+                    ? ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: eulerCharacteristic / 2, Loops: loops, IsSolid: true, HandleCount: eulerCharacteristic / 2))
+                    : isSolid
+                        ? ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Euler characteristic invalid for solid brep"))
+                        : ResultFactory.Create(value: new Topology.TopologicalFeatures(Genus: 0, Loops: loops, IsSolid: false, HandleCount: 0));
             }))(),
             _ => ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.FeatureExtractionFailed.WithContext("Invalid vertex/edge/face counts")),
         };
@@ -40,29 +40,43 @@ internal static class TopologyCompute {
         int maxEdgeThreshold) {
         double tolerance = context.AbsoluteTolerance;
         double nearMissThreshold = tolerance * nearMissMultiplier;
-        (int Index, Point3d Start, Point3d End)[] nakedEdges = [.. Enumerable.Range(0, validBrep.Edges.Count)
-            .Where(i => validBrep.Edges[i].Valence == EdgeAdjacency.Naked && validBrep.Edges[i].EdgeCurve is not null)
-            .Select(i => (Index: i, Start: validBrep.Edges[i].PointAtStart, End: validBrep.Edges[i].PointAtEnd)),
-        ];
+        (int nonManifoldCount, (int Index, BrepEdge Edge)[] nakedEdgeData) = ((Func<(int, (int, BrepEdge)[])>)(() => {
+            int nmCount = 0;
+            List<(int, BrepEdge)> naked = [];
+            for (int i = 0; i < validBrep.Edges.Count; i++) {
+                BrepEdge edge = validBrep.Edges[i];
+                EdgeAdjacency valence = edge.Valence;
+                nmCount = valence == EdgeAdjacency.NonManifold ? nmCount + 1 : nmCount;
+                if (valence == EdgeAdjacency.Naked && edge.EdgeCurve is not null) {
+                    naked.Add((i, edge));
+                }
+            }
+            return (nmCount, [.. naked,]);
+        }))();
 
-        int nonManifoldEdgeCount = validBrep.Edges.Count(e => e.Valence == EdgeAdjacency.NonManifold);
-        (int EdgeA, int EdgeB, double Distance)[] computedPairs = nakedEdges.Length > 1 && nakedEdges.Length <= maxEdgeThreshold
-            ? [.. (from i in Enumerable.Range(0, nakedEdges.Length - 1)
-                   from j in Enumerable.Range(i + 1, nakedEdges.Length - i - 1)
-                   let edgeI = validBrep.Edges[nakedEdges[i].Index]
-                   let edgeJ = validBrep.Edges[nakedEdges[j].Index]
-                   let distance = edgeI.EdgeCurve is Curve ci && edgeJ.EdgeCurve is Curve cj && ci.ClosestPoints(cj, out Point3d ptA, out Point3d ptB)
-                       ? ptA.DistanceTo(ptB)
-                       : double.MaxValue
-                   where distance > tolerance && distance < nearMissThreshold
-                   select (EdgeA: nakedEdges[i].Index, EdgeB: nakedEdges[j].Index, Distance: distance)),
-            ]
+        (int EdgeA, int EdgeB, double Distance)[] computedPairs = nakedEdgeData.Length > 1 && nakedEdgeData.Length <= maxEdgeThreshold
+            ? ((Func<(int, int, double)[]>)(() => {
+                List<(int, int, double)> pairs = [];
+                for (int i = 0; i < nakedEdgeData.Length - 1; i++) {
+                    (int idxA, BrepEdge edgeA) = nakedEdgeData[i];
+                    Curve? curveA = edgeA.EdgeCurve;
+                    if (curveA is null) { continue; }
+                    for (int j = i + 1; j < nakedEdgeData.Length; j++) {
+                        (int idxB, BrepEdge edgeB) = nakedEdgeData[j];
+                        Curve? curveB = edgeB.EdgeCurve;
+                        if (curveB is not null && curveA.ClosestPoints(curveB, out Point3d ptA, out Point3d ptB)) {
+                            double distance = ptA.DistanceTo(ptB);
+                            if (distance > tolerance && distance < nearMissThreshold) {
+                                pairs.Add((idxA, idxB, distance));
+                            }
+                        }
+                    }
+                }
+                return [.. pairs,];
+            }))()
             : [];
 
-        IReadOnlyList<double> gaps = [.. computedPairs.Select(p => p.Distance),];
-        IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> nearMisses = computedPairs;
-
-        IReadOnlyList<Topology.Strategy> repairs = (nakedEdges.Length, nonManifoldEdgeCount, nearMisses.Count) switch {
+        IReadOnlyList<Topology.Strategy> repairs = (nakedEdgeData.Length, nonManifoldCount, computedPairs.Length) switch {
             ( > 0, > 0, > 0) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.AggressiveJoin, Topology.Strategy.Combined,],
             ( > 0, > 0, _) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.AggressiveJoin,],
             ( > 0, _, > 0) => [Topology.Strategy.ConservativeRepair, Topology.Strategy.ModerateJoin, Topology.Strategy.Combined,],
@@ -73,7 +87,10 @@ internal static class TopologyCompute {
             _ => [],
         };
 
-        return ResultFactory.Create(value: new Topology.TopologyDiagnosis(EdgeGaps: gaps, NearMisses: nearMisses, SuggestedStrategies: repairs));
+        return ResultFactory.Create(value: new Topology.TopologyDiagnosis(
+            EdgeGaps: [.. computedPairs.Select(p => p.Distance),],
+            NearMisses: computedPairs,
+            SuggestedStrategies: repairs));
     }
 
     internal static Result<Topology.HealingResult> Heal(
@@ -101,22 +118,27 @@ internal static class TopologyCompute {
                     return copy.Repair(conservativeTolerance) && copy.JoinNakedEdges(moderateTolerance) > 0;
                 }))(),
                 Topology.TargetedJoinStrategy => ((Func<bool>)(() => {
-                    double threshold = strategyTolerance;
                     bool joinedAny = false;
                     for (int iteration = 0; iteration < maxTargetedJoinIterations; iteration++) {
                         int[] nakedEdgeIndices = [.. Enumerable.Range(0, copy.Edges.Count).Where(i => copy.Edges[i].Valence == EdgeAdjacency.Naked),];
                         bool joinedThisPass = false;
-                        for (int i = 0; i < nakedEdgeIndices.Length; i++) {
+                        for (int i = 0; i < nakedEdgeIndices.Length - 1; i++) {
+                            int idxA = nakedEdgeIndices[i];
+                            if (idxA >= copy.Edges.Count || copy.Edges[idxA].Valence != EdgeAdjacency.Naked) { continue; }
+                            BrepEdge edgeA = copy.Edges[idxA];
+                            Curve? curveA = edgeA.EdgeCurve;
+                            if (curveA is null) { continue; }
                             for (int j = i + 1; j < nakedEdgeIndices.Length; j++) {
-                                (int idxA, int idxB) = (nakedEdgeIndices[i], nakedEdgeIndices[j]);
-                                (bool validIndices, BrepEdge? eA, BrepEdge? eB) = idxA < copy.Edges.Count && idxB < copy.Edges.Count
-                                    ? (true, copy.Edges[idxA], copy.Edges[idxB])
-                                    : (false, null, null);
-                                bool bothNaked = validIndices && eA is not null && eB is not null && eA.Valence == EdgeAdjacency.Naked && eB.Valence == EdgeAdjacency.Naked;
-                                double minDist = bothNaked && eA!.EdgeCurve is Curve cA && eB!.EdgeCurve is Curve cB && cA.ClosestPoints(cB, out Point3d ptA, out Point3d ptB)
-                                    ? ptA.DistanceTo(ptB)
-                                    : double.MaxValue;
-                                joinedThisPass = (bothNaked && minDist < threshold && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: threshold, compact: false)) || joinedThisPass;
+                                int idxB = nakedEdgeIndices[j];
+                                if (idxB >= copy.Edges.Count || copy.Edges[idxB].Valence != EdgeAdjacency.Naked) { continue; }
+                                BrepEdge edgeB = copy.Edges[idxB];
+                                Curve? curveB = edgeB.EdgeCurve;
+                                if (curveB is not null && curveA.ClosestPoints(curveB, out Point3d ptA, out Point3d ptB)) {
+                                    double distance = ptA.DistanceTo(ptB);
+                                    if (distance < strategyTolerance && copy.JoinEdges(edgeIndex0: idxA, edgeIndex1: idxB, joinTolerance: strategyTolerance, compact: false)) {
+                                        joinedThisPass = true;
+                                    }
+                                }
                             }
                         }
                         joinedAny = joinedAny || joinedThisPass;
@@ -127,11 +149,16 @@ internal static class TopologyCompute {
                 }))(),
                 Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
                     Brep[] components = copy.GetConnectedComponents() ?? [];
-                    return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) switch {
-                        null or { Length: 0 } => false,
-                        Brep[] { Length: 1 } joined => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
-                        Brep[] joined => ((Func<bool>)(() => { Array.ForEach(joined, b => b.Dispose()); return false; }))(),
-                    };
+                    if (components.Length <= 1) { return false; }
+                    Brep[]? joined = Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance);
+                    if (joined is null || joined.Length == 0) { return false; }
+                    if (joined.Length == 1) {
+                        copy.Dispose();
+                        copy = joined[0];
+                        return true;
+                    }
+                    Array.ForEach(joined, b => b?.Dispose());
+                    return false;
                 }))(),
                 _ => false,
             };
