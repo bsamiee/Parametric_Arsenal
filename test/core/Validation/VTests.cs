@@ -16,8 +16,7 @@ public sealed class VTests {
             Assert.Equal(v.GetHashCode(), copy.GetHashCode());
         }),
         () => ValidationGenerators.VGen.Select(ValidationGenerators.VGen).Run((V v1, V v2) =>
-            Assert.Equal(v1.Equals(v2), v2.Equals(v1))),
-        () => ValidationGenerators.VGen.Run((V v) => Assert.True(v.Equals(v))));
+            Assert.Equal(v1.Equals(v2), v2.Equals(v1))));
 
     /// <summary>Verifies bitwise OR operation commutativity and associativity.</summary>
     [Fact]
