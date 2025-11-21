@@ -337,12 +337,11 @@ internal static class TransformationCompute {
         double t = Math.Clamp(factor, 0.0, 1.0);
         double s = 1.0 - t;
 
-        Transform result = Transform.Identity;
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                result[i, j] = s * first[i, j] + t * second[i, j];
-            }
-        }
+        Transform result = new(
+            m00: s * first.M00 + t * second.M00, m01: s * first.M01 + t * second.M01, m02: s * first.M02 + t * second.M02, m03: s * first.M03 + t * second.M03,
+            m10: s * first.M10 + t * second.M10, m11: s * first.M11 + t * second.M11, m12: s * first.M12 + t * second.M12, m13: s * first.M13 + t * second.M13,
+            m20: s * first.M20 + t * second.M20, m21: s * first.M21 + t * second.M21, m22: s * first.M22 + t * second.M22, m23: s * first.M23 + t * second.M23,
+            m30: s * first.M30 + t * second.M30, m31: s * first.M31 + t * second.M31, m32: s * first.M32 + t * second.M32, m33: s * first.M33 + t * second.M33);
 
         return result.IsValid && Math.Abs(result.Determinant) > context.AbsoluteTolerance
             ? ResultFactory.Create(value: result)
