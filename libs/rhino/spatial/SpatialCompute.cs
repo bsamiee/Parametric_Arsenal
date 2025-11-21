@@ -63,28 +63,30 @@ internal static class SpatialCompute {
     [Pure]
     private static (Point3d Centroid, double[] Radii)[] ComputeClusterResults(int[] assignments, Point3d[] allPoints) {
         int clusterCount = assignments.Max() + 1;
-        (Point3d Centroid, double[] Radii)[] results = new (Point3d, double[])[clusterCount];
-        
-        for (int c = 0; c < clusterCount; c++) {
-            int[] members = [.. Enumerable.Range(0, allPoints.Length).Where(i => assignments[i] == c),];
-            if (members.Length is 0) {
-                results[c] = (Point3d.Origin, []);
-                continue;
-            }
-            
-            Vector3d sum = Vector3d.Zero;
-            for (int mi = 0; mi < members.Length; mi++) {
-                sum += new Vector3d(allPoints[members[mi]]);
-            }
-            Point3d centroid = Point3d.Origin + (sum / members.Length);
-            double[] radii = new double[members.Length];
-            for (int mi = 0; mi < members.Length; mi++) {
-                radii[mi] = allPoints[members[mi]].DistanceTo(centroid);
-            }
-            results[c] = (centroid, radii);
+        // Build member lists once O(n) instead of O(k*n) filtering per cluster
+        List<int>[] memberLists = new List<int>[clusterCount];
+        for (int i = 0; i < clusterCount; i++) {
+            memberLists[i] = [];
         }
-        
-        return results;
+        for (int i = 0; i < allPoints.Length; i++) {
+            memberLists[assignments[i]].Add(i);
+        }
+        // Compute results with dense expression-oriented pattern
+        return [.. Enumerable.Range(0, clusterCount).Select(c => memberLists[c].Count is 0
+            ? (Point3d.Origin, Array.Empty<double>())
+            : ((Func<(Point3d, double[])>)(() => {
+                Vector3d sum = Vector3d.Zero;
+                for (int mi = 0; mi < memberLists[c].Count; mi++) {
+                    sum += new Vector3d(allPoints[memberLists[c][mi]]);
+                }
+                Point3d centroid = Point3d.Origin + (sum / memberLists[c].Count);
+                double[] radii = new double[memberLists[c].Count];
+                for (int mi = 0; mi < memberLists[c].Count; mi++) {
+                    radii[mi] = allPoints[memberLists[c][mi]].DistanceTo(centroid);
+                }
+                return (centroid, radii);
+            }))()),
+        ];
     }
 
     internal static int[] KMeansAssign(Point3d[] pts, int k, double tol, int maxIter) {
@@ -121,14 +123,15 @@ internal static class SpatialCompute {
                 }))();
             }
 
-            // Lloyd's algorithm - fused assignment and accumulation
+            // Lloyd's algorithm - reset then assign with inline accumulation
             (Vector3d Sum, int Count)[] clusters = new (Vector3d, int)[k];
             for (int iter = 0; iter < maxIter; iter++) {
-                // Reset clusters and assign to nearest centroid in single pass
+                // Reset cluster accumulators
                 for (int i = 0; i < k; i++) {
                     clusters[i] = (Vector3d.Zero, 0);
                 }
                 
+                // Assign points to nearest centroid with inline accumulation
                 for (int i = 0; i < pts.Length; i++) {
                     int nearest = 0;
                     double minDist = pts[i].DistanceTo(centroids[0]);
@@ -165,8 +168,8 @@ internal static class SpatialCompute {
         int clusterId = 0;
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
-        int[] GetNeighbors(int idx) {
-            if (tree is not null) {
+        int[] GetNeighbors(int idx) => tree is not null
+            ? ((Func<int[]>)(() => {
                 List<int> buffer = [];
                 _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => {
                     if (args.Id != idx) {
@@ -174,9 +177,8 @@ internal static class SpatialCompute {
                     }
                 });
                 return [.. buffer,];
-            }
-            return [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
-        }
+            }))()
+            : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
 
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
