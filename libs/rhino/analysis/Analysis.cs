@@ -52,6 +52,18 @@ public static class Analysis {
             : this(surface, surface.Domain(0).Mid, surface.Domain(1).Mid, derivativeOrder) { }
     }
 
+    /// <summary>Brep surface and topology analysis request.</summary>
+    public sealed record BrepAnalysis(Brep Brep, int FaceIndex, double U, double V, Point3d TestPoint, int DerivativeOrder) : DifferentialRequest(Brep, DerivativeOrder) {
+        public BrepAnalysis(Brep brep, int faceIndex = 0, int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder)
+            : this(
+                brep,
+                faceIndex,
+                brep.Faces.Count > faceIndex ? brep.Faces[faceIndex].Domain(0).Mid : 0.5,
+                brep.Faces.Count > faceIndex ? brep.Faces[faceIndex].Domain(1).Mid : 0.5,
+                brep.GetBoundingBox(accurate: false).Center,
+                derivativeOrder) { }
+    }
+
     /// <summary>Surface quality metrics: curvature samples, singularity locations, uniformity score.</summary>
     [DebuggerDisplay("SurfaceQuality | Uniformity={UniformityScore:F3} | Singularities={SingularityLocations.Length}")]
     public sealed record SurfaceQualityResult(
@@ -76,18 +88,6 @@ public static class Analysis {
         double[] Jacobians,
         int[] ProblematicFaceIndices,
         (int Warning, int Critical) QualityFlags) : IResult;
-
-    /// <summary>Brep surface and topology analysis request.</summary>
-    public sealed record BrepAnalysis(Brep Brep, int FaceIndex, double U, double V, Point3d TestPoint, int DerivativeOrder) : DifferentialRequest(Brep, DerivativeOrder) {
-        public BrepAnalysis(Brep brep, int faceIndex = 0, int derivativeOrder = AnalysisConfig.DefaultDerivativeOrder)
-            : this(
-                brep,
-                faceIndex,
-                brep.Faces.Count > faceIndex ? brep.Faces[faceIndex].Domain(0).Mid : 0.5,
-                brep.Faces.Count > faceIndex ? brep.Faces[faceIndex].Domain(1).Mid : 0.5,
-                brep.GetBoundingBox(accurate: false).Center,
-                derivativeOrder) { }
-    }
 
     /// <summary>Mesh topology: vertices, edges, manifold state, closure, area, volume.</summary>
     [DebuggerDisplay("Mesh @ {Location} | V={Volume:F3} | A={Area:F3}{(IsClosed ? \" [closed]\" : \"\")}{(IsManifold ? \" [manifold]\" : \"\")}")]

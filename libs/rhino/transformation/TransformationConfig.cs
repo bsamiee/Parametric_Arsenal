@@ -9,15 +9,6 @@ namespace Arsenal.Rhino.Transformation;
 
 /// <summary>Transform validation modes, algorithmic constants, and operation metadata.</summary>
 internal static class TransformationConfig {
-    /// <summary>Transform operation metadata: validation mode and operation name.</summary>
-    internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);
-
-    /// <summary>Array operation metadata: validation mode, operation name, and maximum count.</summary>
-    internal sealed record ArrayOperationMetadata(V ValidationMode, string OperationName, int MaxCount);
-
-    /// <summary>Morph operation metadata: validation mode, operation name, and tolerance.</summary>
-    internal sealed record MorphOperationMetadata(V ValidationMode, string OperationName, double Tolerance);
-
     /// <summary>Unified transform operations dispatch table: operation type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, TransformOperationMetadata> TransformOperations =
         new Dictionary<Type, TransformOperationMetadata> {
@@ -96,6 +87,15 @@ internal static class TransformationConfig {
 
     /// <summary>Default tolerance for morph operations.</summary>
     internal const double DefaultMorphTolerance = 0.001;
+
+    /// <summary>Transform operation metadata: validation mode and operation name.</summary>
+    internal sealed record TransformOperationMetadata(V ValidationMode, string OperationName);
+
+    /// <summary>Array operation metadata: validation mode, operation name, and maximum count.</summary>
+    internal sealed record ArrayOperationMetadata(V ValidationMode, string OperationName, int MaxCount);
+
+    /// <summary>Morph operation metadata: validation mode, operation name, and tolerance.</summary>
+    internal sealed record MorphOperationMetadata(V ValidationMode, string OperationName, double Tolerance);
 
     /// <summary>Get validation mode for geometry type with inheritance fallback.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
