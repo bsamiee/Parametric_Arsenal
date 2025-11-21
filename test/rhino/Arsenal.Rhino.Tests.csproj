@@ -11,6 +11,8 @@
     <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
     <!-- Disable app host for library-style test project -->
     <UseAppHost>false</UseAppHost>
+    <!-- Roll forward to allow net7.0 Rhino.Testing on net8.0 runtime -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
