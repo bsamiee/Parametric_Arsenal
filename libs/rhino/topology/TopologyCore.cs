@@ -14,16 +14,43 @@ namespace Arsenal.Rhino.Topology;
 /// <summary>Topology execution via breadth-first search and edge classification algorithms.</summary>
 [Pure]
 internal static class TopologyCore {
+    internal static Result<Topology.TopologyDiagnosis> ExecuteDiagnose(Brep input, IGeometryContext context) =>
+        TopologyConfig.DiagnosticOps.TryGetValue("Diagnose", out DiagnosticMetadata diagMeta)
+            ? !input.IsValidTopology(out string topologyLog)
+                ? ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
+                : ResultFactory.Create(value: input)
+                    .Validate(args: [context, diagMeta.ValidationMode,])
+                    .Bind(validBrep => TopologyCompute.Diagnose(validBrep: validBrep, context: context, nearMissMultiplier: diagMeta.NearMissMultiplier, maxEdgeThreshold: diagMeta.MaxEdgeThreshold))
+            : ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Diagnose"));
+
+    internal static Result<Topology.TopologicalFeatures> ExecuteExtractFeatures(Brep input, IGeometryContext context) =>
+        TopologyConfig.FeaturesOps.TryGetValue("ExtractFeatures", out FeaturesMetadata featuresMeta)
+            ? !input.IsValidTopology(out string topologyLog)
+                ? ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
+                : ResultFactory.Create(value: input)
+                    .Validate(args: [context, featuresMeta.ValidationMode,])
+                    .Bind(validBrep => TopologyCompute.ExtractFeatures(validBrep: validBrep, context: context, minLoopLength: featuresMeta.MinLoopLength))
+            : ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: ExtractFeatures"));
+
+    internal static Result<Topology.HealingResult> ExecuteHeal(Brep input, IReadOnlyList<Topology.Strategy> strategies, IGeometryContext context) =>
+        TopologyConfig.HealingOps.TryGetValue("Heal", out HealingMetadata healMeta)
+            ? !input.IsValidTopology(out string topologyLog)
+                ? ResultFactory.Create<Topology.HealingResult>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid before healing: {topologyLog}"))
+                : ResultFactory.Create(value: input)
+                    .Validate(args: [context, healMeta.ValidationMode,])
+                    .Bind(validBrep => TopologyCompute.Heal(validBrep: validBrep, strategies: strategies, context: context, maxTargetedJoinIterations: healMeta.MaxTargetedJoinIterations))
+            : ResultFactory.Create<Topology.HealingResult>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Heal"));
+
     internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.Connectivity,
             operation: g => g switch {
-                Brep brep => ComputeConnectivity(
+                Brep brep => TopologyCompute.ComputeConnectivity(
                     _: brep,
                     faceCount: brep.Faces.Count,
                     getAdjacent: fIdx => brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()),
                     getBounds: fIdx => brep.Faces[fIdx].GetBoundingBox(accurate: false),
                     getAdjacentForGraph: fIdx => [.. brep.Faces[fIdx].AdjacentEdges().SelectMany(eIdx => brep.Edges[eIdx].AdjacentFaces()).Where(adj => adj != fIdx),]),
-                Mesh mesh => ComputeConnectivity(
+                Mesh mesh => TopologyCompute.ComputeConnectivity(
                     _: mesh,
                     faceCount: mesh.Faces.Count,
                     getAdjacent: fIdx => mesh.Faces.AdjacentFaces(fIdx).Where(adj => adj >= 0),
@@ -45,10 +72,10 @@ internal static class TopologyCore {
             })) switch {
                 [] => ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(Loops: [], EdgeIndicesPerLoop: [], LoopLengths: [], IsClosedPerLoop: [], JoinTolerance: tol, FailedJoins: 0),]),
                 Curve[] nakedCurves => ((Func<Result<IReadOnlyList<Topology.BoundaryLoopData>>>)(() => {
+                    Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
                     foreach (Curve sourceCurve in nakedCurves) {
                         using (sourceCurve) { }
                     }
-                    Curve[] joined = Curve.JoinCurves(nakedCurves, joinTolerance: tol, preserveDirection: false) ?? [];
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.BoundaryLoopData>)[new Topology.BoundaryLoopData(
                         Loops: joined,
                         EdgeIndicesPerLoop: [.. joined.Select(static _ => (IReadOnlyList<int>)[]),],
@@ -237,7 +264,7 @@ internal static class TopologyCore {
                     return ResultFactory.Create(value: (IReadOnlyList<Topology.EdgeClassificationData>)[new Topology.EdgeClassificationData(EdgeIndices: edgeIndices, Classifications: classifications, ContinuityMeasures: measures, GroupedByType: grouped, MinimumContinuity: minContinuity),]);
                 }))(),
                 Mesh mesh => ((Func<Result<IReadOnlyList<Topology.EdgeClassificationData>>>)(() => {
-                    bool computed = EnsureMeshNormals(mesh);
+                    bool computed = TopologyCompute.EnsureMeshNormals(mesh);
                     double threshold = angleThreshold ?? context.AngleToleranceRadians;
                     double curvatureThreshold = threshold * TopologyConfig.CurvatureThresholdRatio;
                     IReadOnlyList<int> edgeIndices = [.. Enumerable.Range(0, mesh.TopologyEdges.Count),];
@@ -286,7 +313,7 @@ internal static class TopologyCore {
                 }))(),
                 (Brep brep, int idx) => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.InvalidEdgeIndex.WithContext(string.Create(CultureInfo.InvariantCulture, $"EdgeIndex: {idx.ToString(CultureInfo.InvariantCulture)}, Max: {(brep.Edges.Count - 1).ToString(CultureInfo.InvariantCulture)}"))),
                 (Mesh mesh, int idx) when idx >= 0 && idx < mesh.TopologyEdges.Count => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
-                    bool computed = EnsureMeshNormals(mesh);
+                    bool computed = TopologyCompute.EnsureMeshNormals(mesh);
                     int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(idx);
                     return connectedFaces switch {
                         int[] { Length: 2 } af => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {
@@ -322,54 +349,8 @@ internal static class TopologyCore {
                 _ => ResultFactory.Create<IReadOnlyList<Topology.AdjacencyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    private static bool EnsureMeshNormals(Mesh mesh) =>
-        mesh.FaceNormals.Count == mesh.Faces.Count
-            ? mesh.FaceNormals.UnitizeFaceNormals()
-            : mesh.FaceNormals.ComputeFaceNormals() && mesh.FaceNormals.UnitizeFaceNormals();
-
     private static Result<TResult> Execute<T, TResult>(T input, IGeometryContext context, TopologyConfig.OpType opType, Func<T, Result<IReadOnlyList<TResult>>> operation) where T : notnull =>
-        TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out (V ValidationMode, string OpName) meta)
+        TopologyConfig.OperationMeta.TryGetValue((input.GetType(), opType), out OperationMetadata meta)
             ? UnifiedOperation.Apply(input: input, operation: operation, config: new OperationConfig<T, TResult> { Context = context, ValidationMode = meta.ValidationMode, OperationName = meta.OpName, EnableDiagnostics = false }).Map(results => results[0])
             : ResultFactory.Create<TResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}, Operation: {opType}"));
-
-    private static Result<IReadOnlyList<Topology.ConnectivityData>> ComputeConnectivity<TGeometry>(
-        TGeometry _,
-        int faceCount,
-        Func<int, IEnumerable<int>> getAdjacent,
-        Func<int, BoundingBox> getBounds,
-        Func<int, IReadOnlyList<int>> getAdjacentForGraph) {
-        int[] componentIds = new int[faceCount];
-        Array.Fill(componentIds, -1);
-        int componentCount = 0;
-        for (int seed = 0; seed < faceCount; seed++) {
-            componentCount = componentIds[seed] != -1
-                ? componentCount
-                : ((Func<int>)(() => {
-                    Queue<int> queue = new([seed,]);
-                    componentIds[seed] = componentCount;
-                    while (queue.Count > 0) {
-                        int faceIdx = queue.Dequeue();
-                        foreach (int adjFace in getAdjacent(faceIdx).Where(f => componentIds[f] == -1)) {
-                            componentIds[adjFace] = componentCount;
-                            queue.Enqueue(adjFace);
-                        }
-                    }
-                    return componentCount;
-                }))() + 1;
-        }
-        IReadOnlyList<IReadOnlyList<int>> components = [.. Enumerable.Range(0, componentCount).Select(c => (IReadOnlyList<int>)[.. Enumerable.Range(0, faceCount).Where(f => componentIds[f] == c),]),];
-        IReadOnlyList<BoundingBox> bounds = [.. components.Select(c => c.Aggregate(BoundingBox.Empty, (union, fIdx) => getBounds(fIdx) switch {
-            BoundingBox fBox when union.IsValid => BoundingBox.Union(union, fBox),
-            BoundingBox fBox => fBox,
-        })),
-        ];
-        return ResultFactory.Create(value: (IReadOnlyList<Topology.ConnectivityData>)[new Topology.ConnectivityData(
-            ComponentIndices: components,
-            ComponentSizes: [.. components.Select(static c => c.Count),],
-            ComponentBounds: bounds,
-            TotalComponents: componentCount,
-            IsFullyConnected: componentCount == 1,
-            AdjacencyGraph: Enumerable.Range(0, faceCount).ToFrozenDictionary(keySelector: i => i, elementSelector: getAdjacentForGraph)),
-        ]);
-    }
 }
