@@ -583,7 +583,7 @@ internal static class TransformationCompute {
         IGeometryContext context) {
         double det = (q00 * ((q11 * q22) - (q12 * q21))) - (q01 * ((q10 * q22) - (q12 * q20))) + (q02 * ((q10 * q21) - (q11 * q20)));
         return Math.Abs(det) < context.AbsoluteTolerance
-            ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, true, true)
+            ? (q00, q01, q02, q10, q11, q12, q20, q21, q22, false, true)
             : IterateNewtonSchulzCore(q00: q00, q01: q01, q02: q02, q10: q10, q11: q11, q12: q12, q20: q20, q21: q21, q22: q22, det: det, context: context);
     }
 
