@@ -18,9 +18,14 @@ internal static class TransformationCompute {
         TMorph morph,
         T geometry) where TMorph : SpaceMorph where T : GeometryBase {
         T duplicate = (T)geometry.Duplicate();
-        return morph.Morph(duplicate)
+        bool success = morph.Morph(duplicate);
+        Result<T> result = success
             ? ResultFactory.Create(value: duplicate)
             : ResultFactory.Create<T>(error: E.Geometry.Transformation.MorphApplicationFailed.WithContext($"Morph type: {typeof(TMorph).Name}"));
+
+        (result.IsSuccess ? null : duplicate)?.Dispose();
+
+        return result;
     }
 
     /// <summary>Apply SpaceMorph to geometry with duplication.</summary>
