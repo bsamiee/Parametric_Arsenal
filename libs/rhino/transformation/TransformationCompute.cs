@@ -564,7 +564,7 @@ internal static class TransformationCompute {
         IGeometryContext context) =>
         Enumerable.Range(0, TransformationConfig.MaxNewtonSchulzIterations).Aggregate(
             seed: (q00: m00, q01: m01, q02: m02, q10: m10, q11: m11, q12: m12, q20: m20, q21: m21, q22: m22, converged: false, singular: false),
-            func: (state, _) => state.converged
+            func: (state, _) => state.converged || state.singular
                 ? state
                 : IterateNewtonSchulz(state.q00, state.q01, state.q02, state.q10, state.q11, state.q12, state.q20, state.q21, state.q22, context: context),
             resultSelector: final => final.singular || !final.converged
