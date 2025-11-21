@@ -378,7 +378,9 @@ internal static class TransformationCompute {
                     result.M12 *= scale.Z;
                     result.M22 *= scale.Z;
 
-                    return result.IsValid && result.Determinant > context.AbsoluteTolerance
+                    double determinantMagnitude = Math.Abs(result.Determinant);
+
+                    return result.IsValid && determinantMagnitude > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext($"Blend produced invalid matrix, det={result.Determinant.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}"));
                 }));
@@ -435,7 +437,9 @@ internal static class TransformationCompute {
                     result.M12 *= scale.Z;
                     result.M22 *= scale.Z;
 
-                    return result.IsValid && result.Determinant > context.AbsoluteTolerance
+                    double determinantMagnitude = Math.Abs(result.Determinant);
+
+                    return result.IsValid && determinantMagnitude > context.AbsoluteTolerance
                         ? ResultFactory.Create(value: result)
                         : ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformMatrix.WithContext("Interpolation produced invalid matrix"));
                 }));
