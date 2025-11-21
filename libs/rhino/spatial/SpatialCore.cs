@@ -14,7 +14,6 @@ namespace Arsenal.Rhino.Spatial;
 [Pure]
 internal static class SpatialCore {
     /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
         (geometry.Length, request) switch {
             (0, _) => ResultFactory.Create<Spatial.ClusteringResult[]>(error: E.Geometry.InvalidCount.WithContext("Cluster requires at least one geometry")),
@@ -29,7 +28,6 @@ internal static class SpatialCore {
         };
 
     /// <summary>Algebraic Analyze dispatcher routing to specific implementations via unified table lookup.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<int>> Analyze(Spatial.AnalysisRequest request, IGeometryContext context) =>
         request switch {
             null => ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Request cannot be null")),
@@ -46,7 +44,6 @@ internal static class SpatialCore {
         };
 
     /// <summary>Legacy Analyze dispatcher for backward compatibility with type-based API.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(TInput input, TQuery query, IGeometryContext context, int? bufferSize) where TInput : notnull where TQuery : notnull =>
         (input, query) switch {
             (Point3d[] points, Sphere sphere) => Analyze(request: new Spatial.RangeAnalysis<Point3d[]>(Input: points, Shape: new Spatial.SphereRange(Sphere: sphere), BufferSize: bufferSize), context: context),
@@ -65,7 +62,6 @@ internal static class SpatialCore {
         };
 
     /// <summary>Algebraic ProximityField dispatcher.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Spatial.ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, Spatial.DirectionalProximityRequest request, IGeometryContext context) =>
         (geometry.Length, request) switch {
             (0, _) => ResultFactory.Create<Spatial.ProximityFieldResult[]>(error: E.Geometry.InvalidCount.WithContext("ProximityField requires at least one geometry")),
@@ -100,7 +96,6 @@ internal static class SpatialCore {
             }))(),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunRangeAnalysis<TInput>(Spatial.RangeAnalysis<TInput> request, Func<TInput, RTree> factory, V validationMode, int defaultBuffer, string operationName, IGeometryContext context) where TInput : notnull {
         Result<IReadOnlyList<int>> Operation(TInput input) {
             using RTree tree = factory(input);
@@ -140,7 +135,6 @@ internal static class SpatialCore {
             });
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunProximityAnalysis<TInput>(Spatial.ProximityAnalysis<TInput> request, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, V validationMode, string operationName, IGeometryContext context) where TInput : notnull {
         Result<IReadOnlyList<int>> Operation(TInput input) {
             return request.Query switch {
@@ -168,7 +162,6 @@ internal static class SpatialCore {
             });
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunMeshOverlapAnalysis(Spatial.MeshOverlapAnalysis request, IGeometryContext context) =>
         SpatialConfig.Operations.TryGetValue((typeof(Mesh), SpatialConfig.OperationTypeOverlap), out SpatialConfig.SpatialOperationMetadata? meta)
             ? UnifiedOperation.Apply(
@@ -201,31 +194,25 @@ internal static class SpatialCore {
                 })
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Mesh overlap operation not configured"));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildPointArrayTree(Point3d[] points) =>
         RTree.CreateFromPointArray(points) ?? new RTree();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildPointCloudTree(PointCloud cloud) =>
         RTree.CreatePointCloudTree(cloud) ?? new RTree();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildMeshTree(Mesh mesh) =>
         RTree.CreateMeshFaceTree(mesh) ?? new RTree();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunRangeWithLookup<TInput>(Spatial.RangeAnalysis<TInput> request, Type inputType, Func<TInput, RTree> factory, IGeometryContext context) where TInput : notnull =>
         SpatialConfig.Operations.TryGetValue((inputType, SpatialConfig.OperationTypeRange), out SpatialConfig.SpatialOperationMetadata? meta)
             ? RunRangeAnalysis(request: request, factory: factory, validationMode: meta.ValidationMode, defaultBuffer: meta.BufferSize, operationName: meta.OperationName, context: context)
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Range operation not configured"));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> RunProximityWithLookup<TInput>(Spatial.ProximityAnalysis<TInput> request, Type inputType, Func<TInput, Point3d[], int, IEnumerable<int[]>> kNearest, Func<TInput, Point3d[], double, IEnumerable<int[]>> distLimited, IGeometryContext context) where TInput : notnull =>
         SpatialConfig.Operations.TryGetValue((inputType, SpatialConfig.OperationTypeProximity), out SpatialConfig.SpatialOperationMetadata? meta)
             ? RunProximityAnalysis(request: request, kNearest: kNearest, distLimited: distLimited, validationMode: meta.ValidationMode, operationName: meta.OperationName, context: context)
             : ResultFactory.Create<IReadOnlyList<int>>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"{inputType.Name} Proximity operation not configured"));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static RTree BuildGeometryArrayTree<T>(T[] geometries) where T : GeometryBase {
         RTree tree = new();
         for (int i = 0; i < geometries.Length; i++) {
@@ -234,7 +221,6 @@ internal static class SpatialCore {
         return tree;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<IReadOnlyList<int>> HandleTupleQueryTypes<TInput, TQuery>(TInput input, TQuery query, int? bufferSize, IGeometryContext context) where TInput : notnull where TQuery : notnull =>
         query switch {
             ValueTuple<Point3d[], int> kNearest when input is Point3d[] points => Analyze(request: new Spatial.ProximityAnalysis<Point3d[]>(Input: points, Query: new Spatial.KNearestProximity(Needles: kNearest.Item1, Count: kNearest.Item2)), context: context),
