@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Diagnostics.Contracts;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
@@ -228,4 +229,47 @@ internal static class TopologyCompute {
         mesh.FaceNormals.Count == mesh.Faces.Count
             ? mesh.FaceNormals.UnitizeFaceNormals()
             : mesh.FaceNormals.ComputeFaceNormals() && mesh.FaceNormals.UnitizeFaceNormals();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Point3d>> GetEdgeMidpoints(GeometryBase geometry) {
+        return geometry switch {
+            Brep b => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. b.Edges.Select(static e => e.PointAtNormalizedLength(0.5)),]),
+            Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.TopologyEdges.Count).Select(i => m.TopologyEdges.EdgeLine(i)).Where(static l => l.IsValid).Select(static l => l.PointAt(0.5)),]),
+            Curve c when c.DuplicateSegments() is Curve[] { Length: > 0 } segs => ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
+                List<Point3d> midpoints = new(capacity: segs.Length);
+                for (int i = 0; i < segs.Length; i++) {
+                    using Curve s = segs[i];
+                    midpoints.Add(s.PointAtNormalizedLength(0.5));
+                }
+                return ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. midpoints]);
+            }))(),
+            Curve c when c.TryGetPolyline(out Polyline pl) => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. pl.GetSegments().Where(static l => l.IsValid).Select(static l => l.PointAt(0.5)),]),
+            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("EdgeMidpoints requires Brep/Mesh/Curve")),
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<IReadOnlyList<Point3d>> GetFaceCentroids(GeometryBase geometry) {
+        return geometry switch {
+            Brep b => (
+                b.Faces
+                    .Select(f => {
+                        Brep? dup = f.DuplicateFace(duplicateMeshes: false);
+                        if (dup is null) {
+                            return Point3d.Unset;
+                        }
+                        using (dup) {
+                            using AreaMassProperties? mp = AreaMassProperties.Compute(dup);
+                            return mp?.Centroid is Point3d { IsValid: true } c ? c : Point3d.Unset;
+                        }
+                    })
+                    .Where(static p => p != Point3d.Unset)
+                    .ToArray()
+            ) is Point3d[] centroids && centroids.Length > 0
+                ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. centroids,])
+                : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("No valid face centroids found")),
+            Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static p => p.IsValid),]),
+            _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("FaceCentroids requires Brep/Mesh")),
+        };
+    }
 }
