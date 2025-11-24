@@ -502,4 +502,22 @@ internal static class SpatialCompute {
                 }
                 return ResultFactory.Create(value: cells);
             });
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Point3d GetClosestPoint(GeometryBase geometry, Point3d query) =>
+        geometry switch {
+            Mesh m => m.ClosestPoint(query),
+            Brep b => b.ClosestPoint(query),
+            Curve c => c.ClosestPoint(query, out double t) ? c.PointAt(t) : query,
+            Surface s => s.ClosestPoint(query, out double u, out double v) ? s.PointAt(u, v) : query,
+            _ => query,
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool IsPointInside(GeometryBase geometry, Point3d point, double tolerance) =>
+        geometry switch {
+            Brep brep => brep.IsPointInside(point, tolerance: tolerance, strictlyIn: false),
+            Mesh mesh when mesh.IsClosed => mesh.IsPointInside(point, tolerance: tolerance, strictlyIn: false),
+            _ => false,
+        };
 }

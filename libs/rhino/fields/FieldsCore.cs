@@ -6,6 +6,7 @@ using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
 using Arsenal.Core.Results;
+using Arsenal.Rhino.Spatial;
 using Rhino;
 using Rhino.Geometry;
 
@@ -286,19 +287,9 @@ internal static class FieldsCore {
                 }
             }
             for (int i = 0; i < totalSamples; i++) {
-                Point3d closest = typed switch {
-                    Mesh m => m.ClosestPoint(grid[i]),
-                    Brep b => b.ClosestPoint(grid[i]),
-                    Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
-                    Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
-                    _ => throw new UnreachableException($"Unsupported geometry type: {typed.GetType().Name}"),
-                };
+                Point3d closest = Spatial.SpatialCompute.GetClosestPoint(geometry: typed, query: grid[i]);
                 double unsignedDist = grid[i].DistanceTo(closest);
-                bool inside = typed switch {
-                    Brep brep => brep.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance * FieldsConfig.InsideOutsideToleranceMultiplier, strictlyIn: false),
-                    Mesh mesh when mesh.IsClosed => mesh.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance, strictlyIn: false),
-                    _ => false,
-                };
+                bool inside = Spatial.SpatialCompute.IsPointInside(geometry: typed, point: grid[i], tolerance: context.AbsoluteTolerance * FieldsConfig.InsideOutsideToleranceMultiplier);
                 distances[i] = inside ? -unsignedDist : unsignedDist;
             }
             Point3d[] finalGrid = [.. grid[..totalSamples]];
