@@ -24,8 +24,9 @@
     <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
     <PackageReference Include="CsCheck" Version="4.4.1" />
     <!-- Override Rhino.Testing's net48 transitive deps with net8.0-compatible versions -->
-    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
-    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <!-- Note: Do NOT use ExcludeAssets="runtime" here - test host needs these DLLs to start -->
+    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" PrivateAssets="all" />
+    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Windows-only: Project references -->
