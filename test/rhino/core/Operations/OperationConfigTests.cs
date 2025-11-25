@@ -11,7 +11,7 @@ using Rhino;
 namespace Arsenal.Rhino.Tests.Core.Operations;
 
 /// <summary>Tests OperationConfig creation, defaults, and immutability.</summary>
-[TestFixture]
+[RhinoTestFixture]
 public sealed class OperationConfigTests {
     private static readonly IGeometryContext TestContext = new GeometryContext(
         AbsoluteTolerance: 0.01,

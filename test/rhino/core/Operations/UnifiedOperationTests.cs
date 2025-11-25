@@ -11,7 +11,7 @@ using Rhino;
 namespace Arsenal.Rhino.Tests.Core.Operations;
 
 /// <summary>Tests UnifiedOperation polymorphic dispatch, validation, caching, and parallelism.</summary>
-[TestFixture]
+[RhinoTestFixture]
 public sealed class UnifiedOperationTests {
     private static readonly IGeometryContext TestContext = new GeometryContext(
         AbsoluteTolerance: 0.01,

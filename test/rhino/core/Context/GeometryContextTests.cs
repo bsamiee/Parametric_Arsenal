@@ -8,7 +8,7 @@ using Rhino;
 namespace Arsenal.Rhino.Tests.Core.Context;
 
 /// <summary>Tests GeometryContext creation, validation, tolerance methods, and unit conversion.</summary>
-[TestFixture]
+[RhinoTestFixture]
 public sealed class GeometryContextTests {
     /// <summary>Verifies Create() with valid tolerances.</summary>
     [Test]
