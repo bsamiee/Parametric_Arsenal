@@ -40,7 +40,7 @@ internal static class MorphologyCore {
                 error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Operation: {operation.GetType().Name}, InputType: {typeof(T).Name}")),
         };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteCageDeform<T>(
         T input,
         Morphology.CageDeformOperation operation,
@@ -76,7 +76,7 @@ internal static class MorphologyCore {
                 });
 
     /// <summary>Execute subdivision with CatmullClark, Loop, or Butterfly algorithm.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSubdivision<T>(
         T input,
         Morphology.SubdivisionStrategy strategy,
@@ -125,7 +125,7 @@ internal static class MorphologyCore {
                         error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown subdivision strategy: {strategy.GetType().Name}")),
             };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSmoothing<T>(
         T input,
         Morphology.SmoothingStrategy strategy,
@@ -209,7 +209,7 @@ internal static class MorphologyCore {
                     error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unsupported smoothing strategy: {strategy.GetType().Name}")),
             };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteOffset<T>(
         T input,
         Morphology.MeshOffsetOperation operation,
@@ -235,7 +235,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteReduction<T>(
         T input,
         Morphology.MeshReductionOperation operation,
@@ -268,7 +268,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRemesh<T>(
         T input,
         Morphology.IsotropicRemeshOperation operation,
@@ -329,7 +329,7 @@ internal static class MorphologyCore {
         ];
 
     /// <summary>Compute edge lengths, aspect ratios, and minimum angles for triangulated mesh.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static (double[] EdgeLengths, double[] AspectRatios, double[] MinAngles) ComputeMeshMetrics(Mesh mesh, IGeometryContext context) {
         int faceCount = mesh.Faces.Count;
         int edgeCount = mesh.TopologyEdges.Count;
@@ -356,7 +356,7 @@ internal static class MorphologyCore {
         return (edges, aspects, angles);
     }
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ComputeSmoothingMetrics(
         Mesh original,
         Mesh smoothed,
@@ -377,7 +377,7 @@ internal static class MorphologyCore {
             ])
             : ResultFactory.Create<IReadOnlyList<Morphology.IMorphologyResult>>(error: E.Geometry.InvalidCount);
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteRepair<T>(
         T input,
         Morphology.MeshRepairStrategy strategy,
@@ -445,7 +445,7 @@ internal static class MorphologyCore {
                     error: E.Geometry.Morphology.UnsupportedConfiguration.WithContext($"Unknown repair strategy: {strategy.GetType().Name}")),
             };
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteSeparate<T>(
         T input,
         IGeometryContext context) where T : GeometryBase =>
@@ -476,7 +476,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteWeld<T>(
         T input,
         Morphology.MeshWeldOperation operation,
@@ -504,7 +504,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteBrepToMesh<T>(
         T input,
         Morphology.BrepToMeshOperation operation,
@@ -550,7 +550,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteThicken<T>(
         T input,
         Morphology.MeshThickenOperation operation,
@@ -582,7 +582,7 @@ internal static class MorphologyCore {
                     EnableDiagnostics = false,
                 });
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Result<IReadOnlyList<Morphology.IMorphologyResult>> ExecuteUnwrap<T>(
         T input,
         Morphology.UnwrapStrategy strategy,

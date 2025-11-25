@@ -63,7 +63,6 @@ internal static class IntersectionCore {
                     strategy: entry.Strategy,
                     swapped: entry.Swapped)));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Intersection.IntersectionOutput> ExecutePointProjection(
         Point3d[] points,
         object targets,
@@ -123,7 +122,6 @@ internal static class IntersectionCore {
                 error: E.Geometry.InvalidProjection.WithContext("null or invalid direction")),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<Intersection.IntersectionOutput> ExecuteRayShoot(
         Ray3d ray,
         GeometryBase[] targets,
@@ -373,7 +371,6 @@ internal static class IntersectionCore {
                         : output)));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.ClassificationResult> ExecuteClassification(
         Intersection.IntersectionOutput output,
         GeometryBase geometryA,
@@ -395,7 +392,6 @@ internal static class IntersectionCore {
                 OperationName = IntersectionConfig.ClassificationOperation.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.NearMissResult> ExecuteNearMiss(
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -416,7 +412,6 @@ internal static class IntersectionCore {
                 OperationName = IntersectionConfig.NearMissOperation.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Intersection.StabilityResult> ExecuteStability(
         Intersection.IntersectionOutput baseIntersection,
         GeometryBase geometryA,

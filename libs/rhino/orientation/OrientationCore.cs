@@ -1,5 +1,4 @@
 using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
 using Arsenal.Core.Context;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Operations;
@@ -11,17 +10,14 @@ namespace Arsenal.Rhino.Orientation;
 /// <summary>Orchestration layer for orientation operations via UnifiedOperation.</summary>
 [Pure]
 internal static class OrientationCore {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
         OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.PatternDetectionResult> ExecutePatternDetection(GeometryBase[] geometries, IGeometryContext context) =>
         geometries.Length < OrientationConfig.PatternMinInstances
             ? ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.InsufficientParameters.WithContext($"Pattern detection requires at least {OrientationConfig.PatternMinInstances} geometries, got {geometries.Length}"))
             : OrientationCompute.DetectPattern(geometries: geometries, absoluteTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Orientation.OptimizationResult> ExecuteOptimization(Brep brep, Orientation.OptimizationCriteria criteria, IGeometryContext context) =>
         UnifiedOperation.Apply(
             input: brep,
@@ -35,7 +31,6 @@ internal static class OrientationCore {
             }).Map(static r => r[0]);
 
     /// <summary>Execute orientation operation on geometry with unified dispatch.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> Execute<T>(T geometry, Orientation.Operation operation, IGeometryContext context) where T : GeometryBase =>
         !OrientationConfig.Operations.TryGetValue(operation.GetType(), out OrientationConfig.OrientationOperationMetadata? opMeta)
             ? ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode.WithContext($"Unknown operation: {operation.GetType().Name}"))
@@ -52,7 +47,6 @@ internal static class OrientationCore {
                 _ => ResultFactory.Create<T>(error: E.Geometry.InvalidOrientationMode.WithContext($"Unhandled operation: {operation.GetType().Name}")),
             };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToPlane<T>(T geometry, Plane target, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -70,7 +64,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToCanonical<T>(T geometry, Orientation.CanonicalMode mode, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -83,7 +76,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToPoint<T>(T geometry, Point3d target, Orientation.CentroidMode centroidMode, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -97,7 +89,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToVector<T>(T geometry, Vector3d target, Vector3d? source, Point3d? anchor, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -110,7 +101,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToBestFit<T>(T geometry, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -123,7 +113,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteMirror<T>(T geometry, Plane plane, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -137,7 +126,6 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteFlipDirection<T>(T geometry, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         UnifiedOperation.Apply(
             input: geometry,
@@ -149,13 +137,11 @@ internal static class OrientationCore {
                 OperationName = meta.OperationName,
             }).Map(static r => r[0]);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToCurveFrame<T>(T geometry, Curve curve, double parameter, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         curve.FrameAt(parameter, out Plane frame) && frame.IsValid
             ? ExecuteToPlane(geometry: geometry, target: frame, meta: meta, context: context)
             : ResultFactory.Create<T>(error: E.Geometry.InvalidCurveParameter);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Result<T> ExecuteToSurfaceFrame<T>(T geometry, Surface surface, double u, double v, OrientationConfig.OrientationOperationMetadata meta, IGeometryContext context) where T : GeometryBase =>
         surface.FrameAt(u, v, out Plane frame) && frame.IsValid
             ? ExecuteToPlane(geometry: geometry, target: frame, meta: meta, context: context)

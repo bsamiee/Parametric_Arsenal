@@ -90,7 +90,6 @@ internal static class MorphologyConfig {
     internal const byte RepairCullDegenerateFaces = 4;
     internal const byte RepairCompact = 8;
     internal const byte RepairWeld = 16;
-    internal const byte RepairAll = RepairFillHoles | RepairUnifyNormals | RepairCullDegenerateFaces | RepairCompact | RepairWeld;
 
     /// <summary>Mesh reduction configuration.</summary>
     internal const int MinReductionFaceCount = 4;
