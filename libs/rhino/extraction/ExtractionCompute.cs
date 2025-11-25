@@ -263,14 +263,19 @@ internal static class ExtractionCompute {
         }
 
         double uLen = u.Length;
-        return uLen <= context.AbsoluteTolerance
-            ? (Vector3d.Zero, Vector3d.Zero, false)
-            : candidates
-                .Where(candidate => candidate.Length > context.AbsoluteTolerance
-                    && Math.Abs(Vector3d.Multiply(u / uLen, candidate / candidate.Length)) < ExtractionConfig.GridOrthogonalityThreshold)
-                .Select(candidate => (u, candidate, true))
-                .DefaultIfEmpty((Vector3d.Zero, Vector3d.Zero, false))
-                .First();
+        if (uLen <= context.AbsoluteTolerance) {
+            return (Vector3d.Zero, Vector3d.Zero, false);
+        }
+        Vector3d uNormalized = u / uLen;
+        for (int i = 0; i < candidates.Length; i++) {
+            double candidateLen = candidates[i].Length;
+            bool isOrthogonal = candidateLen > context.AbsoluteTolerance
+                && Math.Abs(Vector3d.Multiply(uNormalized, candidates[i] / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold;
+            if (isOrthogonal) {
+                return (u, candidates[i], true);
+            }
+        }
+        return (Vector3d.Zero, Vector3d.Zero, false);
     }
 
     private static Result<Extraction.PatternDetectionResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
@@ -278,16 +283,24 @@ internal static class ExtractionCompute {
         double meanDistance = centers.Average(c => centroid.DistanceTo(c));
         Vector3d normal = Plane.FitPlaneToPoints(points: centers, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
-            : (centers[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? Enumerable.Range(1, centers.Length - 1)
-                    .Select(i => centers[i] - centroid)
-                    .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
-                    .Select(v2 => Vector3d.CrossProduct(v1 / v1.Length, v2))
-                    .Where(normalCand => normalCand.Length > RhinoMath.ZeroTolerance)
-                    .Select(normalCand => normalCand / normalCand.Length)
-                    .DefaultIfEmpty(Vector3d.ZAxis)
-                    .First()
-                : Vector3d.ZAxis;
+            : ((Func<Vector3d>)(() => {
+                Vector3d v1 = centers[0] - centroid;
+                if (v1.Length <= RhinoMath.ZeroTolerance) {
+                    return Vector3d.ZAxis;
+                }
+                Vector3d v1Normalized = v1 / v1.Length;
+                for (int i = 1; i < centers.Length; i++) {
+                    Vector3d v2 = centers[i] - centroid;
+                    if (v2.Length <= RhinoMath.ZeroTolerance) {
+                        continue;
+                    }
+                    Vector3d normalCand = Vector3d.CrossProduct(v1Normalized, v2);
+                    if (normalCand.Length > RhinoMath.ZeroTolerance) {
+                        return normalCand / normalCand.Length;
+                    }
+                }
+                return Vector3d.ZAxis;
+            }))();
         return meanDistance > context.AbsoluteTolerance
             && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
             && centers.Select(c => c - centroid).ToArray() is Vector3d[] radii

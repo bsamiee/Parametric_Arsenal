@@ -301,7 +301,9 @@ internal static class FieldsCore {
                         };
                         distances[idx] = inside ? -unsignedDist : unsignedDist;
                     }
-                    return ResultFactory.Create(value: (Grid: (Point3d[])[.. grid[..totalSamples]], Distances: (double[])[.. distances[..totalSamples]]));
+                    Point3d[] finalGrid = [.. grid[..totalSamples]];
+                    double[] finalDistances = [.. distances[..totalSamples]];
+                    return ResultFactory.Create(value: (Grid: finalGrid, Distances: finalDistances));
                 } finally {
                     ArrayPool<Point3d>.Shared.Return(grid, clearArray: true);
                     ArrayPool<double>.Shared.Return(distances, clearArray: true);

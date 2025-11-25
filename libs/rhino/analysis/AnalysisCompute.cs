@@ -110,17 +110,21 @@ internal static class AnalysisCompute {
         }
         (double Parameter, Vector3d Curvature)[] validSamples = samples.AsSpan(0, validCount).ToArray();
         double[] validCurvatures = curvatures.AsSpan(0, validCount).ToArray();
+        double avgDiff = validCurvatures.Length > 1
+            ? Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1)
+            : 0.0;
+        double curveLength = curve.GetLength();
         return validSamples.Length <= 2
             ? ResultFactory.Create<Analysis.CurveFairnessResult>(error: E.Geometry.CurveAnalysisFailed.WithContext("Insufficient valid curvature samples"))
             : ResultFactory.Create(value: new Analysis.CurveFairnessResult(
-                SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (Enumerable.Range(1, validCurvatures.Length - 1).Sum(i => Math.Abs(validCurvatures[i] - validCurvatures[i - 1])) / (validCurvatures.Length - 1) * smoothnessSensitivity)), 0.0, 1.0),
+                SmoothnessScore: RhinoMath.Clamp(1.0 / (1.0 + (avgDiff * smoothnessSensitivity)), 0.0, 1.0),
                 CurvatureValues: validCurvatures,
                 InflectionPoints: [.. Enumerable.Range(1, validCurvatures.Length - 2)
                     .Where(i => Math.Abs((validCurvatures[i] - validCurvatures[i - 1]) - (validCurvatures[i + 1] - validCurvatures[i])) > inflectionThreshold || ((validCurvatures[i] - validCurvatures[i - 1]) * (validCurvatures[i + 1] - validCurvatures[i])) < 0)
                     .Select(i => (validSamples[i].Parameter, Math.Abs(validCurvatures[i] - validCurvatures[i - 1]) > inflectionThreshold)),
                 ],
                 BendingEnergy: validCurvatures.Max() is double maxCurv && maxCurv > context.AbsoluteTolerance
-                    ? (validCurvatures.Sum(k => k * k) * (curve.GetLength() / (validCount - 1))) / (maxCurv * curve.GetLength())
+                    ? (validCurvatures.Sum(k => k * k) * (curveLength / (validCount - 1))) / (maxCurv * curveLength)
                     : 0.0));
     }
 
@@ -342,7 +346,9 @@ internal static class AnalysisCompute {
                             : 0.0;
                         bool isCritical = aspectRatios[i] > AnalysisConfig.AspectRatioCritical || skewness[i] > AnalysisConfig.SkewnessCritical || jacobians[i] < AnalysisConfig.JacobianCritical;
                         bool isWarning = aspectRatios[i] > AnalysisConfig.AspectRatioWarning || skewness[i] > AnalysisConfig.SkewnessWarning || jacobians[i] < AnalysisConfig.JacobianWarning;
-                        problematicIndices = isCritical ? [.. problematicIndices, i,] : problematicIndices;
+                        if (isCritical) {
+                            problematicIndices.Add(i);
+                        }
                         criticalCount += isCritical ? 1 : 0;
                         warningCount += isWarning ? 1 : 0;
                     }

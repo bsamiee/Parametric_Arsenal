@@ -216,7 +216,9 @@ internal static class ExtractionCore {
                             OperationName = opMeta.OperationName,
                         });
                 } finally {
-                    (shouldDispose ? normalized as IDisposable : null)?.Dispose();
+                    if (shouldDispose) {
+                        (normalized as IDisposable)?.Dispose();
+                    }
                 }
             }))();
 
