@@ -73,4 +73,4 @@ Result<Topology.NgonTopologyData> ngons = Topology.GetNgonTopology(mesh, context
 
 **Healing**: Progressive strategies with automatic rollback; BFS for connectivity; bidirectional edge search for near-misses
 
-**Supported operations by geometry**: Brep (all except NgonTopology), Mesh (all except Diagnose, ExtractFeatures, Heal)
+**Supported operations by geometry**: Breps (all except NgonTopology), Meshes (all except Diagnose, ExtractFeatures, Heal)
