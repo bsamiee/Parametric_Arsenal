@@ -10,8 +10,8 @@
     <MaxCpuCount>1</MaxCpuCount>
     <!-- Results directory -->
     <ResultsDirectory>./TestResults</ResultsDirectory>
-    <!-- Target framework for test execution -->
-    <TargetFrameworkVersion>net8.0</TargetFrameworkVersion>
+    <!-- Target framework for test execution (Windows TFM for Rhino.Testing) -->
+    <TargetFrameworkVersion>net8.0-windows</TargetFrameworkVersion>
   </RunConfiguration>
 
   <NUnit>

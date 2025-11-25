@@ -71,7 +71,7 @@ jobs:
         run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
 
       - name: Run Rhino Tests
-        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0 --no-build --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
+        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0-windows --no-build --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
 
       - name: Upload Test Results
         if: always()

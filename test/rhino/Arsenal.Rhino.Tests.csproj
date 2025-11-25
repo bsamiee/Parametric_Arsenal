@@ -6,23 +6,52 @@
     <IsTestProject>true</IsTestProject>
     <TestFramework>NUnit</TestFramework>
     <!-- Suppress NuGet warnings for Rhino.Testing transitive dependencies -->
-    <!-- These packages are provided by the Rhino runtime, not restored from NuGet -->
     <NoWarn>$(NoWarn);NU1701;NU1608;NU1605</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- Windows: Use Windows-specific TFM for Rhino.Testing CoreCLR compatibility -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <TargetFramework>net8.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Non-Windows: Use generic TFM and exclude from build (allows restore to succeed) -->
+  <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
+
+  <!-- Windows-only: Remove conflicting package versions from Directory.Build.props -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Remove="NUnit" />
+    <PackageReference Remove="NUnit3TestAdapter" />
+    <PackageReference Remove="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+
+  <!-- Windows-only: Override NUnit versions to match Rhino.Testing requirements -->
+  <!-- Rhino.Testing 8.0.28-beta requires NUnit 3.14.0, not NUnit 4.x -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+  </ItemGroup>
+
+  <!-- Windows-only: Using directives for Rhino types -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <Using Include="NUnit.Framework" />
     <Using Include="Rhino.Testing.Fixtures" />
     <Using Include="Arsenal.Rhino.Spatial" />
     <Using Include="Arsenal.Rhino.Extraction" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- Windows-only: Project references -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
     <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- Windows-only: Content files -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <None Update="Rhino.Testing.Configs.xml" CopyToOutputDirectory="Always" />
     <None Update=".runsettings" CopyToOutputDirectory="Always" />
   </ItemGroup>
