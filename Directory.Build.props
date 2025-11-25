@@ -156,7 +156,7 @@
   <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'NUnit'">
     <PackageReference Include="NUnit" Version="4.4.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" />
-    <PackageReference Include="Rhino.Testing" Version="8.0.17-beta" />
+    <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
   </ItemGroup>
 
   <!-- CsCheck for Property-Based Testing (All Test Projects) -->

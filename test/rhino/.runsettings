@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- NUnit + Rhino.Testing runsettings configuration -->
 <!-- https://github.com/mcneel/Rhino.Testing -->
+<!-- Updated for Rhino.Testing 8.0.28-beta with .NET 8.0 support -->
 <RunSettings>
   <RunConfiguration>
-    <!-- Maximum time to allow for test run (minutes) -->
+    <!-- Maximum time to allow for test run (5 minutes) -->
     <TestSessionTimeout>300000</TestSessionTimeout>
     <!-- Disable parallel test execution for Rhino.Testing -->
     <MaxCpuCount>1</MaxCpuCount>
     <!-- Results directory -->
     <ResultsDirectory>./TestResults</ResultsDirectory>
+    <!-- Target framework for test execution -->
+    <TargetFrameworkVersion>net8.0</TargetFrameworkVersion>
   </RunConfiguration>
 
   <NUnit>
@@ -18,7 +21,9 @@
     <ShadowCopyFiles>false</ShadowCopyFiles>
     <!-- Internal trace level for debugging -->
     <InternalTraceLevel>Off</InternalTraceLevel>
-    <!-- Random seed for reproducible test runs -->
+    <!-- Test naming pattern -->
     <DefaultTestNamePattern>{m}{a}</DefaultTestNamePattern>
+    <!-- Explicit work directory -->
+    <WorkDirectory>.</WorkDirectory>
   </NUnit>
 </RunSettings>

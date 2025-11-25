@@ -2,11 +2,12 @@
 
 <!-- Headless configuration for automated CI/CD testing -->
 <!-- https://github.com/mcneel/Rhino.Testing -->
+<!-- Updated for Rhino.Testing 8.0.28-beta with .NET 8.0 support -->
 <Settings>
-  <!-- Rhino installation path (Windows CI) -->
+  <!-- Rhino installation path (Windows CI via mcneel/setup-rhino3d) -->
   <RhinoSystemDirectory>C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
 
-  <!-- Headless mode configuration -->
+  <!-- Headless mode configuration - disable all UI components -->
   <CreateRhinoDoc>false</CreateRhinoDoc>
   <CreateRhinoView>false</CreateRhinoView>
 
@@ -14,6 +15,11 @@
   <LoadEto>false</LoadEto>
   <LoadRDK>false</LoadRDK>
 
-  <!-- Optional: Load Grasshopper if testing GH components -->
-  <!-- <LoadGrasshopper>false</LoadGrasshopper> -->
+  <!-- Grasshopper configuration - disabled by default for pure geometry tests -->
+  <!-- Set to true if testing Grasshopper components -->
+  <LoadGrasshopper>false</LoadGrasshopper>
+  <LoadGrasshopper2>false</LoadGrasshopper2>
+
+  <!-- Legacy IronPython - disabled for .NET 8.0 -->
+  <LoadLegacyIronPython>false</LoadLegacyIronPython>
 </Settings>

@@ -5,6 +5,9 @@
     <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
     <TestFramework>NUnit</TestFramework>
+    <!-- Suppress NuGet warnings for Rhino.Testing transitive dependencies -->
+    <!-- These packages are provided by the Rhino runtime, not restored from NuGet -->
+    <NoWarn>$(NoWarn);NU1701;NU1608;NU1605</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

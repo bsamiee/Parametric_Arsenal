@@ -3,15 +3,28 @@ name: Rhino Tests
 on:
   push:
     branches: [main]
+    paths:
+      - 'libs/rhino/**'
+      - 'test/rhino/**'
+      - '.github/workflows/rhino-tests.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'libs/rhino/**'
+      - 'test/rhino/**'
+      - '.github/workflows/rhino-tests.yml'
   workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Enable debug logging for troubleshooting'
+        required: false
+        default: 'false'
 
 jobs:
   test-rhino:
     name: Rhino Headless Tests
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -57,6 +70,7 @@ jobs:
         if: success()
         run: |
           echo "✅ Rhino tests completed successfully"
-          echo "Test Framework: NUnit 4.4.0 + Rhino.Testing v8.0.17-beta"
+          echo "Test Framework: NUnit 4.4.0 + Rhino.Testing v8.0.28-beta"
+          echo "Target Framework: .NET 8.0"
           echo "Headless Mode: Enabled"
           echo "Platform: Windows with RhinoCommon"

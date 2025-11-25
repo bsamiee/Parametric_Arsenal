@@ -10,7 +10,7 @@ jobs:
   validate:
     name: Build & Analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -37,11 +37,24 @@ jobs:
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
+      - name: Run Core Tests (xUnit)
+        run: dotnet test test/core/Arsenal.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=Arsenal.Core.Tests.trx"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-results
+          path: |
+            **/TestResults/**/*.trx
+          retention-days: 14
+
       - name: Summary
         if: success()
         run: |
-          echo ">> Build passed"
-          echo ">> EditorConfig compliance verified"
-          echo ">> .NET formatting verified"
-          echo ">> Analyzers: Roslynator, Meziantou, IDisposableAnalyzers"
-          echo ">> Code Style: .editorconfig enforced"
+          echo "✅ Build passed"
+          echo "✅ EditorConfig compliance verified"
+          echo "✅ .NET formatting verified"
+          echo "✅ Core tests passed (xUnit + CsCheck)"
+          echo "Analyzers: Roslynator, Meziantou, NetAnalyzers"
+          echo "Code Style: .editorconfig enforced"
