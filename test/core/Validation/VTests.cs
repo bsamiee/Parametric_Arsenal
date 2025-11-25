@@ -135,10 +135,21 @@ public sealed class VTests {
     [Fact]
     public void PredefinedFlagsDistinct() {
         IReadOnlyList<V> flags = [
-            V.Standard, V.AreaCentroid, V.BoundingBox, V.MassProperties,
-            V.Topology, V.Degeneracy, V.Tolerance, V.MeshSpecific,
-            V.SurfaceContinuity, V.PolycurveStructure, V.NurbsGeometry,
-            V.ExtrusionGeometry, V.UVDomain, V.SelfIntersection, V.BrepGranular,
+            V.Standard,
+            V.AreaCentroid,
+            V.BoundingBox,
+            V.MassProperties,
+            V.Topology,
+            V.Degeneracy,
+            V.Tolerance,
+            V.MeshSpecific,
+            V.SurfaceContinuity,
+            V.PolycurveStructure,
+            V.NurbsGeometry,
+            V.ExtrusionGeometry,
+            V.UVDomain,
+            V.SelfIntersection,
+            V.BrepGranular,
         ];
 
         for (int i = 0; i < flags.Count; i++) {
@@ -153,10 +164,21 @@ public sealed class VTests {
     [Fact]
     public void AllContainsAllFlags() {
         IReadOnlyList<V> flags = [
-            V.Standard, V.AreaCentroid, V.BoundingBox, V.MassProperties,
-            V.Topology, V.Degeneracy, V.Tolerance, V.MeshSpecific,
-            V.SurfaceContinuity, V.PolycurveStructure, V.NurbsGeometry,
-            V.ExtrusionGeometry, V.UVDomain, V.SelfIntersection, V.BrepGranular,
+            V.Standard,
+            V.AreaCentroid,
+            V.BoundingBox,
+            V.MassProperties,
+            V.Topology,
+            V.Degeneracy,
+            V.Tolerance,
+            V.MeshSpecific,
+            V.SurfaceContinuity,
+            V.PolycurveStructure,
+            V.NurbsGeometry,
+            V.ExtrusionGeometry,
+            V.UVDomain,
+            V.SelfIntersection,
+            V.BrepGranular,
         ];
 
         for (int i = 0; i < flags.Count; i++) {

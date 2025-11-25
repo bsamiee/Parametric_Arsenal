@@ -19,6 +19,10 @@ on:
         description: 'Enable debug logging for troubleshooting'
         required: false
         default: 'false'
+      run_rhino_tests:
+        description: 'Set to true to run Rhino headless tests on demand'
+        required: false
+        default: 'false'
 
 jobs:
   test-rhino:
@@ -27,6 +31,9 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
+      RHINO_EMAIL: ${{ secrets.RHINO_EMAIL }}
 
     steps:
       - name: Checkout
@@ -42,19 +49,29 @@ jobs:
         with:
           email-address: ${{ secrets.RHINO_EMAIL }}
           release-version: latest
-        env:
-          RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
+
+      - name: Capture Rhino Version
+        shell: pwsh
+        run: |
+          $exe = 'C:\Program Files\Rhino 8\System\Rhino.exe'
+          $dll = 'C:\Program Files\Rhino 8\System\RhinoCommon.dll'
+          if (Test-Path $exe) {
+            $ver = (Get-Item $exe).VersionInfo.ProductVersion
+            Write-Host "Rhino.exe version: $ver"
+          }
+          if (Test-Path $dll) {
+            $dllVer = (Get-Item $dll).VersionInfo.ProductVersion
+            Write-Host "RhinoCommon.dll version: $dllVer"
+          }
 
       - name: Restore Dependencies
-        run: dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj
+        run: dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj --locked-mode
 
       - name: Build Rhino Tests
         run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
 
       - name: Run Rhino Tests
-        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
-        env:
-          RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
+        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0 --no-build --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
 
       - name: Upload Test Results
         if: always()

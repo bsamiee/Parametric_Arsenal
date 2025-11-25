@@ -150,9 +150,7 @@ internal static class TopologyCompute {
                     Brep[] components = copy.GetConnectedComponents() ?? [];
                     Brep[]? joined = components.Length > 1 ? Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) : null;
                     return joined switch {
-                        null => false,
-                        { Length: 0 } => false,
-                        { Length: 1 } => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
+                        null => false, { Length: 0 } => false, { Length: 1 } => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
                         Brep[] multiJoined => ((Func<bool>)(() => { Array.ForEach(multiJoined, b => b?.Dispose()); return false; }))(),
                     };
                 }))(),

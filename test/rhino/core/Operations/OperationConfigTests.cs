@@ -6,7 +6,6 @@ using Arsenal.Core.Validation;
 using Arsenal.Rhino.Tests.Core.Context;
 using Arsenal.Tests.Common;
 using CsCheck;
-using NUnit.Framework;
 using Rhino;
 
 namespace Arsenal.Rhino.Tests.Core.Operations;

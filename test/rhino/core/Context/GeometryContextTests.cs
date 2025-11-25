@@ -3,7 +3,6 @@ using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Arsenal.Tests.Common;
 using CsCheck;
-using NUnit.Framework;
 using Rhino;
 
 namespace Arsenal.Rhino.Tests.Core.Context;

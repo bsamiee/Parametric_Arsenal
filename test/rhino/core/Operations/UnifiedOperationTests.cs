@@ -6,7 +6,6 @@ using Arsenal.Core.Results;
 using Arsenal.Core.Validation;
 using Arsenal.Tests.Common;
 using CsCheck;
-using NUnit.Framework;
 using Rhino;
 
 namespace Arsenal.Rhino.Tests.Core.Operations;
@@ -145,7 +144,7 @@ public sealed class UnifiedOperationTests {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x * 2]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext, EnableParallel = true };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: operation, config: config);
         Test.Success(result, list => list.Count == values.Count);
     });
 
@@ -155,7 +154,7 @@ public sealed class UnifiedOperationTests {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext, EnableParallel = true, MaxDegreeOfParallelism = 2 };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: operation, config: config);
         Test.Success(result, list => list.Count == values.Count);
     });
 
@@ -170,7 +169,7 @@ public sealed class UnifiedOperationTests {
                     : ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
             Func<int, Result<IReadOnlyList<int>>> op = Op;
             OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext, AccumulateErrors = true };
-            Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: op, config: config);
+            Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: op, config: config);
             Test.Failure(result);
         },
         () => {
@@ -181,7 +180,7 @@ public sealed class UnifiedOperationTests {
                     : ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
             Func<int, Result<IReadOnlyList<int>>> op = Op;
             OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext, ShortCircuit = true };
-            Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: op, config: config);
+            Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: op, config: config);
             Test.Failure(result);
         });
 
@@ -203,7 +202,7 @@ public sealed class UnifiedOperationTests {
         static bool Filter(int x) => x % 2 == 0;
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext, OutputFilter = Filter };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: operation, config: config);
         Test.Success(result, list => list.All(x => x % 2 == 0));
     });
 
@@ -247,7 +246,7 @@ public sealed class UnifiedOperationTests {
             InputFilter = Filter,
             SkipInvalid = true,
         };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: operation, config: config);
         Test.Success(result, list => list.Count == 5);
     }
 
@@ -258,7 +257,7 @@ public sealed class UnifiedOperationTests {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Func<int, Result<IReadOnlyList<int>>> op = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: empty, operation: op, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: empty, operation: op, config: config);
         Test.Success(result, list => list.Count == 0);
     }
 
@@ -269,7 +268,7 @@ public sealed class UnifiedOperationTests {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x * 2]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: single, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: single, operation: operation, config: config);
         Test.Success(result, list => list.Count == 1 && list[0] == value * 2);
     });
 
@@ -278,7 +277,7 @@ public sealed class UnifiedOperationTests {
     public void UnsupportedOperationTypeError() => Gen.Int.Run((int value) => {
         const string invalidOp = "not a valid operation";
         OperationConfig<int, int> config = new() { Context = TestContext };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<int, int>(input: value, operation: invalidOp, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: value, operation: invalidOp, config: config);
         Test.Failure(result, errors => errors.Any(e => e.Code == E.Validation.UnsupportedOperationType.Code));
     });
 
@@ -288,7 +287,7 @@ public sealed class UnifiedOperationTests {
         static Result<IReadOnlyList<int>> Op(int x) => ResultFactory.Create(value: (IReadOnlyList<int>)[x]);
         Func<int, Result<IReadOnlyList<int>>> operation = Op;
         OperationConfig<IReadOnlyList<int>, int> config = new() { Context = TestContext };
-        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply<IReadOnlyList<int>, int>(input: values, operation: operation, config: config);
+        Result<IReadOnlyList<int>> result = UnifiedOperation.Apply(input: values, operation: operation, config: config);
         Test.Success(result, list => list.Count == values.Count);
     });
 }

@@ -318,27 +318,27 @@ internal static class SpatialCompute {
             : points.Length > 1 && points[0].Z is double z0 && !points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
                 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"))
                 : ((Func<Result<Point3d[]>>)(() => {
-        Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-        double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-        List<Point3d> lower = [];
-        for (int i = 0; i < pts.Length; i++) {
-            while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
-                lower.RemoveAt(lower.Count - 1);
-            }
-            lower.Add(pts[i]);
-        }
-        List<Point3d> upper = [];
-        for (int i = pts.Length - 1; i >= 0; i--) {
-            while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= crossProductTolerance) {
-                upper.RemoveAt(upper.Count - 1);
-            }
-            upper.Add(pts[i]);
-        }
-        Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
-        return result.Length >= 3
-            ? ResultFactory.Create(value: result)
-            : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
-    }))();
+                    Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
+                    double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+                    List<Point3d> lower = [];
+                    for (int i = 0; i < pts.Length; i++) {
+                        while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
+                            lower.RemoveAt(lower.Count - 1);
+                        }
+                        lower.Add(pts[i]);
+                    }
+                    List<Point3d> upper = [];
+                    for (int i = pts.Length - 1; i >= 0; i--) {
+                        while (upper.Count >= 2 && (((upper[^1].X - upper[^2].X) * (pts[i].Y - upper[^2].Y)) - ((upper[^1].Y - upper[^2].Y) * (pts[i].X - upper[^2].X))) <= crossProductTolerance) {
+                            upper.RemoveAt(upper.Count - 1);
+                        }
+                        upper.Add(pts[i]);
+                    }
+                    Point3d[] result = [.. lower.Take(lower.Count - 1).Concat(upper.Take(upper.Count - 1)),];
+                    return result.Length >= 3
+                        ? ResultFactory.Create(value: result)
+                        : ResultFactory.Create<Point3d[]>(error: E.Validation.DegenerateGeometry.WithContext("ConvexHull2D failed: collinear or degenerate points"));
+                }))();
 
     /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
     [Pure]

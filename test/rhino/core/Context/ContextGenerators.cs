@@ -1,6 +1,5 @@
 using System.Diagnostics.Contracts;
 using Arsenal.Core.Context;
-using Arsenal.Core.Results;
 using CsCheck;
 using Rhino;
 
