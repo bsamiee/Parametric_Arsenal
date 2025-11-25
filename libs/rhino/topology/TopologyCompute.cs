@@ -148,10 +148,11 @@ internal static class TopologyCompute {
                 }))(),
                 Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
                     Brep[] components = copy.GetConnectedComponents() ?? [];
-                    return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) switch {
+                    Brep[]? joined = components.Length > 1 ? Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) : null;
+                    return joined switch {
                         null => false,
                         { Length: 0 } => false,
-                        { Length: 1 } singleJoined => ((Func<bool>)(() => { copy.Dispose(); copy = singleJoined[0]; return true; }))(),
+                        { Length: 1 } => ((Func<bool>)(() => { copy.Dispose(); copy = joined[0]; return true; }))(),
                         Brep[] multiJoined => ((Func<bool>)(() => { Array.ForEach(multiJoined, b => b?.Dispose()); return false; }))(),
                     };
                 }))(),
@@ -160,7 +161,7 @@ internal static class TopologyCompute {
             string validationLog = string.Empty;
             bool isValid = success && copy.IsValidTopology(out validationLog);
             int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
-            _ = isValid || ((Func<bool>)(() => { System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}"); return true; }))();
+            _ = isValid || ((Func<bool>)(() => { System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}"); return false; }))();
             bool isImprovement = isValid && nakedEdges < bestNakedEdges;
 
             Brep? toDispose = isImprovement ? bestHealed : copy;

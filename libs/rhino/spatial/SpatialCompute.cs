@@ -443,11 +443,12 @@ internal static class SpatialCompute {
         // Compute twice the signed area of triangle (a,b,c) to check for degeneracy
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-        // Incircle determinant test using squared distances; returns false for degenerate (collinear) triangles
+        // Incircle determinant test using squared distances
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
         // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics
         double adjustedDet = orientation > 0.0 ? det : -det;
         double determinantTolerance = orientationTolerance * orientationTolerance;
+        // Combined incircle test: false for degenerate triangles (collinear points) OR when point is outside circumcircle
         return Math.Abs(orientation) > orientationTolerance && adjustedDet > determinantTolerance;
     }
 
@@ -466,14 +467,13 @@ internal static class SpatialCompute {
                     circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance
                         ? Point3d.Unset
                         : new Point3d(
-                            (((a.X * a.X + a.Y * a.Y) * (b.Y - c.Y)) +
-                             ((b.X * b.X + b.Y * b.Y) * (c.Y - a.Y)) +
-                             ((c.X * c.X + c.Y * c.Y) * (a.Y - b.Y))) / (2.0 * orientation),
-                            (((a.X * a.X + a.Y * a.Y) * (c.X - b.X)) +
-                             ((b.X * b.X + b.Y * b.Y) * (a.X - c.X)) +
-                             ((c.X * c.X + c.Y * c.Y) * (b.X - a.X))) / (2.0 * orientation),
-                            a.Z
-                        );
+                            ((((a.X * a.X) + (a.Y * a.Y)) * (b.Y - c.Y)) +
+                             (((b.X * b.X) + (b.Y * b.Y)) * (c.Y - a.Y)) +
+                             (((c.X * c.X) + (c.Y * c.Y)) * (a.Y - b.Y))) / (2.0 * orientation),
+                            ((((a.X * a.X) + (a.Y * a.Y)) * (c.X - b.X)) +
+                             (((b.X * b.X) + (b.Y * b.Y)) * (a.X - c.X)) +
+                             (((c.X * c.X) + (c.Y * c.Y)) * (b.X - a.X))) / (2.0 * orientation),
+                            a.Z);
                 }
                 Point3d[][] cells = new Point3d[points.Length][];
                 for (int i = 0; i < points.Length; i++) {
