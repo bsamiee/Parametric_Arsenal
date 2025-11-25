@@ -3,33 +3,36 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    paths:
+      - 'libs/**/*.cs'
+      - 'test/**/*.cs'
+      - '*.csproj'
+      - 'Directory.Build.props'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
+      actions: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Run Claude Code Review
         id: claude-review
@@ -37,21 +40,38 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            Review PR #${{ github.event.pull_request.number }} against CLAUDE.md standards.
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            ## MANDATORY CHECKS (build failures)
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            **Syntax violations** (search for these patterns):
+            - `var ` declarations → must use explicit types
+            - `if (` with `} else {` → must use ternary/switch expressions
+            - `new List<` or `new Dictionary<` → must use collection expressions `[]`
+            - Missing trailing commas in multi-line arrays/collections
+            - `namespace X {` → must use file-scoped `namespace X;`
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            **Architecture violations**:
+            - Direct `throw new` → must return `Result<T>` with `E.*` errors
+            - Missing named parameters for non-obvious args
+            - Multiple types in single file (CA1050)
+            - Helper method extraction instead of inline logic
 
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+            **Organization violations**:
+            - Method >300 LOC
+            - >4 files per folder
+            - >10 types per folder
 
+            ## REVIEW FORMAT
+
+            Use `gh pr review` with:
+            - `--approve` if ALL checks pass
+            - `--request-changes` if ANY violation found
+
+            Include specific line references for each violation.
+            Run `dotnet build` to verify analyzer compliance.
+
+          claude_args: |
+            --model claude-opus-4-5-20251101
+            --max-turns 8
+            --allowedTools Read,Grep,Glob,Bash(dotnet:*),Bash(git diff:*),Bash(gh pr:*)

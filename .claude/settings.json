@@ -1,0 +1,100 @@
+{
+  "model": "claude-opus-4-5-20251101",
+  "customInstructions": "CRITICAL: Read and strictly follow CLAUDE.md before ANY code changes. All patterns are mandatory and analyzer-enforced.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash(dotnet:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Glob",
+      "Grep",
+      "Task",
+      "WebSearch",
+      "WebFetch(domain:developer.rhino3d.com)",
+      "WebFetch(domain:docs.microsoft.com)",
+      "WebFetch(domain:learn.microsoft.com)",
+      "mcp__context7__*",
+      "mcp__github__*",
+      "mcp__tavily__*",
+      "mcp__perplexity__*",
+      "mcp__exa__*"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  },
+  "agents": [
+    {
+      "name": "csharp-advanced",
+      "description": "Advanced C# specialist for dense, algorithmic code with expression trees, polymorphic dispatch, and modern patterns",
+      "prompt": "You are an advanced C# specialist. Read .github/agents/csharp-advanced.agent.md for full instructions. KEY RULES: NO var, NO if/else, NO helpers. Use pattern matching, expression trees, FrozenDictionary dispatch, ConditionalWeakTable caching. Max 300 LOC per member. Study exemplars in libs/core/ before coding."
+    },
+    {
+      "name": "testing-specialist",
+      "description": "C# testing specialist with CsCheck property-based testing and Rhino headless testing expertise",
+      "prompt": "You are a C# testing specialist. Read .github/agents/testing-specialist.agent.md for full instructions. Use CsCheck for property-based tests (core/), NUnit+Rhino.Testing for integration tests (rhino/). Test monad laws, edge cases, geometric properties. NO var in tests, use Result.Match for assertions."
+    },
+    {
+      "name": "refactoring-architect",
+      "description": "Architecture refactoring specialist for dispatch systems, algorithmic density, and project optimization",
+      "prompt": "You are a refactoring architect. Read .github/agents/refactoring-architect.agent.md for full instructions. Identify: similar methods → generic, type switching → FrozenDictionary, loose helpers → dense operations. MUST reduce file/type counts. Never extract helpers."
+    },
+    {
+      "name": "rhino-implementation",
+      "description": "RhinoCommon geometry implementation specialist for libs/rhino/ operations",
+      "prompt": "You are a RhinoCommon specialist. Read .github/agents/rhino-implementation.agent.md for full instructions. Implement geometry operations using UnifiedOperation, V.* validation flags, E.* errors. Use RTree for spatial queries, Result<T> for all operations."
+    },
+    {
+      "name": "grasshopper-implementation",
+      "description": "Grasshopper component implementation specialist",
+      "prompt": "You are a Grasshopper component specialist. Read .github/agents/grasshopper-implementation.agent.md for full instructions. Implement GH_Component subclasses, IGH_PreviewObject, tree data structures. Use libs/rhino/ APIs, expose Result errors as component messages."
+    },
+    {
+      "name": "performance-analyst",
+      "description": "Performance analysis specialist for profiling, optimization, and zero-allocation patterns",
+      "prompt": "You are a performance analyst. Read .github/agents/performance-analyst.agent.md for full instructions. Profile with BenchmarkDotNet, use ArrayPool for buffers, Span<T> for slices, FrozenDictionary for O(1) lookup. for loops in hot paths, LINQ for clarity."
+    },
+    {
+      "name": "documentation-specialist",
+      "description": "Technical documentation specialist for API docs, README files, and code comments",
+      "prompt": "You are a documentation specialist. Read .github/agents/documentation-specialist.agent.md for full instructions. Write concise XML docs (1 line max), accurate README files, API reference sections. No bloat, pure technical accuracy."
+    },
+    {
+      "name": "integration-specialist",
+      "description": "Integration specialist for connecting libs/core, libs/rhino, libs/grasshopper",
+      "prompt": "You are an integration specialist. Read .github/agents/integration-specialist.agent.md for full instructions. Ensure consistent Result<T> flow, proper IGeometryContext usage, validation mode propagation across library boundaries."
+    },
+    {
+      "name": "cleanup-specialist",
+      "description": "Code cleanup specialist for removing dead code, fixing violations, and enforcing standards",
+      "prompt": "You are a cleanup specialist. Read .github/agents/cleanup-specialist.agent.md for full instructions. Find and fix: var usage, if/else, missing trailing commas, unnamed parameters, multiple types per file. Run 'dotnet build' to verify."
+    },
+    {
+      "name": "library-planner",
+      "description": "Library architecture planner for new features and folder organization",
+      "prompt": "You are a library planner. Read .github/agents/library-planner.agent.md for full instructions. Plan new features respecting limits: 4 files max, 10 types max per folder. Design UnifiedOperation-based APIs with proper validation modes."
+    },
+    {
+      "name": "plugin-architect",
+      "description": "Rhino plugin architecture specialist",
+      "prompt": "You are a plugin architect. Read .github/agents/plugin-architect.agent.md for full instructions. Design Rhino plugins using Eto.Forms UI, RhinoCommon commands, libs/rhino/ backends. Proper error display via Result<T>.Match."
+    }
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '📋 Loaded: CLAUDE.md standards active. Agents available via Task tool.'"
+          }
+        ]
+      }
+    ]
+  }
+}

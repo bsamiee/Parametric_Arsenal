@@ -174,10 +174,6 @@ dmypy.json
 .pre-commit-cache/
 .pre-commit-config.yaml.local
 
-# Claude AI / AI Assistants
-.claude/
-.kiro/
-
 # Local configuration
 *.local
 *.local.*

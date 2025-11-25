@@ -1,0 +1,129 @@
+name: Claude Issue Implementation
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event.label.name == 'claude-implement'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Claude Implement Issue
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: "true"
+          prompt: |
+            Implement issue #${{ github.event.issue.number }}: "${{ github.event.issue.title }}"
+
+            ## ISSUE DETAILS
+            ${{ github.event.issue.body }}
+
+            ## IMPLEMENTATION REQUIREMENTS
+
+            1. **Read CLAUDE.md first** - All code must follow these standards exactly
+            2. **Study exemplar files** before writing:
+               - libs/core/results/Result.cs
+               - libs/core/operations/UnifiedOperation.cs
+               - libs/rhino/spatial/Spatial.cs
+
+            3. **Code style (build failures)**:
+               - NO var - explicit types only
+               - NO if/else - ternary, switch expressions, pattern matching
+               - Named parameters for non-obvious args
+               - Trailing commas on all multi-line collections
+               - K&R braces, file-scoped namespaces
+               - One type per file
+
+            4. **Architecture**:
+               - Result<T> for failable operations
+               - UnifiedOperation for polymorphic dispatch
+               - E.* errors from libs/core/errors/E.cs
+               - V.* validation flags
+
+            5. **Verification**:
+               - Run `dotnet build` - must pass with zero warnings
+               - Run `dotnet test` - all tests must pass
+               - Add tests for new functionality
+
+            ## DELIVERABLE
+
+            Create a PR that:
+            - Implements the requested functionality
+            - Passes all CI checks
+            - Includes appropriate tests
+            - Links to issue #${{ github.event.issue.number }}
+
+            Use: `gh pr create --title "..." --body "Closes #${{ github.event.issue.number }}\n\n..."`
+
+          claude_args: |
+            --model claude-sonnet-4-5-20250929
+            --max-turns 20
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Read",
+                  "Write",
+                  "Edit",
+                  "Bash",
+                  "Glob",
+                  "Grep",
+                  "Task",
+                  "WebSearch",
+                  "mcp__context7__*",
+                  "mcp__github__*"
+                ]
+              },
+              "mcpServers": {
+                "context7": {
+                  "command": "npx",
+                  "args": ["-y", "@upstash/context7-mcp"]
+                },
+                "github": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-github"],
+                  "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}"
+                  }
+                }
+              }
+            }
+
+      - name: Comment on issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.issue.number }},
+              body: '❌ Claude encountered an error implementing this issue. Please review the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            })
