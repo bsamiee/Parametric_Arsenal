@@ -46,6 +46,7 @@
     <Using Include="Rhino.Testing.Fixtures" />
     <Using Include="Arsenal.Rhino.Spatial" />
     <Using Include="Arsenal.Rhino.Extraction" />
+    <Using Include="Arsenal.Rhino.Analysis" />
   </ItemGroup>
 
   <!-- Windows-only: Content files -->
