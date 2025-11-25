@@ -351,7 +351,8 @@ internal static class AnalysisCompute {
                     int[] problematicFaceIndices = [.. Enumerable.Range(0, faceCount)
                         .Where(i => aspectRatios[i] > AnalysisConfig.AspectRatioCritical
                             || skewness[i] > AnalysisConfig.SkewnessCritical
-                            || jacobians[i] < AnalysisConfig.JacobianCritical),];
+                            || jacobians[i] < AnalysisConfig.JacobianCritical),
+                    ];
                     return ResultFactory.Create(value: new Analysis.MeshQualityResult(
                         AspectRatios: aspectRatios,
                         Skewness: skewness,

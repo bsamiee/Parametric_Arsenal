@@ -166,7 +166,7 @@
           "Arsenal.Core": "[1.0.0, )",
           "CsCheck": "[4.4.1, )",
           "xunit.abstractions": "[2.0.3, )",
-          "xunit.assert": "[2.9.2, )"
+          "xunit.assert": "[2.9.3, )"
         }
       }
     }
