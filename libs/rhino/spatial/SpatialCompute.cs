@@ -465,13 +465,15 @@ internal static class SpatialCompute {
                     // Use Point3d.Unset as sentinel for degenerate/collinear triangles; filtered by IsValid check below
                     circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance
                         ? Point3d.Unset
-                        : ((Func<Point3d>)(() => {
-                            double twoOrientation = 2.0 * orientation;
-                            double aSq = (a.X * a.X) + (a.Y * a.Y);
-                            double bSq = (b.X * b.X) + (b.Y * b.Y);
-                            double cSq = (c.X * c.X) + (c.Y * c.Y);
-                            return new Point3d(((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / twoOrientation, ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / twoOrientation, a.Z);
-                        }))();
+                        : new Point3d(
+                            (((a.X * a.X + a.Y * a.Y) * (b.Y - c.Y)) +
+                             ((b.X * b.X + b.Y * b.Y) * (c.Y - a.Y)) +
+                             ((c.X * c.X + c.Y * c.Y) * (a.Y - b.Y))) / (2.0 * orientation),
+                            (((a.X * a.X + a.Y * a.Y) * (c.X - b.X)) +
+                             ((b.X * b.X + b.Y * b.Y) * (a.X - c.X)) +
+                             ((c.X * c.X + c.Y * c.Y) * (b.X - a.X))) / (2.0 * orientation),
+                            a.Z
+                        );
                 }
                 Point3d[][] cells = new Point3d[points.Length][];
                 for (int i = 0; i < points.Length; i++) {
