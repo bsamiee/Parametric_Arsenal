@@ -72,12 +72,13 @@
       },
       "Rhino.Testing": {
         "type": "Direct",
-        "requested": "[8.0.17-beta, )",
-        "resolved": "8.0.17-beta",
-        "contentHash": "fSgnmyIIDqwG321TkUjTE+UkSNpNJCg90EQBpxjeaqHK/WRzQyDQBeWkPYPVQnPIyM9z5qvuLbSR081sChH32g==",
+        "requested": "[8.0.28-beta, )",
+        "resolved": "8.0.28-beta",
+        "contentHash": "FEF3nP63EJF1EzHWsMAFoOFeqK6EojAL9A3WX6hasKMNe73KRlAhGFvqCjzSEcKqV4bbANyNuXb0bcwzTH55ow==",
         "dependencies": {
           "NUnit": "3.14.0",
-          "NUnit3TestAdapter": "4.5.0"
+          "NUnit3TestAdapter": "4.6.0",
+          "Rhino.Inside": "8.0.6-beta"
         }
       },
       "RhinoCommon": {
@@ -94,6 +95,14 @@
         "requested": "[4.14.1, )",
         "resolved": "4.14.1",
         "contentHash": "yMSjze/xMYDF6PCE60/ULWx0tttNyKAndw2KijNxbKil0FX8nvDeEneDZGma8Uifk17RlfZqIXxf1mmBmhRHjg=="
+      },
+      "Grasshopper": {
+        "type": "Transitive",
+        "resolved": "8.0.23304.9001",
+        "contentHash": "L1Cse6nAxryzcZ7jsu3WzBiG9BYtgYsaNbRV+p55N+THKTFGmXx1PdBbiWtuxK9kB4jyuLVpeV8XBiYlSGA1Vw==",
+        "dependencies": {
+          "RhinoCommon": "[8.0.23304.9001]"
+        }
       },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
@@ -181,6 +190,15 @@
         "type": "Transitive",
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
+      },
+      "Rhino.Inside": {
+        "type": "Transitive",
+        "resolved": "8.0.6-beta",
+        "contentHash": "TNbaz5vvOZRY7L8dYsXOQ1ur+t9Ckiv6m/zqCDdHj5JYngTF//J5IWcK9aQsA8vQJhlkoO53j6HZ2h7rnCnVng==",
+        "dependencies": {
+          "Grasshopper": "8.0.23304.9001",
+          "RhinoCommon": "8.0.23304.9001"
+        }
       },
       "System.Collections.Immutable": {
         "type": "Transitive",
