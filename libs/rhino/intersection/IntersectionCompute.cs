@@ -61,7 +61,7 @@ internal static class IntersectionCompute {
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ((Func<Result<(Intersection.IntersectionType, double[], bool, double)>>)(() => {
                                                 // Curve-curve: tangent when tangents are parallel or antiparallel (0° or 180°), transverse when near 90°.
-                                                double averageParallelDeviation = Math.Min(averageAngle, Math.Abs(RhinoMath.Pi - averageAngle));
+                                                double averageParallelDeviation = Math.Min(Math.Min(averageAngle, RhinoMath.TwoPI - averageAngle), Math.Abs(RhinoMath.Pi - averageAngle));
                                                 bool isTangent = averageParallelDeviation <= IntersectionConfig.TangentAngleThreshold;
                                                 bool isGrazing = angles.Any(angle => Math.Min(angle, Math.Abs(RhinoMath.Pi - angle)) <= IntersectionConfig.GrazingAngleThreshold);
                                                 (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, isGrazing, isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
