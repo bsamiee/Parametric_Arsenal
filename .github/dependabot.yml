@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      analyzers:
+        patterns:
+          - "Roslynator*"
+          - "Meziantou*"
+          - "*Analyzer*"
+      testing:
+        patterns:
+          - "xunit*"
+          - "NUnit*"
+          - "CsCheck*"
+          - "coverlet*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

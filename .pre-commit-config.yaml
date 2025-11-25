@@ -16,14 +16,7 @@ repos:
 
   - repo: local
     hooks:
-      - id: dotnet-restore
-        name: .NET Restore
-        entry: dotnet restore
-        args: ['Parametric_Arsenal.sln']
-        language: system
-        files: '\.(cs|csproj|sln|props)$'
-        pass_filenames: false
-
+      # Build includes restore automatically - no separate restore hook needed
       - id: dotnet-build
         name: .NET Build with analyzers
         entry: dotnet build
@@ -31,7 +24,6 @@ repos:
           - 'Parametric_Arsenal.sln'
           - '--configuration'
           - 'Release'
-          - '--no-restore'
           - '-p:EnforceCodeStyleInBuild=true'
           - '-p:TreatWarningsAsErrors=true'
         language: system
@@ -39,12 +31,13 @@ repos:
         pass_filenames: false
 
       - id: dotnet-format
-        name: .NET Format
+        name: .NET Format Check
         entry: dotnet format
         args:
           - 'Parametric_Arsenal.sln'
+          - '--verify-no-changes'
           - '--verbosity'
-          - 'normal'
+          - 'quiet'
         language: system
         files: '\.cs$'
         pass_filenames: false

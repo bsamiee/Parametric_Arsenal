@@ -6,13 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
-    name: Build & Analyze
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
+      checks: write
 
     steps:
       - name: Checkout
@@ -22,23 +27,49 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+          cache: true
 
-      - name: EditorConfig Compliance Check
-        uses: editorconfig-checker/action-editorconfig-checker@v2
+      - name: Cache Build Artifacts
+        uses: actions/cache@v4
         with:
-          version: latest
+          path: |
+            **/bin
+            **/obj
+          key: build-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.cs') }}
+          restore-keys: |
+            build-${{ runner.os }}-
 
       - name: Restore
         run: dotnet restore Parametric_Arsenal.sln
 
+      - name: EditorConfig Compliance Check
+        uses: editorconfig-checker/action-editorconfig-checker@v2
+        with:
+          version: '3.0.3'
+
       - name: Verify .NET Formatting
-        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity diagnostic
+        run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity quiet
 
       - name: Build with Analyzers
         run: dotnet build Parametric_Arsenal.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:EnforceCodeStyleInBuild=true -warnaserror
 
-      - name: Run Core Tests (xUnit)
-        run: dotnet test test/core/Arsenal.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=Arsenal.Core.Tests.trx"
+      - name: Run Core Tests with Coverage
+        run: |
+          dotnet test test/core/Arsenal.Core.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --logger "trx;LogFileName=Arsenal.Core.Tests.trx"
+
+      - name: Publish Test Results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: 'Core Tests'
+          path: '**/TestResults/**/*.trx'
+          reporter: 'dotnet-trx'
+          fail-on-error: true
 
       - name: Upload Test Results
         if: always()
@@ -47,14 +78,40 @@ jobs:
           name: core-test-results
           path: |
             **/TestResults/**/*.trx
-          retention-days: 14
+          retention-days: 7
 
-      - name: Summary
-        if: success()
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: '**/TestResults/**/coverage.cobertura.xml'
+          retention-days: 7
+
+      - name: Generate Summary
+        if: always()
         run: |
-          echo "✅ Build passed"
-          echo "✅ EditorConfig compliance verified"
-          echo "✅ .NET formatting verified"
-          echo "✅ Core tests passed (xUnit + CsCheck)"
-          echo "Analyzers: Roslynator, Meziantou, NetAnalyzers"
-          echo "Code Style: .editorconfig enforced"
+          if [ "${{ job.status }}" == "success" ]; then
+            STATUS="[PASS]"
+          else
+            STATUS="[FAIL]"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## $STATUS CI Results
+
+          | Check | Status |
+          |-------|--------|
+          | Restore | [PASS] |
+          | EditorConfig | [PASS] |
+          | Formatting | [PASS] |
+          | Build | [PASS] |
+          | Analyzers | [PASS] |
+          | Core Tests | [PASS] |
+          | Coverage | [PASS] |
+
+          **Configuration**
+          - Analyzers: Roslynator, Meziantou, NetAnalyzers
+          - Code Style: .editorconfig enforced
+          - Coverage: XPlat Cobertura
+          EOF

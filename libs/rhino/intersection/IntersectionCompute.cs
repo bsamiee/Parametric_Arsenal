@@ -15,11 +15,11 @@ internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure]
     internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+        static double minAngleToParallel(double angle) => Math.Min(Math.Abs(angle), Math.Abs(Math.PI - angle));
         // Curve-surface: angle between curve tangent and surface normal
         // Parallel (0° or 180°) → tangent intersection (smooth blend)
         // Perpendicular (90°) → transverse intersection (sharp meeting)
         static Result<(Intersection.IntersectionType, double[], bool, double)> curveSurfaceClassifier(double[] angles) {
-            static double minAngleToParallel(double angle) => Math.Min(Math.Abs(angle), Math.Abs(Math.PI - angle));
             double averageDeviation = angles.Sum(minAngleToParallel) / angles.Length;
             bool grazing = angles.Any(angle => minAngleToParallel(angle) <= IntersectionConfig.GrazingAngleThreshold);
             bool tangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
@@ -60,11 +60,14 @@ internal static class IntersectionCompute {
                                         .Where(static angle => RhinoMath.IsValidDouble(angle))
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ((Func<Result<(Intersection.IntersectionType, double[], bool, double)>>)(() => {
-                                                // Curve-curve: tangent when tangents are parallel or antiparallel (0° or 180°), transverse when near 90°.
-                                                double averageParallelDeviation = Math.Min(Math.Min(averageAngle, RhinoMath.TwoPI - averageAngle), Math.Abs(RhinoMath.Pi - averageAngle));
-                                                bool isTangent = averageParallelDeviation <= IntersectionConfig.TangentAngleThreshold;
-                                                bool isGrazing = angles.Any(static angle => Math.Min(angle, Math.Abs(RhinoMath.Pi - angle)) <= IntersectionConfig.GrazingAngleThreshold);
-                                                (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, isGrazing, isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
+                                                // Curve-curve: tangent (0° or 180°) vs transverse (90°)
+                                                double averageDeviation = minAngleToParallel(averageAngle);
+                                                bool isTangent = averageDeviation <= IntersectionConfig.TangentAngleThreshold;
+                                                (Intersection.IntersectionType, double[], bool, double) result = (
+                                                    isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance,
+                                                    angles,
+                                                    angles.Any(angle => minAngleToParallel(angle) <= IntersectionConfig.GrazingAngleThreshold),
+                                                    isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
                                                 return ResultFactory.Create(value: result);
                                             }))()
                                             : ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
@@ -132,9 +135,11 @@ internal static class IntersectionCompute {
                                         (Curve curve, Surface surface) => Math.Max(IntersectionConfig.MinCurveNearMissSamples, (int)Math.Ceiling(curve.GetLength() / searchRadius)) is int samples
                                             ? Enumerable.Range(0, samples)
                                                 .Select(index => curve.PointAt(curve.Domain.ParameterAt(index / (double)(samples - 1))))
-                                                .Select(point => surface.ClosestPoint(point, out double u, out double v)
-                                                    ? (PointA: point, PointB: surface.PointAt(u, v), Distance: point.DistanceTo(surface.PointAt(u, v)))
-                                                    : (PointA: point, PointB: Point3d.Unset, Distance: double.MaxValue))
+                                                .Select(point => {
+                                                    Point3d closest = surface.ClosestPoint(point, out double u, out double v) ? surface.PointAt(u, v) : Point3d.Unset;
+                                                    double distance = closest.IsValid ? point.DistanceTo(closest) : double.MaxValue;
+                                                    return (PointA: point, PointB: closest, Distance: distance);
+                                                })
                                                 .Where(candidate => candidate.Distance < searchRadius && candidate.Distance > minDistance)
                                                 .ToArray() is (Point3d PointA, Point3d PointB, double Distance)[] pairs && pairs.Length > 0
                                                 ? ResultFactory.Create(value: unpackPairs(pairs))
@@ -144,7 +149,10 @@ internal static class IntersectionCompute {
                                                 .Select(face => (Face: face, Size: face.GetSurfaceSize(out double width, out double height) && width > 0.0 && height > 0.0 ? width * height : 0.0))
                                                 .Where(entry => entry.Size > 0.0)
                                                 .ToArray() is (BrepFace Face, double Size)[] validFaces && validFaces.Length > 0 && validFaces.Sum(static entry => entry.Size) is double totalArea && totalArea > 0.0
-                                                && Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius)) is int totalBudget
+                                                && Math.Clamp(
+                                                    (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius),
+                                                    IntersectionConfig.MinBrepNearMissSamples,
+                                                    IntersectionConfig.MaxNearMissSamples) is int totalBudget
                                                 ? validFaces
                                                     .SelectMany(entry => {
                                                         int faceSamples = Math.Max(IntersectionConfig.MinSamplesPerFace, (int)Math.Round(totalBudget * (entry.Size / totalArea)));

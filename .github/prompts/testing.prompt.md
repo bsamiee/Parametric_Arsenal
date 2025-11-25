@@ -29,13 +29,13 @@ Comprehensive property-based and unit testing. Verify category theory laws (func
 
 ## Success Criteria
 
-✅ Comprehensive test coverage with property-based and concrete tests  
-✅ Category theory laws verified (functor, monad, applicative) for Result operations  
-✅ Zero-allocation static lambdas and FrozenDictionary dispatch in tests  
-✅ Test generators follow algebraic state distribution patterns  
-✅ All tests pass, build cleanly with zero warnings  
-✅ Test utilities leverage test/shared/Test.cs patterns  
-✅ Rhino tests use headless mode with Rhino.Testing.Configs.xml
+[PASS] Comprehensive test coverage with property-based and concrete tests  
+[PASS] Category theory laws verified (functor, monad, applicative) for Result operations  
+[PASS] Zero-allocation static lambdas and FrozenDictionary dispatch in tests  
+[PASS] Test generators follow algebraic state distribution patterns  
+[PASS] All tests pass, build cleanly with zero warnings  
+[PASS] Test utilities leverage test/shared/Test.cs patterns  
+[PASS] Rhino tests use headless mode with Rhino.Testing.Configs.xml
 
 ## Constraints
 
@@ -125,7 +125,7 @@ public static Gen<Result<T>> ToResult<T>(this Gen<T> valueGen) =>
 // Zero-allocation composition
 public static Gen<Func<T, Result<TResult>>> MonadicFunctionGen<T, TResult>() =>
     Gen.Int.Select(Gen.Bool).Select(static (offset, succeeds) =>
-        (Func<T, Result<TResult>>)(x => succeeds 
+        (Func<T, Result<TResult>>)(x => succeeds
             ? ResultFactory.Create(value: Transform(x, offset))
             : ResultFactory.Create<TResult>(error: E.Validation.Failed)));
 ```
@@ -215,7 +215,7 @@ public static Gen<MyRequest> MyRequestGen =>
 **Valid geometry**:
 ```csharp
 public static Gen<Point3d> ValidPointGen =>
-    Gen.Double[-1000, 1000][3].Select(static arr => 
+    Gen.Double[-1000, 1000][3].Select(static arr =>
         new Point3d(arr[0], arr[1], arr[2]));
 
 public static Gen<Line> ValidLineGen =>
@@ -244,9 +244,9 @@ Leverage `test/shared/Test.cs` extension methods:
 // Algebraic state distribution (success/failure/deferred)
 public static Gen<Result<T>> ResultGen<T>() =>
     ValueGen<T>().ToResult(
-        errorGen: ResultGenerators.SystemErrorGen, 
-        successWeight: 1, 
-        failureWeight: 1, 
+        errorGen: ResultGenerators.SystemErrorGen,
+        successWeight: 1,
+        failureWeight: 1,
         deferredWeight: 1);
 
 // Success-only with immediate/deferred
@@ -307,7 +307,7 @@ public void ApplicativeLaws() => Test.RunAll(
 **Invariant verification**:
 ```csharp
 [Fact]
-public void OutputSatisfiesInvariants() => 
+public void OutputSatisfiesInvariants() =>
     MyRequestGen.Run((Action<MyRequest>)(req => {
         Result<MyOutput> result = MyModule.Operation(req);
         Test.Success(result, output => {
@@ -343,7 +343,7 @@ public void TransformPreservesDistances() =>
 public void DegenerateGeometryFailsValidation() =>
     DegenerateLineGen.Run((Action<Line>)(line => {
         Result<Output> result = MyModule.Process(line);
-        Test.Failure(result, errs => 
+        Test.Failure(result, errs =>
             errs.Any(e => e.Code == E.Validation.DegenerateGeometry.Code));
     }), 50);
 ```
@@ -393,7 +393,7 @@ public void UnifiedOperationPipeline() =>
         Result<Step1Output> step1 = Module1.Process(geom);
         Result<Step2Output> step2 = step1.Bind(out1 => Module2.Process(out1));
         Result<FinalOutput> final = step2.Bind(out2 => Module3.Process(out2));
-        
+
         Test.Success(final, output => {
             Assert.NotNull(output);
             Assert.True(output.IsValid);
@@ -409,11 +409,11 @@ public void SpatialAndTopologyIntegration() =>
     MeshGen.Run((Action<Mesh>)(mesh => {
         // Spatial indexing
         Result<SpatialIndex> spatialResult = Spatial.Index(mesh);
-        
+
         // Topology analysis on indexed geometry
         Result<TopologyDiagnosis> topoResult = spatialResult.Bind(index =>
             Topology.Diagnose(index, mode: V.Standard));
-        
+
         Test.Success(topoResult, diagnosis => {
             Assert.NotEmpty(diagnosis.Issues);
             return true;
@@ -508,7 +508,7 @@ public void PropertyBasedWithCsCheck() {
     Gen.Double[-100, 100][3].Run((Action<double[]>)(arr => {
         Point3d point = new(arr[0], arr[1], arr[2]);
         Result<Output> result = MyModule.Process(point);
-        
+
         Test.Success(result, output => {
             Assert.That(output.Distance, Is.GreaterThanOrEqualTo(0));
             return true;
@@ -616,7 +616,7 @@ After implementation:
 
 ## Editing Discipline
 
-✅ **Do**:
+[PASS] **Do**:
 - Study exemplar tests before writing (ResultAlgebraTests, ResultGenerators)
 - Leverage test/shared/Test.cs utilities extensively
 - Write property-based tests for invariants and transformations
@@ -624,7 +624,7 @@ After implementation:
 - Test all validation modes and error paths
 - Follow xUnit (core) or NUnit (rhino) conventions
 
-❌ **Don't**:
+[FAIL] **Don't**:
 - Use `var` or `if`/`else` statements in tests
 - Create ad-hoc assertion methods (use Test.cs)
 - Skip algebraic law verification for Result operations

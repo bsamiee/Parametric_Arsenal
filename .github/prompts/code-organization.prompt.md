@@ -32,13 +32,13 @@ Each folder contains 4 files:
 
 ## Success Criteria
 
-✅ Members reordered by consistent category structure  
-✅ Within categories, shorter members appear before longer (fewest lines first)  
-✅ FrozenDictionary fields at top of types (when present)  
-✅ XML documentation consolidated where duplicate/redundant  
-✅ No functional behavior changes whatsoever  
-✅ No signature, attribute, accessibility, namespace changes  
-✅ Zero new warnings, all analyzers pass
+[PASS] Members reordered by consistent category structure  
+[PASS] Within categories, shorter members appear before longer (fewest lines first)  
+[PASS] FrozenDictionary fields at top of types (when present)  
+[PASS] XML documentation consolidated where duplicate/redundant  
+[PASS] No functional behavior changes whatsoever  
+[PASS] No signature, attribute, accessibility, namespace changes  
+[PASS] Zero new warnings, all analyzers pass
 
 ## Constraints
 
@@ -174,13 +174,13 @@ After organization:
 
 ## Editing Discipline
 
-✅ **Do**:
+[PASS] **Do**:
 - Reorder members within types to match category model
 - Consolidate duplicate XML docs/comments into clean group-level documentation
 - Adjust whitespace/blank lines to reinforce new groupings
 - Keep tightly coupled code (API method + dedicated helper) adjacent as cluster
 
-❌ **Don't**:
+[FAIL] **Don't**:
 - Change any signatures, attributes, accessibility, namespaces, using directives
 - Add or remove executable statements
 - Introduce new methods, types, or `.cs` files

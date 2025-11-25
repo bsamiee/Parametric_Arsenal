@@ -20,5 +20,5 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 ---
 
 <p align="center">
-Built with ❤️ for the AEC community by <a href="https://github.com/bsamiee">Bardia Samiee</a>
+Built for the AEC community by <a href="https://github.com/bsamiee">Bardia Samiee</a>
 </p>

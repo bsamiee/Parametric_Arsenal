@@ -35,14 +35,14 @@ Each folder contains 4 files:
 
 ## Success Criteria
 
-✅ All algorithms mathematically/geometrically correct (no logic errors, no half-implemented formulas)  
-✅ Full RhinoCommon/RhinoMath/Rhino collections usage (no SDK reinvention)  
-✅ Unified constants and FrozenDictionary dispatch in `Config` (no loose magic numbers)  
-✅ Correct `UnifiedOperation` wiring and validation in `Core`  
-✅ Clean algebraic API with nested domain types in `.cs`  
-✅ Cross-folder coherence with canonical patterns from reference folders  
-✅ Parameter-driven logic (no constant spam, reuse computed intermediates)  
-✅ Zero new warnings, all analyzers pass
+[PASS] All algorithms mathematically/geometrically correct (no logic errors, no half-implemented formulas)  
+[PASS] Full RhinoCommon/RhinoMath/Rhino collections usage (no SDK reinvention)  
+[PASS] Unified constants and FrozenDictionary dispatch in `Config` (no loose magic numbers)  
+[PASS] Correct `UnifiedOperation` wiring and validation in `Core`  
+[PASS] Clean algebraic API with nested domain types in `.cs`  
+[PASS] Cross-folder coherence with canonical patterns from reference folders  
+[PASS] Parameter-driven logic (no constant spam, reuse computed intermediates)  
+[PASS] Zero new warnings, all analyzers pass
 
 ## Constraints
 
@@ -253,13 +253,13 @@ After audit:
 
 ## Editing Discipline
 
-✅ **Do**:
+[PASS] **Do**:
 - Be surgical—change only when logic, completeness, SDK usage, or dispatch/constant discipline requires
 - Maintain or improve performance where reasonable
 - Preserve overall algebraic model and 4-file architecture
 - If API shape must change, justify by domain clarity and remain consistent with reference patterns
 
-❌ **Don't**:
+[FAIL] **Don't**:
 - Perform large stylistic rewrites not improving correctness/robustness/architectural alignment
 - Change unrelated code or fix unrelated bugs
 - Add new `.cs` files

@@ -33,14 +33,14 @@ Each folder contains 4 files:
 
 ## Success Criteria
 
-✅ External behavior fully preserved (same inputs → same outputs/errors)  
-✅ Hot paths identified and optimized (allocations reduced, branches eliminated, loops combined)  
-✅ Result monad exploited effectively (combinators replace manual error propagation)  
-✅ Validation/error handling optimized (redundant checks removed)  
-✅ LOC reduced through dense, expressive C# (not opaque nested ternaries)  
-✅ Advanced C# features used strategically on hot paths only  
-✅ Dead code eliminated (unused constants, single-use helpers inlined)  
-✅ Zero new warnings, all analyzers pass
+[PASS] External behavior fully preserved (same inputs → same outputs/errors)  
+[PASS] Hot paths identified and optimized (allocations reduced, branches eliminated, loops combined)  
+[PASS] Result monad exploited effectively (combinators replace manual error propagation)  
+[PASS] Validation/error handling optimized (redundant checks removed)  
+[PASS] LOC reduced through dense, expressive C# (not opaque nested ternaries)  
+[PASS] Advanced C# features used strategically on hot paths only  
+[PASS] Dead code eliminated (unused constants, single-use helpers inlined)  
+[PASS] Zero new warnings, all analyzers pass
 
 ## Constraints
 
@@ -247,14 +247,14 @@ After optimization:
 
 ## Editing Discipline
 
-✅ **Do**:
+[PASS] **Do**:
 - Be surgical—only change when clearly improves performance, reduces LOC, or simplifies Result/validation pipeline
 - Focus on hot paths first
 - Use profiling data if available
 - Test incrementally
 - Preserve clarity while increasing density
 
-❌ **Don't**:
+[FAIL] **Don't**:
 - Introduce cosmetic changes or style churn
 - Add new `.cs` files or helper methods forwarding parameters
 - Regress behavior or API surface

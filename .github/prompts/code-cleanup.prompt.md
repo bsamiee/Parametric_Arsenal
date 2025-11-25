@@ -33,14 +33,14 @@ Each folder contains 4 files:
 
 ## Success Criteria
 
-✅ Net LOC reduced or unchanged per folder (small increases only if strong justification)  
-✅ Semantics and behavior fully preserved (same inputs → same outputs/errors)  
-✅ Expression-based C# used correctly (ternary, switch expressions, pattern matching)  
-✅ Comments/XML docs cleaned (concise, one-line max, group-level where appropriate)  
-✅ Magic numbers eliminated (RhinoMath, `Config` metadata, or well-named constants)  
-✅ Unused code/parameters/errors removed coherently  
-✅ Advanced C# features (`MethodImpl`, `readonly struct`, etc.) used only where beneficial  
-✅ Zero new warnings, all analyzers pass
+[PASS] Net LOC reduced or unchanged per folder (small increases only if strong justification)  
+[PASS] Semantics and behavior fully preserved (same inputs → same outputs/errors)  
+[PASS] Expression-based C# used correctly (ternary, switch expressions, pattern matching)  
+[PASS] Comments/XML docs cleaned (concise, one-line max, group-level where appropriate)  
+[PASS] Magic numbers eliminated (RhinoMath, `Config` metadata, or well-named constants)  
+[PASS] Unused code/parameters/errors removed coherently  
+[PASS] Advanced C# features (`MethodImpl`, `readonly struct`, etc.) used only where beneficial  
+[PASS] Zero new warnings, all analyzers pass
 
 ## Constraints
 
@@ -271,14 +271,14 @@ After cleanup:
 
 ## Editing Discipline
 
-✅ **Do**:
+[PASS] **Do**:
 - Make surgical, justified, semantics-preserving changes
 - Refactor, move, inline, consolidate within/across 4 files
 - Adjust/remove advanced C# features where beneficial
 - Remove dead code and redundant abstractions
 - Restructure logic with better patterns (tuples, pattern matching)
 
-❌ **Don't**:
+[FAIL] **Don't**:
 - Introduce new `.cs` files or helpers
 - Break existing public APIs without strong consolidation rationale
 - Make purely stylistic changes increasing LOC/reducing clarity
