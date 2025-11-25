@@ -95,8 +95,8 @@
     <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
   </PropertyGroup>
 
-  <!-- RhinoCommon Package Reference -->
-  <ItemGroup>
+  <!-- RhinoCommon Package Reference (excluded for Arsenal.Rhino.Tests - Rhino.Testing handles it) -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Arsenal.Rhino.Tests'">
     <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
@@ -129,8 +129,8 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!-- Test Project References -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
+  <!-- Test Project References (excluded for Arsenal.Rhino.Tests on non-Windows - handled in csproj) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
     <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
     <ProjectReference Include="../../libs/core/Core.csproj" />
   </ItemGroup>
@@ -140,8 +140,8 @@
     <ProjectReference Include="../../libs/core/Core.csproj" />
   </ItemGroup>
 
-  <!-- Test Framework Packages -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+  <!-- Test Framework Packages (excluded for Arsenal.Rhino.Tests on non-Windows) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
     <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
   </ItemGroup>
@@ -152,28 +152,33 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- NUnit Test Framework & Rhino Testing -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'NUnit'">
+  <!-- NUnit Test Framework & Rhino Testing (excluded for Arsenal.Rhino.Tests on non-Windows) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'NUnit' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
     <PackageReference Include="NUnit" Version="4.4.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" />
     <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
   </ItemGroup>
 
-  <!-- CsCheck for Property-Based Testing (All Test Projects) -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared'">
+  <!-- CsCheck for Property-Based Testing (excluded for Arsenal.Rhino.Tests on non-Windows) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
     <PackageReference Include="CsCheck" Version="4.4.1" />
   </ItemGroup>
 
-  <!-- Rhino Testing Configuration (NUnit) -->
-  <PropertyGroup Condition="'$(TestFramework)' == 'NUnit'">
-    <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">C:\Program Files\Rhino 8\System</RhinoSystemDirectory>
-    <RhinoSystemDirectory Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">/Applications/Rhino 8.app/Contents/Frameworks</RhinoSystemDirectory>
+  <!-- ============================================ -->
+  <!-- Arsenal.Rhino.Tests: Windows-Only Config    -->
+  <!-- ============================================ -->
+  <!-- This project requires Rhino.Testing which only works on Windows with net8.0-windows -->
+  <!-- On non-Windows, build as empty project so pre-commit hooks pass -->
+
+  <!-- Windows: Use Windows-specific TFM for Rhino.Testing CoreCLR compatibility -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND $([MSBuild]::IsOSPlatform('Windows'))">
+    <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
 
-  <!-- Rhino Direct References (NUnit Tests) -->
-  <ItemGroup Condition="'$(TestFramework)' == 'NUnit' AND Exists('$(RhinoSystemDirectory)')">
-    <Reference Include="$(RhinoSystemDirectory)\netcore\RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'" />
-    <Reference Include="$(RhinoSystemDirectory)/RhinoCommon.dll" Private="False" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'" />
-  </ItemGroup>
+  <!-- Non-Windows: Build as empty project (no source files) -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
 
 </Project>

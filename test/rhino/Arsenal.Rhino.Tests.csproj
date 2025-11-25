@@ -5,38 +5,22 @@
     <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
     <TestFramework>NUnit</TestFramework>
+    <!-- TargetFramework set in Directory.Build.props: net8.0-windows on Windows, net8.0 on other platforms -->
     <!-- Suppress NuGet warnings for Rhino.Testing transitive dependencies -->
     <NoWarn>$(NoWarn);NU1701;NU1608;NU1605</NoWarn>
   </PropertyGroup>
 
-  <!-- Windows: Use Windows-specific TFM for Rhino.Testing CoreCLR compatibility -->
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <TargetFramework>net8.0-windows</TargetFramework>
-  </PropertyGroup>
-
-  <!-- Non-Windows: Use generic TFM and exclude from build (allows restore to succeed) -->
-  <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
-    <TargetFramework>net8.0</TargetFramework>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
-  </PropertyGroup>
-
-  <!-- Windows-only: Remove conflicting package versions from Directory.Build.props -->
+  <!-- Windows-only: Override NUnit versions to match Rhino.Testing 8.0.28-beta requirements -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Remove="NUnit" />
     <PackageReference Remove="NUnit3TestAdapter" />
     <PackageReference Remove="Microsoft.NET.Test.Sdk" />
-  </ItemGroup>
-
-  <!-- Windows-only: Override NUnit versions to match Rhino.Testing requirements -->
-  <!-- Rhino.Testing 8.0.28-beta requires NUnit 3.14.0, not NUnit 4.x -->
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
   </ItemGroup>
 
-  <!-- Windows-only: Using directives for Rhino types -->
+  <!-- Windows-only: Using directives -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <Using Include="NUnit.Framework" />
     <Using Include="Rhino.Testing.Fixtures" />
