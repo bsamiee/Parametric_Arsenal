@@ -443,17 +443,13 @@ internal static class SpatialCompute {
         // Compute twice the signed area of triangle (a,b,c) to check for degeneracy
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
         double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-        // Check for degenerate triangle: if orientation is near zero, the points are collinear and the incircle predicate is not meaningful.
-        if (Math.Abs(orientation) <= orientationTolerance) {
-            return false;
-        }
-
         // Incircle determinant test using squared distances
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
-        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics.
+        // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics
         double adjustedDet = orientation > 0.0 ? det : -det;
         double determinantTolerance = orientationTolerance * orientationTolerance;
-        return adjustedDet > determinantTolerance;
+        // Combined incircle test: false for degenerate triangles (collinear points) OR when point is outside circumcircle
+        return Math.Abs(orientation) > orientationTolerance && adjustedDet > determinantTolerance;
     }
 
     /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>
@@ -467,18 +463,17 @@ internal static class SpatialCompute {
                     (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
                     double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
                     double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-                    if (Math.Abs(orientation) <= orientationTolerance) {
-                        // Mark circumcenter as invalid for degenerate/collinear triangles.
-                        // Point3d.Unset is used as a sentinel; see IsValid check at line 482.
-                        circumcenters[ti] = Point3d.Unset;
-                        continue;
-                    }
-
-                    double twoOrientation = 2.0 * orientation;
-                    double aSq = (a.X * a.X) + (a.Y * a.Y);
-                    double bSq = (b.X * b.X) + (b.Y * b.Y);
-                    double cSq = (c.X * c.X) + (c.Y * c.Y);
-                    circumcenters[ti] = new Point3d(((aSq * (b.Y - c.Y)) + (bSq * (c.Y - a.Y)) + (cSq * (a.Y - b.Y))) / twoOrientation, ((aSq * (c.X - b.X)) + (bSq * (a.X - c.X)) + (cSq * (b.X - a.X))) / twoOrientation, a.Z);
+                    // Use Point3d.Unset as sentinel for degenerate/collinear triangles; filtered by IsValid check below
+                    circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance
+                        ? Point3d.Unset
+                        : new Point3d(
+                            ((((a.X * a.X) + (a.Y * a.Y)) * (b.Y - c.Y)) +
+                             (((b.X * b.X) + (b.Y * b.Y)) * (c.Y - a.Y)) +
+                             (((c.X * c.X) + (c.Y * c.Y)) * (a.Y - b.Y))) / (2.0 * orientation),
+                            ((((a.X * a.X) + (a.Y * a.Y)) * (c.X - b.X)) +
+                             (((b.X * b.X) + (b.Y * b.Y)) * (a.X - c.X)) +
+                             (((c.X * c.X) + (c.Y * c.Y)) * (b.X - a.X))) / (2.0 * orientation),
+                            a.Z);
                 }
                 Point3d[][] cells = new Point3d[points.Length][];
                 for (int i = 0; i < points.Length; i++) {
