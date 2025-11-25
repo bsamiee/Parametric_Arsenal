@@ -73,7 +73,15 @@ jobs:
 
       - name: Run Rhino Tests
         # Note: Do NOT use --no-build flag; McNeel's own CI doesn't use it and test discovery requires build context
-        run: dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0-windows --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings
+        # COREHOST_TRACE=1 enables diagnostic output for CoreCLR initialization debugging
+        env:
+          COREHOST_TRACE: 1
+          COREHOST_TRACEFILE: D:\a\corehost_trace.log
+        shell: pwsh
+        run: |
+          dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0-windows --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings --diag:D:\a\vstest_diag.log
+          if (Test-Path D:\a\corehost_trace.log) { Get-Content D:\a\corehost_trace.log -Tail 200 }
+          if (Test-Path D:\a\vstest_diag.log) { Get-Content D:\a\vstest_diag.log -Tail 100 }
 
       - name: Upload Test Results
         if: always()
@@ -83,6 +91,8 @@ jobs:
           path: |
             **/TestResults/**/*.trx
             **/TestResults/**/*.xml
+            D:\a\corehost_trace.log
+            D:\a\vstest_diag.log
           retention-days: 30
 
       - name: Summary
