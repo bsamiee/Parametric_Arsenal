@@ -17,68 +17,66 @@
   <!-- Language & Platform Configuration            -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>                                     <!-- Target .NET 8.0 framework -->
-    <LangVersion>preview</LangVersion>                                            <!-- Use latest C# preview features -->
-    <Nullable>enable</Nullable>                                                   <!-- Enable nullable reference types -->
-    <ImplicitUsings>enable</ImplicitUsings>                                       <!-- Enable implicit global usings -->
-    <Features>strict</Features>                                                   <!-- Enable strict language features -->
-    <PlatformTarget>AnyCPU</PlatformTarget>                                       <!-- Build for any CPU architecture -->
-    <Prefer32Bit>false</Prefer32Bit>                                              <!-- Prefer 64-bit execution -->
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Features>strict</Features>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Build Configuration                          -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <IsPackable>false</IsPackable>                                                <!-- Not a NuGet package -->
-    <IsPublishable>false</IsPublishable>                                          <!-- Not for standalone publishing -->
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>               <!-- Use package lock for deterministic restore -->
-    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder> <!-- No fallback package folder -->
-    <Deterministic>true</Deterministic>                                           <!-- Enable deterministic builds -->
-    <DebugType>portable</DebugType>                                               <!-- Use portable PDB format -->
-    <DebugSymbols>true</DebugSymbols>                                             <!-- Generate debug symbols -->
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>             <!-- Auto-generate binding redirects -->
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType> <!-- Generate for output type -->
-    <DisableRAR1001Warning>true</DisableRAR1001Warning>                           <!-- Disable assembly reference warnings -->
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <DisableRAR1001Warning>true</DisableRAR1001Warning>
   </PropertyGroup>
 
   <!-- Debug Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <Optimize>false</Optimize>                                                    <!-- Disable optimizations for debugging -->
-    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>                   <!-- Check arithmetic overflow in Debug -->
+    <Optimize>false</Optimize>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
 
   <!-- Release Configuration -->
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <Optimize>true</Optimize>                                                     <!-- Enable compiler optimizations -->
-    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>                  <!-- No overflow checks for performance -->
-    <ConcurrentBuild>true</ConcurrentBuild>                                       <!-- Build projects in parallel -->
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>                 <!-- Optimize for CI environment -->
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>                     <!-- Generate reference assemblies -->
-    <TieredCompilation>true</TieredCompilation>                                   <!-- Enable tiered JIT compilation -->
+    <Optimize>true</Optimize>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <ConcurrentBuild>true</ConcurrentBuild>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <TieredCompilation>true</TieredCompilation>
   </PropertyGroup>
 
   <!-- ============================================ -->
   <!-- Code Analysis Configuration                  -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>                                 <!-- Enable .NET code analyzers -->
-    <AnalysisLevel>latest-all</AnalysisLevel>                                     <!-- Use latest analyzer version with all rules -->
-    <AnalysisMode>All</AnalysisMode>                                              <!-- Enable all analysis categories -->
-    <RunAnalyzers>true</RunAnalyzers>                                             <!-- Run analyzers during compilation -->
-    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>         <!-- Run analyzers in IDE during editing -->
-    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>                       <!-- Run analyzers during build -->
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>                       <!-- Enforce code style rules at build time -->
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>                           <!-- Treat all warnings as errors -->
-    <ReportAnalyzer>true</ReportAnalyzer>                                         <!-- Report all analyzer diagnostics -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
+    <RunAnalyzers>true</RunAnalyzers>
+    <RunAnalyzersDuringLiveAnalysis>true</RunAnalyzersDuringLiveAnalysis>
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ReportAnalyzer>true</ReportAnalyzer>
   </PropertyGroup>
 
   <!-- ============================================ -->
-  <!-- Code Analyzers                               -->
+  <!-- Code Analyzers (all projects)                -->
   <!-- ============================================ -->
   <ItemGroup>
-    <!-- IDisposableAnalyzers 4.0.8 causes stack overflow with complex lambda expressions - disabled until fix available -->
-    <!-- <PackageReference Include="IDisposableAnalyzers" Version="4.0.8" PrivateAssets="all" /> -->
     <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
     <PackageReference Include="Meziantou.Analyzer" Version="2.0.254" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.100" PrivateAssets="all" />
@@ -95,28 +93,28 @@
     <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
   </PropertyGroup>
 
-  <!-- RhinoCommon Package Reference (excluded for Arsenal.Rhino.Tests - Rhino.Testing handles it) -->
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Arsenal.Rhino.Tests'">
+  <!-- RhinoCommon for library projects only (test projects manage their own) -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
     <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
 
-  <!-- Grasshopper Package Reference (Windows Only) -->
-  <ItemGroup Condition="'$(IsGrasshopperPlugin)'=='true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">
+  <!-- Grasshopper Package Reference (Windows Only, library projects) -->
+  <ItemGroup Condition="'$(IsGrasshopperPlugin)'=='true' AND '$(IsTestProject)' != 'true' AND $([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="Grasshopper" Version="$(RhinoVersion)">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
 
-  <!-- Grasshopper Direct References (macOS) -->
-  <PropertyGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">
+  <!-- Grasshopper Direct References (macOS, library projects) -->
+  <PropertyGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$(IsTestProject)' != 'true' AND $([MSBuild]::IsOSPlatform('OSX'))">
     <GrasshopperPluginPath>/Applications/Rhino 8.app/Contents/Frameworks/RhCore.framework/Versions/A/Resources/ManagedPlugIns/GrasshopperPlugin.rhp</GrasshopperPluginPath>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true' AND Exists('$(GrasshopperPluginPath)')">
+  <ItemGroup Condition="'$(IsGrasshopperPlugin)' == 'true' AND '$(IsTestProject)' != 'true' AND $([MSBuild]::IsOSPlatform('OSX')) AND Exists('$(GrasshopperPluginPath)')">
     <Reference Include="$(GrasshopperPluginPath)/Grasshopper.dll" Private="False" />
     <Reference Include="$(GrasshopperPluginPath)/GH_IO.dll" Private="False" />
     <Reference Include="$(GrasshopperPluginPath)/GH_Util.dll" Private="False" />
@@ -124,58 +122,41 @@
 
   <!-- ============================================ -->
   <!-- Test Project Configuration                   -->
+  <!-- Arsenal.Rhino.Tests is fully self-contained -->
   <!-- ============================================ -->
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!-- Test Project References (excluded for Arsenal.Rhino.Tests on non-Windows - handled in csproj) -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
+  <!-- Standard test project references (Arsenal.Core.Tests only) -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared' AND '$(MSBuildProjectName)' != 'Arsenal.Rhino.Tests'">
     <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
     <ProjectReference Include="../../libs/core/Core.csproj" />
-  </ItemGroup>
-
-  <!-- Shared Test Project References -->
-  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Tests.Shared'">
-    <ProjectReference Include="../../libs/core/Core.csproj" />
-  </ItemGroup>
-
-  <!-- Test Framework Packages (excluded for Arsenal.Rhino.Tests on non-Windows) -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
     <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageReference Include="CsCheck" Version="4.4.1" />
   </ItemGroup>
 
-  <!-- xUnit Test Framework -->
+  <!-- xUnit Test Framework (Arsenal.Core.Tests) -->
   <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'xUnit'">
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- NUnit Test Framework & Rhino Testing (excluded for Arsenal.Rhino.Tests on non-Windows) -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(TestFramework)' == 'NUnit' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
-    <PackageReference Include="NUnit" Version="4.4.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" PrivateAssets="all" />
-    <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
-  </ItemGroup>
-
-  <!-- CsCheck for Property-Based Testing (excluded for Arsenal.Rhino.Tests on non-Windows) -->
-  <ItemGroup Condition="'$(IsTestProject)' == 'true' AND '$(MSBuildProjectName)' != 'Arsenal.Tests.Shared' AND !('$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows')))">
-    <PackageReference Include="CsCheck" Version="4.4.1" />
+  <!-- Arsenal.Tests.Shared references -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Tests.Shared'">
+    <ProjectReference Include="../../libs/core/Core.csproj" />
   </ItemGroup>
 
   <!-- ============================================ -->
-  <!-- Arsenal.Rhino.Tests: Windows-Only Config    -->
+  <!-- Arsenal.Rhino.Tests: Platform-Specific Build -->
   <!-- ============================================ -->
-  <!-- This project requires Rhino.Testing which only works on Windows with net8.0-windows -->
-  <!-- On non-Windows, build as empty project so pre-commit hooks pass -->
-
-  <!-- Windows: Use Windows-specific TFM for Rhino.Testing CoreCLR compatibility -->
+  <!-- Windows: net8.0-windows for Rhino.Testing CoreCLR compatibility -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND $([MSBuild]::IsOSPlatform('Windows'))">
     <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
 
-  <!-- Non-Windows: Build as empty project (no source files) -->
+  <!-- Non-Windows: Build as empty project for pre-commit hooks -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Arsenal.Rhino.Tests' AND !$([MSBuild]::IsOSPlatform('Windows'))">
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>

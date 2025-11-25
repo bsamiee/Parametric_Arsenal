@@ -4,20 +4,32 @@
     <AssemblyName>Arsenal.Rhino.Tests</AssemblyName>
     <RootNamespace>Arsenal.Rhino.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
-    <TestFramework>NUnit</TestFramework>
-    <!-- TargetFramework set in Directory.Build.props: net8.0-windows on Windows, net8.0 on other platforms -->
-    <!-- Suppress NuGet warnings for Rhino.Testing transitive dependencies -->
-    <NoWarn>$(NoWarn);NU1701;NU1608;NU1605</NoWarn>
+    <!-- TFM set in Directory.Build.props: net8.0-windows on Windows, net8.0 elsewhere -->
+    <!-- This project is self-contained - all dependencies defined here, not inherited -->
   </PropertyGroup>
 
-  <!-- Windows-only: Override NUnit versions to match Rhino.Testing 8.0.28-beta requirements -->
+  <!-- ============================================ -->
+  <!-- Windows-only: All test dependencies          -->
+  <!-- ============================================ -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <PackageReference Remove="NUnit" />
-    <PackageReference Remove="NUnit3TestAdapter" />
-    <PackageReference Remove="Microsoft.NET.Test.Sdk" />
+    <!-- Test Framework: NUnit 3.14.0 required by Rhino.Testing 8.0.28-beta -->
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
+    <PackageReference Include="CsCheck" Version="4.4.1" />
+    <!-- Override Rhino.Testing's transitive RhinoCommon/Grasshopper to match project version -->
+    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Windows-only: Project references -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ProjectReference Include="../../libs/core/Core.csproj" />
+    <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
+    <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
+    <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
 
   <!-- Windows-only: Using directives -->
@@ -26,12 +38,6 @@
     <Using Include="Rhino.Testing.Fixtures" />
     <Using Include="Arsenal.Rhino.Spatial" />
     <Using Include="Arsenal.Rhino.Extraction" />
-  </ItemGroup>
-
-  <!-- Windows-only: Project references -->
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
-    <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
 
   <!-- Windows-only: Content files -->

@@ -54,15 +54,6 @@
         "resolved": "0.3.1",
         "contentHash": "Q7N3nziye+vGsDPcrKrPFjlaFhrM+1adtJcpjFeq4ufBB+uKc4kRezSK03382xpE8iNQbiRHUl+z31NW0W18FQ=="
       },
-      "RhinoCommon": {
-        "type": "Direct",
-        "requested": "[8.24.25281.15001, )",
-        "resolved": "8.24.25281.15001",
-        "contentHash": "K8dd7DJvEUUYHpwkyyxr/ojK3e8swlE0STeyG+ulVWkWNHK6gIRDxMYCwB7kNyHHMgpr/vpQlMgR3SVD1GoMTA==",
-        "dependencies": {
-          "System.Drawing.Common": "7.0.0"
-        }
-      },
       "Roslynator.Analyzers": {
         "type": "Direct",
         "requested": "[4.14.1, )",
@@ -108,11 +99,6 @@
           "Newtonsoft.Json": "13.0.3"
         }
       },
-      "Microsoft.Win32.SystemEvents": {
-        "type": "Transitive",
-        "resolved": "7.0.0",
-        "contentHash": "2nXPrhdAyAzir0gLl8Yy8S5Mnm/uBSQQA7jEsILOS1MTyS7DbmV1NgViMtvV1sfCD1ebITpNwb1NIinKeJgUVQ=="
-      },
       "Newtonsoft.Json": {
         "type": "Transitive",
         "resolved": "13.0.3",
@@ -122,14 +108,6 @@
         "type": "Transitive",
         "resolved": "8.0.0",
         "contentHash": "AurL6Y5BA1WotzlEvVaIDpqzpIPvYnnldxru8oXJU2yFxFUy3+pNXjXd1ymO+RA0rq0+590Q8gaz2l3Sr7fmqg=="
-      },
-      "System.Drawing.Common": {
-        "type": "Transitive",
-        "resolved": "7.0.0",
-        "contentHash": "KIX+oBU38pxkKPxvLcLfIkOV5Ien8ReN78wro7OF5/erwcmortzeFx+iBswlh2Vz6gVne0khocQudGwaO1Ey6A==",
-        "dependencies": {
-          "Microsoft.Win32.SystemEvents": "7.0.0"
-        }
       },
       "System.Reflection.Metadata": {
         "type": "Transitive",
@@ -187,7 +165,6 @@
         "dependencies": {
           "Arsenal.Core": "[1.0.0, )",
           "CsCheck": "[4.4.1, )",
-          "Microsoft.NET.Test.Sdk": "[18.0.0, )",
           "xunit.abstractions": "[2.0.3, )",
           "xunit.assert": "[2.9.2, )"
         }
