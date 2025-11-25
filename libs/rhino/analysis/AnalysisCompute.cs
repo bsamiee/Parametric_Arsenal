@@ -294,7 +294,6 @@ internal static class AnalysisCompute {
                 double[] aspectRatios = new double[faceCount];
                 double[] skewness = new double[faceCount];
                 double[] jacobians = new double[faceCount];
-                List<int> problematicIndices = [];
                 int warningCount = 0;
                 int criticalCount = 0;
                 try {
@@ -346,17 +345,18 @@ internal static class AnalysisCompute {
                             : 0.0;
                         bool isCritical = aspectRatios[i] > AnalysisConfig.AspectRatioCritical || skewness[i] > AnalysisConfig.SkewnessCritical || jacobians[i] < AnalysisConfig.JacobianCritical;
                         bool isWarning = aspectRatios[i] > AnalysisConfig.AspectRatioWarning || skewness[i] > AnalysisConfig.SkewnessWarning || jacobians[i] < AnalysisConfig.JacobianWarning;
-                        if (isCritical) {
-                            problematicIndices.Add(i);
-                        }
                         criticalCount += isCritical ? 1 : 0;
                         warningCount += isWarning ? 1 : 0;
                     }
+                    int[] problematicFaceIndices = [.. Enumerable.Range(0, faceCount)
+                        .Where(i => aspectRatios[i] > AnalysisConfig.AspectRatioCritical
+                            || skewness[i] > AnalysisConfig.SkewnessCritical
+                            || jacobians[i] < AnalysisConfig.JacobianCritical),];
                     return ResultFactory.Create(value: new Analysis.MeshQualityResult(
                         AspectRatios: aspectRatios,
                         Skewness: skewness,
                         Jacobians: jacobians,
-                        ProblematicFaceIndices: [.. problematicIndices,],
+                        ProblematicFaceIndices: problematicFaceIndices,
                         QualityFlags: (Warning: warningCount, Critical: criticalCount)));
                 } finally {
                     ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
