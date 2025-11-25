@@ -145,9 +145,10 @@ internal static class IntersectionCompute {
                                                 .Select(face => (Face: face, Size: face.GetSurfaceSize(out double width, out double height) && width > 0.0 && height > 0.0 ? width * height : 0.0))
                                                 .Where(entry => entry.Size > 0.0)
                                                 .ToArray() is (BrepFace Face, double Size)[] validFaces && validFaces.Length > 0 && validFaces.Sum(static entry => entry.Size) is double totalArea && totalArea > 0.0
-                                                && Math.Min(
-                                                    IntersectionConfig.MaxNearMissSamples,
-                                                    Math.Max(IntersectionConfig.MinBrepNearMissSamples, (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius))) is int totalBudget
+                                                && Math.Clamp(
+                                                    (int)Math.Ceiling(brepA.GetBoundingBox(accurate: false).Diagonal.Length / searchRadius),
+                                                    IntersectionConfig.MinBrepNearMissSamples,
+                                                    IntersectionConfig.MaxNearMissSamples) is int totalBudget
                                                 ? validFaces
                                                     .SelectMany(entry => {
                                                         int faceSamples = Math.Max(IntersectionConfig.MinSamplesPerFace, (int)Math.Round(totalBudget * (entry.Size / totalArea)));
