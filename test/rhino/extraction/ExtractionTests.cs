@@ -229,7 +229,7 @@ public sealed class ExtractionTests {
     /// <summary>Verifies invalid geometry returns appropriate error.</summary>
     [Test]
     public void InvalidGeometry_ReturnsValidationError() {
-        LineCurve degenerateCurve = new(Point3d.Origin, Point3d.Origin);
+        using LineCurve degenerateCurve = new(Point3d.Origin, Point3d.Origin);
         Result<IReadOnlyList<Point3d>> result = Extraction.Points(degenerateCurve, new Extraction.ByCount(5), DefaultContext);
         Assert.That(result.IsSuccess, Is.False);
     }
