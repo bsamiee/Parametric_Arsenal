@@ -25,7 +25,7 @@ public sealed class AnalysisTests {
         double t = line.Domain.Mid;
         Result<Analysis.CurveData> result = Analysis.Analyze(curve: line, context: DefaultContext, parameter: t);
         Test.Success(result, data => {
-            Test.EqualWithin(data.Curvature, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Curvature, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -61,12 +61,12 @@ public sealed class AnalysisTests {
         Result<Analysis.CurveData> result = Analysis.Analyze(curve: curve, context: DefaultContext, parameter: t);
         Test.Success(result, data => {
             Plane frame = data.Frame;
-            Test.EqualWithin(frame.XAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.YAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.ZAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.XAxis * frame.YAxis, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.XAxis * frame.ZAxis, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.YAxis * frame.ZAxis, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.XAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.YAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.ZAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.XAxis * frame.YAxis, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.XAxis * frame.ZAxis, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.YAxis * frame.ZAxis, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -78,7 +78,7 @@ public sealed class AnalysisTests {
         Result<Analysis.CurveData> result = Analysis.Analyze(curve: curve, context: DefaultContext, parameter: t);
         Test.Success(result, data => {
             Point3d expected = curve.PointAt(t);
-            Test.EqualWithin(data.Location.DistanceTo(expected), expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Location.DistanceTo(expected), right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -103,7 +103,7 @@ public sealed class AnalysisTests {
             Vector3d tangent = curve.TangentAt(t);
             Vector3d deriv = data.Derivatives[0];
             deriv.Unitize();
-            Test.EqualWithin(Math.Abs(deriv * tangent), expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance * 10);
+            Test.EqualWithin(Math.Abs(deriv * tangent), right: 1.0, tolerance: DefaultContext.AbsoluteTolerance * 10);
             return true;
         });
     });
@@ -117,7 +117,7 @@ public sealed class AnalysisTests {
     public void PlaneGaussianCurvature_IsZero() => AnalysisGenerators.PlaneSurfaceGen.Run((PlaneSurface plane) => {
         Result<Analysis.SurfaceData> result = Analysis.Analyze(surface: plane, context: DefaultContext);
         Test.Success(result, data => {
-            Test.EqualWithin(data.Gaussian, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Gaussian, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -127,7 +127,7 @@ public sealed class AnalysisTests {
     public void PlaneMeanCurvature_IsZero() => AnalysisGenerators.PlaneSurfaceGen.Run((PlaneSurface plane) => {
         Result<Analysis.SurfaceData> result = Analysis.Analyze(surface: plane, context: DefaultContext);
         Test.Success(result, data => {
-            Test.EqualWithin(data.Mean, expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Mean, right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -185,7 +185,7 @@ public sealed class AnalysisTests {
     public void SurfaceNormal_IsUnitVector() => AnalysisGenerators.SurfaceGen.Run((Surface surface) => {
         Result<Analysis.SurfaceData> result = Analysis.Analyze(surface: surface, context: DefaultContext);
         Test.Success(result, data => {
-            Test.EqualWithin(data.Normal.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Normal.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -196,9 +196,9 @@ public sealed class AnalysisTests {
         Result<Analysis.SurfaceData> result = Analysis.Analyze(surface: surface, context: DefaultContext);
         Test.Success(result, data => {
             Plane frame = data.Frame;
-            Test.EqualWithin(frame.XAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.YAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            Test.EqualWithin(frame.ZAxis.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.XAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.YAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(frame.ZAxis.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -221,7 +221,7 @@ public sealed class AnalysisTests {
         Result<Analysis.SurfaceData> result = Analysis.Analyze(surface: surface, context: DefaultContext, uvParameter: (u, v));
         Test.Success(result, data => {
             Point3d expected = surface.PointAt(u, v);
-            Test.EqualWithin(data.Location.DistanceTo(expected), expected: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Location.DistanceTo(expected), right: 0.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
@@ -313,7 +313,7 @@ public sealed class AnalysisTests {
         _ = vertexIndex >= 0 || throw new InvalidOperationException("Mesh has no vertices");
         Result<Analysis.MeshData> result = Analysis.Analyze(mesh: mesh, context: DefaultContext, vertexIndex: vertexIndex);
         Test.Success(result, data => {
-            Test.EqualWithin(data.Normal.Length, expected: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+            Test.EqualWithin(data.Normal.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
             return true;
         });
     });
