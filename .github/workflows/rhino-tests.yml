@@ -15,22 +15,23 @@ on:
       - '.github/workflows/rhino-tests.yml'
   workflow_dispatch:
     inputs:
-      debug_enabled:
-        description: 'Enable debug logging for troubleshooting'
-        required: false
-        default: 'false'
-      run_rhino_tests:
-        description: 'Set to true to run Rhino headless tests on demand'
-        required: false
-        default: 'false'
+      enable_diagnostics:
+        description: 'Enable CoreCLR trace logging for debugging'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test-rhino:
     name: Rhino Headless Tests
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
+      checks: write
     env:
       RHINO_TOKEN: ${{ secrets.RHINO_TOKEN }}
       RHINO_EMAIL: ${{ secrets.RHINO_EMAIL }}
@@ -43,6 +44,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+          cache: true
 
       - name: Install Rhino
         uses: mcneel/setup-rhino3d@v2
@@ -65,23 +67,40 @@ jobs:
           }
 
       - name: Restore Dependencies
-        # Note: --locked-mode disabled because TFM is platform-conditional (net8.0-windows on Windows, net8.0 elsewhere)
         run: dotnet restore test/rhino/Arsenal.Rhino.Tests.csproj
 
       - name: Build Rhino Tests
         run: dotnet build test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --no-restore
 
       - name: Run Rhino Tests
-        # Note: Do NOT use --no-build flag; McNeel's own CI doesn't use it and test discovery requires build context
-        # COREHOST_TRACE=1 enables diagnostic output for CoreCLR initialization debugging
         env:
-          COREHOST_TRACE: 1
-          COREHOST_TRACEFILE: D:\a\corehost_trace.log
+          COREHOST_TRACE: ${{ inputs.enable_diagnostics && '1' || '0' }}
+          COREHOST_TRACEFILE: ${{ inputs.enable_diagnostics && 'D:\a\corehost_trace.log' || '' }}
         shell: pwsh
         run: |
-          dotnet test test/rhino/Arsenal.Rhino.Tests.csproj --configuration Release --framework net8.0-windows --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" --settings test/rhino/.runsettings --diag:D:\a\vstest_diag.log
-          if (Test-Path D:\a\corehost_trace.log) { Get-Content D:\a\corehost_trace.log -Tail 200 }
-          if (Test-Path D:\a\vstest_diag.log) { Get-Content D:\a\vstest_diag.log -Tail 100 }
+          $diagArgs = @()
+          if ('${{ inputs.enable_diagnostics }}' -eq 'true') {
+            $diagArgs += '--diag:D:\a\vstest_diag.log'
+          }
+          dotnet test test/rhino/Arsenal.Rhino.Tests.csproj `
+            --configuration Release `
+            --framework net8.0-windows `
+            --logger "trx;LogFileName=Arsenal.Rhino.Tests.trx" `
+            --settings test/rhino/.runsettings `
+            @diagArgs
+          if ('${{ inputs.enable_diagnostics }}' -eq 'true') {
+            if (Test-Path D:\a\corehost_trace.log) { Get-Content D:\a\corehost_trace.log -Tail 200 }
+            if (Test-Path D:\a\vstest_diag.log) { Get-Content D:\a\vstest_diag.log -Tail 100 }
+          }
+
+      - name: Publish Test Results
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: 'Rhino Tests'
+          path: '**/TestResults/**/*.trx'
+          reporter: 'dotnet-trx'
+          fail-on-error: true
 
       - name: Upload Test Results
         if: always()
@@ -91,15 +110,30 @@ jobs:
           path: |
             **/TestResults/**/*.trx
             **/TestResults/**/*.xml
+          retention-days: 7
+
+      - name: Upload Diagnostic Logs
+        if: inputs.enable_diagnostics && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-logs
+          path: |
             D:\a\corehost_trace.log
             D:\a\vstest_diag.log
-          retention-days: 30
+          retention-days: 7
 
-      - name: Summary
-        if: success()
+      - name: Generate Summary
+        if: always()
+        shell: pwsh
         run: |
-          echo "✅ Rhino tests completed successfully"
-          echo "Test Framework: NUnit 3.14.0 + Rhino.Testing v8.0.28-beta"
-          echo "Target Framework: .NET 8.0-windows"
-          echo "Headless Mode: Enabled"
-          echo "Platform: Windows with RhinoCommon"
+          $status = if ('${{ job.status }}' -eq 'success') { '[PASS]' } else { '[FAIL]' }
+          @"
+          ## $status Rhino Headless Tests
+
+          | Property | Value |
+          |----------|-------|
+          | Framework | NUnit 3.14.0 + Rhino.Testing v8.0.28-beta |
+          | Target | .NET 8.0-windows |
+          | Platform | Windows with RhinoCommon |
+          | Diagnostics | ${{ inputs.enable_diagnostics || 'false' }} |
+          "@ >> $env:GITHUB_STEP_SUMMARY

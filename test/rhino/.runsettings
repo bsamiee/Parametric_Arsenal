@@ -1,29 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NUnit + Rhino.Testing runsettings configuration -->
-<!-- https://github.com/mcneel/Rhino.Testing -->
-<!-- Updated for Rhino.Testing 8.0.28-beta with .NET 8.0 support -->
+<!-- NUnit + Rhino.Testing runsettings - see https://github.com/mcneel/Rhino.Testing -->
 <RunSettings>
   <RunConfiguration>
-    <!-- Per-session timeout (5 minutes) - workflow has overall 30 minute timeout -->
     <TestSessionTimeout>300000</TestSessionTimeout>
-    <!-- Disable parallel test execution for Rhino.Testing -->
     <MaxCpuCount>1</MaxCpuCount>
-    <!-- Results directory -->
     <ResultsDirectory>./TestResults</ResultsDirectory>
-    <!-- Target framework for test execution (Windows TFM for Rhino.Testing) -->
     <TargetFrameworkVersion>net8.0-windows</TargetFrameworkVersion>
   </RunConfiguration>
 
   <NUnit>
-    <!-- Single threaded execution required for Rhino.Testing -->
     <NumberOfTestWorkers>1</NumberOfTestWorkers>
-    <!-- Disable shadow copying for Rhino assemblies -->
     <ShadowCopyFiles>false</ShadowCopyFiles>
-    <!-- Internal trace level for debugging -->
     <InternalTraceLevel>Off</InternalTraceLevel>
-    <!-- Test naming pattern -->
     <DefaultTestNamePattern>{m}{a}</DefaultTestNamePattern>
-    <!-- Explicit work directory -->
     <WorkDirectory>.</WorkDirectory>
   </NUnit>
 </RunSettings>
