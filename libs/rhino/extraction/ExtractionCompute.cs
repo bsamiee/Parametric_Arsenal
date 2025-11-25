@@ -243,9 +243,9 @@ internal static class ExtractionCompute {
             for (int j = 0; j < sampleCount; j++) {
                 double vp = v.ParameterAt(sampleCount > 1 ? j / sampleDivisor : 0.5);
                 SurfaceCurvature? curv = surface.CurvatureAt(u: up, v: vp);
-                if (curv is not null) {
-                    curvatures[validCount++] = curv;
-                }
+                (curvatures[validCount], validCount) = curv is not null
+                    ? (curv, validCount + 1)
+                    : (curvatures[validCount], validCount);
             }
         }
 
@@ -259,24 +259,20 @@ internal static class ExtractionCompute {
         double minLengthSq = u.SquareLength;
         for (int i = 1; i < candidates.Length; i++) {
             double lengthSq = candidates[i].SquareLength;
-            if (lengthSq < minLengthSq) {
-                u = candidates[i];
-                minLengthSq = lengthSq;
-            }
+            (u, minLengthSq) = lengthSq < minLengthSq ? (candidates[i], lengthSq) : (u, minLengthSq);
         }
 
         double uLen = u.Length;
         if (uLen <= context.AbsoluteTolerance) {
             return (Vector3d.Zero, Vector3d.Zero, false);
         }
-
-        Vector3d uDir = u / uLen;
+        Vector3d uNormalized = u / uLen;
         for (int i = 0; i < candidates.Length; i++) {
-            Vector3d candidate = candidates[i];
-            double candidateLen = candidate.Length;
-            if (candidateLen > context.AbsoluteTolerance
-                && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
-                return (u, candidate, true);
+            double candidateLen = candidates[i].Length;
+            bool isOrthogonal = candidateLen > context.AbsoluteTolerance
+                && Math.Abs(Vector3d.Multiply(uNormalized, candidates[i] / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold;
+            if (isOrthogonal) {
+                return (u, candidates[i], true);
             }
         }
         return (Vector3d.Zero, Vector3d.Zero, false);
@@ -287,21 +283,24 @@ internal static class ExtractionCompute {
         double meanDistance = centers.Average(c => centroid.DistanceTo(c));
         Vector3d normal = Plane.FitPlaneToPoints(points: centers, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
-            : (centers[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? ((Func<Vector3d>)(() => {
-                    Vector3d v1n = v1 / v1.Length;
-                    for (int i = 1; i < centers.Length; i++) {
-                        Vector3d v2 = centers[i] - centroid;
-                        if (v2.Length > RhinoMath.ZeroTolerance) {
-                            Vector3d normalCand = Vector3d.CrossProduct(v1n, v2);
-                            if (normalCand.Length > RhinoMath.ZeroTolerance) {
-                                return normalCand / normalCand.Length;
-                            }
-                        }
-                    }
+            : ((Func<Vector3d>)(() => {
+                Vector3d v1 = centers[0] - centroid;
+                if (v1.Length <= RhinoMath.ZeroTolerance) {
                     return Vector3d.ZAxis;
-                }))()
-                : Vector3d.ZAxis;
+                }
+                Vector3d v1Normalized = v1 / v1.Length;
+                for (int i = 1; i < centers.Length; i++) {
+                    Vector3d v2 = centers[i] - centroid;
+                    if (v2.Length <= RhinoMath.ZeroTolerance) {
+                        continue;
+                    }
+                    Vector3d normalCand = Vector3d.CrossProduct(v1Normalized, v2);
+                    if (normalCand.Length > RhinoMath.ZeroTolerance) {
+                        return normalCand / normalCand.Length;
+                    }
+                }
+                return Vector3d.ZAxis;
+            }))();
         return meanDistance > context.AbsoluteTolerance
             && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
             && centers.Select(c => c - centroid).ToArray() is Vector3d[] radii

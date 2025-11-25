@@ -206,18 +206,20 @@ internal static class ExtractionCore {
             ? ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext($"Unknown point operation: {operation.GetType().Name}"))
             : ((Func<Result<IReadOnlyList<Point3d>>>)(() => {
                 (GeometryBase normalized, bool shouldDispose) = NormalizeGeometry(geometry: geometry, _: operation);
-                Result<IReadOnlyList<Point3d>> result = UnifiedOperation.Apply(
-                    input: normalized,
-                    operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
-                    config: new OperationConfig<GeometryBase, Point3d> {
-                        Context = context,
-                        ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
-                        OperationName = opMeta.OperationName,
-                    });
-                if (shouldDispose) {
-                    (normalized as IDisposable)?.Dispose();
+                try {
+                    return UnifiedOperation.Apply(
+                        input: normalized,
+                        operation: (Func<GeometryBase, Result<IReadOnlyList<Point3d>>>)(item => DispatchPointOperation(geometry: item, operation: operation, context: context)),
+                        config: new OperationConfig<GeometryBase, Point3d> {
+                            Context = context,
+                            ValidationMode = ExtractionConfig.GetValidationMode(_: operation.GetType(), geometryType: normalized.GetType(), baseMode: opMeta.ValidationMode),
+                            OperationName = opMeta.OperationName,
+                        });
+                } finally {
+                    if (shouldDispose) {
+                        (normalized as IDisposable)?.Dispose();
+                    }
                 }
-                return result;
             }))();
 
     private static Result<IReadOnlyList<Point3d>> ExtractGreville(GeometryBase geometry) {
@@ -241,29 +243,25 @@ internal static class ExtractionCore {
         };
     }
 
-    private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(GeometryBase geometry) {
-        return geometry switch {
-            Brep b => (
-                b.Faces
-                    .Select(f => {
-                        Brep? dup = f.DuplicateFace(duplicateMeshes: false);
-                        if (dup is null) {
-                            return Point3d.Unset;
-                        }
+    private static Result<IReadOnlyList<Point3d>> ExtractFaceCentroids(GeometryBase geometry) =>
+        geometry switch {
+            Brep b => b.Faces
+                .Select(f => f.DuplicateFace(duplicateMeshes: false) switch {
+                    null => Point3d.Unset,
+                    Brep dup => ((Func<Point3d>)(() => {
                         using (dup) {
                             using AreaMassProperties? mp = AreaMassProperties.Compute(dup);
                             return mp?.Centroid is Point3d { IsValid: true } c ? c : Point3d.Unset;
                         }
-                    })
-                    .Where(static p => p != Point3d.Unset)
-                    .ToArray()
-            ) is Point3d[] centroids && centroids.Length > 0
-                ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. centroids,])
-                : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("No valid face centroids found")),
+                    }))(),
+                })
+                .Where(static p => p != Point3d.Unset)
+                .ToArray() is Point3d[] centroids && centroids.Length > 0
+                    ? ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. centroids,])
+                    : ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("No valid face centroids found")),
             Mesh m => ResultFactory.Create(value: (IReadOnlyList<Point3d>)[.. Enumerable.Range(0, m.Faces.Count).Select(i => m.Faces.GetFaceCenter(i)).Where(static p => p.IsValid),]),
             _ => ResultFactory.Create<IReadOnlyList<Point3d>>(error: E.Geometry.InvalidExtraction.WithContext("FaceCentroids requires Brep/Mesh")),
         };
-    }
 
     private static Result<IReadOnlyList<Point3d>> ExtractAnalytical(GeometryBase geometry) =>
         geometry switch {
