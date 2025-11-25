@@ -32,7 +32,10 @@
   <!-- Windows-only: Project references -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <ProjectReference Include="../../libs/core/Core.csproj" />
-    <ProjectReference Include="../../libs/rhino/Rhino.csproj" />
+    <!-- Private="false" prevents Arsenal.Rhino.rhp from being copied to test output.
+         .rhp files in TRUSTED_PLATFORM_ASSEMBLIES cause CoreCLR initialization to fail
+         with error 0x80070057 (E_INVALIDARG) because TPA parser can't handle non-.dll extensions. -->
+    <ProjectReference Include="../../libs/rhino/Rhino.csproj" Private="false" />
     <ProjectReference Include="../shared/Arsenal.Tests.Shared.csproj" />
     <ProjectReference Include="../core/Arsenal.Core.Tests.csproj" />
   </ItemGroup>
