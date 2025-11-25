@@ -36,7 +36,6 @@ Result<HealingResult> HealTopology(Brep brep, IReadOnlyList<Strategy> strategies
 
 ```csharp
 IGeometryContext context = new GeometryContext(absoluteTolerance: 0.001);
-
 // Edge classification
 Result<Topology.EdgeClassificationData> edges = Topology.ClassifyEdges(
     geometry: brep,
