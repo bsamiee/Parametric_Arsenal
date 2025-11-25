@@ -60,10 +60,11 @@ internal static class IntersectionCompute {
                                         .Where(static angle => RhinoMath.IsValidDouble(angle))
                                         .ToArray() is double[] angles && angles.Length > 0 && Math.Atan2(angles.Sum(Math.Sin) / angles.Length, angles.Sum(Math.Cos) / angles.Length) is double circularMean && RhinoMath.Wrap(circularMean, 0.0, RhinoMath.TwoPI) is double averageAngle
                                             ? ((Func<Result<(Intersection.IntersectionType, double[], bool, double)>>)(() => {
-                                                // Curve-curve: tangent (0° or 180°) vs transverse (90°)
-                                                // Check both parallel (0°) and antiparallel (180°/2π) cases
-                                                bool isTangent = averageAngle < IntersectionConfig.TangentAngleThreshold || averageAngle > (RhinoMath.TwoPI - IntersectionConfig.TangentAngleThreshold);
-                                                (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, angles.Any(static angle => angle < IntersectionConfig.GrazingAngleThreshold || angle > (RhinoMath.TwoPI - IntersectionConfig.GrazingAngleThreshold)), isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
+                                                // Curve-curve: tangent when tangents are parallel or antiparallel (0° or 180°), transverse when near 90°.
+                                                double averageParallelDeviation = Math.Min(averageAngle, Math.Abs(RhinoMath.Pi - averageAngle));
+                                                bool isTangent = averageParallelDeviation <= IntersectionConfig.TangentAngleThreshold;
+                                                bool isGrazing = angles.Any(angle => Math.Min(angle, Math.Abs(RhinoMath.Pi - angle)) <= IntersectionConfig.GrazingAngleThreshold);
+                                                (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, isGrazing, isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
                                                 return ResultFactory.Create(value: result);
                                             }))()
                                             : ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.ClassificationFailed),
