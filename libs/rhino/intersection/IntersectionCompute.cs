@@ -12,11 +12,6 @@ namespace Arsenal.Rhino.Intersection;
 /// <summary>Dense intersection analysis algorithms.</summary>
 [Pure]
 internal static class IntersectionCompute {
-    /// <summary>Validates geometry with mode or returns success if mode is None.</summary>
-    [Pure]
-    private static Result<T> Validate<T>(T geometry, IGeometryContext context, V mode) where T : notnull =>
-        mode == V.None ? ResultFactory.Create(value: geometry) : ResultFactory.Create(value: geometry).Validate(args: [context, mode,]);
-
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
     [Pure]
     internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
@@ -53,8 +48,8 @@ internal static class IntersectionCompute {
                         ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
                         : (entry.Strategy.ModeA, entry.Strategy.ModeB);
 
-                    return Validate(geomA, context, modeA)
-                        .Bind(validA => Validate(geomB, context, modeB)
+                    return (modeA == V.None ? ResultFactory.Create(value: geomA) : ResultFactory.Create(value: geomA).Validate(args: [context, modeA,]))
+                        .Bind(validA => (modeB == V.None ? ResultFactory.Create(value: geomB) : ResultFactory.Create(value: geomB).Validate(args: [context, modeB,]))
                             .Bind(validB => (output.Points.Count, output.ParametersA.Count, output.ParametersB.Count) switch {
                                 (0, _, _) => ResultFactory.Create<(Intersection.IntersectionType, double[], bool, double)>(error: E.Geometry.InsufficientIntersectionData),
                                 (int count, int parametersA, int parametersB) => (validA, validB) switch {
@@ -106,8 +101,8 @@ internal static class IntersectionCompute {
                             ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
                             : (entry.Strategy.ModeA, entry.Strategy.ModeB);
 
-                        return Validate(geomA, context, modeA)
-                            .Bind(validA => Validate(geomB, context, modeB)
+                        return (modeA == V.None ? ResultFactory.Create(value: geomA) : ResultFactory.Create(value: geomA).Validate(args: [context, modeA,]))
+                            .Bind(validA => (modeB == V.None ? ResultFactory.Create(value: geomB) : ResultFactory.Create(value: geomB).Validate(args: [context, modeB,]))
                                 .Bind(validB => {
                                     (GeometryBase primary, GeometryBase secondary) = (validA, validB) switch {
                                         (Curve c, Surface s) => (c, s),
@@ -212,8 +207,8 @@ internal static class IntersectionCompute {
                         ? (entry.Strategy.ModeB, entry.Strategy.ModeA)
                         : (entry.Strategy.ModeA, entry.Strategy.ModeB);
 
-                    return Validate(geomA, context, modeA)
-                        .Bind(validA => Validate(geomB, context, modeB)
+                    return (modeA == V.None ? ResultFactory.Create(value: geomA) : ResultFactory.Create(value: geomA).Validate(args: [context, modeA,]))
+                        .Bind(validA => (modeB == V.None ? ResultFactory.Create(value: geomB) : ResultFactory.Create(value: geomB).Validate(args: [context, modeB,]))
                             .Bind(validB => IntersectionCore.NormalizeSettings(new Intersection.IntersectionSettings(), context)
                                 .Bind(normalized => {
                                     Vector3d[] directions = [.. Enumerable.Range(0, IntersectionConfig.StabilitySampleCount)

@@ -1,5 +1,4 @@
 using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
 using Arsenal.Core.Errors;
 using Arsenal.Core.Results;
 using Rhino;
@@ -10,14 +9,12 @@ namespace Arsenal.Rhino.Orientation;
 /// <summary>Dense algorithmic implementations for orientation operations.</summary>
 [Pure]
 internal static class OrientationCompute {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform transform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
             T dup when dup.Transform(transform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.TransformFailed),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Point3d> ExtractCentroid(GeometryBase geometry, bool useMassProperties) =>
         useMassProperties
             ? geometry switch {
@@ -55,7 +52,6 @@ internal static class OrientationCompute {
                 ? ResultFactory.Create(value: box.Center)
                 : ResultFactory.Create<Point3d>(error: E.Geometry.CentroidExtractionFailed);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Plane> ExtractBestFitPlane(GeometryBase geometry) =>
         geometry switch {
             PointCloud pc when pc.Count >= OrientationConfig.BestFitMinPoints => ((Func<Result<Plane>>)(() => {
@@ -79,7 +75,6 @@ internal static class OrientationCompute {
             _ => ResultFactory.Create<Plane>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<IReadOnlyList<T>> FlipDirection<T>(T geometry) where T : GeometryBase =>
         geometry.Duplicate() switch {
             Curve c when c.Reverse() => ResultFactory.Create(value: (IReadOnlyList<T>)[(T)(GeometryBase)c,]),
@@ -93,7 +88,6 @@ internal static class OrientationCompute {
             _ => ResultFactory.Create<IReadOnlyList<T>>(error: E.Geometry.UnsupportedOrientationType.WithContext(geometry.GetType().Name)),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> ComputeCanonicalTransform(GeometryBase geometry, Orientation.CanonicalMode mode) =>
         (mode, geometry.GetBoundingBox(accurate: true)) switch {
             (_, BoundingBox box) when !box.IsValid && mode is not Orientation.VolumeCentroid =>
@@ -134,7 +128,6 @@ internal static class OrientationCompute {
              _ => ResultFactory.Create<Orientation.RelativeOrientationResult>(error: E.Geometry.UnsupportedOrientationType),
          };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<Transform> ComputeVectorRotation(GeometryBase geometry, Vector3d target, Vector3d? source, Point3d? anchor) =>
         (geometry.GetBoundingBox(accurate: true), source ?? Vector3d.ZAxis, target) switch {
             (BoundingBox box, Vector3d s, Vector3d t) when box.IsValid && s.Length > RhinoMath.ZeroTolerance && t.Length > RhinoMath.ZeroTolerance =>
@@ -170,7 +163,6 @@ internal static class OrientationCompute {
                 },
             };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Plane[] GenerateTestPlanes(BoundingBox box) =>
         (d1: new Vector3d(1, 1, 0), d2: new Vector3d(1, 0, 1), d3: new Vector3d(0, 1, 1)) switch {
             var d when d.d1.Unitize() && d.d2.Unitize() && d.d3.Unitize() => [
@@ -184,7 +176,6 @@ internal static class OrientationCompute {
             _ => [],
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static (Transform xform, double score, Orientation.OptimizationCriteria[] satisfied) EvaluateOrientation(
         Brep brep, Plane plane, Orientation.OptimizationCriteria criteria, double tolerance, Point3d centroid) =>
         Transform.PlaneToPlane(plane, Plane.WorldXY) switch {
@@ -244,7 +235,6 @@ internal static class OrientationCompute {
                 Result<Point3d>[] results => ResultFactory.Create<Orientation.PatternDetectionResult>(error: E.Geometry.PatternDetectionFailed.WithContext($"Centroid extraction failed for {results.Count(r => !r.IsSuccess)} geometries")),
             };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Orientation.RelationshipType ClassifyRelationship(Plane pa, Plane pb, double angleTolerance) =>
         Math.Abs(Vector3d.Multiply(pa.ZAxis, pb.ZAxis)) switch {
             double dot when Math.Abs(dot - 1.0) < 1.0 - Math.Cos(angleTolerance) => new Orientation.Parallel(),
@@ -252,7 +242,6 @@ internal static class OrientationCompute {
             _ => new Orientation.Oblique(),
         };
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Orientation.SymmetryType ClassifySymmetry(GeometryBase geometryA, GeometryBase geometryB, Plane pa, Plane pb, double tolerance, double angleTol) =>
         (geometryA, geometryB) switch {
             (Brep ba, Brep bb) when ba.Vertices.Count == bb.Vertices.Count =>

@@ -12,7 +12,7 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology algorithm implementations.</summary>
 internal static class MorphologyCompute {
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
         GeometryBase _,
@@ -36,7 +36,6 @@ internal static class MorphologyCompute {
                             ? ResultFactory.Create(value: deformed)
                             : ResultFactory.Create<GeometryBase>(error: E.Geometry.Morphology.CageDeformFailed.WithContext("Failed to apply deformation to geometry"));
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ApplyCageDeformation(GeometryBase geometry, BoundingBox cageBounds, Point3d[] deformedControlPoints) {
         Vector3d span = cageBounds.Max - cageBounds.Min;
         Vector3d ComputeTrilinear(double u, double v, double w) =>
@@ -108,7 +107,7 @@ internal static class MorphologyCompute {
                         return ResultFactory.Create(value: next);
                     }));
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Mesh? SubdivideLoop(Mesh mesh) =>
         mesh.Faces.TriangleCount != mesh.Faces.Count
             ? null
@@ -168,7 +167,7 @@ internal static class MorphologyCompute {
                 return subdivided.Normals.ComputeNormals() && subdivided.Compact() ? subdivided : null;
             }))();
 
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [Pure]
     private static Mesh? SubdivideButterfly(Mesh mesh) =>
         mesh.Faces.TriangleCount != mesh.Faces.Count
             ? null
@@ -233,7 +232,6 @@ internal static class MorphologyCompute {
                 return subdivided.Normals.ComputeNormals() && subdivided.Compact() ? subdivided : null;
             }))();
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static (int, int) FindButterflyOpposites(Mesh mesh, int v1, int v2) =>
         Enumerable.Range(0, mesh.Faces.Count).Aggregate(
             (-1, -1),
