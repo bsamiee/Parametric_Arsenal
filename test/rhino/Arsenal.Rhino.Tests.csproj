@@ -15,7 +15,7 @@
     <!-- Test Framework: NUnit 3.14.0 required by Rhino.Testing 8.0.28-beta -->
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
     <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
     <PackageReference Include="CsCheck" Version="4.4.1" />
