@@ -63,7 +63,7 @@ internal static class IntersectionCompute {
                                                 // Curve-curve: tangent when tangents are parallel or antiparallel (0° or 180°), transverse when near 90°.
                                                 double averageParallelDeviation = Math.Min(Math.Min(averageAngle, RhinoMath.TwoPI - averageAngle), Math.Abs(RhinoMath.Pi - averageAngle));
                                                 bool isTangent = averageParallelDeviation <= IntersectionConfig.TangentAngleThreshold;
-                                                bool isGrazing = angles.Any(angle => Math.Min(angle, Math.Abs(RhinoMath.Pi - angle)) <= IntersectionConfig.GrazingAngleThreshold);
+                                                bool isGrazing = angles.Any(static angle => Math.Min(angle, Math.Abs(RhinoMath.Pi - angle)) <= IntersectionConfig.GrazingAngleThreshold);
                                                 (Intersection.IntersectionType, double[], bool, double) result = (isTangent ? Intersection.IntersectionType.Tangent.Instance : Intersection.IntersectionType.Transverse.Instance, angles, isGrazing, isTangent ? IntersectionConfig.TangentBlendScore : IntersectionConfig.PerpendicularBlendScore);
                                                 return ResultFactory.Create(value: result);
                                             }))()
