@@ -6,8 +6,9 @@
     <IsTestProject>true</IsTestProject>
     <!-- TFM set in Directory.Build.props: net8.0-windows on Windows, net8.0 elsewhere -->
     <!-- This project is self-contained - all dependencies defined here, not inherited -->
-    <!-- Suppress NU1605: Project refs use RhinoCommon 8.24.x but Rhino.Testing requires 8.0.x -->
-    <NoWarn>$(NoWarn);NU1605</NoWarn>
+    <!-- NU1605: Transitive dependency downgrade (project refs use 8.24.x, Rhino.Testing wants 8.0.x) -->
+    <!-- NU1701: net48 package fallback (Rhino.Testing's old RhinoCommon/Grasshopper deps) -->
+    <NoWarn>$(NoWarn);NU1605;NU1701</NoWarn>
   </PropertyGroup>
 
   <!-- ============================================ -->
@@ -21,6 +22,9 @@
     <PackageReference Include="Rhino.Testing" Version="8.0.28-beta" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" PrivateAssets="all" />
     <PackageReference Include="CsCheck" Version="4.4.1" />
+    <!-- Override Rhino.Testing's net48 transitive deps with net8.0-compatible versions -->
+    <PackageReference Include="RhinoCommon" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Grasshopper" Version="$(RhinoVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Windows-only: Project references -->
