@@ -267,46 +267,45 @@ internal static class FieldsCore {
         IGeometryContext context) where T : GeometryBase {
         T typed = (T)geometry;
         BoundingBox bounds = sampling.Bounds ?? typed.GetBoundingBox(accurate: true);
-        if (!bounds.IsValid) {
-            return ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds);
-        }
-        int resolution = sampling.Resolution;
-        int totalSamples = resolution * resolution * resolution;
-        int actualBufferSize = Math.Max(totalSamples, bufferSize);
-        Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(actualBufferSize);
-        double[] distances = ArrayPool<double>.Shared.Rent(actualBufferSize);
-        try {
-            Vector3d delta = (bounds.Max - bounds.Min) / (resolution - 1);
-            int gridIndex = 0;
-            for (int i = 0; i < resolution; i++) {
-                for (int j = 0; j < resolution; j++) {
-                    for (int k = 0; k < resolution; k++) {
-                        grid[gridIndex++] = new(bounds.Min.X + (i * delta.X), bounds.Min.Y + (j * delta.Y), bounds.Min.Z + (k * delta.Z));
+        return !bounds.IsValid
+            ? ResultFactory.Create<(Point3d[], double[])>(error: E.Geometry.InvalidFieldBounds)
+            : ((Func<Result<(Point3d[], double[])>>)(() => {
+                int resolution = sampling.Resolution;
+                int totalSamples = resolution * resolution * resolution;
+                int actualBufferSize = Math.Max(totalSamples, bufferSize);
+                Point3d[] grid = ArrayPool<Point3d>.Shared.Rent(actualBufferSize);
+                double[] distances = ArrayPool<double>.Shared.Rent(actualBufferSize);
+                try {
+                    Vector3d delta = (bounds.Max - bounds.Min) / (resolution - 1);
+                    int gridIndex = 0;
+                    for (int i = 0; i < resolution; i++) {
+                        for (int j = 0; j < resolution; j++) {
+                            for (int k = 0; k < resolution; k++) {
+                                grid[gridIndex++] = new(bounds.Min.X + (i * delta.X), bounds.Min.Y + (j * delta.Y), bounds.Min.Z + (k * delta.Z));
+                            }
+                        }
                     }
+                    for (int idx = 0; idx < totalSamples; idx++) {
+                        Point3d closest = typed switch {
+                            Mesh m => m.ClosestPoint(grid[idx]),
+                            Brep b => b.ClosestPoint(grid[idx]),
+                            Curve c => c.ClosestPoint(grid[idx], out double t) ? c.PointAt(t) : grid[idx],
+                            Surface s => s.ClosestPoint(grid[idx], out double u, out double v) ? s.PointAt(u, v) : grid[idx],
+                            _ => throw new UnreachableException($"Unsupported geometry type: {typed.GetType().Name}"),
+                        };
+                        double unsignedDist = grid[idx].DistanceTo(closest);
+                        bool inside = typed switch {
+                            Brep brep => brep.IsPointInside(grid[idx], tolerance: context.AbsoluteTolerance * FieldsConfig.InsideOutsideToleranceMultiplier, strictlyIn: false),
+                            Mesh mesh when mesh.IsClosed => mesh.IsPointInside(grid[idx], tolerance: context.AbsoluteTolerance, strictlyIn: false),
+                            _ => false,
+                        };
+                        distances[idx] = inside ? -unsignedDist : unsignedDist;
+                    }
+                    return ResultFactory.Create(value: (Grid: (Point3d[])[.. grid[..totalSamples]], Distances: (double[])[.. distances[..totalSamples]]));
+                } finally {
+                    ArrayPool<Point3d>.Shared.Return(grid, clearArray: true);
+                    ArrayPool<double>.Shared.Return(distances, clearArray: true);
                 }
-            }
-            for (int i = 0; i < totalSamples; i++) {
-                Point3d closest = typed switch {
-                    Mesh m => m.ClosestPoint(grid[i]),
-                    Brep b => b.ClosestPoint(grid[i]),
-                    Curve c => c.ClosestPoint(grid[i], out double t) ? c.PointAt(t) : grid[i],
-                    Surface s => s.ClosestPoint(grid[i], out double u, out double v) ? s.PointAt(u, v) : grid[i],
-                    _ => throw new UnreachableException($"Unsupported geometry type: {typed.GetType().Name}"),
-                };
-                double unsignedDist = grid[i].DistanceTo(closest);
-                bool inside = typed switch {
-                    Brep brep => brep.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance * FieldsConfig.InsideOutsideToleranceMultiplier, strictlyIn: false),
-                    Mesh mesh when mesh.IsClosed => mesh.IsPointInside(grid[i], tolerance: context.AbsoluteTolerance, strictlyIn: false),
-                    _ => false,
-                };
-                distances[i] = inside ? -unsignedDist : unsignedDist;
-            }
-            Point3d[] finalGrid = [.. grid[..totalSamples]];
-            double[] finalDistances = [.. distances[..totalSamples]];
-            return ResultFactory.Create(value: (Grid: finalGrid, Distances: finalDistances));
-        } finally {
-            ArrayPool<Point3d>.Shared.Return(grid, clearArray: true);
-            ArrayPool<double>.Shared.Return(distances, clearArray: true);
-        }
+            }))();
     }
 }

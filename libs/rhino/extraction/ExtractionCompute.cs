@@ -243,9 +243,9 @@ internal static class ExtractionCompute {
             for (int j = 0; j < sampleCount; j++) {
                 double vp = v.ParameterAt(sampleCount > 1 ? j / sampleDivisor : 0.5);
                 SurfaceCurvature? curv = surface.CurvatureAt(u: up, v: vp);
-                if (curv is not null) {
-                    curvatures[validCount++] = curv;
-                }
+                (curvatures[validCount], validCount) = curv is not null
+                    ? (curv, validCount + 1)
+                    : (curvatures[validCount], validCount);
             }
         }
 
@@ -259,27 +259,18 @@ internal static class ExtractionCompute {
         double minLengthSq = u.SquareLength;
         for (int i = 1; i < candidates.Length; i++) {
             double lengthSq = candidates[i].SquareLength;
-            if (lengthSq < minLengthSq) {
-                u = candidates[i];
-                minLengthSq = lengthSq;
-            }
+            (u, minLengthSq) = lengthSq < minLengthSq ? (candidates[i], lengthSq) : (u, minLengthSq);
         }
 
         double uLen = u.Length;
-        if (uLen <= context.AbsoluteTolerance) {
-            return (Vector3d.Zero, Vector3d.Zero, false);
-        }
-
-        Vector3d uDir = u / uLen;
-        for (int i = 0; i < candidates.Length; i++) {
-            Vector3d candidate = candidates[i];
-            double candidateLen = candidate.Length;
-            if (candidateLen > context.AbsoluteTolerance
-                && Math.Abs(Vector3d.Multiply(uDir, candidate / candidateLen)) < ExtractionConfig.GridOrthogonalityThreshold) {
-                return (u, candidate, true);
-            }
-        }
-        return (Vector3d.Zero, Vector3d.Zero, false);
+        return uLen <= context.AbsoluteTolerance
+            ? (Vector3d.Zero, Vector3d.Zero, false)
+            : candidates
+                .Where(candidate => candidate.Length > context.AbsoluteTolerance
+                    && Math.Abs(Vector3d.Multiply(u / uLen, candidate / candidate.Length)) < ExtractionConfig.GridOrthogonalityThreshold)
+                .Select(candidate => (u, candidate, true))
+                .DefaultIfEmpty((Vector3d.Zero, Vector3d.Zero, false))
+                .First();
     }
 
     private static Result<Extraction.PatternDetectionResult> TryDetectRadialPattern(Point3d[] centers, IGeometryContext context) {
@@ -288,19 +279,14 @@ internal static class ExtractionCompute {
         Vector3d normal = Plane.FitPlaneToPoints(points: centers, plane: out Plane bestFit) == PlaneFitResult.Success
             ? bestFit.Normal
             : (centers[0] - centroid) is Vector3d v1 && v1.Length > RhinoMath.ZeroTolerance
-                ? ((Func<Vector3d>)(() => {
-                    Vector3d v1n = v1 / v1.Length;
-                    for (int i = 1; i < centers.Length; i++) {
-                        Vector3d v2 = centers[i] - centroid;
-                        if (v2.Length > RhinoMath.ZeroTolerance) {
-                            Vector3d normalCand = Vector3d.CrossProduct(v1n, v2);
-                            if (normalCand.Length > RhinoMath.ZeroTolerance) {
-                                return normalCand / normalCand.Length;
-                            }
-                        }
-                    }
-                    return Vector3d.ZAxis;
-                }))()
+                ? Enumerable.Range(1, centers.Length - 1)
+                    .Select(i => centers[i] - centroid)
+                    .Where(v2 => v2.Length > RhinoMath.ZeroTolerance)
+                    .Select(v2 => Vector3d.CrossProduct(v1 / v1.Length, v2))
+                    .Where(normalCand => normalCand.Length > RhinoMath.ZeroTolerance)
+                    .Select(normalCand => normalCand / normalCand.Length)
+                    .DefaultIfEmpty(Vector3d.ZAxis)
+                    .First()
                 : Vector3d.ZAxis;
         return meanDistance > context.AbsoluteTolerance
             && centers.All(c => RhinoMath.EpsilonEquals(centroid.DistanceTo(c), meanDistance, meanDistance * ExtractionConfig.RadialDistanceVariationThreshold))
