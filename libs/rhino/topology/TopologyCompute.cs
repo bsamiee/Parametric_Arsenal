@@ -148,25 +148,19 @@ internal static class TopologyCompute {
                 }))(),
                 Topology.ComponentJoinStrategy => ((Func<bool>)(() => {
                     Brep[] components = copy.GetConnectedComponents() ?? [];
-                    if (components.Length <= 1) { return false; }
-                    Brep[]? joined = Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance);
-                    if (joined is null || joined.Length == 0) { return false; }
-                    if (joined.Length == 1) {
-                        copy.Dispose();
-                        copy = joined[0];
-                        return true;
-                    }
-                    Array.ForEach(joined, b => b?.Dispose());
-                    return false;
+                    return components.Length > 1 && Brep.JoinBreps(brepsToJoin: components, tolerance: strategyTolerance) switch {
+                        null => false,
+                        { Length: 0 } => false,
+                        { Length: 1 } singleJoined => ((Func<bool>)(() => { copy.Dispose(); copy = singleJoined[0]; return true; }))(),
+                        Brep[] multiJoined => ((Func<bool>)(() => { Array.ForEach(multiJoined, b => b?.Dispose()); return false; }))(),
+                    };
                 }))(),
                 _ => false,
             };
             string validationLog = string.Empty;
             bool isValid = success && copy.IsValidTopology(out validationLog);
             int nakedEdges = isValid ? copy.Edges.Count(e => e.Valence == EdgeAdjacency.Naked) : int.MaxValue;
-            if (!isValid) {
-                System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}");
-            }
+            _ = isValid || ((Func<bool>)(() => { System.Diagnostics.Debug.WriteLine($"Strategy {currentStrategy.GetType().Name} failed validation: {validationLog}"); return true; }))();
             bool isImprovement = isValid && nakedEdges < bestNakedEdges;
 
             Brep? toDispose = isImprovement ? bestHealed : copy;
@@ -177,11 +171,9 @@ internal static class TopologyCompute {
         }
 
         bool healedSuccessfully = bestNakedEdges < originalNakedEdges || originalNakedEdges == 0;
-        if (!healedSuccessfully) {
-            bestHealed.Dispose();
-            return ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed"));
-        }
-        return ResultFactory.Create(value: new Topology.HealingResult(Healed: bestHealed, AppliedStrategy: bestStrategy, Success: true));
+        return healedSuccessfully
+            ? ResultFactory.Create(value: new Topology.HealingResult(Healed: bestHealed, AppliedStrategy: bestStrategy, Success: true))
+            : ((Func<Result<Topology.HealingResult>>)(() => { bestHealed.Dispose(); return ResultFactory.Create<Topology.HealingResult>(error: E.Topology.HealingFailed.WithContext($"All {strategies.Count.ToString(CultureInfo.InvariantCulture)} strategies failed")); }))();
     }
 
     internal static Result<IReadOnlyList<Topology.ConnectivityData>> ComputeConnectivity<TGeometry>(
