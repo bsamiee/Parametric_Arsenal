@@ -4,7 +4,7 @@
 <!-- Updated for Rhino.Testing 8.0.28-beta with .NET 8.0 support -->
 <RunSettings>
   <RunConfiguration>
-    <!-- Maximum time to allow for test run (5 minutes) -->
+    <!-- Per-session timeout (5 minutes) - workflow has overall 30 minute timeout -->
     <TestSessionTimeout>300000</TestSessionTimeout>
     <!-- Disable parallel test execution for Rhino.Testing -->
     <MaxCpuCount>1</MaxCpuCount>
