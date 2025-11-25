@@ -374,14 +374,14 @@ internal static class ExtractionCompute {
             ? meanVar / (meanMean * meanMean) < ExtractionConfig.CurvatureVariationThreshold
             : meanVar < RhinoMath.SqrtEpsilon;
 
-        return (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon) switch {
-            (true, _, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+        return (gaussianConstant, meanConstant, Math.Abs(gaussianMean) < RhinoMath.SqrtEpsilon, Math.Abs(meanMean) < RhinoMath.SqrtEpsilon) switch {
+            (true, _, true, true) => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
                 ? new Extraction.PlanarPrimitive(Frame: frame, Origin: frame.Origin)
                 : new Extraction.UnknownPrimitive(Frame: Plane.WorldXY),
-            (false, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+            (true, true, true, false) when meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
                 ? new Extraction.CylindricalPrimitive(Frame: frame, Radius: 1.0 / (2.0 * meanMean), Height: surface.GetBoundingBox(accurate: false).Diagonal.Length)
                 : new Extraction.UnknownPrimitive(Frame: Plane.WorldXY),
-            (true, true, false) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
+            (true, true, false, _) when gaussianMean > RhinoMath.ZeroTolerance && meanMean > RhinoMath.ZeroTolerance => surface.FrameAt(u: surface.Domain(0).Mid, v: surface.Domain(1).Mid, out Plane frame)
                 ? new Extraction.SphericalPrimitive(Frame: frame, Radius: 1.0 / Math.Sqrt(gaussianMean))
                 : new Extraction.UnknownPrimitive(Frame: Plane.WorldXY),
             _ => new Extraction.UnknownPrimitive(Frame: Plane.WorldXY),
