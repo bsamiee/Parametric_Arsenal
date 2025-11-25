@@ -343,7 +343,7 @@ public sealed class ExtractionTests {
     /// <summary>Verifies Quadrant extraction for circles returns 4 cardinal points.</summary>
     [Test]
     public void QuadrantCircle_ReturnsFourCardinalPoints() => GeometryGenerators.CircleGen.Run((Circle circle) => {
-        ArcCurve arcCurve = new(circle);
+        using ArcCurve arcCurve = new(circle);
         Result<IReadOnlyList<Point3d>> result = Extraction.Points(arcCurve, new Extraction.Quadrant(), DefaultContext);
         Test.Success(result, points => {
             Assert.That(points.Count, Is.EqualTo(4));
