@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rhino-test-results
           path: |
@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload Diagnostic Logs
         if: inputs.enable_diagnostics && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: diagnostic-logs
           path: |
