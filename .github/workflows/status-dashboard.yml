@@ -1,0 +1,376 @@
+name: Status Dashboard
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: status-dashboard
+  cancel-in-progress: false
+
+jobs:
+  generate-dashboard:
+    name: Generate Autonomy Dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Collect Workflow Metrics
+        id: metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today - 30 * 24 * 60 * 60 * 1000);
+            
+            // Get workflow runs for last 30 days
+            const workflowNames = [
+              'claude-issues.yml',
+              'claude-code-review.yml',
+              'claude-autofix.yml',
+              'auto-merge.yml',
+              'context-gen.yml',
+              'standards-sync.yml'
+            ];
+            
+            const metrics = {
+              total_runs: 0,
+              successful_runs: 0,
+              failed_runs: 0,
+              avg_duration_minutes: 0,
+              workflow_breakdown: {}
+            };
+            
+            let totalDuration = 0;
+            
+            for (const workflowName of workflowNames) {
+              const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflowName,
+                created: `>=${thirtyDaysAgo.toISOString()}`,
+                per_page: 100
+              });
+              
+              const successful = runs.workflow_runs.filter(r => r.conclusion === 'success').length;
+              const failed = runs.workflow_runs.filter(r => r.conclusion === 'failure').length;
+              
+              metrics.workflow_breakdown[workflowName] = {
+                total: runs.workflow_runs.length,
+                successful,
+                failed,
+                success_rate: runs.workflow_runs.length > 0 
+                  ? Math.round((successful / runs.workflow_runs.length) * 100)
+                  : 0
+              };
+              
+              metrics.total_runs += runs.workflow_runs.length;
+              metrics.successful_runs += successful;
+              metrics.failed_runs += failed;
+              
+              runs.workflow_runs.forEach(run => {
+                if (run.run_started_at && run.updated_at) {
+                  const duration = (new Date(run.updated_at) - new Date(run.run_started_at)) / 1000 / 60;
+                  totalDuration += duration;
+                }
+              });
+            }
+            
+            metrics.avg_duration_minutes = metrics.total_runs > 0
+              ? Math.round(totalDuration / metrics.total_runs)
+              : 0;
+            
+            core.setOutput('metrics', JSON.stringify(metrics));
+            return metrics;
+
+      - name: Collect PR Metrics
+        id: pr_metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today - 30 * 24 * 60 * 60 * 1000);
+            
+            // Get PRs for last 30 days
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+            
+            const recentPrs = prs.filter(pr => new Date(pr.created_at) >= thirtyDaysAgo);
+            const botPrs = recentPrs.filter(pr => pr.user.login.includes('bot') || pr.user.login.includes('claude'));
+            const mergedPrs = recentPrs.filter(pr => pr.merged_at);
+            const botMergedPrs = botPrs.filter(pr => pr.merged_at);
+            
+            // Calculate time to merge
+            let totalTimeToMerge = 0;
+            let mergedCount = 0;
+            
+            mergedPrs.forEach(pr => {
+              if (pr.created_at && pr.merged_at) {
+                const duration = (new Date(pr.merged_at) - new Date(pr.created_at)) / 1000 / 60;
+                totalTimeToMerge += duration;
+                mergedCount++;
+              }
+            });
+            
+            const prMetrics = {
+              total_prs: recentPrs.length,
+              bot_prs: botPrs.length,
+              merged_prs: mergedPrs.length,
+              bot_merged_prs: botMergedPrs.length,
+              autonomy_rate: recentPrs.length > 0 
+                ? Math.round((botMergedPrs.length / mergedPrs.length) * 100)
+                : 0,
+              avg_time_to_merge_minutes: mergedCount > 0
+                ? Math.round(totalTimeToMerge / mergedCount)
+                : 0,
+              open_prs: prs.filter(pr => pr.state === 'open').length
+            };
+            
+            core.setOutput('pr_metrics', JSON.stringify(prMetrics));
+            return prMetrics;
+
+      - name: Count Autofix Iterations
+        id: autofix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today - 30 * 24 * 60 * 60 * 1000);
+            
+            // Get recent PRs with autofix labels
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+            
+            const recentPrs = prs.filter(pr => new Date(pr.created_at) >= thirtyDaysAgo);
+            
+            let totalIterations = 0;
+            let prsWithAutofix = 0;
+            const iterationCounts = { 0: 0, 1: 0, 2: 0, 3: 0 };
+            
+            for (const pr of recentPrs) {
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number
+              });
+              
+              const autofixLabels = labels.filter(l => l.name.startsWith('autofix-attempt-'));
+              
+              if (autofixLabels.length > 0) {
+                prsWithAutofix++;
+                const maxIteration = Math.max(...autofixLabels.map(l => {
+                  const match = l.name.match(/autofix-attempt-(\d+)/);
+                  return match ? parseInt(match[1]) : 0;
+                }));
+                totalIterations += maxIteration;
+                iterationCounts[Math.min(maxIteration, 3)]++;
+              } else {
+                iterationCounts[0]++;
+              }
+            }
+            
+            const autofixMetrics = {
+              prs_with_autofix: prsWithAutofix,
+              avg_iterations: prsWithAutofix > 0
+                ? (totalIterations / prsWithAutofix).toFixed(2)
+                : 0,
+              iteration_distribution: iterationCounts
+            };
+            
+            core.setOutput('autofix_metrics', JSON.stringify(autofixMetrics));
+            return autofixMetrics;
+
+      - name: Check Context Freshness
+        id: context
+        run: |
+          echo "Checking context file timestamps..."
+          
+          context_files=(
+            "docs/agent-context/architecture.json"
+            "docs/agent-context/error-catalog.json"
+            "docs/agent-context/validation-modes.json"
+            "docs/agent-context/exemplar-metrics.json"
+            "docs/agent-context/domain-map.json"
+          )
+          
+          oldest_age=0
+          stale_files=""
+          
+          for file in "${context_files[@]}"; do
+            if [ -f "$file" ]; then
+              age_seconds=$(( $(date +%s) - $(stat -c %Y "$file") ))
+              age_hours=$(( age_seconds / 3600 ))
+              
+              if [ $age_hours -gt $oldest_age ]; then
+                oldest_age=$age_hours
+              fi
+              
+              if [ $age_hours -gt 24 ]; then
+                stale_files="$stale_files\n- $file ($age_hours hours old)"
+              fi
+            else
+              stale_files="$stale_files\n- $file (MISSING)"
+            fi
+          done
+          
+          echo "oldest_age=$oldest_age" >> $GITHUB_OUTPUT
+          echo "stale_files<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$stale_files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate Dashboard Issue Body
+        id: dashboard
+        uses: actions/github-script@v7
+        env:
+          WORKFLOW_METRICS: ${{ steps.metrics.outputs.metrics }}
+          PR_METRICS: ${{ steps.pr_metrics.outputs.pr_metrics }}
+          AUTOFIX_METRICS: ${{ steps.autofix.outputs.autofix_metrics }}
+          CONTEXT_AGE: ${{ steps.context.outputs.oldest_age }}
+          STALE_FILES: ${{ steps.context.outputs.stale_files }}
+        with:
+          script: |
+            const workflowMetrics = JSON.parse(process.env.WORKFLOW_METRICS);
+            const prMetrics = JSON.parse(process.env.PR_METRICS);
+            const autofixMetrics = JSON.parse(process.env.AUTOFIX_METRICS);
+            const contextAge = process.env.CONTEXT_AGE;
+            const staleFiles = process.env.STALE_FILES;
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            const body = `# 🤖 Autonomy Dashboard — ${today}
+            
+            > **Monitoring Period**: Last 30 days
+            > **Target Autonomy**: >70% (bot-only PRs merged)
+            
+            ---
+            
+            ## 📊 Overall Metrics
+            
+            | Metric | Value | Target | Status |
+            |--------|-------|--------|--------|
+            | **Autonomy Rate** | ${prMetrics.autonomy_rate}% | >70% | ${prMetrics.autonomy_rate >= 70 ? '✅ PASS' : '⚠️ BELOW TARGET'} |
+            | **Bot PRs Merged** | ${prMetrics.bot_merged_prs}/${prMetrics.merged_prs} | — | ${prMetrics.bot_merged_prs > 0 ? '✅' : '❌'} |
+            | **Avg Time to Merge** | ${prMetrics.avg_time_to_merge_minutes} min | <60 min | ${prMetrics.avg_time_to_merge_minutes < 60 ? '✅ PASS' : '⚠️ SLOW'} |
+            | **Avg Review Iterations** | ${autofixMetrics.avg_iterations} | <2.0 | ${autofixMetrics.avg_iterations < 2 ? '✅ PASS' : '⚠️ HIGH'} |
+            | **Context Freshness** | ${contextAge}h | <24h | ${contextAge < 24 ? '✅ FRESH' : '⚠️ STALE'} |
+            
+            ---
+            
+            ## 🔄 Workflow Performance
+            
+            **Total Runs**: ${workflowMetrics.total_runs} (${workflowMetrics.successful_runs} successful, ${workflowMetrics.failed_runs} failed)
+            
+            **Avg Duration**: ${workflowMetrics.avg_duration_minutes} minutes
+            
+            | Workflow | Runs | Success Rate | Status |
+            |----------|------|--------------|--------|
+            ${Object.entries(workflowMetrics.workflow_breakdown).map(([name, data]) => 
+              `| \`${name}\` | ${data.total} | ${data.success_rate}% | ${data.success_rate >= 90 ? '✅' : data.success_rate >= 70 ? '⚠️' : '❌'} |`
+            ).join('\n')}
+            
+            ---
+            
+            ## 📈 Pull Request Activity
+            
+            | Metric | Value |
+            |--------|-------|
+            | **Total PRs** | ${prMetrics.total_prs} |
+            | **Bot PRs** | ${prMetrics.bot_prs} (${prMetrics.total_prs > 0 ? Math.round((prMetrics.bot_prs/prMetrics.total_prs)*100) : 0}%) |
+            | **Merged PRs** | ${prMetrics.merged_prs} |
+            | **Bot Merged** | ${prMetrics.bot_merged_prs} |
+            | **Open PRs** | ${prMetrics.open_prs} |
+            
+            ---
+            
+            ## 🔧 Auto-Fix Statistics
+            
+            **PRs with Auto-Fix**: ${autofixMetrics.prs_with_autofix}
+            
+            **Avg Iterations per PR**: ${autofixMetrics.avg_iterations}
+            
+            **Iteration Distribution**:
+            - 0 iterations (no fixes needed): ${autofixMetrics.iteration_distribution[0]}
+            - 1 iteration: ${autofixMetrics.iteration_distribution[1]}
+            - 2 iterations: ${autofixMetrics.iteration_distribution[2]}
+            - 3 iterations (max): ${autofixMetrics.iteration_distribution[3]}
+            
+            ${autofixMetrics.iteration_distribution[3] > 0 ? '⚠️ **Warning**: Some PRs hit the 3-iteration limit. Manual review required.' : ''}
+            
+            ---
+            
+            ## 📁 Context File Status
+            
+            ${staleFiles ? `⚠️ **Stale Context Files Detected**:\n${staleFiles}\n\nRun \`context-gen\` workflow to refresh.` : '✅ All context files are fresh (<24h old).'}
+            
+            ---
+            
+            ## 🎯 Recommendations
+            
+            ${prMetrics.autonomy_rate < 70 ? '- ⚠️ **Autonomy rate below target**: Review auto-merge gates and agent prompts.\n' : ''}
+            ${prMetrics.avg_time_to_merge_minutes > 60 ? '- ⚠️ **Slow merge times**: Optimize workflow durations or increase parallelism.\n' : ''}
+            ${autofixMetrics.avg_iterations > 2 ? '- ⚠️ **High iteration count**: Improve review prompts or agent instructions.\n' : ''}
+            ${contextAge > 24 ? '- ⚠️ **Stale context files**: Trigger \`context-gen\` workflow manually.\n' : ''}
+            ${workflowMetrics.failed_runs > workflowMetrics.successful_runs * 0.1 ? '- ⚠️ **High workflow failure rate**: Investigate failing workflows.\n' : ''}
+            ${prMetrics.autonomy_rate >= 70 && prMetrics.avg_time_to_merge_minutes < 60 && autofixMetrics.avg_iterations < 2 && contextAge < 24 ? '✅ **All systems operating optimally!**' : ''}
+            
+            ---
+            
+            _Generated automatically by \`status-dashboard.yml\` • Updated daily at 00:00 UTC_`;
+            
+            return body;
+
+      - name: Create Dashboard Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = ${{ steps.dashboard.outputs.result }};
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Close previous dashboard issues
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'dashboard',
+              state: 'open'
+            });
+            
+            for (const issue of issues) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed'
+              });
+            }
+            
+            // Create new dashboard issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Autonomy Dashboard — ${today}`,
+              body: body,
+              labels: ['dashboard', 'metrics']
+            });

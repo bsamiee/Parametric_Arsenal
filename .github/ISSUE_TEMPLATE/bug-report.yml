@@ -1,0 +1,253 @@
+name: Bug Report (Claude-Ready)
+description: Report a bug with structured information for agentic workflows
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        
+        Thank you for reporting a bug! This template provides structured information that enables our agentic workflows to diagnose and fix issues automatically.
+        
+        **Please fill out all required fields.** The more detail you provide, the faster the issue can be resolved.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - critical (blocks development/production)
+        - high (major functionality broken)
+        - medium (feature works but with issues)
+        - low (minor issue/cosmetic)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected Scope
+      description: Which part of the codebase is affected?
+      options:
+        - libs/core/results
+        - libs/core/operations
+        - libs/core/validation
+        - libs/core/errors
+        - libs/rhino/spatial
+        - libs/rhino/analysis
+        - libs/rhino/topology
+        - libs/rhino/transformation
+        - libs/rhino/fields
+        - libs/rhino/morphology
+        - libs/rhino/orientation
+        - libs/rhino/extraction
+        - libs/rhino/intersection
+        - libs/grasshopper
+        - tools/ContextGen
+        - tools/standards
+        - .github/workflows
+        - documentation
+        - other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Recommended Agent
+      description: Which specialist agent should handle this bug?
+      options:
+        - auto-detect
+        - csharp-advanced
+        - testing-specialist
+        - refactoring-architect
+        - rhino-implementation
+        - grasshopper-implementation
+        - performance-analyst
+        - documentation-specialist
+        - integration-specialist
+        - cleanup-specialist
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of the bug
+      placeholder: When calling Spatial.Analyze with an empty PointCloud, the method throws NullReferenceException instead of returning Result<T> with error.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: Should return Result<T>.Failure with E.Validation.EmptyCollection error
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: Throws System.NullReferenceException at line 127 in SpatialCore.cs
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the bug
+      placeholder: |
+        1. Create empty PointCloud: `PointCloud cloud = new();`
+        2. Call Spatial.Analyze: `Result<IReadOnlyList<int>> result = Spatial.Analyze(cloud, query, context);`
+        3. Observe exception instead of Result.Failure
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: code_sample
+    attributes:
+      label: Minimal Code Sample
+      description: Minimal C# code that reproduces the bug
+      placeholder: |
+        ```csharp
+        PointCloud cloud = new();
+        Sphere query = new(new Point3d(0, 0, 0), radius: 10.0);
+        IGeometryContext context = new GeometryContext();
+        
+        // This throws instead of returning Result.Failure
+        Result<IReadOnlyList<int>> result = Spatial.Analyze(cloud, query, context);
+        ```
+      render: csharp
+    validations:
+      required: false
+
+  - type: textarea
+    id: stack_trace
+    attributes:
+      label: Stack Trace
+      description: Full stack trace if an exception is thrown
+      placeholder: |
+        System.NullReferenceException: Object reference not set to an instance of an object.
+           at Arsenal.Rhino.Spatial.SpatialCore.QueryInternal(...) in SpatialCore.cs:line 127
+           at Arsenal.Rhino.Spatial.Spatial.Analyze(...) in Spatial.cs:line 89
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which version are you using? (commit hash or branch name)
+      placeholder: main @ 1a2b3c4 or v1.0.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Linux (Ubuntu)
+        - Linux (other)
+    validations:
+      required: true
+
+  - type: input
+    id: dotnet_version
+    attributes:
+      label: .NET Version
+      description: Output of `dotnet --version`
+      placeholder: 8.0.403
+    validations:
+      required: true
+
+  - type: input
+    id: rhino_version
+    attributes:
+      label: Rhino Version (if applicable)
+      description: Rhino version if bug is in libs/rhino
+      placeholder: "8.14.24317.15001"
+    validations:
+      required: false
+
+  - type: textarea
+    id: analyzer_output
+    attributes:
+      label: Analyzer/Build Output
+      description: If build fails, paste relevant analyzer errors
+      placeholder: |
+        error IDE0007: Use explicit type instead of var
+        error CA1050: Declare types in namespaces
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify these items before submitting
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I have provided a minimal code sample that reproduces the bug
+          required: false
+        - label: I have included the full stack trace (if applicable)
+          required: false
+        - label: I have tested on the latest main branch
+          required: true
+        - label: I am willing to submit a PR to fix this (optional)
+          required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information
+      placeholder: This bug appeared after updating from v0.9 to v1.0
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## For Bot Processing
+        
+        <!-- ISSUE_METADATA
+        {
+          "type": "bug",
+          "auto_assign": true,
+          "priority_detection": true,
+          "context_files": []
+        }
+        -->
+        
+        After submission, the `claude-issues` workflow will:
+        1. Auto-detect priority from severity
+        2. Assign recommended agent (or auto-detect)
+        3. Load relevant context files
+        4. Generate diagnostic plan
+        5. Create fix PR with tests
+        
+        **Expected turnaround**: 15-30 minutes for automated diagnosis and fix PR creation.

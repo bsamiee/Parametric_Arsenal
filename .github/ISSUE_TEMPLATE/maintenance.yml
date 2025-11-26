@@ -1,0 +1,266 @@
+name: Maintenance Task (Claude-Ready)
+description: Code maintenance, refactoring, or cleanup tasks
+title: "[MAINT] "
+labels: ["maintenance", "technical-debt"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Maintenance Task
+        
+        Use this template for code maintenance tasks such as:
+        - Refactoring for better patterns
+        - Cleanup of technical debt
+        - Dependency updates
+        - Documentation improvements
+        - Performance optimizations
+        - Standards compliance fixes
+
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task Type
+      description: What kind of maintenance is this?
+      options:
+        - refactoring (improve structure/patterns)
+        - cleanup (remove dead code/fix violations)
+        - optimization (improve performance)
+        - documentation (update docs/comments)
+        - dependencies (update packages)
+        - standards (enforce CLAUDE.md compliance)
+        - testing (improve test coverage)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected Scope
+      description: Which part of the codebase needs maintenance?
+      options:
+        - libs/core/results
+        - libs/core/operations
+        - libs/core/validation
+        - libs/core/errors
+        - libs/rhino/spatial
+        - libs/rhino/analysis
+        - libs/rhino/topology
+        - libs/rhino/transformation
+        - libs/rhino/fields
+        - libs/rhino/morphology
+        - libs/rhino/orientation
+        - libs/rhino/extraction
+        - libs/rhino/intersection
+        - libs/grasshopper
+        - test/core
+        - test/rhino
+        - tools/ContextGen
+        - tools/standards
+        - .github/workflows
+        - .github/agents
+        - documentation
+        - repository-wide
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Recommended Agent
+      description: Which specialist agent should handle this?
+      options:
+        - auto-detect
+        - cleanup-specialist
+        - refactoring-architect
+        - performance-analyst
+        - documentation-specialist
+        - testing-specialist
+        - integration-specialist
+        - csharp-advanced
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How urgent is this maintenance?
+      options:
+        - high (blocking other work)
+        - medium (should be done soon)
+        - low (nice to have)
+      default: 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Detailed description of what needs to be done
+      placeholder: |
+        The libs/rhino/spatial folder has 6 files (exceeds 4-file limit) and 14 types (exceeds 10-type limit). 
+        Need to consolidate by:
+        1. Merging similar query methods into parameterized operations
+        2. Using FrozenDictionary dispatch instead of separate files
+        3. Ensuring all operations use UnifiedOperation pattern
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Current State
+      description: What is the current state of the code?
+      placeholder: |
+        - 6 files in libs/rhino/spatial/
+        - Multiple similar methods (QueryByDistance, QueryByProximity, QueryByRadius)
+        - Some operations not using UnifiedOperation
+        - Validation modes inconsistent
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_state
+    attributes:
+      label: Desired State
+      description: What should the code look like after maintenance?
+      placeholder: |
+        - 3 files in libs/rhino/spatial/ (Spatial.cs, SpatialCore.cs, SpatialConfig.cs)
+        - Single Query method with SpatialQueryType enum parameter
+        - All operations use UnifiedOperation.Apply
+        - Consistent V.Standard | V.BoundingBox validation
+    validations:
+      required: true
+
+  - type: textarea
+    id: standards_violations
+    attributes:
+      label: Standards Violations (if applicable)
+      description: List any CLAUDE.md violations to fix
+      placeholder: |
+        - [ ] 3 instances of `var` usage in SpatialCore.cs
+        - [ ] 2 if/else statements in Query method (lines 127, 145)
+        - [ ] Missing trailing commas in FrozenDictionary initializer
+        - [ ] Unnamed parameters in ResultFactory.Create calls
+      value: |
+        - [ ] 
+    validations:
+      required: false
+
+  - type: textarea
+    id: test_requirements
+    attributes:
+      label: Test Requirements
+      description: What tests need to be added/updated?
+      placeholder: |
+        - Add property-based tests for new Query parameter combinations
+        - Update integration tests to use new API
+        - Ensure 80%+ coverage maintained
+    validations:
+      required: false
+
+  - type: dropdown
+    id: breaking_changes
+    attributes:
+      label: Breaking Changes
+      description: Will this introduce breaking changes?
+      options:
+        - "no"
+        - "yes (public API changes)"
+        - "yes (behavior changes)"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration_notes
+    attributes:
+      label: Migration Notes (if breaking)
+      description: How should users migrate if there are breaking changes?
+      placeholder: |
+        Old: `Spatial.QueryByDistance(cloud, point, distance, context)`
+        New: `Spatial.Query(cloud, new DistanceQuery(point, distance), context)`
+    validations:
+      required: false
+
+  - type: textarea
+    id: exemplars
+    attributes:
+      label: Exemplar Files to Study
+      description: Which files should be studied for patterns?
+      placeholder: |
+        - libs/core/operations/UnifiedOperation.cs - Dispatch pattern
+        - libs/core/validation/ValidationRules.cs - Expression tree compilation
+        - libs/rhino/topology/Topology.cs - Clean 3-file structure
+      value: |
+        - 
+    validations:
+      required: false
+
+  - type: textarea
+    id: estimated_impact
+    attributes:
+      label: Estimated Impact
+      description: What will improve after this maintenance?
+      placeholder: |
+        - File count: 6 → 3 (50% reduction)
+        - Type count: 14 → 8 (43% reduction)
+        - LOC: 800 → 600 (25% reduction through better algorithms)
+        - Maintainability: Better cohesion, single dispatch point
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify these items
+      options:
+        - label: I have identified specific files/methods to refactor
+          required: true
+        - label: I have described the desired end state clearly
+          required: true
+        - label: I have considered impact on tests
+          required: true
+        - label: I have noted any breaking changes
+          required: true
+        - label: I am willing to submit a PR for this (optional)
+          required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other information, benchmarks, or analysis
+      placeholder: |
+        Current query performance: ~50ms for 10k points
+        Target after optimization: ~20ms (using RTree spatial indexing)
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## For Bot Processing
+        
+        <!-- ISSUE_METADATA
+        {
+          "type": "maintenance",
+          "auto_assign": true,
+          "context_files": [],
+          "validation_mode": "V.Standard"
+        }
+        -->
+        
+        After submission, the `claude-maintenance` workflow will:
+        1. Analyze current state vs. desired state
+        2. Assign recommended agent
+        3. Load exemplar files for pattern reference
+        4. Generate refactoring plan
+        5. Create PR with changes and updated tests
+        
+        **Expected turnaround**: 20-45 minutes for automated refactoring PR.
