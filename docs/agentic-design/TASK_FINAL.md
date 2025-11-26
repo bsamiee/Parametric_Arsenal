@@ -4,7 +4,7 @@
 
 > **Objective**: Transform Parametric Arsenal into Self-Describing Agentic Environment
 > **Target**: >70% issue-to-merge autonomy
-> **Total Effort**: ~46 hours
+> **Total Effort**: ~44 hours
 
 ---
 
@@ -12,10 +12,10 @@
 
 | Phase | Priority | Tasks | Effort | Autonomy Gain |
 |-------|----------|-------|--------|---------------|
-| **1** | CRITICAL | CD-2, CD-3, CD-4 | 7h | +25% |
-| **2** | HIGH | P-1, P-2, C-1, C-7, I-1, I-3 | 18h | +25% |
+| **1** | CRITICAL | CD-2, CD-3, CD-4, I-5 | 8h | +25% |
+| **2** | HIGH | P-1, P-2, C-1, C-7, I-1, I-3 | 16h | +25% |
 | **3** | MEDIUM | C-2→C-6, CD-1, CD-5→CD-7 | 14h | +15% |
-| **4** | LOW | P-4→P-8, I-2, I-4→I-6, CD-8→CD-9 | 7h | +5% |
+| **4** | LOW | P-4→P-8, I-2, I-4, I-6, CD-8→CD-9 | 6h | +5% |
 
 ---
 
@@ -39,27 +39,33 @@
 
 **LOGIC**:
 ```
-TRIGGER: workflow_run[Claude Code Review].completed
+TRIGGER: workflow_run[claude-code-review.yml].completed
 
 IF review-output/pr-{N}.json exists:
   verdict = parse(json).verdict
 
   IF verdict == "request_changes":
-    iteration_count = count(commits with "fix(review):")
+    iteration_count = count(PR labels matching "autofix-attempt-*")
 
     IF iteration_count >= 3:
-      comment("⚠️ Auto-fix limit reached. Manual review required.")
+      comment("⚠️ Auto-fix limit (3) reached. Manual review required.")
       EXIT
 
-    FOR violation IN parse(json).violations:
-      edit(violation.file, violation.line, violation.suggested)
+    # Sort violations by file, then by start_line DESC to avoid line shifts
+    sorted_violations = sort(violations, by: file ASC, start_line DESC)
+
+    FOR violation IN sorted_violations:
+      edit(violation.file, violation.start_line, violation.end_line, violation.suggested)
 
     RUN: dotnet build
     RUN: dotnet format --verify-no-changes
+    ADD_LABEL: "autofix-attempt-{iteration_count + 1}"
     COMMIT: "fix(review): apply agentic review fixes"
     PUSH
     COMMENT: "@claude Please re-review"
 ```
+
+> **Implementation Note**: Apply fixes in reverse line order (highest line first) within each file to prevent line number shifts from invalidating subsequent fix locations.
 
 **VERIFY**:
 - [ ] Triggers on review completion
@@ -83,22 +89,28 @@ IF review-output/pr-{N}.json exists:
 
 **OUTPUT**: `.github/workflows/auto-merge.yml`
 
+**APPROACH**: Leverage GitHub's native auto-merge with branch protection rules.
+
 **LOGIC**:
 ```
-TRIGGER: check_suite.completed OR pull_request_review.submitted
+TRIGGER: pull_request.opened OR pull_request.ready_for_review
 
 IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
-  ci_status = gh pr checks --json state
-  review_status = gh pr view --json reviewDecision
+  # Enable GitHub's native auto-merge (requires branch protection)
+  gh pr merge --squash --auto --delete-branch
 
-  IF ci_status == "SUCCESS" AND review_status == "APPROVED":
-    gh pr merge --squash --auto --delete-branch
+# GitHub handles the actual merge when:
+# - All required status checks pass
+# - Required reviews are approved
+# - Branch is up to date (if required)
 ```
 
+> **Note**: Relies on branch protection rules for merge gates. Configure `main` branch to require status checks and reviews. GitHub's `--auto` flag queues merge until all conditions are met, avoiding race conditions.
+
 **VERIFY**:
-- [ ] Checks CI status
-- [ ] Checks review approval
-- [ ] Squash merges
+- [ ] Branch protection enabled on `main`
+- [ ] Required status checks configured
+- [ ] Auto-merge enabled in repo settings
 - [ ] Deletes branch after merge
 
 ---
@@ -129,7 +141,8 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
   "violations": [{
     "rule": "NO_VAR | NO_IF_ELSE | TRAILING_COMMA | ...",
     "file": "relative/path.cs",
-    "line": 127,
+    "start_line": 127,
+    "end_line": 127,
     "current": "var x = new RTree();",
     "suggested": "RTree x = new();"
   }],
@@ -137,11 +150,36 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
 }
 ```
 
+> **Note**: Use `start_line`/`end_line` for multi-line changes. Single-line violations have equal values.
+
 **VERIFY**:
 - [ ] JSON file created per review
 - [ ] Artifact uploaded
 - [ ] Schema is valid
 - [ ] Violations have actionable fixes
+
+---
+
+### I-5: Review Output Schema
+<!-- DIRECTIVE: Must complete before CD-2 implementation -->
+
+| Field | Value |
+|-------|-------|
+| **Priority** | CRITICAL |
+| **Effort** | 1h |
+| **Requires** | None |
+| **Blocks** | CD-2, CD-4 |
+
+**OUTPUT**: `tools/schemas/review-output.schema.json`
+
+**PURPOSE**: Formal JSON Schema defining review output structure. Required for:
+- CD-4 to generate compliant JSON
+- CD-2 to parse violations correctly
+
+**VERIFY**:
+- [ ] Schema validates against JSON Schema Draft-07
+- [ ] All fields documented with descriptions
+- [ ] Example violations included
 
 ---
 
@@ -244,10 +282,15 @@ System.Text.Json
 
 **CI TRIGGER**: `push` to `main` on `libs/**/*.cs`
 
+**CI BEHAVIOR**: Creates PR with updated context files (not direct commit to main)
+
+> **Rationale**: Direct commits to main bypass branch protection and risk infinite workflow loops. PRs allow review and prevent recursive triggers.
+
 **VERIFY**:
 - [ ] Opens solution via Roslyn
 - [ ] Generates to `docs/agent-context/`
-- [ ] CI commits changes automatically
+- [ ] CI creates PR with changes (not direct commit)
+- [ ] PR auto-merges if checks pass
 
 ---
 
@@ -399,7 +442,9 @@ System.Text.Json
 | **Effort** | 1h |
 | **Requires** | CD-2 |
 
-**LOGIC**: Count `fix(review):` commits, stop at 3
+**LOGIC**: Count PR labels matching `autofix-attempt-*`, stop at 3
+
+> **Note**: PR labels are more reliable than commit message parsing and persist across force-pushes.
 
 ---
 
@@ -427,7 +472,6 @@ System.Text.Json
 | P-8 | Agent frontmatter schema | 1h |
 | I-2 | Bug report template | 30m |
 | I-4 | Maintenance template | 30m |
-| I-5 | Review output schema | 1h |
 | I-6 | Prompts README | 30m |
 | CD-8 | Status dashboard workflow | 1h |
 | CD-9 | Add timeouts to all workflows | 30m |

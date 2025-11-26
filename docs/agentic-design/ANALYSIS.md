@@ -182,7 +182,7 @@ validation_mode: V.Standard | V.Topology
 | `exemplar-metrics.json` | Parse exemplar files | LOC, methods, patterns |
 | `domain-map.json` | Parse libs/rhino/* | 4-file pattern, API types |
 
-**CI**: Regenerate on `libs/**/*.cs` changes, commit to repo.
+**CI**: Regenerate on `libs/**/*.cs` changes, create PR (not direct commit to prevent infinite loops).
 
 ### Pillar D: Agentic Handshake
 
@@ -197,16 +197,21 @@ validation_mode: V.Standard | V.Topology
 **Review Output Schema**:
 ```json
 {
+  "pr_number": 42,
   "verdict": "approve | request_changes",
   "violations": [{
     "rule": "NO_VAR",
     "file": "path",
-    "line": 127,
+    "start_line": 127,
+    "end_line": 127,
     "current": "var x = ...",
     "suggested": "int x = ..."
-  }]
+  }],
+  "passed_checks": ["RULE_ID", ...]
 }
 ```
+
+> **Note**: `start_line`/`end_line` support multi-line changes. Fixes applied in reverse line order to prevent line shifts.
 
 ---
 
@@ -250,12 +255,13 @@ validation_mode: V.Standard | V.Topology
 
 ```
 PHASE 1 (CRITICAL) — Unblock agent autonomy
+├── I-5: Review output schema (blocks CD-2, CD-4)
+├── CD-4: Add JSON output to claude-code-review
 ├── CD-2: Create claude-autofix.yml workflow
-├── CD-3: Create auto-merge.yml workflow
-└── CD-4: Add JSON output to claude-code-review
+└── CD-3: Create auto-merge.yml workflow
 
 PHASE 2 (HIGH) — Enable structured input
-├── C-1/C-7: ContextGen tool + CI workflow
+├── C-1/C-7: ContextGen tool + CI workflow (creates PRs, not direct commits)
 ├── P-1/P-2: STANDARDS.yaml + generator
 └── I-1/I-3: Issue + PR templates
 
@@ -268,7 +274,7 @@ PHASE 4 (LOW) — Polish
 └── P-4→P-8, CD-8→CD-9, CONTRIBUTING.md
 ```
 
-**Total Effort**: ~46 hours → 70% autonomy target
+**Total Effort**: ~44 hours → 70% autonomy target
 
 ---
 
