@@ -183,10 +183,10 @@ Run `dotnet build` to verify analyzer compliance before verdict.
 > **Note**: Use `start_line`/`end_line` for multi-line changes. Single-line violations have equal values.
 
 **VERIFY**:
-- [ ] JSON file created per review
-- [ ] Artifact uploaded
-- [ ] Schema is valid
-- [ ] Violations have actionable fixes
+- [x] JSON file created per review
+- [x] Artifact uploaded
+- [x] Schema is valid
+- [x] Violations have actionable fixes
 
 ---
 

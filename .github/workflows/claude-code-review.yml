@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -33,6 +33,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Create review output directory
+        run: mkdir -p .github/review-output
 
       - name: Run Claude Code Review
         id: claude-review
@@ -42,36 +45,86 @@ jobs:
           prompt: |
             Review PR #${{ github.event.pull_request.number }} against CLAUDE.md standards.
 
+            ## OUTPUT REQUIREMENT
+
+            You MUST generate structured JSON output to `.github/review-output/pr-${{ github.event.pull_request.number }}.json`.
+
+            The JSON must follow this schema:
+            ```json
+            {
+              "pr_number": ${{ github.event.pull_request.number }},
+              "verdict": "approve" | "request_changes",
+              "violations": [
+                {
+                  "rule": "RULE_ID",
+                  "file": "relative/path.cs",
+                  "start_line": 1,
+                  "end_line": 1,
+                  "current": "code that violates",
+                  "suggested": "code that fixes",
+                  "severity": "error",
+                  "context": "optional explanation"
+                }
+              ],
+              "passed_checks": ["RULE_ID", ...],
+              "metadata": {
+                "review_timestamp": "ISO 8601 timestamp",
+                "build_status": "success" | "failure"
+              }
+            }
+            ```
+
+            Valid RULE_IDs: NO_VAR, NO_IF_ELSE, TRAILING_COMMA, NAMED_PARAMETERS,
+            TARGET_TYPED_NEW, COLLECTION_EXPRESSIONS, FILE_SCOPED_NAMESPACE,
+            ONE_TYPE_PER_FILE, KR_BRACE_STYLE, RESULT_MONAD, UNIFIED_OPERATION,
+            ERROR_REGISTRY, FILES_PER_FOLDER, TYPES_PER_FOLDER, LOC_PER_MEMBER,
+            PRIMARY_CONSTRUCTORS
+
             ## MANDATORY CHECKS (build failures)
 
             **Syntax violations** (search for these patterns):
-            - `var ` declarations → must use explicit types
-            - `if (` with `} else {` → must use ternary/switch expressions
-            - `new List<` or `new Dictionary<` → must use collection expressions `[]`
-            - Missing trailing commas in multi-line arrays/collections
-            - `namespace X {` → must use file-scoped `namespace X;`
+            - `var ` declarations → must use explicit types (NO_VAR)
+            - `if (` with `} else {` → must use ternary/switch expressions (NO_IF_ELSE)
+            - `new List<` or `new Dictionary<` → must use collection expressions `[]` (COLLECTION_EXPRESSIONS)
+            - Missing trailing commas in multi-line arrays/collections (TRAILING_COMMA)
+            - `namespace X {` → must use file-scoped `namespace X;` (FILE_SCOPED_NAMESPACE)
 
             **Architecture violations**:
-            - Direct `throw new` → must return `Result<T>` with `E.*` errors
-            - Missing named parameters for non-obvious args
-            - Multiple types in single file (CA1050)
+            - Direct `throw new` → must return `Result<T>` with `E.*` errors (RESULT_MONAD)
+            - Missing named parameters for non-obvious args (NAMED_PARAMETERS)
+            - Multiple types in single file (ONE_TYPE_PER_FILE)
             - Helper method extraction instead of inline logic
 
             **Organization violations**:
-            - Method >300 LOC
-            - >4 files per folder
-            - >10 types per folder
+            - Method >300 LOC (LOC_PER_MEMBER)
+            - >4 files per folder (FILES_PER_FOLDER)
+            - >10 types per folder (TYPES_PER_FOLDER)
 
-            ## REVIEW FORMAT
+            ## EXECUTION STEPS
 
-            Use `gh pr review` with:
-            - `--approve` if ALL checks pass
-            - `--request-changes` if ANY violation found
+            1. Run `dotnet build` to check analyzer compliance
+            2. Search changed files for pattern violations
+            3. For each violation found, record with exact line numbers and suggested fix
+            4. Write JSON to `.github/review-output/pr-${{ github.event.pull_request.number }}.json`
+            5. Use `gh pr review` with `--approve` or `--request-changes` based on verdict
 
-            Include specific line references for each violation.
-            Run `dotnet build` to verify analyzer compliance.
+            ## IMPORTANT
+
+            - The JSON file MUST be created even if verdict is "approve" (with empty violations array)
+            - Include ALL passed checks in passed_checks array
+            - Violations must have actionable suggested fixes
+            - Apply fixes in reverse line order (highest line first) within each file to prevent shifts
 
           claude_args: |
             --model claude-opus-4-5-20251101
             --max-turns 8
-            --allowedTools Read,Grep,Glob,Bash(dotnet:*),Bash(git diff:*),Bash(gh pr:*)
+            --allowedTools Read,Write,Grep,Glob,Bash(dotnet:*),Bash(git diff:*),Bash(gh pr:*)
+
+      - name: Upload review output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-output-pr-${{ github.event.pull_request.number }}
+          path: .github/review-output/pr-${{ github.event.pull_request.number }}.json
+          if-no-files-found: warn
+          retention-days: 30
