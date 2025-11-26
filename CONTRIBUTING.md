@@ -364,13 +364,13 @@ The `claude-issues` workflow will automatically:
 - Generate an implementation plan
 - Create a PR with changes
 
-### Bug Report (`bug-report.yml`) - Coming Soon
+### Bug Report (`bug-report.yml`)
 
-For reporting bugs with structured information.
+For reporting bugs with structured information including severity, scope, reproduction steps, and stack traces.
 
-### Maintenance (`maintenance.yml`) - Coming Soon
+### Maintenance (`maintenance.yml`)
 
-For maintenance tasks like refactoring or documentation updates.
+For maintenance tasks like refactoring, cleanup, optimization, and documentation updates.
 
 ---
 
