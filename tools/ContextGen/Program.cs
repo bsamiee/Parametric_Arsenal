@@ -10,6 +10,7 @@ internal static class Program {
         Console.WriteLine("[INFO] ContextGen starting...");
 
         // Register MSBuild before creating workspace
+        // Note: Return value (VisualStudioInstance) not needed for basic MSBuild operations
         _ = MSBuildLocator.RegisterDefaults();
 
         // Get repository root - navigate from current directory
@@ -185,20 +186,26 @@ internal static class Program {
         }
 
         // Extract static readonly V fields with their values
-        List<object> flags = [.. vStruct.Members
+        List<object> flags = [];
+        foreach (FieldDeclarationSyntax field in vStruct.Members
             .OfType<FieldDeclarationSyntax>()
             .Where(f => f.Modifiers.Any(m => string.Equals(m.Text, "static", StringComparison.Ordinal))
                      && f.Modifiers.Any(m => string.Equals(m.Text, "readonly", StringComparison.Ordinal))
-                     && string.Equals(f.Declaration.Type.ToString(), "V", StringComparison.Ordinal))
-            .SelectMany(f => f.Declaration.Variables.Select(v => {
-                // Extract value from new(value) initializer
-                SyntaxToken valueToken = v.Initializer?.Value?.DescendantTokens()
+                     && string.Equals(f.Declaration.Type.ToString(), "V", StringComparison.Ordinal))) {
+            foreach (VariableDeclaratorSyntax variable in field.Declaration.Variables) {
+                string name = variable.Identifier.Text;
+                // Extract numeric value from new(value) initializer
+                SyntaxToken valueToken = variable.Initializer?.Value?.DescendantTokens()
                     .FirstOrDefault(t => int.TryParse(s: t.Text, provider: null, out _)) ?? default;
-                return new {
-                    Name = v.Identifier.Text,
-                    Value = !string.IsNullOrEmpty(valueToken.Text) ? valueToken.Text : "0",
-                };
-            })),];
+                string value = !string.IsNullOrEmpty(valueToken.Text) ? valueToken.Text : "0";
+                // Special handling for 'All' - calculate as bitwise OR of all flags
+                if (string.Equals(name, "All", StringComparison.Ordinal)) {
+                    int allValue = flags.Cast<dynamic>().Sum(f => int.Parse(f.Value));
+                    value = allValue.ToString(provider: null);
+                }
+                flags.Add(new { Name = name, Value = value, });
+            }
+        }
 
         object modes = new { Flags = flags, };
         string validationJson = JsonSerializer.Serialize(modes, jsonOptions);
