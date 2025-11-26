@@ -339,7 +339,7 @@ git diff libs/rhino/spatial/SpatialCore.cs
 | **Standards Compliance** | 100% | Zero analyzer violations |
 | **Time to Resolution** | <30 min | Average time from issue to merged PR |
 
-Track metrics in `docs/agent-context/dashboard.json` (auto-generated).
+Track metrics via the daily dashboard issues created by `status-dashboard.yml` workflow (runs at 00:00 UTC).
 
 ---
 
