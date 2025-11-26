@@ -17,8 +17,10 @@
       - MA0004: No SynchronizationContext in console app (ConfigureAwait unnecessary)
       - MA0032: CancellationToken not applicable for short-lived analysis tool
       - MA0045: GetRoot() is synchronous by design in Roslyn syntax tree API
+      - MA0047: Global Program class acceptable for utility tool
+      - RCS1110: Global Program class acceptable for utility tool
     -->
-    <NoWarn>CA1031,MA0004,MA0032,MA0045</NoWarn>
+    <NoWarn>CA1031,MA0004,MA0032,MA0045,MA0047,RCS1110</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

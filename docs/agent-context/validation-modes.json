@@ -1,0 +1,72 @@
+{
+  "Flags": [
+    {
+      "Name": "None",
+      "Value": "0"
+    },
+    {
+      "Name": "Standard",
+      "Value": "1"
+    },
+    {
+      "Name": "AreaCentroid",
+      "Value": "2"
+    },
+    {
+      "Name": "BoundingBox",
+      "Value": "4"
+    },
+    {
+      "Name": "MassProperties",
+      "Value": "8"
+    },
+    {
+      "Name": "Topology",
+      "Value": "16"
+    },
+    {
+      "Name": "Degeneracy",
+      "Value": "32"
+    },
+    {
+      "Name": "Tolerance",
+      "Value": "64"
+    },
+    {
+      "Name": "MeshSpecific",
+      "Value": "128"
+    },
+    {
+      "Name": "SurfaceContinuity",
+      "Value": "256"
+    },
+    {
+      "Name": "PolycurveStructure",
+      "Value": "512"
+    },
+    {
+      "Name": "NurbsGeometry",
+      "Value": "1024"
+    },
+    {
+      "Name": "ExtrusionGeometry",
+      "Value": "2048"
+    },
+    {
+      "Name": "UVDomain",
+      "Value": "4096"
+    },
+    {
+      "Name": "SelfIntersection",
+      "Value": "8192"
+    },
+    {
+      "Name": "BrepGranular",
+      "Value": "16384"
+    },
+    {
+      "Name": "All",
+      "Value": "0"
+    }
+  ]
+}
