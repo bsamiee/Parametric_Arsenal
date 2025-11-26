@@ -4,7 +4,7 @@
 
 > **Objective**: Transform Parametric Arsenal into Self-Describing Agentic Environment
 > **Target**: >70% issue-to-merge autonomy
-> **Total Effort**: ~50 hours (optimized from 73h via task consolidation)
+> **Total Effort**: ~46 hours
 
 ---
 
@@ -12,73 +12,16 @@
 
 | Phase | Priority | Tasks | Effort | Autonomy Gain |
 |-------|----------|-------|--------|---------------|
-| **1** | CRITICAL | P-3, CD-2, CD-3, CD-4 | 14h | +25% |
+| **1** | CRITICAL | CD-2, CD-3, CD-4 | 7h | +25% |
 | **2** | HIGH | P-1, P-2, C-1, C-7, I-1, I-3 | 18h | +25% |
-| **3** | MEDIUM | C-2→C-6, CD-1, CD-5→CD-7 | 12h | +15% |
-| **4** | LOW | P-4→P-8, I-2, I-4→I-6, CD-8→CD-9 | 6h | +5% |
+| **3** | MEDIUM | C-2→C-6, CD-1, CD-5→CD-7 | 14h | +15% |
+| **4** | LOW | P-4→P-8, I-2, I-4→I-6, CD-8→CD-9 | 7h | +5% |
 
 ---
 
 ## PHASE 1: CRITICAL — Unblock Autonomy
 
 <!-- CHECKPOINT: After Phase 1, review loop and auto-merge functional -->
-
-### P-3: Create Missing Agent Files
-<!-- DIRECTIVE: Parallel execution allowed for all 6 files -->
-
-| Field | Value |
-|-------|-------|
-| **Priority** | CRITICAL |
-| **Effort** | 4h |
-| **Requires** | None |
-| **Blocks** | All agent invocations |
-
-**INPUT**: Existing agent files for template reference:
-- `.github/agents/csharp-advanced.agent.md`
-- `.github/agents/testing-specialist.agent.md`
-
-**OUTPUT**: 6 new files in `.github/agents/`:
-```
-cleanup-specialist.agent.md      → Dead code removal, consolidation
-library-planner.agent.md         → New domain architecture
-documentation-specialist.agent.md → API docs, examples
-integration-specialist.agent.md  → Cross-module patterns
-grasshopper-implementation.agent.md → GH component development
-plugin-architect.agent.md        → Rhino plugin patterns
-```
-
-**STRUCTURE** (per file):
-```markdown
----
-name: {kebab-case}
-description: {one-line purpose}
-capabilities: [{cap1}, {cap2}, {cap3}]
-domains: [libs/{domain1}, libs/{domain2}]
----
-
-# [ROLE]
-{2-3 sentences defining expertise}
-
-# [CRITICAL RULES]
-{Copy from existing agents - these will sync via STANDARDS.yaml later}
-
-# [PATTERNS]
-{3-5 code patterns specific to this agent}
-
-# [WORKFLOW]
-1. Read context files
-2. Analyze scope
-3. Implement following patterns
-4. Verify: dotnet build && dotnet test
-```
-
-**VERIFY**:
-- [ ] All 6 files created
-- [ ] Each has ≥3 capabilities
-- [ ] Each references ≥2 domains
-- [ ] `.claude/settings.json` paths are valid
-
----
 
 ### CD-2: Create Auto-Fix Workflow
 <!-- DIRECTIVE: This is the critical missing link in the review loop -->
@@ -432,7 +375,7 @@ System.Text.Json
 | Field | Value |
 |-------|-------|
 | **Effort** | 2h |
-| **Requires** | I-1, P-3 |
+| **Requires** | I-1 |
 
 **CHANGES**: Parse template dropdowns, inject agent file into prompt
 
@@ -493,7 +436,7 @@ System.Text.Json
 
 ## File Deliverables Summary
 
-### New Files (26)
+### New Files (20)
 ```
 tools/standards/
 ├── STANDARDS.yaml
@@ -529,14 +472,6 @@ docs/agent-context/
 ├── PULL_REQUEST_TEMPLATE.md
 └── prompts/README.md
 
-.github/agents/
-├── cleanup-specialist.agent.md
-├── library-planner.agent.md
-├── documentation-specialist.agent.md
-├── integration-specialist.agent.md
-├── grasshopper-implementation.agent.md
-└── plugin-architect.agent.md
-
 .github/workflows/
 ├── standards-sync.yml
 ├── context-gen.yml
@@ -547,12 +482,12 @@ docs/agent-context/
 CONTRIBUTING.md
 ```
 
-### Files to Update (8)
+### Files to Update (12)
 ```
 .claude/settings.json
 CLAUDE.md (via generator)
 .github/copilot-instructions.md (via generator)
-.github/agents/*.agent.md (5 existing)
+.github/agents/*.agent.md (11 existing - sync [CRITICAL RULES] section)
 .github/workflows/claude-issues.yml
 .github/workflows/claude-code-review.yml
 .github/workflows/claude-maintenance.yml
@@ -578,9 +513,9 @@ CLAUDE.md (via generator)
 | Failure Point | Recovery |
 |---------------|----------|
 | Auto-fix breaks build | Revert commit, disable workflow |
-| Auto-merge on bad PR | Branch protection required |
-| Context gen corrupts JSON | Delete + regenerate |
-| Standards drift detected | Run generator, commit |
+| Auto-merge on bad PR | Revert merge, add missing branch protection rule |
+| Context gen corrupts JSON | Delete files, re-run context-gen workflow |
+| Standards drift detected | Run StandardsGen.csx, commit changes |
 
 ---
 

@@ -11,7 +11,7 @@
 | Metric | Current | Target | Gap |
 |--------|---------|--------|-----|
 | **Autonomy Rate** | ~30% | >70% | Protocol fragmentation, no review loop |
-| **Agent Files** | 5/11 exist | 11/11 | 6 MISSING files block specialization |
+| **Agent Files** | 11/11 exist | 11/11 | ✅ Complete |
 | **Context Freshness** | Manual | <24h auto | No JSON generation pipeline |
 | **Review→Fix→Merge** | Manual | Automated | No agentic handshake workflow |
 
@@ -28,21 +28,19 @@ SYNCHRONIZATION STATUS
 ┌────────────────────────────────────────────────────┐
 │  STANDARDS.yaml (MISSING - proposed)               │
 │       ↓ should generate ↓                          │
-│  ┌──────────┐  ┌──────────────────┐  ┌──────────┐ │
-│  │CLAUDE.md │  │copilot-instruct. │  │*.agent.md│ │
-│  │ 1000 LOC │  │    323 LOC       │  │ 5 exist  │ │
-│  │ CANONICAL│  │   CONDENSED      │  │ 6 MISSING│ │
-│  └──────────┘  └──────────────────┘  └──────────┘ │
+│  ┌──────────┐  ┌───────────────────────┐  ┌──────────┐ │
+│  │CLAUDE.md │  │copilot-instructions.md│  │*.agent.md│ │
+│  │ 1000 LOC │  │       323 LOC         │  │11 exist  │ │
+│  │ CANONICAL│  │      CONDENSED        │  │ COMPLETE │ │
+│  └──────────┘  └───────────────────────┘  └──────────┘ │
 │       ↑              ↑                    ↑        │
 │       └──── 95% DUPLICATION ──────────────┘        │
 └────────────────────────────────────────────────────┘
 ```
 
-**CRITICAL**: `.claude/settings.json` references 11 agents, only 5 exist:
-- ✅ csharp-advanced, testing-specialist, refactoring-architect, rhino-implementation, performance-analyst
-- ❌ **MISSING**: cleanup-specialist, library-planner, documentation-specialist, integration-specialist, grasshopper-implementation, plugin-architect
+**Status**: All 11 agent files exist and are referenced correctly in `.claude/settings.json`.
 
-**Impact**: Agent invocation fails or uses stale 1-sentence inline prompts.
+**Improvement Opportunity**: Standardize agent file structure and sync `[CRITICAL RULES]` sections via STANDARDS.yaml.
 
 ### 1.2 CI/CD Fabric: INCOMPLETE LOOP
 
@@ -51,7 +49,7 @@ CURRENT FLOW (manual bottleneck)
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
 │  ISSUE ──▶ claude-issues ──▶ PR ──▶ claude-review  │
-│  (label)   (Sonnet,20t)          (Opus,8t)         │
+│  (label)   (Sonnet, 20 turns)    (Opus, 8 turns)   │
 │                                       │             │
 │                              ┌────────▼────────┐   │
 │                              │ REQUEST_CHANGES │   │
@@ -79,7 +77,7 @@ TARGET FLOW (automated)
 │                              │ (reads JSON,    │   │
 │                              │  applies fixes) │   │
 │                              └────────┬────────┘   │
-│                                       │ max 3 iter │
+│                                       │ max 3 iterations
 │                              ┌────────▼────────┐   │
 │                              │   auto-merge    │ ← NEW
 │                              └─────────────────┘   │
@@ -230,8 +228,8 @@ validation_mode: V.Standard | V.Topology
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Standards drift | HIGH | HIGH | Single-source YAML + CI sync check |
-| Agent file missing | **CONFIRMED** | HIGH | Create 6 files immediately |
-| Review loop infinite | LOW | HIGH | Max 3 iterations |
+| Agent rules out of sync | MEDIUM | MEDIUM | Generate `[CRITICAL RULES]` from STANDARDS.yaml |
+| Review loop infinite | LOW | HIGH | Max 3 iterations hard limit |
 | Context staleness | MEDIUM | MEDIUM | CI-triggered regeneration |
 
 ---
@@ -252,23 +250,25 @@ validation_mode: V.Standard | V.Topology
 
 ```
 PHASE 1 (CRITICAL) — Unblock agent autonomy
-├── P-3: Create 6 missing agent files
 ├── CD-2: Create claude-autofix.yml workflow
 ├── CD-3: Create auto-merge.yml workflow
 └── CD-4: Add JSON output to claude-code-review
 
 PHASE 2 (HIGH) — Enable structured input
-├── C-1/C-2/C-7: ContextGen tool + CI workflow
+├── C-1/C-7: ContextGen tool + CI workflow
 ├── P-1/P-2: STANDARDS.yaml + generator
 └── I-1/I-3: Issue + PR templates
 
-PHASE 3 (MEDIUM) — Polish
-├── Remaining context generators (C-3 to C-6)
-├── Additional templates (I-2, I-4, I-6)
-└── Documentation (P-6, CONTRIBUTING.md)
+PHASE 3 (MEDIUM) — Complete context layer
+├── C-2→C-6: Context generators
+├── CD-1/CD-5→CD-7: Workflow enhancements
+└── Additional templates (I-2, I-4, I-6)
+
+PHASE 4 (LOW) — Polish
+└── P-4→P-8, CD-8→CD-9, CONTRIBUTING.md
 ```
 
-**Total Effort**: ~73 hours → 70% autonomy target
+**Total Effort**: ~46 hours → 70% autonomy target
 
 ---
 
