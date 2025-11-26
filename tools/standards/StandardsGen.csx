@@ -16,16 +16,16 @@ string repoRoot = currentDir.Contains("tools/standards") || currentDir.Contains(
     ? Path.GetFullPath(Path.Combine(currentDir, "..", ".."))
     : currentDir;
 
-Console.WriteLine($"📂 Repository root: {repoRoot}");
-Console.WriteLine($"📜 Current directory: {currentDir}");
+Console.WriteLine($"[INFO] Repository root: {repoRoot}");
+Console.WriteLine($"[INFO] Current directory: {currentDir}");
 Console.WriteLine();
 
 // Load STANDARDS.yaml
 string yamlPath = Path.Combine(repoRoot, "tools", "standards", "STANDARDS.yaml");
-Console.WriteLine($"📖 Loading STANDARDS.yaml from: {yamlPath}");
+Console.WriteLine($"[INFO] Loading STANDARDS.yaml from: {yamlPath}");
 
 if (!File.Exists(yamlPath)) {
-    Console.WriteLine($"❌ ERROR: STANDARDS.yaml not found at {yamlPath}");
+    Console.WriteLine($"[ERROR] STANDARDS.yaml not found at {yamlPath}");
     Environment.Exit(1);
 }
 
@@ -36,7 +36,7 @@ IDeserializer deserializer = new DeserializerBuilder()
 
 dynamic standards = deserializer.Deserialize<dynamic>(yamlContent);
 
-Console.WriteLine($"✅ Loaded STANDARDS.yaml version {standards["version"]}");
+Console.WriteLine($"[PASS] Loaded STANDARDS.yaml version {standards["version"]}");
 Console.WriteLine();
 
 // Helper to generate [CRITICAL RULES] section for agent files
@@ -63,21 +63,21 @@ string GenerateCriticalRulesSection() {
     int count = 1;
     foreach (dynamic rule in syntaxRules.Take(5)) {
         string desc = rule["description"];
-        sb.AppendLine($"{count}. ❌ **{rule["id"].Replace('_', ' ')}** - {desc}");
+        sb.AppendLine($"{count}. **{rule["id"].Replace('_', ' ')}** - {desc}");
         count++;
     }
     
     sb.AppendLine();
     sb.AppendLine("## Always Required");
-    sb.AppendLine("- ✅ Named parameters (non-obvious args)");
-    sb.AppendLine("- ✅ Trailing commas (multi-line collections)");
-    sb.AppendLine("- ✅ K&R brace style (same line)");
-    sb.AppendLine("- ✅ File-scoped namespaces");
-    sb.AppendLine("- ✅ Target-typed `new()`");
-    sb.AppendLine("- ✅ Collection expressions `[]`");
-    sb.AppendLine("- ✅ Result<T> for error handling");
-    sb.AppendLine("- ✅ UnifiedOperation for polymorphic dispatch");
-    sb.AppendLine("- ✅ E.* error registry");
+    sb.AppendLine("- Named parameters (non-obvious args)");
+    sb.AppendLine("- Trailing commas (multi-line collections)");
+    sb.AppendLine("- K&R brace style (same line)");
+    sb.AppendLine("- File-scoped namespaces");
+    sb.AppendLine("- Target-typed `new()`");
+    sb.AppendLine("- Collection expressions `[]`");
+    sb.AppendLine("- Result<T> for error handling");
+    sb.AppendLine("- UnifiedOperation for polymorphic dispatch");
+    sb.AppendLine("- E.* error registry");
     
     return sb.ToString();
 }
@@ -116,22 +116,22 @@ string GenerateImmediateBlockers() {
             _ => desc
         };
         
-        sb.AppendLine($"{count}. ❌ **{(exampleWrong != "" ? exampleWrong : id.Replace('_', ' '))}** → {actionText}");
+        sb.AppendLine($"{count}. **{(exampleWrong != "" ? exampleWrong : id.Replace('_', ' '))}** → {actionText}");
         count++;
     }
     
     // Add organizational limits
-    sb.AppendLine($"{count}. ❌ **Folder has >{limits["files_per_folder"]["maximum"]} files** → Consolidate into {limits["files_per_folder"]["ideal"]} files");
+    sb.AppendLine($"{count}. **Folder has >{limits["files_per_folder"]["maximum"]} files** → Consolidate into {limits["files_per_folder"]["ideal"]} files");
     count++;
-    sb.AppendLine($"{count}. ❌ **Folder has >{limits["types_per_folder"]["maximum"]} types** → Consolidate into {limits["types_per_folder"]["ideal"]} types");
+    sb.AppendLine($"{count}. **Folder has >{limits["types_per_folder"]["maximum"]} types** → Consolidate into {limits["types_per_folder"]["ideal"]} types");
     count++;
-    sb.AppendLine($"{count}. ❌ **Member has >{limits["loc_per_member"]["maximum"]} LOC** → Improve algorithm, don't extract helpers");
+    sb.AppendLine($"{count}. **Member has >{limits["loc_per_member"]["maximum"]} LOC** → Improve algorithm, don't extract helpers");
     
     return sb.ToString();
 }
 
 // Generate CRITICAL RULES section for all agent files
-Console.WriteLine("🔄 Updating [CRITICAL RULES] sections in agent files...");
+Console.WriteLine("[INFO] Updating [CRITICAL RULES] sections in agent files...");
 string agentDir = Path.Combine(repoRoot, ".github", "agents");
 string[] agentFiles = Directory.GetFiles(agentDir, "*.agent.md");
 
@@ -144,24 +144,24 @@ foreach (string agentFile in agentFiles) {
     // Find the [CRITICAL RULES] section
     int startIdx = content.IndexOf("# [CRITICAL RULES]");
     if (startIdx == -1) {
-        Console.WriteLine($"⚠️  Skipping {Path.GetFileName(agentFile)} - no [CRITICAL RULES] section found");
+        Console.WriteLine($"[WARN] Skipping {Path.GetFileName(agentFile)} - no [CRITICAL RULES] section found");
         continue;
     }
     
     // Find the next section (starts with # [
     int endIdx = content.IndexOf("\n# [", startIdx + 1);
     if (endIdx == -1) {
-        Console.WriteLine($"⚠️  Skipping {Path.GetFileName(agentFile)} - could not find end of section");
+        Console.WriteLine($"[WARN] Skipping {Path.GetFileName(agentFile)} - could not find end of section");
         continue;
     }
     
     // Replace the section
-    string before = content.Substring(0, startIdx);
-    string after = content.Substring(endIdx);
+    string before = content[..startIdx];
+    string after = content[endIdx..];
     string newContent = before + criticalRulesSection + after;
     
     File.WriteAllText(agentFile, newContent);
-    Console.WriteLine($"   ✅ Updated {Path.GetFileName(agentFile)}");
+    Console.WriteLine($"   [PASS] Updated {Path.GetFileName(agentFile)}");
     updatedAgents++;
 }
 
@@ -179,31 +179,31 @@ if (File.Exists(copilotPath)) {
     if (startIdx != -1) {
         int endIdx = copilotContent.IndexOf("\n---", startIdx);
         if (endIdx != -1) {
-            string before = copilotContent.Substring(0, startIdx);
+            string before = copilotContent[..startIdx];
             string after = copilotContent[endIdx..];
             
             string newBlockers = GenerateImmediateBlockers();
             string newContent = before + newBlockers + "\n" + after;
             
             File.WriteAllText(copilotPath, newContent);
-            Console.WriteLine("   ✅ Updated copilot-instructions.md");
+            Console.WriteLine("   [PASS] Updated copilot-instructions.md");
         } else {
-            Console.WriteLine("   ⚠️  Could not find end marker (---) in copilot-instructions.md");
+            Console.WriteLine("   [WARN] Could not find end marker (---) in copilot-instructions.md");
         }
     } else {
-        Console.WriteLine("   ⚠️  Could not find IMMEDIATE BLOCKERS section in copilot-instructions.md");
+        Console.WriteLine("   [WARN] Could not find IMMEDIATE BLOCKERS section in copilot-instructions.md");
     }
 } else {
-    Console.WriteLine("   ⚠️  copilot-instructions.md not found");
+    Console.WriteLine("   [WARN] copilot-instructions.md not found");
 }
 
 Console.WriteLine();
-Console.WriteLine("🎉 Standards generation complete!");
+Console.WriteLine("[PASS] Standards generation complete!");
 Console.WriteLine();
-Console.WriteLine("📊 Summary:");
-Console.WriteLine($"   - Updated {updatedAgents} agent files with synchronized [CRITICAL RULES]");
-Console.WriteLine($"   - Updated copilot-instructions.md with IMMEDIATE BLOCKERS");
-Console.WriteLine($"   - Source of truth: {yamlPath}");
+Console.WriteLine("[INFO] Summary:");
+Console.WriteLine($"       - Updated {updatedAgents} agent files with synchronized [CRITICAL RULES]");
+Console.WriteLine($"       - Updated copilot-instructions.md with IMMEDIATE BLOCKERS");
+Console.WriteLine($"       - Source of truth: {yamlPath}");
 Console.WriteLine();
-Console.WriteLine("💡 Note: CLAUDE.md is manually curated and not auto-generated.");
-Console.WriteLine("         Use STANDARDS.yaml as the authoritative reference.");
+Console.WriteLine("[INFO] Note: CLAUDE.md is manually curated and not auto-generated.");
+Console.WriteLine("       Use STANDARDS.yaml as the authoritative reference.");

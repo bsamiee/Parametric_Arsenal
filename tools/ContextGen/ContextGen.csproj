@@ -6,7 +6,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <!-- Disable strict analyzers for utility tool -->
+    
+    <!-- 
+      Disable strict analyzers for one-off utility tool:
+      - CA1031: Catch general exception (utility needs broad error handling)
+      - MA0004: ConfigureAwait not needed (no SynchronizationContext in console app)
+      - MA0001/MA0006/MA0074: String comparison rules (not perf-critical)
+      - MA0032: CancellationToken not needed (short-lived process)
+      - MA0045: GetRootAsync not needed (sync is fine for utility)
+      - IDE0305/RCS1007/RCS1036: Style preferences relaxed for tools
+    -->
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>CA1031,MA0004,MA0001,MA0006,MA0074,MA0032,MA0045,IDE0305,RCS1007,RCS1036</NoWarn>
