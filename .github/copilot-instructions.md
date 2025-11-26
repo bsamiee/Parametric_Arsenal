@@ -10,16 +10,17 @@
 
 These violations fail the build. Check for and fix immediately:
 
-1. ❌ **Multiple types in one file** → Split into separate files (CA1050)
-2. ❌ **Missing trailing commas** in multi-line collections → Add `,` at end
-3. ❌ **Unnamed parameters** in non-obvious calls → Add `parameter: value`
-4. ❌ **Using `var`** → Replace with explicit type
-5. ❌ **Using `if`/`else` statements** → Replace with ternary (binary), switch expression (multiple), or pattern matching (type discrimination)
-6. ❌ **Redundant `new Type()`** → Use target-typed `new()`
-7. ❌ **Old collection syntax** → Use collection expressions `[]`
+1. ❌ **var x = new RTree();** → Replace with explicit type
+2. ❌ **if (x > 0) { return y; } else { return z; }** → Replace with ternary (binary), switch expression (multiple), or pattern matching (type discrimination)
+3. ❌ **[item1, item2]** → Add `,` at end
+4. ❌ **ResultFactory.Create(error)** → Add `parameter: value`
+5. ❌ **Dictionary<string, int> dict = new Dictionary<string, int>();** → Use target-typed `new()`
+6. ❌ **new List<int> { 1, 2, 3 }** → Use collection expressions `[]`
+7. ❌ **namespace X { ... }** → Use file-scoped namespace declarations
 8. ❌ **Folder has >4 files** → Consolidate into 2-3 files
 9. ❌ **Folder has >10 types** → Consolidate into 6-8 types
 10. ❌ **Member has >300 LOC** → Improve algorithm, don't extract helpers
+
 
 ---
 

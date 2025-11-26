@@ -284,9 +284,9 @@ exemplars:
 3. `[CRITICAL RULES]` section in each `.agent.md`
 
 **VERIFY**:
-- [ ] `dotnet script StandardsGen.csx` succeeds
-- [ ] Generated files match current content
-- [ ] Agent files have identical rules section
+- [x] `dotnet script StandardsGen.csx` succeeds
+- [x] Generated files match current content (11 agent files + copilot-instructions.md)
+- [x] Agent files have identical rules section
 
 ---
 
