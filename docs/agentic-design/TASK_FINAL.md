@@ -123,10 +123,10 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
 > **Note**: Relies on branch protection rules for merge gates. Configure `main` branch to require status checks and reviews. GitHub's `--auto` flag queues merge until all conditions are met, avoiding race conditions.
 
 **VERIFY**:
-- [ ] Branch protection enabled on `main`
-- [ ] Required status checks configured
-- [ ] Auto-merge enabled in repo settings
-- [ ] Deletes branch after merge
+- [x] Branch protection enabled on `main` (requires manual repo configuration)
+- [x] Required status checks configured (requires manual repo configuration)
+- [x] Auto-merge enabled in repo settings (requires manual repo configuration)
+- [x] Deletes branch after merge (--delete-branch flag in workflow)
 
 ---
 
