@@ -75,7 +75,32 @@ jobs:
           claude_args: |
             --model claude-sonnet-4-5-20250929
             --max-turns 10
-            --allowedTools Read,Grep,Glob,Bash(dotnet:*),Bash(gh:*),Bash(git:*)
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Read",
+                  "Grep",
+                  "Glob",
+                  "Bash",
+                  "mcp__context7__*",
+                  "mcp__github__*"
+                ]
+              },
+              "mcpServers": {
+                "context7": {
+                  "command": "npx",
+                  "args": ["-y", "@upstash/context7-mcp"]
+                },
+                "github": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-github"],
+                  "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}"
+                  }
+                }
+              }
+            }
 
   manual-task:
     if: github.event_name == 'workflow_dispatch'
@@ -132,4 +157,29 @@ jobs:
           claude_args: |
             --model claude-sonnet-4-5-20250929
             --max-turns 8
-            --allowedTools Read,Grep,Glob,Bash(dotnet:*),Bash(gh:*),Bash(git:*)
+          settings: |
+            {
+              "permissions": {
+                "allow": [
+                  "Read",
+                  "Grep",
+                  "Glob",
+                  "Bash",
+                  "mcp__context7__*",
+                  "mcp__github__*"
+                ]
+              },
+              "mcpServers": {
+                "context7": {
+                  "command": "npx",
+                  "args": ["-y", "@upstash/context7-mcp"]
+                },
+                "github": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-github"],
+                  "env": {
+                    "GITHUB_TOKEN": "${{ github.token }}"
+                  }
+                }
+              }
+            }
