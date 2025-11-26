@@ -19,6 +19,17 @@ jobs:
 
     steps:
       - name: Download review artifact
+        id: download
+        uses: actions/download-artifact@v4
+        with:
+          name: review-output
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .github/review-output
+        continue-on-error: true
+
+      - name: Retry artifact download if needed
+        if: steps.download.outcome == 'failure'
         uses: actions/download-artifact@v4
         with:
           name: review-output
@@ -86,8 +97,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
-          # Count existing autofix-attempt labels
-          LABELS=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' 2>/dev/null || echo "")
+          # Count existing autofix-attempt labels with explicit error handling
+          if ! LABELS=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name'); then
+            echo "⚠️ Failed to fetch PR labels, assuming no previous attempts"
+            LABELS=""
+          fi
           ATTEMPT_COUNT=$(echo "$LABELS" | grep -c "autofix-attempt-" || echo "0")
 
           echo "count=${ATTEMPT_COUNT}" >> $GITHUB_OUTPUT
@@ -211,12 +225,22 @@ jobs:
             exit 0
           fi
 
-          git add -A
-          git commit -m "fix(review): apply agentic review fixes (attempt ${{ steps.iteration.outputs.next_attempt }})"
-          git push
+          # Stage only tracked files that were modified (avoid build artifacts)
+          git add -u
+          # Also add any new .cs files that Claude may have created
+          git add '*.cs' 2>/dev/null || true
 
-          echo "changes_made=true" >> $GITHUB_OUTPUT
-          echo "✅ Fixes committed and pushed"
+          git commit -m "fix(review): apply agentic review fixes (attempt ${{ steps.iteration.outputs.next_attempt }})"
+
+          # Push with error handling
+          if git push; then
+            echo "changes_made=true" >> $GITHUB_OUTPUT
+            echo "✅ Fixes committed and pushed"
+          else
+            echo "❌ Push failed"
+            echo "changes_made=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
 
       - name: Add attempt label
         if: steps.commit.outputs.changes_made == 'true'
@@ -228,7 +252,7 @@ jobs:
           gh pr edit "$PR_NUMBER" --add-label "autofix-attempt-${ATTEMPT}"
           echo "🏷️ Added label: autofix-attempt-${ATTEMPT}"
 
-      - name: Request re-review
+      - name: Post fix summary
         if: steps.commit.outputs.changes_made == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -239,9 +263,9 @@ jobs:
 
           Applied fixes for violations detected in the code review.
 
-          @claude Please re-review this PR to verify the fixes address all violations.
+          ⏳ **Re-review will start automatically** when the push triggers the Claude Code Review workflow.
 
           ---
           *This is an automated message from the claude-autofix workflow.*"
 
-          echo "💬 Posted re-review request comment"
+          echo "💬 Posted fix summary comment"
