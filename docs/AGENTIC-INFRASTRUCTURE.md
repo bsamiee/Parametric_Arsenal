@@ -10,6 +10,7 @@
 
 ### Core Configuration
 - `.claude/settings.json` — Model config, permissions, agent registry, session hooks
+- `.claude/commands/*.md` — 4 slash commands (implement, refactor, review-csharp, test)
 - `AGENTS.md` — Primary agent instructions (405 LOC)
 - `.github/copilot-instructions.md` — IDE Copilot instructions (323 LOC, condensed from AGENTS.md)
 
@@ -186,6 +187,9 @@
 **`.claude/settings.json`**  
 Master configuration for Claude AI interactions. Defines model (claude-opus-4-5), permissions (Read/Write/Bash/MCP), 11 specialized agent definitions with prompts, and session hooks. All agents reference their respective `.agent.md` files for detailed instructions. Permissions explicitly allow dotnet/git/gh commands while denying destructive operations (rm -rf, force push, hard reset).
 
+**`.claude/commands/*.md`**  
+Four reusable slash commands for common workflows in claude.ai/code interface. `implement.md`: guides feature implementation with agent selection (rhino-implementation, csharp-advanced, testing-specialist, grasshopper-implementation based on domain). `refactor.md`: consolidates folders exceeding limits (4 files, 10 types), identifies dispatch opportunities, improves algorithmic density. `review-csharp.md`: validates CLAUDE.md compliance (mandatory syntax/architecture/organization checks, correct patterns with examples). `test.md`: creates property-based tests (xUnit+CsCheck for core, NUnit+Rhino.Testing for geometry). Each command includes workflows, code examples, and verification steps. Invoked via `/implement`, `/refactor`, `/review-csharp`, `/test` in Claude chat.
+
 **`AGENTS.md`**  
 Primary 405-line instruction manual for autonomous agents. Contains 5 critical prohibitions (NO var, NO if/else, NO helpers, NO multi-type files, NO old patterns), 5 always-required practices (named parameters, trailing commas, Result<T>, UnifiedOperation, K&R braces), organizational limits (4 files max, 10 types max, 300 LOC max per member), 4 decision trees (when to use if vs switch vs pattern matching), and 5 exemplar file paths agents must study before coding. Referenced by CLI/CI workflows.
 
@@ -359,4 +363,4 @@ Automated dependency updates. NuGet ecosystem monitoring. Weekly update schedule
 
 ---
 
-*Document Version: 1.0 | Last Updated: 2025-11-26 | LOC: 362 / 400 cap*
+*Document Version: 1.0 | Last Updated: 2025-11-26 | LOC: 366 / 400 cap*
