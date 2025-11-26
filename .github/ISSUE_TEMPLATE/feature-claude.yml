@@ -1,0 +1,202 @@
+name: Feature Request (Claude-Ready)
+description: Request a new feature or enhancement for Claude to implement
+title: "[Feature]: "
+labels: ["enhancement", "claude-implement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request Template
+        This template creates structured issues that Claude can implement autonomously.
+        
+        **Requirements**: All fields must be completed for autonomous implementation.
+
+  - type: input
+    id: title
+    attributes:
+      label: Feature Title
+      description: Brief, descriptive title for the feature
+      placeholder: "Add spatial indexing support for large geometry collections"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which domain does this feature affect?
+      options:
+        - libs/core/results
+        - libs/core/operations
+        - libs/core/validation
+        - libs/core/errors
+        - libs/core/context
+        - libs/rhino/spatial
+        - libs/rhino/geometry
+        - libs/rhino/analysis
+        - libs/rhino/transform
+        - libs/grasshopper
+        - test/core
+        - test/rhino
+        - documentation
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Complexity
+      description: Estimated implementation complexity
+      options:
+        - trivial (< 2h, single file)
+        - medium (2-4h, 2-3 files)
+        - hard (4-8h, multiple files)
+        - expert (8h+, architecture changes)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Recommended Agent
+      description: Which specialist agent should handle this feature?
+      options:
+        - auto-detect
+        - csharp-advanced
+        - testing-specialist
+        - refactoring-architect
+        - rhino-implementation
+        - grasshopper-implementation
+        - performance-analyst
+        - documentation-specialist
+        - integration-specialist
+        - cleanup-specialist
+        - library-planner
+        - plugin-architect
+    validations:
+      required: true
+
+  - type: dropdown
+    id: validation_mode
+    attributes:
+      label: Validation Mode
+      description: Required validation level for this feature
+      options:
+        - V.None
+        - V.Standard
+        - V.Degeneracy
+        - V.Topology
+        - V.BoundingBox
+        - V.Standard | V.Degeneracy
+        - V.Standard | V.Topology
+        - V.All
+      default: 0
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: |
+        Detailed description of the requested feature.
+        
+        **Include**:
+        - What the feature should do
+        - Why it's needed
+        - How it integrates with existing code
+      placeholder: |
+        This feature adds RTree-based spatial indexing to improve performance for large geometry collections (>1000 items).
+        
+        Current behavior: O(n²) intersection checks
+        Proposed: O(n log n) with RTree spatial index
+        
+        Integration: Extend libs/rhino/spatial with new SpatialIndex class
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Clear, testable criteria for completion.
+        
+        **Format**: Use checkboxes
+      placeholder: |
+        - [ ] New SpatialIndex class in libs/rhino/spatial
+        - [ ] RTree implementation with Insert/Query operations
+        - [ ] Result<T> error handling throughout
+        - [ ] UnifiedOperation integration
+        - [ ] Unit tests with CsCheck (>90% coverage)
+        - [ ] Performance benchmarks (BenchmarkDotNet)
+        - [ ] Documentation in BLUEPRINT.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: Technical Notes
+      description: |
+        Implementation guidance, constraints, or references.
+        
+        **Optional but recommended**: SDK references, algorithm details, performance requirements
+      placeholder: |
+        - Use RhinoCommon.RTree class as base
+        - Reference: libs/core/validation/ValidationRules.cs for expression tree patterns
+        - Performance target: <10ms for 10k geometries
+        - Must follow 4-file-per-folder organizational limit
+    validations:
+      required: false
+
+  - type: textarea
+    id: related_issues
+    attributes:
+      label: Related Issues
+      description: Links to related issues or PRs
+      placeholder: |
+        Relates to #123
+        Blocks #456
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: standards_compliance
+    attributes:
+      label: CLAUDE.md Compliance Checklist
+      description: Implementation must follow these standards
+      options:
+        - label: NO var - explicit types only
+          required: false
+        - label: NO if/else - use ternary, switch expressions, pattern matching
+          required: false
+        - label: Named parameters for non-obvious args
+          required: false
+        - label: Trailing commas on multi-line collections
+          required: false
+        - label: Result<T> for failable operations
+          required: false
+        - label: UnifiedOperation for polymorphic dispatch
+          required: false
+        - label: E.* errors from error registry
+          required: false
+        - label: One type per file
+          required: false
+        - label: Max 4 files per folder, 10 types per folder, 300 LOC per member
+          required: false
+
+  - type: checkboxes
+    id: testing_requirements
+    attributes:
+      label: Testing Requirements
+      description: Testing expectations for this feature
+      options:
+        - label: Unit tests with CsCheck (property-based testing)
+          required: false
+        - label: Integration tests with real Rhino geometry
+          required: false
+        - label: Performance benchmarks with BenchmarkDotNet
+          required: false
+        - label: Edge case coverage (null, empty, degenerate geometry)
+          required: false

@@ -25,9 +25,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "🤖 Enabling auto-merge for PR #${PR_NUMBER}"
-          echo "   Author: ${{ github.event.pull_request.user.login }}"
-          echo "   Labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          echo "[INFO] Enabling auto-merge for PR #${PR_NUMBER}"
+          echo "[INFO] Author: ${{ github.event.pull_request.user.login }}"
+          echo "[INFO] Labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
 
           # Enable auto-merge with squash strategy
           # GitHub will merge when all required status checks pass
@@ -38,7 +38,7 @@ jobs:
             --delete-branch \
             --subject "Merge PR #${PR_NUMBER}: ${{ github.event.pull_request.title }}"
 
-          echo "✅ Auto-merge enabled. PR will merge when all checks pass."
+          echo "[PASS] Auto-merge enabled. PR will merge when all checks pass."
 
   # Separate job for review-triggered merges
   merge-on-approval:
@@ -62,8 +62,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "✅ PR #${PR_NUMBER} approved by ${{ github.event.review.user.login }}"
-          echo "🔄 Attempting merge..."
+          echo "[PASS] PR #${PR_NUMBER} approved by ${{ github.event.review.user.login }}"
+          echo "[INFO] Attempting merge..."
 
           # Try to merge immediately since approval received
           # This will fail gracefully if other checks haven't passed yet
@@ -73,4 +73,4 @@ jobs:
             --auto \
             --delete-branch \
             --subject "Merge PR #${PR_NUMBER}: ${{ github.event.pull_request.title }}" \
-            || echo "⏳ Waiting for other checks to complete..."
+            || echo "[WAIT] Waiting for other checks to complete..."

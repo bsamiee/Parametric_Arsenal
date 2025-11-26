@@ -1,0 +1,101 @@
+[
+  {
+    "Name": "spatial",
+    "Path": "libs/rhino/spatial",
+    "FileCount": 4,
+    "Files": [
+      "SpatialConfig.cs",
+      "SpatialCore.cs",
+      "SpatialCompute.cs",
+      "Spatial.cs"
+    ]
+  },
+  {
+    "Name": "intersection",
+    "Path": "libs/rhino/intersection",
+    "FileCount": 4,
+    "Files": [
+      "IntersectionConfig.cs",
+      "Intersection.cs",
+      "IntersectionCompute.cs",
+      "IntersectionCore.cs"
+    ]
+  },
+  {
+    "Name": "orientation",
+    "Path": "libs/rhino/orientation",
+    "FileCount": 4,
+    "Files": [
+      "OrientationCore.cs",
+      "OrientationCompute.cs",
+      "Orientation.cs",
+      "OrientationConfig.cs"
+    ]
+  },
+  {
+    "Name": "extraction",
+    "Path": "libs/rhino/extraction",
+    "FileCount": 4,
+    "Files": [
+      "ExtractionCore.cs",
+      "ExtractionConfig.cs",
+      "ExtractionCompute.cs",
+      "Extraction.cs"
+    ]
+  },
+  {
+    "Name": "fields",
+    "Path": "libs/rhino/fields",
+    "FileCount": 4,
+    "Files": [
+      "Fields.cs",
+      "FieldsCore.cs",
+      "FieldsConfig.cs",
+      "FieldsCompute.cs"
+    ]
+  },
+  {
+    "Name": "topology",
+    "Path": "libs/rhino/topology",
+    "FileCount": 4,
+    "Files": [
+      "TopologyCompute.cs",
+      "Topology.cs",
+      "TopologyConfig.cs",
+      "TopologyCore.cs"
+    ]
+  },
+  {
+    "Name": "transformation",
+    "Path": "libs/rhino/transformation",
+    "FileCount": 4,
+    "Files": [
+      "TransformationCompute.cs",
+      "Transformation.cs",
+      "TransformationConfig.cs",
+      "TransformationCore.cs"
+    ]
+  },
+  {
+    "Name": "morphology",
+    "Path": "libs/rhino/morphology",
+    "FileCount": 4,
+    "Files": [
+      "Morphology.cs",
+      "MorphologyCore.cs",
+      "MorphologyConfig.cs",
+      "MorphologyCompute.cs"
+    ]
+  },
+  {
+    "Name": "analysis",
+    "Path": "libs/rhino/analysis",
+    "FileCount": 4,
+    "Files": [
+      "Analysis.cs",
+      "AnalysisCore.cs",
+      "AnalysisConfig.cs",
+      "AnalysisCompute.cs"
+    ]
+  }
+]

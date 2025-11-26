@@ -1,0 +1,2596 @@
+[
+  {
+    "Name": "Arsenal.Core",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/libs/core/Core.csproj",
+    "Namespace": "Arsenal.Core.Context",
+    "TypeCount": 22,
+    "Types": [
+      {
+        "Name": "GeometryContext",
+        "Namespace": "Arsenal.Core.Context",
+        "Kind": "Class",
+        "MemberCount": 47,
+        "IsPublic": true
+      },
+      {
+        "Name": "IGeometryContext",
+        "Namespace": "Arsenal.Core.Context",
+        "Kind": "Interface",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "DiagnosticCapture",
+        "Namespace": "Arsenal.Core.Diagnostics",
+        "Kind": "Class",
+        "MemberCount": 8,
+        "IsPublic": false
+      },
+      {
+        "Name": "DiagnosticContext",
+        "Namespace": "Arsenal.Core.Diagnostics",
+        "Kind": "Struct",
+        "MemberCount": 36,
+        "IsPublic": false
+      },
+      {
+        "Name": "E",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 15,
+        "IsPublic": true
+      },
+      {
+        "Name": "Results",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 6,
+        "IsPublic": true
+      },
+      {
+        "Name": "Geometry",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 61,
+        "IsPublic": true
+      },
+      {
+        "Name": "Transformation",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "BooleanOps",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 10,
+        "IsPublic": true
+      },
+      {
+        "Name": "Morphology",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "Fitting",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "Validation",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "Spatial",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Topology",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Class",
+        "MemberCount": 5,
+        "IsPublic": true
+      },
+      {
+        "Name": "SystemError",
+        "Namespace": "Arsenal.Core.Errors",
+        "Kind": "Struct",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "OperationConfig",
+        "Namespace": "Arsenal.Core.Operations",
+        "Kind": "Class",
+        "MemberCount": 78,
+        "IsPublic": true
+      },
+      {
+        "Name": "UnifiedOperation",
+        "Namespace": "Arsenal.Core.Operations",
+        "Kind": "Class",
+        "MemberCount": 3,
+        "IsPublic": true
+      },
+      {
+        "Name": "Result",
+        "Namespace": "Arsenal.Core.Results",
+        "Kind": "Struct",
+        "MemberCount": 36,
+        "IsPublic": true
+      },
+      {
+        "Name": "ResultFactory",
+        "Namespace": "Arsenal.Core.Results",
+        "Kind": "Class",
+        "MemberCount": 6,
+        "IsPublic": true
+      },
+      {
+        "Name": "V",
+        "Namespace": "Arsenal.Core.Validation",
+        "Kind": "Struct",
+        "MemberCount": 36,
+        "IsPublic": true
+      },
+      {
+        "Name": "ValidationRules",
+        "Namespace": "Arsenal.Core.Validation",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": false
+      },
+      {
+        "Name": "CacheKey",
+        "Namespace": "Arsenal.Core.Validation",
+        "Kind": "Struct",
+        "MemberCount": 26,
+        "IsPublic": false
+      }
+    ]
+  },
+  {
+    "Name": "Arsenal.Rhino",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/libs/rhino/Rhino.csproj",
+    "Namespace": "Arsenal.Rhino.Analysis",
+    "TypeCount": 327,
+    "Types": [
+      {
+        "Name": "Analysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 27,
+        "IsPublic": true
+      },
+      {
+        "Name": "IResult",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Interface",
+        "MemberCount": 0,
+        "IsPublic": true
+      },
+      {
+        "Name": "DifferentialRequest",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "QualityRequest",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "ExtrusionAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 34,
+        "IsPublic": true
+      },
+      {
+        "Name": "BatchAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 34,
+        "IsPublic": true
+      },
+      {
+        "Name": "SurfaceQualityAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurveFairnessAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshQualityAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurveAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": true
+      },
+      {
+        "Name": "SurfaceAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 27,
+        "IsPublic": true
+      },
+      {
+        "Name": "BrepAnalysis",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 35,
+        "IsPublic": true
+      },
+      {
+        "Name": "SurfaceQualityResult",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurveFairnessResult",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshQualityResult",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 33,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshData",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 49,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurveData",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 53,
+        "IsPublic": true
+      },
+      {
+        "Name": "SurfaceData",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 69,
+        "IsPublic": true
+      },
+      {
+        "Name": "BrepData",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 97,
+        "IsPublic": true
+      },
+      {
+        "Name": "AnalysisCompute",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 8,
+        "IsPublic": false
+      },
+      {
+        "Name": "AnalysisConfig",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": false
+      },
+      {
+        "Name": "DifferentialMetadata",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 33,
+        "IsPublic": false
+      },
+      {
+        "Name": "QualityMetadata",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 49,
+        "IsPublic": false
+      },
+      {
+        "Name": "AnalysisCore",
+        "Namespace": "Arsenal.Rhino.Analysis",
+        "Kind": "Class",
+        "MemberCount": 11,
+        "IsPublic": false
+      },
+      {
+        "Name": "Extraction",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 51,
+        "IsPublic": true
+      },
+      {
+        "Name": "PointOperation",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "Analytical",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Extremal",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Greville",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Inflection",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Quadrant",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "EdgeMidpoints",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "FaceCentroids",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Discontinuity",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ByDirection",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "OsculatingFrames",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ByCount",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ByLength",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurveOperation",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "Boundary",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "FeatureEdges",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Isocurves",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "IsocurvesAt",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "IsocurveDirection",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "UDirection",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "VDirection",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "BothDirections",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Feature",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "Fillet",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Chamfer",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Hole",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "GenericEdge",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "VariableRadiusFillet",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "FeatureExtractionResult",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "Primitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "UnknownPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "PlanarPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "SphericalPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ExtrusionPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "CylindricalPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToroidalPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ConicalPrimitive",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "PrimitiveDecompositionResult",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "Pattern",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "LinearPattern",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "RadialPattern",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "GridPattern",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "ScalingPattern",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "PatternDetectionResult",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "ExtractionCompute",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": false
+      },
+      {
+        "Name": "ExtractionConfig",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": false
+      },
+      {
+        "Name": "ExtractionOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "ExtractionCore",
+        "Namespace": "Arsenal.Rhino.Extraction",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "Fields",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 42,
+        "IsPublic": true
+      },
+      {
+        "Name": "InterpolationMode",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "NearestInterpolationMode",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "TrilinearInterpolationMode",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "IntegrationScheme",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "EulerIntegrationScheme",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "MidpointIntegrationScheme",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "RungeKutta4IntegrationScheme",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorComponent",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "XComponent",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "YComponent",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "ZComponent",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CriticalPointKind",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "MinimumCriticalPoint",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "MaximumCriticalPoint",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "SaddleCriticalPoint",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldStatistics",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Struct",
+        "MemberCount": 34,
+        "IsPublic": true
+      },
+      {
+        "Name": "ScalarFieldSamples",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorFieldSamples",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "HessianFieldSamples",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "CriticalPoint",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Struct",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldSampling",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldResult",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "ScalarValue",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorValue",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Scalar",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Vector",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Hessian",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Curves",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Meshes",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "CriticalPoints",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Statistics",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldOperation",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldMagnitudeRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "NormalizeFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ComputeStatisticsRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "DirectionalDerivativeFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "DistanceFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "GradientFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "CurlFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "DivergenceFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "LaplacianFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorPotentialFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "HessianFieldRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "IsosurfacesRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "ScalarVectorProductRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorDotProductRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "InterpolateScalarRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 38,
+        "IsPublic": true
+      },
+      {
+        "Name": "InterpolateVectorRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 38,
+        "IsPublic": true
+      },
+      {
+        "Name": "StreamlinesRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 38,
+        "IsPublic": true
+      },
+      {
+        "Name": "CriticalPointsRequest",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 34,
+        "IsPublic": true
+      },
+      {
+        "Name": "FieldsCompute",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": false
+      },
+      {
+        "Name": "FieldsConfig",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": false
+      },
+      {
+        "Name": "DistanceFieldMetadata",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "FieldsCore",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": false
+      },
+      {
+        "Name": "DistanceOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Fields",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "Intersection",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "Request",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "General",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "PointProjection",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "RayShoot",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "IntersectionSettings",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Struct",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "IntersectionType",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 15,
+        "IsPublic": true
+      },
+      {
+        "Name": "Tangent",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "Transverse",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "Unknown",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "IntersectionOutput",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Struct",
+        "MemberCount": 36,
+        "IsPublic": true
+      },
+      {
+        "Name": "ClassificationResult",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": true
+      },
+      {
+        "Name": "NearMissResult",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "StabilityResult",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "IntersectionCompute",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 3,
+        "IsPublic": false
+      },
+      {
+        "Name": "IntersectionConfig",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "IntersectionPairMetadata",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "IntersectionCore",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Class",
+        "MemberCount": 19,
+        "IsPublic": false
+      },
+      {
+        "Name": "IntersectionStrategy",
+        "Namespace": "Arsenal.Rhino.Intersection",
+        "Kind": "Struct",
+        "MemberCount": 22,
+        "IsPublic": false
+      },
+      {
+        "Name": "Morphology",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 42,
+        "IsPublic": true
+      },
+      {
+        "Name": "IMorphologyResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Interface",
+        "MemberCount": 0,
+        "IsPublic": true
+      },
+      {
+        "Name": "Operation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshRepairStrategy",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "UnwrapStrategy",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "FillHolesRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "UnifyNormalsRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CullDegenerateFacesRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CompactRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "WeldRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "PlanarUnwrap",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshSeparateOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "SubdivisionStrategy",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "CatmullClarkSubdivision",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "LoopSubdivision",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "ButterflySubdivision",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshOffsetOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "BrepToMeshOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "CylindricalUnwrap",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "SphericalUnwrap",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshWeldOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "SmoothingStrategy",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "LaplacianSmoothing",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "CompositeRepair",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeanCurvatureFlowSmoothing",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "TaubinSmoothing",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshReductionOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "IsotropicRemeshOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshThickenOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "CageDeformOperation",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "CageDeformResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "SmoothingResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "OffsetResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "SubdivisionResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 47,
+        "IsPublic": true
+      },
+      {
+        "Name": "ReductionResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 47,
+        "IsPublic": true
+      },
+      {
+        "Name": "RemeshResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 51,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshRepairResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 51,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshSeparationResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshWeldResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 47,
+        "IsPublic": true
+      },
+      {
+        "Name": "BrepToMeshResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 67,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshThickenResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 55,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshUnwrapResult",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 51,
+        "IsPublic": true
+      },
+      {
+        "Name": "MorphologyCompute",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": false
+      },
+      {
+        "Name": "MorphologyConfig",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 54,
+        "IsPublic": false
+      },
+      {
+        "Name": "MorphologyOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 37,
+        "IsPublic": false
+      },
+      {
+        "Name": "MorphologyCore",
+        "Namespace": "Arsenal.Rhino.Morphology",
+        "Kind": "Class",
+        "MemberCount": 16,
+        "IsPublic": false
+      },
+      {
+        "Name": "Orientation",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "CentroidMode",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "BoundingBoxCentroid",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "MassCentroid",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CanonicalMode",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "WorldXY",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "WorldYZ",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "WorldXZ",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "AreaCentroid",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "VolumeCentroid",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "SymmetryType",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "NoSymmetry",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "MirrorSymmetry",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "RotationalSymmetry",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "RelationshipType",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "Parallel",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Perpendicular",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Oblique",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "PatternType",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "LinearPattern",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "RadialPattern",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "NoPattern",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "OptimizationCriteria",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "CompactCriteria",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CenteredCriteria",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "FlatnessCriteria",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CanonicalCriteria",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Operation",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToPlane",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToBestFit",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Mirror",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "FlipDirection",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToCanonical",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToPoint",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToCurveFrame",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToSurfaceFrame",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "ToVector",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "OptimizationResult",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "PatternDetectionResult",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": true
+      },
+      {
+        "Name": "RelativeOrientationResult",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 37,
+        "IsPublic": true
+      },
+      {
+        "Name": "OrientationCompute",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": false
+      },
+      {
+        "Name": "OrientationConfig",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": false
+      },
+      {
+        "Name": "OrientationOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "PlaneExtractorMetadata",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": false
+      },
+      {
+        "Name": "OrientationCore",
+        "Namespace": "Arsenal.Rhino.Orientation",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": false
+      },
+      {
+        "Name": "Spatial",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 24,
+        "IsPublic": true
+      },
+      {
+        "Name": "AnalysisRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "RangeAnalysis",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "ProximityAnalysis",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "MeshOverlapAnalysis",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "RangeShape",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "SphereRange",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "BoundingBoxRange",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ProximityQuery",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 17,
+        "IsPublic": true
+      },
+      {
+        "Name": "KNearestProximity",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "DistanceLimitedProximity",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ClusterRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "KMeansRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "DBSCANRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "HierarchicalRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ClusteringResult",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "DirectionalProximityRequest",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "ProximityFieldResult",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": true
+      },
+      {
+        "Name": "SpatialCompute",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 16,
+        "IsPublic": false
+      },
+      {
+        "Name": "SpatialConfig",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 15,
+        "IsPublic": false
+      },
+      {
+        "Name": "SpatialOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "SpatialCore",
+        "Namespace": "Arsenal.Rhino.Spatial",
+        "Kind": "Class",
+        "MemberCount": 11,
+        "IsPublic": false
+      },
+      {
+        "Name": "Topology",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 31,
+        "IsPublic": true
+      },
+      {
+        "Name": "IResult",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Interface",
+        "MemberCount": 0,
+        "IsPublic": true
+      },
+      {
+        "Name": "ConservativeRepairStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "ModerateJoinStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "AggressiveJoinStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "CombinedStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "TargetedJoinStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "ComponentJoinStrategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 13,
+        "IsPublic": true
+      },
+      {
+        "Name": "Strategy",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 19,
+        "IsPublic": true
+      },
+      {
+        "Name": "EdgeContinuityType",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Struct",
+        "MemberCount": 21,
+        "IsPublic": true
+      },
+      {
+        "Name": "TopologyDiagnosis",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 27,
+        "IsPublic": true
+      },
+      {
+        "Name": "HealingResult",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 27,
+        "IsPublic": true
+      },
+      {
+        "Name": "NakedEdgeData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "TopologicalFeatures",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 31,
+        "IsPublic": true
+      },
+      {
+        "Name": "EdgeClassificationData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 35,
+        "IsPublic": true
+      },
+      {
+        "Name": "BoundaryLoopData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "VertexData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "ConnectivityData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "NonManifoldData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "NgonTopologyData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 43,
+        "IsPublic": true
+      },
+      {
+        "Name": "AdjacencyData",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 39,
+        "IsPublic": true
+      },
+      {
+        "Name": "TopologyCompute",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 5,
+        "IsPublic": false
+      },
+      {
+        "Name": "TopologyConfig",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": false
+      },
+      {
+        "Name": "OperationMetadata",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "DiagnosticMetadata",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": false
+      },
+      {
+        "Name": "FeaturesMetadata",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "HealingMetadata",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "TopologyCore",
+        "Namespace": "Arsenal.Rhino.Topology",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": false
+      },
+      {
+        "Name": "Transformation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 48,
+        "IsPublic": true
+      },
+      {
+        "Name": "TransformOperation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "ArrayOperation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "MorphOperation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "MirrorTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "Translation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ProjectionTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "BasisChange",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "PlaneTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "MatrixTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "UniformScale",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "VectorRotation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "LinearArray",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "StretchMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "BendMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": true
+      },
+      {
+        "Name": "PathArray",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "AxisRotation",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "TwistMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "PolarArray",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "TaperMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "NonUniformScale",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 30,
+        "IsPublic": true
+      },
+      {
+        "Name": "ShearTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "FlowMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "SplopMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "MaelstromMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "SporphMorph",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "RectangularArray",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 38,
+        "IsPublic": true
+      },
+      {
+        "Name": "CompoundTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "BlendedTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "InterpolatedTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 26,
+        "IsPublic": true
+      },
+      {
+        "Name": "DecomposedTransform",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 37,
+        "IsPublic": true
+      },
+      {
+        "Name": "TransformationCompute",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 29,
+        "IsPublic": false
+      },
+      {
+        "Name": "TransformationConfig",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "TransformOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 21,
+        "IsPublic": false
+      },
+      {
+        "Name": "ArrayOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "MorphOperationMetadata",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": false
+      },
+      {
+        "Name": "TransformationCore",
+        "Namespace": "Arsenal.Rhino.Transformation",
+        "Kind": "Class",
+        "MemberCount": 22,
+        "IsPublic": false
+      }
+    ]
+  },
+  {
+    "Name": "Arsenal.Grasshopper",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/libs/grasshopper/Grasshopper.csproj",
+    "Namespace": "",
+    "TypeCount": 0,
+    "Types": []
+  },
+  {
+    "Name": "Arsenal.Core.Tests",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/test/core/Arsenal.Core.Tests.csproj",
+    "Namespace": "Arsenal.Core.Tests.Diagnostics",
+    "TypeCount": 11,
+    "Types": [
+      {
+        "Name": "DebuggerDisplayTests",
+        "Namespace": "Arsenal.Core.Tests.Diagnostics",
+        "Kind": "Class",
+        "MemberCount": 9,
+        "IsPublic": true
+      },
+      {
+        "Name": "ErrorConstantsTests",
+        "Namespace": "Arsenal.Core.Tests.Errors",
+        "Kind": "Class",
+        "MemberCount": 4,
+        "IsPublic": true
+      },
+      {
+        "Name": "ErrorGenerators",
+        "Namespace": "Arsenal.Core.Tests.Errors",
+        "Kind": "Class",
+        "MemberCount": 14,
+        "IsPublic": true
+      },
+      {
+        "Name": "ErrorRegistryTests",
+        "Namespace": "Arsenal.Core.Tests.Errors",
+        "Kind": "Class",
+        "MemberCount": 6,
+        "IsPublic": true
+      },
+      {
+        "Name": "SystemErrorTests",
+        "Namespace": "Arsenal.Core.Tests.Errors",
+        "Kind": "Class",
+        "MemberCount": 12,
+        "IsPublic": true
+      },
+      {
+        "Name": "ResultAlgebraTests",
+        "Namespace": "Arsenal.Core.Tests.Results",
+        "Kind": "Class",
+        "MemberCount": 25,
+        "IsPublic": true
+      },
+      {
+        "Name": "ResultEdgeCaseTests",
+        "Namespace": "Arsenal.Core.Tests.Results",
+        "Kind": "Class",
+        "MemberCount": 23,
+        "IsPublic": true
+      },
+      {
+        "Name": "ResultGenerators",
+        "Namespace": "Arsenal.Core.Tests.Results",
+        "Kind": "Class",
+        "MemberCount": 16,
+        "IsPublic": true
+      },
+      {
+        "Name": "SharedUtilitiesTests",
+        "Namespace": "Arsenal.Core.Tests.SharedUtilities",
+        "Kind": "Class",
+        "MemberCount": 18,
+        "IsPublic": true
+      },
+      {
+        "Name": "ValidationGenerators",
+        "Namespace": "Arsenal.Core.Tests.Validation",
+        "Kind": "Class",
+        "MemberCount": 10,
+        "IsPublic": true
+      },
+      {
+        "Name": "VTests",
+        "Namespace": "Arsenal.Core.Tests.Validation",
+        "Kind": "Class",
+        "MemberCount": 15,
+        "IsPublic": true
+      }
+    ]
+  },
+  {
+    "Name": "Arsenal.Rhino.Tests",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/test/rhino/Arsenal.Rhino.Tests.csproj",
+    "Namespace": "",
+    "TypeCount": 0,
+    "Types": []
+  },
+  {
+    "Name": "Arsenal.Tests.Shared",
+    "Path": "/home/runner/work/Parametric_Arsenal/Parametric_Arsenal/test/shared/Arsenal.Tests.Shared.csproj",
+    "Namespace": "Arsenal.Tests.Common",
+    "TypeCount": 4,
+    "Types": [
+      {
+        "Name": "Test",
+        "Namespace": "Arsenal.Tests.Common",
+        "Kind": "Class",
+        "MemberCount": 40,
+        "IsPublic": true
+      },
+      {
+        "Name": "TestBench",
+        "Namespace": "Arsenal.Tests.Common",
+        "Kind": "Class",
+        "MemberCount": 16,
+        "IsPublic": true
+      },
+      {
+        "Name": "Measurement",
+        "Namespace": "Arsenal.Tests.Common",
+        "Kind": "Struct",
+        "MemberCount": 11,
+        "IsPublic": true
+      },
+      {
+        "Name": "Statistics",
+        "Namespace": "Arsenal.Tests.Common",
+        "Kind": "Struct",
+        "MemberCount": 12,
+        "IsPublic": true
+      }
+    ]
+  }
+]

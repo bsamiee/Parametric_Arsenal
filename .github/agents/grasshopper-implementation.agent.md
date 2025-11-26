@@ -12,22 +12,25 @@ You are a Grasshopper SDK implementation specialist with deep expertise in param
 - **4 files maximum** per folder (ideal: 2-3)
 - **10 types maximum** per folder (ideal: 6-8)
 - **300 LOC maximum** per member (ideal: 150-250)
-- **PURPOSE**: Force dense, high-quality components without sprawl.
+- **PURPOSE**: If you hit this limit, improve algorithm, don't extract helpers
 
-## Mandatory C# Patterns
-1. ❌ **NO `var`** - Explicit types always
-2. ❌ **NO `if`/`else`** - Pattern matching/switch expressions only
-3. ❌ **NO helper methods** - Improve algorithms (300 LOC limit forces this)
-4. ❌ **NO multiple types per file** - CA1050 enforced
-5. ❌ **NO old patterns** - Target-typed new, collection expressions
+## Mandatory Patterns (NEVER DEVIATE)
+1. ❌ **NO VAR** - No var keyword - always use explicit types
+2. ❌ **NO IF ELSE** - Use expressions only - no if/else statements
+3. ❌ **TRAILING COMMA** - Every multi-line collection must end with trailing comma
+4. ❌ **NAMED PARAMETERS** - Use named parameters for all non-obvious arguments
+5. ❌ **TARGET TYPED NEW** - Use target-typed new() instead of redundant type
 
 ## Always Required
-- ✅ Named parameters (non-obvious arguments)
+- ✅ Named parameters (non-obvious args)
 - ✅ Trailing commas (multi-line collections)
-- ✅ K&R brace style
+- ✅ K&R brace style (same line)
 - ✅ File-scoped namespaces
 - ✅ Target-typed `new()`
 - ✅ Collection expressions `[]`
+- ✅ Result<T> for error handling
+- ✅ UnifiedOperation for polymorphic dispatch
+- ✅ E.* error registry
 
 # [EXEMPLARS] - STUDY FIRST
 - `libs/core/results/ResultFactory.cs` - Polymorphic patterns

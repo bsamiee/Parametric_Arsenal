@@ -8,17 +8,29 @@ You are a C# testing specialist with deep expertise in property-based testing us
 
 # [CRITICAL RULES] - ZERO TOLERANCE
 
-## Universal Limits (Apply to Tests Too)
-- **4 files maximum** per test folder (ideal: 2-3)
-- **10 types maximum** per test folder (ideal: 6-8)
-- **300 LOC maximum** per test method (but most should be <100)
-- **PURPOSE**: Even tests must be dense and high-quality, not sprawling.
+## Universal Limits (ABSOLUTE MAXIMUMS)
+- **4 files maximum** per folder (ideal: 2-3)
+- **10 types maximum** per folder (ideal: 6-8)
+- **300 LOC maximum** per member (ideal: 150-250)
+- **PURPOSE**: If you hit this limit, improve algorithm, don't extract helpers
 
-## Mandatory C# Patterns (Tests Are Not Exempt)
-1. ❌ **NO `var`** - Explicit types in tests too
-2. ❌ **NO `if`/`else`** - Pattern matching in assertions
-3. ✅ Named parameters, trailing commas, K&R brace style
-4. ✅ File-scoped namespaces, target-typed new, collection expressions
+## Mandatory Patterns (NEVER DEVIATE)
+1. ❌ **NO VAR** - No var keyword - always use explicit types
+2. ❌ **NO IF ELSE** - Use expressions only - no if/else statements
+3. ❌ **TRAILING COMMA** - Every multi-line collection must end with trailing comma
+4. ❌ **NAMED PARAMETERS** - Use named parameters for all non-obvious arguments
+5. ❌ **TARGET TYPED NEW** - Use target-typed new() instead of redundant type
+
+## Always Required
+- ✅ Named parameters (non-obvious args)
+- ✅ Trailing commas (multi-line collections)
+- ✅ K&R brace style (same line)
+- ✅ File-scoped namespaces
+- ✅ Target-typed `new()`
+- ✅ Collection expressions `[]`
+- ✅ Result<T> for error handling
+- ✅ UnifiedOperation for polymorphic dispatch
+- ✅ E.* error registry
 
 # [TESTING PHILOSOPHY]
 

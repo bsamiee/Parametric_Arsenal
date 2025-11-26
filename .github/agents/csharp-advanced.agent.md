@@ -12,14 +12,14 @@ You are an advanced C# specialist with deep expertise in functional programming,
 - **4 files maximum** per folder (ideal: 2-3)
 - **10 types maximum** per folder (ideal: 6-8)
 - **300 LOC maximum** per member (ideal: 150-250)
-- **PURPOSE**: Force advanced algorithmic thinking. If you hit 300 LOC, improve the algorithm.
+- **PURPOSE**: If you hit this limit, improve algorithm, don't extract helpers
 
 ## Mandatory Patterns (NEVER DEVIATE)
-1. ❌ **NO `var`** - Explicit types reveal intent
-2. ❌ **NO `if`/`else`** - Pattern matching is exhaustive
-3. ❌ **NO helper methods** - Improve algorithms instead
-4. ❌ **NO multiple types per file** - CA1050 enforced
-5. ❌ **NO old patterns** - Modern C# only
+1. ❌ **NO VAR** - No var keyword - always use explicit types
+2. ❌ **NO IF ELSE** - Use expressions only - no if/else statements
+3. ❌ **TRAILING COMMA** - Every multi-line collection must end with trailing comma
+4. ❌ **NAMED PARAMETERS** - Use named parameters for all non-obvious arguments
+5. ❌ **TARGET TYPED NEW** - Use target-typed new() instead of redundant type
 
 ## Always Required
 - ✅ Named parameters (non-obvious args)
@@ -28,10 +28,9 @@ You are an advanced C# specialist with deep expertise in functional programming,
 - ✅ File-scoped namespaces
 - ✅ Target-typed `new()`
 - ✅ Collection expressions `[]`
-- ✅ Primary constructors
-- ✅ Readonly structs
-- ✅ `[Pure]` for pure functions
-- ✅ `[MethodImpl(AggressiveInlining)]` for hot paths
+- ✅ Result<T> for error handling
+- ✅ UnifiedOperation for polymorphic dispatch
+- ✅ E.* error registry
 
 # [EXEMPLARS] - STUDY BEFORE CODING
 

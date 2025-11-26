@@ -44,9 +44,9 @@ jobs:
           if [ -f ".github/review-output/pr-number.txt" ]; then
             PR_NUMBER=$(cat .github/review-output/pr-number.txt)
             echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-            echo "📋 Processing PR #${PR_NUMBER}"
+            echo "[INFO] Processing PR #${PR_NUMBER}"
           else
-            echo "❌ PR metadata not found in artifact"
+            echo "[ERROR] PR metadata not found in artifact"
             exit 1
           fi
 
@@ -54,7 +54,7 @@ jobs:
           if [ -f ".github/review-output/head-branch.txt" ]; then
             HEAD_BRANCH=$(cat .github/review-output/head-branch.txt)
             echo "head_branch=${HEAD_BRANCH}" >> $GITHUB_OUTPUT
-            echo "📋 Head branch: ${HEAD_BRANCH}"
+            echo "[INFO] Head branch: ${HEAD_BRANCH}"
           fi
 
       - name: Check if review JSON exists
@@ -64,10 +64,10 @@ jobs:
           if [ -f "$JSON_PATH" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "path=${JSON_PATH}" >> $GITHUB_OUTPUT
-            echo "✅ Found review JSON at ${JSON_PATH}"
+            echo "[PASS] Found review JSON at ${JSON_PATH}"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Review JSON not found"
+            echo "[WARN] Review JSON not found"
           fi
 
       - name: Parse review verdict
@@ -81,11 +81,11 @@ jobs:
           echo "verdict=${VERDICT}" >> $GITHUB_OUTPUT
           echo "violation_count=${VIOLATION_COUNT}" >> $GITHUB_OUTPUT
 
-          echo "📊 Verdict: ${VERDICT}"
-          echo "📊 Violations: ${VIOLATION_COUNT}"
+          echo "[INFO] Verdict: ${VERDICT}"
+          echo "[INFO] Violations: ${VIOLATION_COUNT}"
 
           if [ "$VERDICT" = "approve" ]; then
-            echo "✅ Review approved - no fixes needed"
+            echo "[PASS] Review approved - no fixes needed"
           fi
 
       - name: Check iteration limit
@@ -99,22 +99,22 @@ jobs:
         run: |
           # Count existing autofix-attempt labels with explicit error handling
           if ! LABELS=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name'); then
-            echo "⚠️ Failed to fetch PR labels, assuming no previous attempts"
+            echo "[WARN] Failed to fetch PR labels, assuming no previous attempts"
             LABELS=""
           fi
           ATTEMPT_COUNT=$(echo "$LABELS" | grep -c "autofix-attempt-" || echo "0")
 
           echo "count=${ATTEMPT_COUNT}" >> $GITHUB_OUTPUT
-          echo "📊 Previous autofix attempts: ${ATTEMPT_COUNT}"
+          echo "[INFO] Previous autofix attempts: ${ATTEMPT_COUNT}"
 
           if [ "$ATTEMPT_COUNT" -ge 3 ]; then
             echo "limit_reached=true" >> $GITHUB_OUTPUT
-            echo "⚠️ Auto-fix limit (3) reached"
+            echo "[WARN] Auto-fix limit (3) reached"
           else
             echo "limit_reached=false" >> $GITHUB_OUTPUT
             NEXT_ATTEMPT=$((ATTEMPT_COUNT + 1))
             echo "next_attempt=${NEXT_ATTEMPT}" >> $GITHUB_OUTPUT
-            echo "🔄 Starting attempt ${NEXT_ATTEMPT}"
+            echo "[INFO] Starting attempt ${NEXT_ATTEMPT}"
           fi
 
       - name: Comment on limit reached
@@ -123,7 +123,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "⚠️ **Auto-fix limit (3) reached.**
+          gh pr comment "$PR_NUMBER" --body "[WARN] **Auto-fix limit (3) reached.**
 
           The automatic fix workflow has attempted to resolve violations 3 times without success.
 
@@ -220,7 +220,7 @@ jobs:
 
           # Check if there are changes to commit
           if git diff --quiet && git diff --cached --quiet; then
-            echo "📝 No changes to commit"
+            echo "[INFO] No changes to commit"
             echo "changes_made=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -235,9 +235,9 @@ jobs:
           # Push with error handling
           if git push; then
             echo "changes_made=true" >> $GITHUB_OUTPUT
-            echo "✅ Fixes committed and pushed"
+            echo "[PASS] Fixes committed and pushed"
           else
-            echo "❌ Push failed"
+            echo "[ERROR] Push failed"
             echo "changes_made=false" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -250,7 +250,7 @@ jobs:
           ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
         run: |
           gh pr edit "$PR_NUMBER" --add-label "autofix-attempt-${ATTEMPT}"
-          echo "🏷️ Added label: autofix-attempt-${ATTEMPT}"
+          echo "[PASS] Added label: autofix-attempt-${ATTEMPT}"
 
       - name: Post fix summary
         if: steps.commit.outputs.changes_made == 'true'
@@ -259,13 +259,13 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "🔄 **Auto-fix attempt ${ATTEMPT} complete.**
+          gh pr comment "$PR_NUMBER" --body "[INFO] **Auto-fix attempt ${ATTEMPT} complete.**
 
           Applied fixes for violations detected in the code review.
 
-          ⏳ **Re-review will start automatically** when the push triggers the Claude Code Review workflow.
+          **Re-review will start automatically** when the push triggers the Claude Code Review workflow.
 
           ---
           *This is an automated message from the claude-autofix workflow.*"
 
-          echo "💬 Posted fix summary comment"
+          echo "[PASS] Posted fix summary comment"

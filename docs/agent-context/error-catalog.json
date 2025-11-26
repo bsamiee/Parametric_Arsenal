@@ -1,0 +1,416 @@
+{
+  "Results": [
+    {
+      "Name": "NoValueProvided",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidCreate",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidValidate",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidLift",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidAccess",
+      "Declaration": "SystemError"
+    }
+  ],
+  "Geometry": [
+    {
+      "Name": "InvalidExtraction",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InsufficientParameters",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidCount",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidLength",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidDirection",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidParameters",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidAngle",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedIntersection",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "IntersectionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidProjection",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidMaxHits",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ClassificationFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InsufficientIntersectionData",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NearMissSearchFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidSearchRadius",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedAnalysis",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "CurveAnalysisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "SurfaceAnalysisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "BrepAnalysisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "MeshAnalysisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidEdgeIndex",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidVertexIndex",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedOrientationType",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidOrientationPlane",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "TransformFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "CentroidExtractionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidOrientationMode",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ParallelVectorAlignment",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidOrientationVectors",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidCurveParameter",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidSurfaceUV",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "FrameExtractionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "OrientationFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "PatternDetectionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "FeatureExtractionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "DecompositionFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NoPrimitivesDetected",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NoPatternDetected",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldBounds",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidStreamlineSeeds",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidIsovalue",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidScalarField",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidCurlComputation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidDivergenceComputation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidLaplacianComputation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidVectorPotentialComputation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldInterpolation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidHessianComputation",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidDirectionalDerivative",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldMagnitude",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldNormalization",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidCriticalPointDetection",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldStatistics",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidFieldComposition",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidGeometryType",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedConfiguration",
+      "Declaration": "SystemError"
+    }
+  ],
+  "Validation": [
+    {
+      "Name": "GeometryInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "CurveNotClosedOrPlanar",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "BoundingBoxInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "MassPropertiesComputationFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidTopology",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "DegenerateGeometry",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "SelfIntersecting",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NonManifoldEdges",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "PositionalDiscontinuity",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ToleranceAbsoluteInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ToleranceRelativeInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ToleranceAngleInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ToleranceExceeded",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "PolycurveGaps",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NurbsControlPointCount",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ExtrusionProfileInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UVDomainSingularity",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "BrepTopologyInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "BrepGeometryInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "BrepTolerancesAndFlagsInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "MeshInvalid",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidUnitConversion",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedOperationType",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InputFiltered",
+      "Declaration": "SystemError"
+    }
+  ],
+  "Spatial": [
+    {
+      "Name": "InvalidK",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidDistance",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "UnsupportedTypeCombo",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ProximityFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ClusteringFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidClusterK",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidEpsilon",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "KExceedsPointCount",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "ZeroLengthDirection",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "MedialAxisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "NonPlanarNotSupported",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "InvalidDirection",
+      "Declaration": "SystemError"
+    }
+  ],
+  "Topology": [
+    {
+      "Name": "DiagnosisFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "TopologyTooComplex",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "HealingFailed",
+      "Declaration": "SystemError"
+    },
+    {
+      "Name": "FeatureExtractionFailed",
+      "Declaration": "SystemError"
+    }
+  ]
+}
