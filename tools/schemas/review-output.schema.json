@@ -91,7 +91,7 @@
         },
         "file": {
           "type": "string",
-          "pattern": "^[^/].*\\.cs$",
+          "pattern": "^[a-zA-Z0-9_\\-./]+\\.cs$",
           "description": "Relative path to the C# file containing the violation"
         },
         "start_line": {
