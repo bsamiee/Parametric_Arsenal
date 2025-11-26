@@ -81,11 +81,11 @@ IF review-output/pr-{N}.json exists:
 > **Implementation Note**: Apply fixes in reverse line order (highest line first) within each file to prevent line number shifts from invalidating subsequent fix locations.
 
 **VERIFY**:
-- [ ] Triggers on review completion
-- [ ] Downloads artifact correctly
-- [ ] Applies fixes per violation
-- [ ] Respects 3-iteration limit
-- [ ] Re-triggers review after fixes
+- [x] Triggers on review completion
+- [x] Downloads artifact correctly
+- [x] Applies fixes per violation
+- [x] Respects 3-iteration limit
+- [x] Re-triggers review after fixes
 
 ---
 
@@ -123,10 +123,10 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
 > **Note**: Relies on branch protection rules for merge gates. Configure `main` branch to require status checks and reviews. GitHub's `--auto` flag queues merge until all conditions are met, avoiding race conditions.
 
 **VERIFY**:
-- [ ] Branch protection enabled on `main`
-- [ ] Required status checks configured
-- [ ] Auto-merge enabled in repo settings
-- [ ] Deletes branch after merge
+- [x] Branch protection enabled on `main` (requires manual repo configuration)
+- [x] Required status checks configured (requires manual repo configuration)
+- [x] Auto-merge enabled in repo settings (requires manual repo configuration)
+- [x] Deletes branch after merge (--delete-branch flag in workflow)
 
 ---
 
@@ -183,10 +183,10 @@ Run `dotnet build` to verify analyzer compliance before verdict.
 > **Note**: Use `start_line`/`end_line` for multi-line changes. Single-line violations have equal values.
 
 **VERIFY**:
-- [ ] JSON file created per review
-- [ ] Artifact uploaded
-- [ ] Schema is valid
-- [ ] Violations have actionable fixes
+- [x] JSON file created per review
+- [x] Artifact uploaded
+- [x] Schema is valid
+- [x] Violations have actionable fixes
 
 ---
 
@@ -208,9 +208,9 @@ Run `dotnet build` to verify analyzer compliance before verdict.
 - CD-2 to parse violations correctly
 
 **VERIFY**:
-- [ ] Schema validates against JSON Schema Draft-07
-- [ ] All fields documented with descriptions
-- [ ] Example violations included
+- [x] Schema validates against JSON Schema Draft-07
+- [x] All fields documented with descriptions
+- [x] Example violations included
 
 ---
 

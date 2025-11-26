@@ -1,0 +1,76 @@
+name: Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, labeled]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run for claude[bot] PRs or PRs with auto-merge label
+    if: |
+      github.event.pull_request.user.login == 'claude[bot]' ||
+      contains(github.event.pull_request.labels.*.name, 'auto-merge')
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "🤖 Enabling auto-merge for PR #${PR_NUMBER}"
+          echo "   Author: ${{ github.event.pull_request.user.login }}"
+          echo "   Labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+
+          # Enable auto-merge with squash strategy
+          # GitHub will merge when all required status checks pass
+          gh pr merge "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --auto \
+            --delete-branch \
+            --subject "Merge PR #${PR_NUMBER}: ${{ github.event.pull_request.title }}"
+
+          echo "✅ Auto-merge enabled. PR will merge when all checks pass."
+
+  # Separate job for review-triggered merges
+  merge-on-approval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: |
+      github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'approved' &&
+      (
+        github.event.pull_request.user.login == 'claude[bot]' ||
+        contains(github.event.pull_request.labels.*.name, 'auto-merge')
+      )
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Merge on approval
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "✅ PR #${PR_NUMBER} approved by ${{ github.event.review.user.login }}"
+          echo "🔄 Attempting merge..."
+
+          # Try to merge immediately since approval received
+          # This will fail gracefully if other checks haven't passed yet
+          gh pr merge "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --auto \
+            --delete-branch \
+            --subject "Merge PR #${PR_NUMBER}: ${{ github.event.pull_request.title }}" \
+            || echo "⏳ Waiting for other checks to complete..."

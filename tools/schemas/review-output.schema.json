@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bsamiee/Parametric_Arsenal/tools/schemas/review-output.schema.json",
+  "title": "Claude Code Review Output",
+  "description": "Structured JSON output from claude-code-review workflow for agentic handshake protocol. Enables claude-autofix to parse and apply suggested fixes automatically.",
+  "type": "object",
+  "required": ["pr_number", "verdict", "violations", "passed_checks"],
+  "additionalProperties": false,
+  "properties": {
+    "pr_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "GitHub pull request number being reviewed"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "request_changes"],
+      "description": "Review verdict: 'approve' if ALL checks pass, 'request_changes' if ANY violation detected"
+    },
+    "violations": {
+      "type": "array",
+      "description": "Array of code violations requiring fixes. Empty array when verdict is 'approve'",
+      "items": {
+        "$ref": "#/definitions/Violation"
+      }
+    },
+    "passed_checks": {
+      "type": "array",
+      "description": "Array of rule IDs that passed validation",
+      "items": {
+        "$ref": "#/definitions/RuleId"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata about the review process",
+      "properties": {
+        "review_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when review was completed"
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Current autofix iteration number (1-3)"
+        },
+        "build_status": {
+          "type": "string",
+          "enum": ["success", "failure"],
+          "description": "Result of 'dotnet build' verification"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "RuleId": {
+      "type": "string",
+      "description": "Unique identifier for a CLAUDE.md rule",
+      "enum": [
+        "NO_VAR",
+        "NO_IF_ELSE",
+        "TRAILING_COMMA",
+        "NAMED_PARAMETERS",
+        "TARGET_TYPED_NEW",
+        "COLLECTION_EXPRESSIONS",
+        "FILE_SCOPED_NAMESPACE",
+        "ONE_TYPE_PER_FILE",
+        "KR_BRACE_STYLE",
+        "PATTERN_MATCHING",
+        "RESULT_MONAD",
+        "UNIFIED_OPERATION",
+        "ERROR_REGISTRY",
+        "FILES_PER_FOLDER",
+        "TYPES_PER_FOLDER",
+        "LOC_PER_MEMBER",
+        "PRIMARY_CONSTRUCTORS"
+      ]
+    },
+    "Violation": {
+      "type": "object",
+      "description": "A single code violation with suggested fix",
+      "required": ["rule", "file", "start_line", "end_line", "current", "suggested"],
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "$ref": "#/definitions/RuleId",
+          "description": "The CLAUDE.md rule that was violated"
+        },
+        "file": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-./]+\\.cs$",
+          "description": "Relative path to the C# file containing the violation"
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Starting line number of the violation (1-indexed)"
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ending line number of the violation (1-indexed). Must be greater than or equal to start_line"
+        },
+        "current": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The current code that violates the rule"
+        },
+        "suggested": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The suggested replacement code that fixes the violation"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning"],
+          "default": "error",
+          "description": "Violation severity. 'error' blocks approval, 'warning' is informational"
+        },
+        "context": {
+          "type": "string",
+          "description": "Optional additional context explaining the violation"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "pr_number": 42,
+      "verdict": "request_changes",
+      "violations": [
+        {
+          "rule": "NO_VAR",
+          "file": "libs/rhino/spatial/Spatial.cs",
+          "start_line": 127,
+          "end_line": 127,
+          "current": "var tree = new RTree();",
+          "suggested": "RTree tree = new();",
+          "severity": "error",
+          "context": "IDE0007: Use explicit type instead of 'var'"
+        },
+        {
+          "rule": "TRAILING_COMMA",
+          "file": "libs/core/errors/E.cs",
+          "start_line": 45,
+          "end_line": 48,
+          "current": "[\n    E.Validation.Invalid,\n    E.Validation.Null\n]",
+          "suggested": "[\n    E.Validation.Invalid,\n    E.Validation.Null,\n]",
+          "severity": "error"
+        },
+        {
+          "rule": "NO_IF_ELSE",
+          "file": "libs/core/operations/UnifiedOperation.cs",
+          "start_line": 89,
+          "end_line": 93,
+          "current": "if (result.IsSuccess) {\n    return result.Value;\n} else {\n    return default;\n}",
+          "suggested": "return result.IsSuccess ? result.Value : default;",
+          "severity": "error",
+          "context": "Use ternary operator for simple binary branching"
+        }
+      ],
+      "passed_checks": [
+        "NAMED_PARAMETERS",
+        "TARGET_TYPED_NEW",
+        "FILE_SCOPED_NAMESPACE",
+        "ONE_TYPE_PER_FILE",
+        "KR_BRACE_STYLE"
+      ],
+      "metadata": {
+        "review_timestamp": "2025-11-26T10:30:00Z",
+        "iteration": 1,
+        "build_status": "failure"
+      }
+    },
+    {
+      "pr_number": 43,
+      "verdict": "approve",
+      "violations": [],
+      "passed_checks": [
+        "NO_VAR",
+        "NO_IF_ELSE",
+        "TRAILING_COMMA",
+        "NAMED_PARAMETERS",
+        "TARGET_TYPED_NEW",
+        "COLLECTION_EXPRESSIONS",
+        "FILE_SCOPED_NAMESPACE",
+        "ONE_TYPE_PER_FILE",
+        "KR_BRACE_STYLE",
+        "RESULT_MONAD",
+        "UNIFIED_OPERATION",
+        "ERROR_REGISTRY"
+      ],
+      "metadata": {
+        "review_timestamp": "2025-11-26T11:45:00Z",
+        "iteration": 2,
+        "build_status": "success"
+      }
+    }
+  ]
+}
