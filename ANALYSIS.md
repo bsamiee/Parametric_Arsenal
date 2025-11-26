@@ -6,6 +6,22 @@
 
 ---
 
+## 0. Input Clarification
+
+> **Note**: The original prompt template referenced `TASK_a.md`, `TASK_b.md`, `TASK_c.md`, `REQUIREMENTS.md`, and JavaScript tooling (`nx.json`, `biome.json`, `pnpm-workspace.yaml`, `lefthook.yml`). **None of these files exist in this repository.**
+>
+> This is a **C#/.NET monorepo** for Parametric Arsenal (RhinoCommon/Grasshopper geometry library). Analysis was performed on the **actual** repository infrastructure:
+>
+> | Analyzed Instead | Files |
+> |-----------------|-------|
+> | Agent Instructions | `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md` |
+> | Agent Definitions | `.claude/settings.json`, `.github/agents/*.agent.md` |
+> | CI/CD Workflows | `.github/workflows/*.yml` (6 workflows) |
+> | Build System | `Directory.Build.props`, `.pre-commit-config.yaml` |
+> | Prompts & Commands | `.github/prompts/`, `.claude/commands/` |
+
+---
+
 ## 1. Executive Summary
 
 This analysis incorporates extensive research on bleeding-edge agentic workflows, multi-agent orchestration patterns, and industry-standard instruction file formats. Key corrections from initial analysis:
