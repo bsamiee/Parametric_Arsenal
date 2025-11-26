@@ -180,7 +180,7 @@ if (File.Exists(copilotPath)) {
         int endIdx = copilotContent.IndexOf("\n---", startIdx);
         if (endIdx != -1) {
             string before = copilotContent.Substring(0, startIdx);
-            string after = copilotContent.Substring(endIdx);
+            string after = copilotContent[endIdx..];
             
             string newBlockers = GenerateImmediateBlockers();
             string newContent = before + newBlockers + "\n" + after;
