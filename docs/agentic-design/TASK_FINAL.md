@@ -361,10 +361,10 @@ System.Text.Json
 > **Rationale**: Direct commits to main bypass branch protection and risk infinite workflow loops. PRs allow review and prevent recursive triggers.
 
 **VERIFY**:
-- [ ] Opens solution via Roslyn
-- [ ] Generates to `docs/agent-context/`
-- [ ] CI creates PR with changes (not direct commit)
-- [ ] PR auto-merges if checks pass
+- [x] Opens solution via Roslyn (MSBuildWorkspace with MSBuildLocator)
+- [x] Generates to `docs/agent-context/` (5 JSON files: architecture, error-catalog, validation-modes, exemplar-metrics, domain-map)
+- [x] CI creates PR with changes (not direct commit - uses feature branch + gh pr create)
+- [x] PR auto-merges if checks pass (auto-merge label applied)
 
 ---
 

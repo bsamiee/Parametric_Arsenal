@@ -1,0 +1,27 @@
+[
+  {
+    "Path": "libs/core/validation/ValidationRules.cs",
+    "LOC": 119,
+    "TotalLines": 133
+  },
+  {
+    "Path": "libs/core/results/ResultFactory.cs",
+    "LOC": 112,
+    "TotalLines": 126
+  },
+  {
+    "Path": "libs/core/operations/UnifiedOperation.cs",
+    "LOC": 115,
+    "TotalLines": 129
+  },
+  {
+    "Path": "libs/core/results/Result.cs",
+    "LOC": 178,
+    "TotalLines": 211
+  },
+  {
+    "Path": "libs/rhino/spatial/Spatial.cs",
+    "LOC": 66,
+    "TotalLines": 116
+  }
+]
