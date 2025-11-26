@@ -2,297 +2,437 @@
 
 **Date**: 2025-11-26
 **Scope**: Parametric Arsenal Monorepo
-**Objective**: Consolidate agent systems, eliminate redundancy, establish XML-structured agentic protocols
+**Objective**: Establish world-class, bleeding-edge agentic infrastructure with multi-agent orchestration capabilities
 
 ---
 
-## 1. Repository Audit Summary
+## 1. Executive Summary
 
-### Technology Stack (Actual)
-| Layer | Technology | Version |
-|-------|------------|---------|
-| Runtime | .NET 8.0 | C# preview |
-| Platform | RhinoCommon | 8.25.25328.11001 |
-| Platform | Grasshopper | 8.25.25328.11001 |
-| Testing (Core) | xUnit + CsCheck | 2.9.3 / 4.4.1 |
-| Testing (Rhino) | NUnit + Rhino.Testing | 4.x / 8.0.28-beta |
-| Analyzers | Roslynator, Meziantou, NetAnalyzers | Latest |
-| CI/CD | GitHub Actions | 6 workflows |
-| Agent System | Claude Code + GitHub Actions | Hybrid |
+This analysis incorporates extensive research on bleeding-edge agentic workflows, multi-agent orchestration patterns, and industry-standard instruction file formats. Key corrections from initial analysis:
 
-### Critical Observation
-User request referenced `Nx`, `Biome`, `Effect TS`, `pnpm-workspace.yaml`, `lefthook.yml` — **NONE exist in this repository**. This is a pure C#/.NET monorepo. Analysis proceeds with actual infrastructure.
+| Initial Decision | Corrected Decision | Rationale |
+|-----------------|-------------------|-----------|
+| Deprecate AGENTS.md | **RETAIN AGENTS.md** | Industry standard for OpenAI Codex, GitHub Copilot, Cursor, Google Jules |
+| Single instruction file | **Multi-file strategy** | Different agents (Claude, Codex, Copilot) read different files |
+| Basic workflow consolidation | **Agentic workflow upgrade** | Leverage GitHub Agentic Workflows, structured outputs |
 
 ---
 
-## 2. Conflict Resolution Matrix
+## 2. Industry Standards Research
 
-### 2.1 Agent Definition Duplication (CRITICAL)
+### 2.1 Agent Instruction File Ecosystem
 
-**Conflict**: Agent definitions exist in 3 locations with divergent configurations:
+Research reveals a fragmented but converging ecosystem. **All major files should be maintained**:
 
-| Location | Agent Count | Model | Prompt Style |
-|----------|-------------|-------|--------------|
-| `.claude/settings.json` | 11 agents | claude-opus-4-5 | Terse inline |
-| `.github/workflows/claude.yml` | 5 agents | claude-opus-4-5 | Truncated inline |
-| `.github/agents/*.agent.md` | 11 files | N/A | Full markdown |
+| File | Consumers | Status |
+|------|-----------|--------|
+| `AGENTS.md` | OpenAI Codex, GitHub Copilot, Cursor, Google Jules, Aider, Factory | **Industry standard** |
+| `CLAUDE.md` | Claude Code, Claude Desktop | **Anthropic standard** |
+| `GEMINI.md` | Google Gemini | Optional |
+| `.github/copilot-instructions.md` | GitHub Copilot | **GitHub standard** |
+| `.github/instructions/*.instructions.md` | GitHub Copilot (modular) | **GitHub standard** |
 
-**Resolution**:
-- **DISCARD** inline agent definitions in workflow YAML
-- **RETAIN** `.claude/settings.json` as agent registry (pointer)
-- **RETAIN** `.github/agents/*.agent.md` as full instruction files
-- **UPGRADE** to XML-structured prompts within `.github/agents/`
+**Source**: [OpenAI agents.md repository](https://github.com/openai/agents.md), [GitHub Copilot docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot)
 
-**Rationale**: Workflow YAML has 5 agents with truncated prompts; settings.json has full 11 with proper pointers to detailed files. The `.github/agents/` markdown files are comprehensive (7-14KB each) and should be the single source of truth.
+### 2.2 AGENTS.md Specification
 
-### 2.2 Documentation Fragmentation
+From [agents.md](https://agents.md/) and [OpenAI documentation](https://developers.openai.com/codex/guides/agents-md/):
 
-**Conflict**: Overlapping content across 4 files:
+- **Format**: Standard Markdown, no required fields
+- **Precedence**: Nested files override parent (closest to edited file wins)
+- **Content**: Project structure, coding standards, testing instructions, PR instructions
+- **Compatibility**: Universal across major AI coding tools
 
-| File | Lines | Content |
-|------|-------|---------|
-| `CLAUDE.md` | 809 | Complete standards, patterns, philosophy |
-| `AGENTS.md` | 405 | Condensed reference, decision trees |
-| `.github/copilot-instructions.md` | 323 | Quick reference, same patterns |
-| `.github/agents/*.agent.md` | 11 files | Role-specific subsets |
+**Key Insight**: "One file, any agent. Your codebase gets a universal voice that every AI coding tool can understand."
 
-**Resolution**:
-- **RETAIN** `CLAUDE.md` as authoritative master document
-- **DEPRECATE** `AGENTS.md` → merge unique content into CLAUDE.md
-- **REFACTOR** `copilot-instructions.md` → minimal pointer to CLAUDE.md
-- **RETAIN** `.github/agents/*.agent.md` → role-specific instructions only
+### 2.3 Multi-Agent Orchestration Patterns
 
-**Rationale**: CLAUDE.md is comprehensive (809 LOC). AGENTS.md duplicates 70% of content. Copilot instructions duplicate 50%. Consolidation eliminates drift.
+Research from [Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns) and [MarkTechPost](https://www.marktechpost.com/2025/08/09/9-agentic-ai-workflow-patterns-transforming-ai-agents-in-2025/):
 
-### 2.3 Prompt System Fragmentation
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| **Sequential/Pipeline** | Step-by-step, output→input chain | Code review → fix → test |
+| **Parallelization** | Independent sub-tasks concurrent execution | Multi-file analysis |
+| **Orchestrator-Worker** | Central coordinator + specialized workers | Complex implementations |
+| **Maker-Checker** | One agent creates, another validates | Code generation + review |
 
-**Conflict**: Two prompt systems coexist:
-
-| Location | Files | Purpose |
-|----------|-------|---------|
-| `.github/prompts/*.prompt.md` | 7 files | Task-specific prompts (11-26KB) |
-| `.claude/commands/*.md` | 4 files | Slash command definitions |
-
-**Resolution**:
-- **RETAIN** both systems (distinct purposes)
-- **UPGRADE** `.github/prompts/` to XML-structured format
-- **REFACTOR** `.claude/commands/` to reference `.github/prompts/` where overlapping
-
-**Rationale**: Prompts are CI/automation-focused; commands are interactive session-focused. Minimal overlap. XML upgrade improves parseability.
-
-### 2.4 Workflow Overlap
-
-**Conflict**: 6 workflows with unclear boundaries:
-
-| Workflow | Trigger | Overlap With |
-|----------|---------|--------------|
-| `ci.yml` | push/PR | N/A (core CI) |
-| `claude.yml` | @claude mention | `claude-issues.yml` |
-| `claude-code-review.yml` | PR opened | `ci.yml` (both check PRs) |
-| `claude-issues.yml` | label added | `claude.yml` |
-| `claude-maintenance.yml` | schedule/manual | N/A |
-| `rhino-tests.yml` | rhino path changes | `ci.yml` (subset) |
-
-**Resolution**:
-- **MERGE** `claude.yml` + `claude-issues.yml` → unified `claude-automation.yml`
-- **RETAIN** `ci.yml`, `claude-code-review.yml`, `claude-maintenance.yml`, `rhino-tests.yml`
-- **REFACTOR** trigger conditions to eliminate double-execution
-
-**Rationale**: `claude.yml` and `claude-issues.yml` have overlapping triggers (issues:opened). Merging prevents race conditions.
+**Applicable to Repository**: Orchestrator-Worker pattern with specialized agents (csharp-advanced, testing-specialist, rhino-implementation).
 
 ---
 
-## 3. Integration Strategy
+## 3. Infrastructure Gaps Identified
 
-### 3.1 Agent ↔ Documentation Handshake
+### 3.1 Missing GitHub Infrastructure
 
+| Component | Status | Impact |
+|-----------|--------|--------|
+| Issue Forms (YAML) | **Missing** | No structured input for agent automation |
+| PR Templates | **Missing** | Inconsistent PR descriptions |
+| `.mcp.json` | **Missing** | No project-scoped MCP servers |
+| Structured output schemas | **Missing** | Unpredictable agent output format |
+
+### 3.2 Missing Agentic Infrastructure
+
+| Component | Status | Impact |
+|-----------|--------|--------|
+| Claude Code Hooks | **Partial** | Only SessionStart configured |
+| `docs/` knowledge base | **Missing** | No centralized agent reference |
+| Agentic Workflows | **Missing** | No GitHub Next integration |
+| Agent memory/context | **Missing** | No persistent agent state |
+
+---
+
+## 4. Recommended Infrastructure Additions
+
+### 4.1 GitHub Issue Forms
+
+**Location**: `.github/ISSUE_TEMPLATE/`
+
+Create YAML-based issue forms for structured agent input:
+
+```yaml
+# .github/ISSUE_TEMPLATE/feature-request.yml
+name: Feature Request
+description: Request a new feature for Parametric Arsenal
+labels: ["enhancement", "triage"]
+assignees: []
+body:
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain
+      options:
+        - libs/core
+        - libs/rhino
+        - libs/grasshopper
+        - test/
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you'd like
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: agent-assist
+    attributes:
+      label: Agent Implementation
+      options:
+        - label: "I want Claude to implement this (add `claude-implement` label)"
 ```
-<agent-context-flow>
-  <step order="1">
-    <trigger>Agent receives task</trigger>
-    <action>Read CLAUDE.md (mandatory preamble)</action>
-    <verification>Agent confirms pattern compliance</verification>
-  </step>
-  <step order="2">
-    <trigger>Agent begins implementation</trigger>
-    <action>Read relevant .github/agents/{role}.agent.md</action>
-    <verification>Role-specific constraints loaded</verification>
-  </step>
-  <step order="3">
-    <trigger>Pre-commit validation</trigger>
-    <action>dotnet build + dotnet format --verify-no-changes</action>
-    <verification>Zero warnings, style compliant</verification>
-  </step>
-</agent-context-flow>
+
+**Rationale**: Structured forms enable [Advanced Issue Labeler](https://github.com/marketplace/actions/advanced-issue-labeler) and reliable parsing for agent automation.
+
+### 4.2 PR Template
+
+**Location**: `.github/PULL_REQUEST_TEMPLATE.md`
+
+```markdown
+## Summary
+<!-- One-line description of changes -->
+
+## Changes
+<!-- Bullet list of changes -->
+-
+
+## Domain
+<!-- Check applicable domains -->
+- [ ] libs/core
+- [ ] libs/rhino
+- [ ] libs/grasshopper
+- [ ] test/
+- [ ] docs/
+- [ ] CI/CD
+
+## Verification
+<!-- Required for all PRs -->
+- [ ] `dotnet build` passes with zero warnings
+- [ ] `dotnet test` passes
+- [ ] CLAUDE.md standards followed
+
+## Agent Context
+<!-- For agent-generated PRs -->
+- Agent: <!-- csharp-advanced, testing-specialist, etc. -->
+- Issue: <!-- Closes #XX -->
 ```
 
-### 3.2 Agent Registry Architecture
+### 4.3 Project-Scoped MCP Configuration
 
-**Current State**: Agents defined in `.claude/settings.json` with inline prompts
-**Target State**: Agents registered with external prompt files
+**Location**: `.mcp.json` (repository root, version-controlled)
 
 ```json
 {
-  "agents": [
-    {
-      "name": "csharp-advanced",
-      "description": "...",
-      "promptFile": ".github/agents/csharp-advanced.agent.md"
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
     }
-  ]
+  }
 }
 ```
 
-**Note**: Claude Code action does not currently support `promptFile`. Workaround: Agents must explicitly read their instruction file as first action.
+**Rationale**: Per [Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp), project-scoped servers enable team collaboration.
 
-### 3.3 Workflow ↔ Agent Coordination
+### 4.4 Claude Code Hooks Configuration
+
+**Location**: `.claude/settings.json` (expand existing)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command' | grep -q '^git commit'; then ./scripts/pre-commit-check.sh; fi",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet format --include \"$CLAUDE_TOOL_INPUT\" --verify-no-changes 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '📋 Loaded: CLAUDE.md + AGENTS.md standards active. MCP servers available.'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Source**: [Claude Code Hooks Guide](https://www.brethorsting.com/blog/2025/08/demystifying-claude-code-hooks/), [GitButler Integration](https://docs.gitbutler.com/features/ai-integration/claude-code-hooks)
+
+### 4.5 Agent Knowledge Base (`docs/`)
+
+**Location**: `docs/agents/`
+
+Create a knowledge base that agents can reference:
 
 ```
-<workflow-agent-protocol>
-  <workflow name="claude-automation">
-    <on>issue_comment, PR, issues:labeled</on>
-    <agent-selection>
-      <condition match="claude-implement label">csharp-advanced OR rhino-implementation</condition>
-      <condition match="test request">testing-specialist</condition>
-      <condition match="review request">refactoring-architect</condition>
-      <fallback>csharp-advanced</fallback>
-    </agent-selection>
-  </workflow>
-</workflow-agent-protocol>
+docs/
+├── agents/
+│   ├── README.md                    # Agent system overview
+│   ├── architecture-reference.md    # Result monad, UnifiedOperation patterns
+│   ├── error-codes.md               # Complete E.* error registry
+│   ├── validation-modes.md          # V.* flag combinations
+│   ├── exemplar-analysis.md         # Deep dive into exemplar files
+│   └── decision-trees.md            # When to use what
+├── api/
+│   ├── core-api.md                  # libs/core public API
+│   └── rhino-api.md                 # libs/rhino public API
+└── schemas/
+    ├── issue-output.schema.json     # Expected issue triage output
+    ├── pr-review.schema.json        # Expected PR review output
+    └── implementation.schema.json   # Expected implementation output
 ```
+
+### 4.6 Structured Output Schemas
+
+**Location**: `docs/schemas/`
+
+Define JSON schemas for predictable agent output:
+
+```json
+// docs/schemas/pr-review.schema.json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PR Review Output",
+  "type": "object",
+  "required": ["verdict", "violations", "suggestions"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "request-changes", "comment"]
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
+```
+
+**Rationale**: Per [Structured Output Schemas](https://github.com/danielrosehill/Structured-Output-Schemas), schemas ensure predictable, parseable agent output.
 
 ---
 
-## 4. Tooling Decisions
+## 5. Revised Conflict Resolution
 
-### 4.1 Tools Retained (No Change)
+### 5.1 Agent Instruction Files
 
-| Tool | Justification |
-|------|---------------|
-| .NET 8.0 + C# preview | Modern language features required |
-| Roslynator + Meziantou | Comprehensive analyzer coverage |
-| pre-commit hooks | Local validation before CI |
-| xUnit + CsCheck | Property-based testing for core |
-| NUnit + Rhino.Testing | Headless Rhino integration tests |
-| Dependabot | Automated dependency updates |
+**CORRECTED Resolution**:
 
-### 4.2 Tools Upgraded
+| File | Action | Rationale |
+|------|--------|-----------|
+| `CLAUDE.md` | **RETAIN as master** | Comprehensive, Claude-specific |
+| `AGENTS.md` | **RETAIN and SYNC** | Industry standard for Codex/Copilot |
+| `.github/copilot-instructions.md` | **RETAIN as pointer** | GitHub Copilot specific |
+| `.github/agents/*.agent.md` | **RETAIN and UPGRADE** | Role-specific details |
 
-| Tool | Current | Target | Justification |
-|------|---------|--------|---------------|
-| Agent prompt format | Markdown | XML-structured | Machine-parseable, explicit sections |
-| Workflow agents | Inline JSON | External file reference | Single source of truth |
-| Documentation | 4 overlapping files | 2 focused files | Eliminate drift |
+**Synchronization Strategy**:
+- `CLAUDE.md` is the source of truth
+- `AGENTS.md` auto-generated or manually synced from CLAUDE.md
+- Both files cover same rules but AGENTS.md in OpenAI-friendly format
 
-### 4.3 Tools Considered but Rejected
+### 5.2 Workflow Consolidation
 
-| Tool | Reason for Rejection |
-|------|---------------------|
-| Nx | Repository is pure C#, not TypeScript |
-| Biome | Not applicable to C# projects |
-| lefthook | pre-commit already configured, redundant |
-| pnpm | No JavaScript/TypeScript dependencies |
+**RETAIN original plan** to merge `claude.yml` + `claude-issues.yml`, but add:
+- GitHub Agentic Workflows integration (future)
+- Structured output parsing
+- Issue form integration
 
 ---
 
-## 5. XML-Structured Agent Prompt Template
+## 6. Multi-Agent Architecture Design
 
-All `.github/agents/*.agent.md` files will be refactored to this structure:
+### 6.1 Orchestration Model
 
-```xml
-<agent-definition>
-  <metadata>
-    <name>{agent-name}</name>
-    <version>1.0</version>
-    <description>{short description}</description>
-  </metadata>
+```
+<multi-agent-architecture>
+  <orchestrator>
+    <name>task-router</name>
+    <triggers>issue-labeled, pr-opened, @claude-mention</triggers>
+    <routing>
+      <route condition="label:claude-implement AND domain:core">
+        <agent>csharp-advanced</agent>
+      </route>
+      <route condition="label:claude-implement AND domain:rhino">
+        <agent>rhino-implementation</agent>
+      </route>
+      <route condition="label:claude-test">
+        <agent>testing-specialist</agent>
+      </route>
+      <route condition="pr-review">
+        <agent>refactoring-architect</agent>
+      </route>
+      <fallback>
+        <agent>csharp-advanced</agent>
+      </fallback>
+    </routing>
+  </orchestrator>
 
-  <role>
-    <primary>{primary responsibility}</primary>
-    <expertise>{comma-separated domains}</expertise>
-  </role>
-
-  <constraints>
-    <absolute-rules>
-      <rule id="1" severity="error">{rule}</rule>
-      <!-- ... -->
-    </absolute-rules>
-    <organizational-limits>
-      <limit metric="files-per-folder" max="4" ideal="2-3"/>
-      <limit metric="types-per-folder" max="10" ideal="6-8"/>
-      <limit metric="loc-per-member" max="300" ideal="150-250"/>
-    </organizational-limits>
-  </constraints>
-
-  <patterns>
-    <pattern name="{pattern-name}">
-      <description>{what/when}</description>
-      <code language="csharp">
-        <!-- code example -->
-      </code>
-    </pattern>
-  </patterns>
-
-  <workflow>
-    <step order="1">{action}</step>
-    <!-- ... -->
-  </workflow>
+  <workers>
+    <agent name="csharp-advanced" specialization="core-patterns"/>
+    <agent name="rhino-implementation" specialization="geometry"/>
+    <agent name="testing-specialist" specialization="testing"/>
+    <agent name="refactoring-architect" specialization="review"/>
+  </workers>
 
   <verification>
-    <check type="build">dotnet build --configuration Release</check>
-    <check type="test">dotnet test</check>
-    <check type="limits">Verify file/type/LOC limits</check>
+    <agent name="cleanup-specialist" role="post-check"/>
   </verification>
-</agent-definition>
+</multi-agent-architecture>
 ```
 
----
+### 6.2 Agent Communication Protocol
 
-## 6. Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Agent prompt migration breaks existing behavior | Medium | High | Incremental rollout, parallel operation |
-| Documentation consolidation loses nuance | Low | Medium | Archive deprecated files, not delete |
-| Workflow merge creates execution gaps | Medium | Medium | Comprehensive trigger testing |
-| XML format rejected by Claude Code | Low | High | Fallback to markdown with XML sections |
+Agents communicate through:
+1. **Issue comments** - Progress updates, questions
+2. **PR descriptions** - Structured output per schema
+3. **Commit messages** - Conventional commits format
+4. **GitHub Actions outputs** - Machine-readable state
 
 ---
 
-## 7. Success Metrics
+## 7. Implementation Priority (Revised)
+
+| Priority | Domain | Task | Effort | Impact |
+|----------|--------|------|--------|--------|
+| **P0** | Infrastructure | Add GitHub Issue Forms | Low | High |
+| **P0** | Infrastructure | Add PR Template | Low | Medium |
+| **P0** | Infrastructure | Add `.mcp.json` | Low | High |
+| **P1** | Agents | Expand Claude Code Hooks | Medium | High |
+| **P1** | Agents | Sync AGENTS.md with CLAUDE.md | Low | High |
+| **P1** | Documentation | Create `docs/agents/` knowledge base | Medium | High |
+| **P2** | Agents | Add structured output schemas | Medium | Medium |
+| **P2** | CI/CD | Merge overlapping workflows | Low | Medium |
+| **P2** | CI/CD | Add issue form parsing to workflows | Medium | Medium |
+| **P3** | Future | GitHub Agentic Workflows integration | High | High |
+
+---
+
+## 8. Success Metrics (Revised)
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Agent definition locations | 3 | 1 (+ pointer) |
-| Documentation files with overlapping content | 4 | 1 master + pointers |
-| Workflows with overlapping triggers | 2 | 0 |
-| Agent prompts using XML structure | 0 | 11 |
-| Agent instruction files (.github/agents/) | 11 | 11 (unchanged, upgraded) |
+| Agent instruction file coverage | 2 (CLAUDE.md, AGENTS.md) | 2 (maintained, synced) |
+| GitHub Issue Forms | 0 | 4 (bug, feature, claude-implement, docs) |
+| PR Template | 0 | 1 |
+| MCP configuration | 0 | 1 (`.mcp.json`) |
+| Claude Code Hooks | 1 (SessionStart) | 3 (PreToolUse, PostToolUse, SessionStart) |
+| Agent knowledge docs | 0 | 5+ documents |
+| Structured output schemas | 0 | 3+ schemas |
 
 ---
 
-## 8. Scope Exclusions
+## 9. Research Sources
 
-The following are **out of scope** for this overhaul:
+### Industry Standards
+- [AGENTS.md Official Site](https://agents.md/)
+- [OpenAI agents.md Repository](https://github.com/openai/agents.md)
+- [OpenAI Codex AGENTS.md Guide](https://developers.openai.com/codex/guides/agents-md/)
+- [GitHub Copilot Custom Instructions](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot)
 
-1. **Core library architecture** (`libs/core/`, `libs/rhino/`) — code patterns unchanged
-2. **Test framework selection** — xUnit/NUnit split is intentional
-3. **Analyzer configuration** — already comprehensive
-4. **RhinoCommon version** — tied to platform requirements
-5. **Build system** — MSBuild + Directory.Build.props is appropriate
+### Multi-Agent Patterns
+- [Azure AI Agent Design Patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
+- [9 Agentic AI Workflow Patterns 2025](https://www.marktechpost.com/2025/08/09/9-agentic-ai-workflow-patterns-transforming-ai-agents-in-2025/)
+- [Multi-Agent AI Workflows: Next Evolution](https://www.infoworld.com/article/4035926/multi-agent-ai-workflows-the-next-evolution-of-ai-coding.html)
 
----
+### Claude Code Infrastructure
+- [Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Claude Code MCP Integration](https://docs.anthropic.com/en/docs/claude-code/mcp)
+- [Claude Code Hooks Guide](https://www.brethorsting.com/blog/2025/08/demystifying-claude-code-hooks/)
+- [GitButler Claude Code Hooks](https://docs.gitbutler.com/features/ai-integration/claude-code-hooks)
 
-## 9. Implementation Priority
+### GitHub Actions & Templates
+- [GitHub Issue Forms Syntax](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms)
+- [GitHub Agentic Workflows](https://githubnext.com/projects/agentic-workflows/)
+- [claude-code-action Repository](https://github.com/anthropics/claude-code-action)
 
-| Priority | Domain | Effort | Impact |
-|----------|--------|--------|--------|
-| P0 | Consolidate agent definitions | Low | High |
-| P0 | Merge claude.yml + claude-issues.yml | Low | Medium |
-| P1 | XML-structure agent prompts | Medium | High |
-| P1 | Deprecate AGENTS.md, merge to CLAUDE.md | Low | Medium |
-| P2 | Refactor copilot-instructions.md | Low | Low |
-| P2 | Optimize workflow triggers | Medium | Medium |
+### Structured Output
+- [Structured Output Schemas](https://github.com/danielrosehill/Structured-Output-Schemas)
+- [GitHub AI Inference Action](https://github.com/actions/ai-inference)
 
 ---
 
