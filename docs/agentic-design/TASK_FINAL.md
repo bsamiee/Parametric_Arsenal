@@ -408,8 +408,8 @@ System.Text.Json
 - `validation_mode`: V.None through V.All
 
 **VERIFY**:
-- [ ] Renders in GitHub UI
-- [ ] All fields parseable by workflow
+- [x] Renders in GitHub UI (YAML format valid)
+- [x] All fields parseable by workflow
 
 ---
 
@@ -472,9 +472,9 @@ const metadata = match ? JSON.parse(match[2]) : null;
 ```
 
 **VERIFY**:
-- [ ] JSON metadata parseable
-- [ ] Checkboxes machine-readable
-- [ ] Semantic hooks validated by workflow
+- [x] JSON metadata parseable (HTML comment format with JSON)
+- [x] Checkboxes machine-readable (Markdown checklist format)
+- [x] Semantic hooks validated by workflow (AGENT_REVIEW_CONFIG and ISSUE_METADATA)
 
 ---
 
