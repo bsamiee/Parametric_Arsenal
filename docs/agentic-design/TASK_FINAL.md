@@ -326,10 +326,10 @@ exemplars:
 ```
 
 **VERIFY**:
-- [ ] All 11 agent files have identical `[CRITICAL RULES]` content
-- [ ] Rules match STANDARDS.yaml source of truth
-- [ ] No manual edits to `[CRITICAL RULES]` sections (generated only)
-- [ ] CI workflow validates sync on PR
+- [x] All 11 agent files have identical `[CRITICAL RULES]` content
+- [x] Rules match STANDARDS.yaml source of truth
+- [x] No manual edits to `[CRITICAL RULES]` sections (generated only)
+- [ ] CI workflow validates sync on PR (deferred to P-5: Standards sync CI workflow)
 
 ---
 
