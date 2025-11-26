@@ -1,0 +1,121 @@
+name: Standards Sync Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/standards/STANDARDS.yaml'
+      - 'tools/standards/StandardsGen.csx'
+      - '.github/agents/*.agent.md'
+      - '.github/copilot-instructions.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-sync:
+    name: Validate Standards Synchronization
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install dotnet-script
+        run: dotnet tool install --global dotnet-script
+
+      - name: Run StandardsGen.csx
+        run: |
+          echo "[INFO] Running StandardsGen.csx to regenerate standards sections..."
+          cd tools/standards
+          dotnet script StandardsGen.csx
+          cd ../..
+
+      - name: Check for inconsistencies
+        id: check
+        run: |
+          if git diff --quiet .github/agents/ .github/copilot-instructions.md; then
+            echo "in_sync=true" >> $GITHUB_OUTPUT
+            echo "[PASS] All standards sections are synchronized"
+          else
+            echo "in_sync=false" >> $GITHUB_OUTPUT
+            echo "[FAIL] Standards sections are out of sync"
+            echo ""
+            echo "Files with inconsistencies:"
+            git diff --name-only .github/agents/ .github/copilot-instructions.md
+            echo ""
+            echo "Diff:"
+            git diff .github/agents/ .github/copilot-instructions.md
+          fi
+
+      - name: Create PR comment with sync status
+        if: steps.check.outputs.in_sync == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const diff = `\`\`\`diff
+            ${require('child_process').execSync('git diff .github/agents/ .github/copilot-instructions.md').toString()}
+            \`\`\``;
+            
+            const body = `## ⚠️ Standards Synchronization Check Failed
+
+            The agent files and/or copilot-instructions.md are out of sync with STANDARDS.yaml.
+
+            ### Files requiring updates:
+            ${require('child_process').execSync('git diff --name-only .github/agents/ .github/copilot-instructions.md').toString().split('\n').filter(f => f).map(f => `- \`${f}\``).join('\n')}
+
+            ### How to fix:
+            1. Run \`dotnet script tools/standards/StandardsGen.csx\` from repository root
+            2. Commit the updated files
+            3. Push to this PR
+
+            ### Detected differences:
+            ${diff.length > 60000 ? '[Diff too large to display - run locally to see changes]' : diff}
+
+            ---
+            **Note**: This check ensures all \`[CRITICAL RULES]\` sections remain synchronized with the canonical STANDARDS.yaml.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if out of sync
+        if: steps.check.outputs.in_sync == 'false'
+        run: |
+          echo "[ERROR] Standards sections are out of sync!"
+          echo ""
+          echo "To fix this:"
+          echo "1. Run: dotnet script tools/standards/StandardsGen.csx"
+          echo "2. Commit the updated files"
+          echo "3. Push to this PR"
+          echo ""
+          exit 1
+
+      - name: Success summary
+        if: steps.check.outputs.in_sync == 'true'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Standards Synchronization Check Passed
+
+          All files are in sync with STANDARDS.yaml:
+          - All 11 agent files have synchronized \`[CRITICAL RULES]\` sections
+          - copilot-instructions.md has synchronized \`[BLOCKERS]\` section
+          - Source of truth: \`tools/standards/STANDARDS.yaml\`
+
+          ---
+          **Workflow**: [\`standards-sync.yml\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF

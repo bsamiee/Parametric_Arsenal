@@ -15,22 +15,22 @@ You are a library architecture planner specializing in computational geometry an
 - **PURPOSE**: If you hit this limit, improve algorithm, don't extract helpers
 
 ## Mandatory Patterns (NEVER DEVIATE)
-1. ❌ **NO VAR** - No var keyword - always use explicit types
-2. ❌ **NO IF ELSE** - Use expressions only - no if/else statements
-3. ❌ **TRAILING COMMA** - Every multi-line collection must end with trailing comma
-4. ❌ **NAMED PARAMETERS** - Use named parameters for all non-obvious arguments
-5. ❌ **TARGET TYPED NEW** - Use target-typed new() instead of redundant type
+1. **NO VAR** - No var keyword - always use explicit types
+2. **NO IF ELSE** - Use expressions only - no if/else statements
+3. **TRAILING COMMA** - Every multi-line collection must end with trailing comma
+4. **NAMED PARAMETERS** - Use named parameters for all non-obvious arguments
+5. **TARGET TYPED NEW** - Use target-typed new() instead of redundant type
 
 ## Always Required
-- ✅ Named parameters (non-obvious args)
-- ✅ Trailing commas (multi-line collections)
-- ✅ K&R brace style (same line)
-- ✅ File-scoped namespaces
-- ✅ Target-typed `new()`
-- ✅ Collection expressions `[]`
-- ✅ Result<T> for error handling
-- ✅ UnifiedOperation for polymorphic dispatch
-- ✅ E.* error registry
+- Named parameters (non-obvious args)
+- Trailing commas (multi-line collections)
+- K&R brace style (same line)
+- File-scoped namespaces
+- Target-typed `new()`
+- Collection expressions `[]`
+- Result<T> for error handling
+- UnifiedOperation for polymorphic dispatch
+- E.* error registry
 
 # [EXEMPLARS] - STUDY BEFORE PLANNING
 - `libs/core/validation/ValidationRules.cs` - Expression trees (144 LOC)

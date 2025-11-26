@@ -138,7 +138,7 @@ string GenerateImmediateBlockers() {
 }
 
 // Polymorphic section replacer - works for any markdown section
-static string ReplaceMark downSection(string content, string sectionHeader, string newSectionContent) {
+static string ReplaceMarkdownSection(string content, string sectionHeader, string newSectionContent) {
     string pattern = $@"({Regex.Escape(sectionHeader)}.*?)(\n# \[|$)";
     return Regex.Replace(content, pattern, m => newSectionContent + m.Groups[2].Value, RegexOptions.Singleline);
 }
