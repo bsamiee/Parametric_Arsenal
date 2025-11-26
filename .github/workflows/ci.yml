@@ -43,8 +43,6 @@ jobs:
 
       - name: EditorConfig Compliance Check
         uses: editorconfig-checker/action-editorconfig-checker@v2
-        with:
-          version: '3.0.3'
 
       - name: Verify .NET Formatting
         run: dotnet format Parametric_Arsenal.sln --verify-no-changes --verbosity quiet
