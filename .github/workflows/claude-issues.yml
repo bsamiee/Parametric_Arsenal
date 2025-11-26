@@ -34,6 +34,44 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Parse Issue Metadata
+        id: parse_issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            body || core.warning('Issue body is empty, using defaults');
+            
+            const extractMatch = (regex, fallback) => {
+              const match = body.match(regex);
+              return match ? match[1].trim() : fallback;
+            };
+            
+            const agent = extractMatch(/### Recommended Agent\s+([^\n]+)/, 'auto-detect');
+            const scope = extractMatch(/### Scope\s+([^\n]+)/, 'unknown');
+            
+            core.setOutput('agent', agent);
+            core.setOutput('scope', scope);
+            core.info(`Detected agent: ${agent}`);
+            core.info(`Detected scope: ${scope}`);
+
+      - name: Load Agent Context
+        id: agent_context
+        if: steps.parse_issue.outputs.agent != 'auto-detect'
+        run: |
+          AGENT="${{ steps.parse_issue.outputs.agent }}"
+          AGENT_FILE=".github/agents/${AGENT}.agent.md"
+          
+          if [ -f "$AGENT_FILE" ]; then
+            echo "agent_instructions<<EOF" >> $GITHUB_OUTPUT
+            cat "$AGENT_FILE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "[INFO] Loaded agent context from $AGENT_FILE"
+          else
+            echo "agent_instructions=" >> $GITHUB_OUTPUT
+            echo "[WARN] Agent file $AGENT_FILE not found, proceeding without agent context"
+          fi
+
       - name: Claude Implement Issue
         uses: anthropics/claude-code-action@v1
         with:
@@ -44,6 +82,8 @@ jobs:
 
             ## ISSUE DETAILS
             ${{ github.event.issue.body }}
+
+            ${{ steps.agent_context.outputs.agent_instructions && format('## SPECIALIST AGENT CONTEXT\n\n{0}', steps.agent_context.outputs.agent_instructions) || '' }}
 
             ## IMPLEMENTATION REQUIREMENTS
 
@@ -69,8 +109,9 @@ jobs:
 
             5. **Verification**:
                - Run `dotnet build` - must pass with zero warnings
-               - Run `dotnet test` - all tests must pass
+               - Run `dotnet test --collect:"XPlat Code Coverage"` - all tests must pass
                - Add tests for new functionality
+               - Coverage for new code must be >80%
 
             ## DELIVERABLE
 
@@ -115,6 +156,34 @@ jobs:
                 }
               }
             }
+
+      - name: Run Tests with Coverage
+        id: coverage
+        if: success()
+        run: |
+          dotnet test --collect:"XPlat Code Coverage" --results-directory ./TestResults
+          echo "[INFO] Test coverage collected"
+
+      - name: Install Coverage Tools
+        if: success()
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils bc
+
+      - name: Check Coverage Threshold
+        if: success()
+        run: |
+          command -v xmllint &> /dev/null || { echo "[ERROR] xmllint not found"; exit 1; }
+          command -v bc &> /dev/null || { echo "[ERROR] bc not found"; exit 1; }
+          
+          COVERAGE=$(find ./TestResults -name 'coverage.cobertura.xml' -exec xmllint --xpath 'string(//coverage/@line-rate)' {} \; 2>/dev/null | head -1)
+          [ -z "$COVERAGE" ] && { echo "[ERROR] Could not parse coverage report"; exit 1; }
+          
+          COVERAGE_PCT=$(echo "$COVERAGE * 100" | bc)
+          echo "[INFO] Code coverage: ${COVERAGE_PCT}%"
+          
+          (( $(echo "$COVERAGE < 0.80" | bc -l) )) && {
+            echo "[ERROR] Coverage ${COVERAGE_PCT}% is below 80% threshold"
+            exit 1
+          }
 
       - name: Comment on issue
         if: failure()
