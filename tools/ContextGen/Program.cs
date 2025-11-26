@@ -186,7 +186,8 @@ internal static class Program {
         }
 
         // Extract static readonly V fields with their values
-        List<object> flags = [];
+        // First pass: collect all non-All flags
+        List<(string Name, string Value)> flagValues = [];
         foreach (FieldDeclarationSyntax field in vStruct.Members
             .OfType<FieldDeclarationSyntax>()
             .Where(f => f.Modifiers.Any(m => string.Equals(m.Text, "static", StringComparison.Ordinal))
@@ -194,17 +195,23 @@ internal static class Program {
                      && string.Equals(f.Declaration.Type.ToString(), "V", StringComparison.Ordinal))) {
             foreach (VariableDeclaratorSyntax variable in field.Declaration.Variables) {
                 string name = variable.Identifier.Text;
-                // Extract numeric value from new(value) initializer
-                SyntaxToken valueToken = variable.Initializer?.Value?.DescendantTokens()
-                    .FirstOrDefault(t => int.TryParse(s: t.Text, provider: null, out _)) ?? default;
-                string value = !string.IsNullOrEmpty(valueToken.Text) ? valueToken.Text : "0";
-                // Special handling for 'All' - calculate as bitwise OR of all flags
-                if (string.Equals(name, "All", StringComparison.Ordinal)) {
-                    int allValue = flags.Cast<dynamic>().Sum(f => int.Parse(f.Value));
-                    value = allValue.ToString(provider: null);
-                }
-                flags.Add(new { Name = name, Value = value, });
+                string value = string.Equals(name, "All", StringComparison.Ordinal) ? "" : ExtractValue(variable);
+                flagValues.Add((name, value));
             }
+        }
+        // Second pass: calculate 'All' as bitwise OR of collected flags
+        int allValue = flagValues.Where(f => !string.Equals(f.Name, "All", StringComparison.Ordinal))
+            .Sum(f => int.Parse(s: f.Value, provider: null));
+        // Build final list
+        List<object> flags = [.. flagValues.Select(f =>
+            string.Equals(f.Name, "All", StringComparison.Ordinal)
+                ? new { f.Name, Value = allValue.ToString(provider: null), }
+                : new { f.Name, f.Value, }),];
+
+        static string ExtractValue(VariableDeclaratorSyntax variable) {
+            SyntaxToken valueToken = variable.Initializer?.Value?.DescendantTokens()
+                .FirstOrDefault(t => int.TryParse(s: t.Text, provider: null, out _)) ?? default;
+            return !string.IsNullOrEmpty(valueToken.Text) ? valueToken.Text : "0";
         }
 
         object modes = new { Flags = flags, };

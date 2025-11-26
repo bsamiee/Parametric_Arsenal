@@ -64,16 +64,30 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const diff = `\`\`\`diff
-            ${require('child_process').execSync('git diff .github/agents/ .github/copilot-instructions.md').toString()}
-            \`\`\``;
+            const { execSync } = require('child_process');
+            const execOpts = { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 };
+            
+            const safeExec = (cmd) => {
+              try {
+                return execSync(cmd, execOpts);
+              } catch (error) {
+                console.error(`Error executing: ${cmd}`, error);
+                return '';
+              }
+            };
+            
+            const diff = safeExec('git diff .github/agents/ .github/copilot-instructions.md');
+            const fileList = safeExec('git diff --name-only .github/agents/ .github/copilot-instructions.md');
+            
+            const formattedDiff = diff ? `\`\`\`diff\n${diff}\n\`\`\`` : '[No diff available]';
+            const formattedFileList = fileList.split('\n').filter(f => f).map(f => `- \`${f}\``).join('\n') || '[No files]';
             
             const body = `## ⚠️ Standards Synchronization Check Failed
 
             The agent files and/or copilot-instructions.md are out of sync with STANDARDS.yaml.
 
             ### Files requiring updates:
-            ${require('child_process').execSync('git diff --name-only .github/agents/ .github/copilot-instructions.md').toString().split('\n').filter(f => f).map(f => `- \`${f}\``).join('\n')}
+            ${formattedFileList}
 
             ### How to fix:
             1. Run \`dotnet script tools/standards/StandardsGen.csx\` from repository root
@@ -81,7 +95,7 @@ jobs:
             3. Push to this PR
 
             ### Detected differences:
-            ${diff.length > 60000 ? '[Diff too large to display - run locally to see changes]' : diff}
+            ${formattedDiff.length > 60000 ? '[Diff too large to display - run locally to see changes]' : formattedDiff}
 
             ---
             **Note**: This check ensures all \`[CRITICAL RULES]\` sections remain synchronized with the canonical STANDARDS.yaml.`;

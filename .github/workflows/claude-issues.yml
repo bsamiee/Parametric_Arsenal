@@ -39,15 +39,16 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const body = context.payload.issue.body;
+            const body = context.payload.issue.body || '';
+            body || core.warning('Issue body is empty, using defaults');
             
-            // Extract agent selection from issue body
-            const agentMatch = body.match(/### Recommended Agent\s+([^\n]+)/);
-            const agent = agentMatch ? agentMatch[1].trim() : 'auto-detect';
+            const extractMatch = (regex, fallback) => {
+              const match = body.match(regex);
+              return match ? match[1].trim() : fallback;
+            };
             
-            // Extract scope
-            const scopeMatch = body.match(/### Scope\s+([^\n]+)/);
-            const scope = scopeMatch ? scopeMatch[1].trim() : 'unknown';
+            const agent = extractMatch(/### Recommended Agent\s+([^\n]+)/, 'auto-detect');
+            const scope = extractMatch(/### Scope\s+([^\n]+)/, 'unknown');
             
             core.setOutput('agent', agent);
             core.setOutput('scope', scope);
@@ -163,20 +164,26 @@ jobs:
           dotnet test --collect:"XPlat Code Coverage" --results-directory ./TestResults
           echo "[INFO] Test coverage collected"
 
+      - name: Install Coverage Tools
+        if: success()
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils bc
+
       - name: Check Coverage Threshold
         if: success()
         run: |
-          # Parse coverage XML and check minimum threshold
-          if command -v xmllint &> /dev/null; then
-            COVERAGE=$(find ./TestResults -name 'coverage.cobertura.xml' -exec xmllint --xpath 'string(//coverage/@line-rate)' {} \; 2>/dev/null | head -1)
-            if [ -n "$COVERAGE" ]; then
-              COVERAGE_PCT=$(echo "$COVERAGE * 100" | bc)
-              echo "[INFO] Code coverage: ${COVERAGE_PCT}%"
-              if (( $(echo "$COVERAGE < 0.80" | bc -l) )); then
-                echo "[WARN] Coverage ${COVERAGE_PCT}% is below 80% threshold"
-              fi
-            fi
-          fi
+          command -v xmllint &> /dev/null || { echo "[ERROR] xmllint not found"; exit 1; }
+          command -v bc &> /dev/null || { echo "[ERROR] bc not found"; exit 1; }
+          
+          COVERAGE=$(find ./TestResults -name 'coverage.cobertura.xml' -exec xmllint --xpath 'string(//coverage/@line-rate)' {} \; 2>/dev/null | head -1)
+          [ -z "$COVERAGE" ] && { echo "[ERROR] Could not parse coverage report"; exit 1; }
+          
+          COVERAGE_PCT=$(echo "$COVERAGE * 100" | bc)
+          echo "[INFO] Code coverage: ${COVERAGE_PCT}%"
+          
+          (( $(echo "$COVERAGE < 0.80" | bc -l) )) && {
+            echo "[ERROR] Coverage ${COVERAGE_PCT}% is below 80% threshold"
+            exit 1
+          }
 
       - name: Comment on issue
         if: failure()
