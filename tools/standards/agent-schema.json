@@ -1,0 +1,323 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bsamiee/Parametric_Arsenal/schemas/agent-schema.json",
+  "title": "Agent File Schema",
+  "description": "JSON Schema for validating custom agent definition files (.agent.md frontmatter)",
+  "type": "object",
+  "required": [
+    "name",
+    "description",
+    "role",
+    "expertise",
+    "critical_rules"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Agent name (must match filename without .agent.md)",
+      "pattern": "^[a-z]+(-[a-z]+)*$",
+      "examples": [
+        "csharp-advanced",
+        "testing-specialist",
+        "refactoring-architect"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief one-line description of agent's purpose",
+      "minLength": 10,
+      "maxLength": 200
+    },
+    "role": {
+      "type": "string",
+      "description": "Agent's primary role classification",
+      "enum": [
+        "implementation",
+        "testing",
+        "refactoring",
+        "documentation",
+        "integration",
+        "planning",
+        "performance",
+        "cleanup"
+      ]
+    },
+    "expertise": {
+      "type": "array",
+      "description": "List of expertise areas",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "enum": [
+          "csharp",
+          "dotnet",
+          "rhino",
+          "grasshopper",
+          "result-monad",
+          "unified-operation",
+          "validation",
+          "testing",
+          "property-testing",
+          "expression-trees",
+          "pattern-matching",
+          "performance",
+          "algorithms",
+          "spatial-indexing",
+          "geometry",
+          "documentation",
+          "architecture",
+          "refactoring"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "critical_rules": {
+      "type": "object",
+      "description": "Critical rules enforced by this agent (synced from STANDARDS.yaml)",
+      "required": [
+        "prohibitions",
+        "requirements"
+      ],
+      "properties": {
+        "prohibitions": {
+          "type": "array",
+          "description": "Absolute prohibitions that fail the build",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "rule",
+              "severity"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Z_]+$"
+              },
+              "rule": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              "analyzer": {
+                "type": "string",
+                "description": "Optional analyzer rule ID (e.g., IDE0007, CA1050)"
+              }
+            }
+          }
+        },
+        "requirements": {
+          "type": "array",
+          "description": "Mandatory requirements for all code",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "rule"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Z_]+$"
+              },
+              "rule": {
+                "type": "string"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "description": "Code patterns this agent specializes in",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string",
+            "description": "Code example demonstrating the pattern"
+          }
+        }
+      }
+    },
+    "exemplars": {
+      "type": "array",
+      "description": "Exemplar files this agent should study",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "purpose"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^libs/"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "loc": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "description": "Agent's operational scope",
+      "properties": {
+        "libraries": {
+          "type": "array",
+          "description": "Which libs/ folders this agent can work in",
+          "items": {
+            "type": "string",
+            "enum": [
+              "core",
+              "rhino",
+              "grasshopper"
+            ]
+          }
+        },
+        "file_types": {
+          "type": "array",
+          "description": "File types this agent handles",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cs",
+              "csproj",
+              "md",
+              "yml",
+              "json"
+            ]
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "description": "Organizational limits enforced by this agent",
+      "properties": {
+        "max_files_per_folder": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 4
+        },
+        "max_types_per_folder": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max_loc_per_member": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 1,
+          "maximum": 300
+        }
+      }
+    },
+    "decision_trees": {
+      "type": "array",
+      "description": "Decision trees for common scenarios",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "tree"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tree": {
+            "type": "string",
+            "description": "ASCII tree representation or markdown"
+          }
+        }
+      }
+    },
+    "version": {
+      "type": "string",
+      "description": "Schema version for this agent file",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "1.0"
+    }
+  },
+  "examples": [
+    {
+      "name": "csharp-advanced",
+      "description": "Advanced C# specialist for dense, algorithmic, polymorphic code with modern patterns",
+      "role": "implementation",
+      "expertise": [
+        "csharp",
+        "dotnet",
+        "pattern-matching",
+        "expression-trees",
+        "algorithms"
+      ],
+      "critical_rules": {
+        "prohibitions": [
+          {
+            "id": "NO_VAR",
+            "rule": "Never use var - explicit types always",
+            "severity": "error",
+            "analyzer": "IDE0007"
+          },
+          {
+            "id": "NO_IF_ELSE",
+            "rule": "Never use if/else statements - use expressions",
+            "severity": "error"
+          }
+        ],
+        "requirements": [
+          {
+            "id": "NAMED_PARAMS",
+            "rule": "Always use named parameters for non-obvious arguments",
+            "examples": [
+              "ResultFactory.Create(error: E.Validation.X)"
+            ]
+          }
+        ]
+      },
+      "exemplars": [
+        {
+          "path": "libs/core/results/Result.cs",
+          "purpose": "Monadic composition with lazy evaluation",
+          "loc": 202
+        }
+      ],
+      "version": "1.0"
+    }
+  ]
+}
