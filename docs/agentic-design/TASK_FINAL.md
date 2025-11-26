@@ -81,11 +81,11 @@ IF review-output/pr-{N}.json exists:
 > **Implementation Note**: Apply fixes in reverse line order (highest line first) within each file to prevent line number shifts from invalidating subsequent fix locations.
 
 **VERIFY**:
-- [ ] Triggers on review completion
-- [ ] Downloads artifact correctly
-- [ ] Applies fixes per violation
-- [ ] Respects 3-iteration limit
-- [ ] Re-triggers review after fixes
+- [x] Triggers on review completion
+- [x] Downloads artifact correctly
+- [x] Applies fixes per violation
+- [x] Respects 3-iteration limit
+- [x] Re-triggers review after fixes
 
 ---
 

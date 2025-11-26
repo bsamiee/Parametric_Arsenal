@@ -1,0 +1,229 @@
+name: Claude Auto-Fix
+
+on:
+  workflow_run:
+    workflows: ["Claude Code Review"]
+    types: [completed]
+
+concurrency:
+  group: autofix-${{ github.event.workflow_run.pull_requests[0].number }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    # Only run if review workflow completed successfully and is a PR
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0] != null
+
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: Get PR number
+        id: pr
+        run: |
+          PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "📋 Processing PR #${PR_NUMBER}"
+
+      - name: Download review artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: review-output-pr-${{ steps.pr.outputs.number }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .github/review-output
+
+      - name: Check if review JSON exists
+        id: check
+        run: |
+          JSON_PATH=".github/review-output/pr-${{ steps.pr.outputs.number }}.json"
+          if [ -f "$JSON_PATH" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "path=${JSON_PATH}" >> $GITHUB_OUTPUT
+            echo "✅ Found review JSON at ${JSON_PATH}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Review JSON not found"
+          fi
+
+      - name: Parse review verdict
+        if: steps.check.outputs.exists == 'true'
+        id: verdict
+        run: |
+          JSON_PATH="${{ steps.check.outputs.path }}"
+          VERDICT=$(jq -r '.verdict' "$JSON_PATH")
+          VIOLATION_COUNT=$(jq '.violations | length' "$JSON_PATH")
+
+          echo "verdict=${VERDICT}" >> $GITHUB_OUTPUT
+          echo "violation_count=${VIOLATION_COUNT}" >> $GITHUB_OUTPUT
+
+          echo "📊 Verdict: ${VERDICT}"
+          echo "📊 Violations: ${VIOLATION_COUNT}"
+
+          if [ "$VERDICT" = "approve" ]; then
+            echo "✅ Review approved - no fixes needed"
+          fi
+
+      - name: Check iteration limit
+        if: |
+          steps.check.outputs.exists == 'true' &&
+          steps.verdict.outputs.verdict == 'request_changes'
+        id: iteration
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          # Count existing autofix-attempt labels
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' 2>/dev/null || echo "")
+          ATTEMPT_COUNT=$(echo "$LABELS" | grep -c "autofix-attempt-" || echo "0")
+
+          echo "count=${ATTEMPT_COUNT}" >> $GITHUB_OUTPUT
+          echo "📊 Previous autofix attempts: ${ATTEMPT_COUNT}"
+
+          if [ "$ATTEMPT_COUNT" -ge 3 ]; then
+            echo "limit_reached=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Auto-fix limit (3) reached"
+          else
+            echo "limit_reached=false" >> $GITHUB_OUTPUT
+            NEXT_ATTEMPT=$((ATTEMPT_COUNT + 1))
+            echo "next_attempt=${NEXT_ATTEMPT}" >> $GITHUB_OUTPUT
+            echo "🔄 Starting attempt ${NEXT_ATTEMPT}"
+          fi
+
+      - name: Comment on limit reached
+        if: steps.iteration.outputs.limit_reached == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "⚠️ **Auto-fix limit (3) reached.**
+
+          The automatic fix workflow has attempted to resolve violations 3 times without success.
+
+          **Manual review is required.**
+
+          Please review the remaining violations and apply fixes manually, or close and re-open this PR after addressing the issues."
+
+      - name: Checkout PR branch
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup .NET 8
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Apply fixes with Claude
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Apply fixes from the code review for PR #${{ steps.pr.outputs.number }}.
+
+            ## REVIEW DATA
+
+            Read the review JSON at `.github/review-output/pr-${{ steps.pr.outputs.number }}.json`.
+
+            ## FIX APPLICATION RULES
+
+            1. **Sort violations** by file path ASC, then by start_line DESC (highest line first)
+            2. **Apply each fix** by replacing the `current` code with `suggested` code
+            3. **Preserve context**: Ensure indentation matches surrounding code
+            4. **Verify after each file**: Run `dotnet build` after modifying each file
+
+            ## CRITICAL ORDER
+
+            Apply fixes in REVERSE line order within each file to prevent line number shifts.
+
+            Example order for file "A.cs" with violations on lines 50, 30, 10:
+            1. Fix line 50 first
+            2. Fix line 30 second
+            3. Fix line 10 last
+
+            ## VALIDATION
+
+            After all fixes:
+            1. Run `dotnet build` - must succeed
+            2. Run `dotnet format --verify-no-changes` - must succeed
+
+            If build fails after fixes, analyze the error and make additional corrections.
+
+            ## OUTPUT
+
+            Report which violations were fixed and the final build status.
+
+          claude_args: |
+            --model claude-sonnet-4-20250514
+            --max-turns 20
+            --allowedTools Read,Write,Edit,Grep,Glob,Bash(dotnet:*)
+
+      - name: Add attempt label
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
+        run: |
+          gh pr edit "$PR_NUMBER" --add-label "autofix-attempt-${ATTEMPT}"
+          echo "🏷️ Added label: autofix-attempt-${ATTEMPT}"
+
+      - name: Commit and push fixes
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "📝 No changes to commit"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "fix(review): apply agentic review fixes (attempt ${{ steps.iteration.outputs.next_attempt }})"
+          git push
+
+          echo "✅ Fixes committed and pushed"
+
+      - name: Request re-review
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "🔄 **Auto-fix attempt ${ATTEMPT} complete.**
+
+          Applied fixes for violations detected in the code review.
+
+          @claude Please re-review this PR to verify the fixes address all violations.
+
+          ---
+          *This is an automated message from the claude-autofix workflow.*"
+
+          echo "💬 Posted re-review request comment"
