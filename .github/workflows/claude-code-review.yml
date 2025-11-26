@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -76,9 +76,9 @@ jobs:
 
             Valid RULE_IDs: NO_VAR, NO_IF_ELSE, TRAILING_COMMA, NAMED_PARAMETERS,
             TARGET_TYPED_NEW, COLLECTION_EXPRESSIONS, FILE_SCOPED_NAMESPACE,
-            ONE_TYPE_PER_FILE, KR_BRACE_STYLE, RESULT_MONAD, UNIFIED_OPERATION,
-            ERROR_REGISTRY, FILES_PER_FOLDER, TYPES_PER_FOLDER, LOC_PER_MEMBER,
-            PRIMARY_CONSTRUCTORS
+            ONE_TYPE_PER_FILE, KR_BRACE_STYLE, PATTERN_MATCHING, RESULT_MONAD,
+            UNIFIED_OPERATION, ERROR_REGISTRY, FILES_PER_FOLDER, TYPES_PER_FOLDER,
+            LOC_PER_MEMBER, PRIMARY_CONSTRUCTORS
 
             ## MANDATORY CHECKS (build failures)
 

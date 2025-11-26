@@ -69,6 +69,7 @@
         "FILE_SCOPED_NAMESPACE",
         "ONE_TYPE_PER_FILE",
         "KR_BRACE_STYLE",
+        "PATTERN_MATCHING",
         "RESULT_MONAD",
         "UNIFIED_OPERATION",
         "ERROR_REGISTRY",
@@ -101,7 +102,7 @@
         "end_line": {
           "type": "integer",
           "minimum": 1,
-          "description": "Ending line number of the violation (1-indexed). Equal to start_line for single-line violations"
+          "description": "Ending line number of the violation (1-indexed). Must be greater than or equal to start_line"
         },
         "current": {
           "type": "string",

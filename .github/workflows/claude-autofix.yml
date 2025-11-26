@@ -113,7 +113,7 @@ jobs:
         if: |
           steps.verdict.outputs.verdict == 'request_changes' &&
           steps.iteration.outputs.limit_reached != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
@@ -174,19 +174,8 @@ jobs:
             --max-turns 20
             --allowedTools Read,Write,Edit,Grep,Glob,Bash(dotnet:*)
 
-      - name: Add attempt label
-        if: |
-          steps.verdict.outputs.verdict == 'request_changes' &&
-          steps.iteration.outputs.limit_reached != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
-        run: |
-          gh pr edit "$PR_NUMBER" --add-label "autofix-attempt-${ATTEMPT}"
-          echo "🏷️ Added label: autofix-attempt-${ATTEMPT}"
-
       - name: Commit and push fixes
+        id: commit
         if: |
           steps.verdict.outputs.verdict == 'request_changes' &&
           steps.iteration.outputs.limit_reached != 'true'
@@ -199,6 +188,7 @@ jobs:
           # Check if there are changes to commit
           if git diff --quiet && git diff --cached --quiet; then
             echo "📝 No changes to commit"
+            echo "changes_made=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -206,12 +196,21 @@ jobs:
           git commit -m "fix(review): apply agentic review fixes (attempt ${{ steps.iteration.outputs.next_attempt }})"
           git push
 
+          echo "changes_made=true" >> $GITHUB_OUTPUT
           echo "✅ Fixes committed and pushed"
 
+      - name: Add attempt label
+        if: steps.commit.outputs.changes_made == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          ATTEMPT: ${{ steps.iteration.outputs.next_attempt }}
+        run: |
+          gh pr edit "$PR_NUMBER" --add-label "autofix-attempt-${ATTEMPT}"
+          echo "🏷️ Added label: autofix-attempt-${ATTEMPT}"
+
       - name: Request re-review
-        if: |
-          steps.verdict.outputs.verdict == 'request_changes' &&
-          steps.iteration.outputs.limit_reached != 'true'
+        if: steps.commit.outputs.changes_made == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
