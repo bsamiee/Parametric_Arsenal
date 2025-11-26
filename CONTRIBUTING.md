@@ -622,7 +622,7 @@ Current metrics tracked:
 - Agent invocation counts by type
 - Context file freshness
 
-View current status in daily dashboard issues (coming soon).
+View current status in daily dashboard issues (auto-created at 00:00 UTC daily).
 
 ---
 
