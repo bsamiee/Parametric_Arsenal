@@ -298,7 +298,7 @@ jobs:
             | Metric | Value |
             |--------|-------|
             | **Total PRs** | ${prMetrics.total_prs} |
-            | **Bot PRs** | ${prMetrics.bot_prs} (${Math.round((prMetrics.bot_prs/prMetrics.total_prs)*100)}%) |
+            | **Bot PRs** | ${prMetrics.bot_prs} (${prMetrics.total_prs > 0 ? Math.round((prMetrics.bot_prs/prMetrics.total_prs)*100) : 0}%) |
             | **Merged PRs** | ${prMetrics.merged_prs} |
             | **Bot Merged** | ${prMetrics.bot_merged_prs} |
             | **Open PRs** | ${prMetrics.open_prs} |
