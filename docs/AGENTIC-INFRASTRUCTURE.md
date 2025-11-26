@@ -194,7 +194,7 @@ Four reusable slash commands for common workflows in claude.ai/code interface. `
 Primary 405-line instruction manual for autonomous agents. Contains 5 critical prohibitions (NO var, NO if/else, NO helpers, NO multi-type files, NO old patterns), 5 always-required practices (named parameters, trailing commas, Result<T>, UnifiedOperation, K&R braces), organizational limits (4 files max, 10 types max, 300 LOC max per member), 4 decision trees (when to use if vs switch vs pattern matching), and 5 exemplar file paths agents must study before coding. Referenced by CLI/CI workflows.
 
 **`.github/copilot-instructions.md`**  
-Condensed 323-line version of AGENTS.md for IDE Copilot. Focuses on immediate blockers (10 quick-reference rules) with minimal prose. Generated from STANDARDS.yaml to maintain sync. Includes Python-specific section (Ruff, mypy, Pydantic) not in AGENTS.md. Referenced by GitHub Copilot during in-editor assistance.
+Condensed 25-line version of AGENTS.md for IDE Copilot. Focuses on immediate blockers (10 quick-reference rules) with minimal prose. Generated from STANDARDS.yaml to maintain sync. Mentions Python only in the context line; contains no Python-specific content. Referenced by GitHub Copilot during in-editor assistance.
 
 ### Automation Workflows
 
