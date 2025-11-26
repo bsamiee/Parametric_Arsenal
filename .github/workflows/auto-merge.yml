@@ -6,13 +6,10 @@ on:
   pull_request_review:
     types: [submitted]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # Only run for claude[bot] PRs or PRs with auto-merge label
     if: |
       github.event.pull_request.user.login == 'claude[bot]' ||
@@ -23,9 +20,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,6 +32,7 @@ jobs:
           # Enable auto-merge with squash strategy
           # GitHub will merge when all required status checks pass
           gh pr merge "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
             --squash \
             --auto \
             --delete-branch \
@@ -48,6 +43,7 @@ jobs:
   # Separate job for review-triggered merges
   merge-on-approval:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: |
       github.event_name == 'pull_request_review' &&
       github.event.review.state == 'approved' &&
@@ -61,9 +57,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
       - name: Merge on approval
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,6 +68,7 @@ jobs:
           # Try to merge immediately since approval received
           # This will fail gracefully if other checks haven't passed yet
           gh pr merge "${PR_NUMBER}" \
+            --repo "${{ github.repository }}" \
             --squash \
             --auto \
             --delete-branch \

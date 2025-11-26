@@ -5,17 +5,12 @@ on:
     workflows: ["Claude Code Review"]
     types: [completed]
 
-concurrency:
-  group: autofix-${{ github.event.workflow_run.pull_requests[0].number }}
-  cancel-in-progress: true
-
 jobs:
   autofix:
     runs-on: ubuntu-latest
-    # Only run if review workflow completed successfully and is a PR
-    if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.pull_requests[0] != null
+    timeout-minutes: 30
+    # Only run if review workflow completed successfully
+    if: github.event.workflow_run.conclusion == 'success'
 
     permissions:
       contents: write
@@ -23,20 +18,33 @@ jobs:
       actions: read
 
     steps:
-      - name: Get PR number
-        id: pr
-        run: |
-          PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
-          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "📋 Processing PR #${PR_NUMBER}"
-
       - name: Download review artifact
         uses: actions/download-artifact@v4
         with:
-          name: review-output-pr-${{ steps.pr.outputs.number }}
+          name: review-output
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .github/review-output
+
+      - name: Extract PR metadata
+        id: pr
+        run: |
+          # Read PR number from artifact (works for fork PRs too)
+          if [ -f ".github/review-output/pr-number.txt" ]; then
+            PR_NUMBER=$(cat .github/review-output/pr-number.txt)
+            echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+            echo "📋 Processing PR #${PR_NUMBER}"
+          else
+            echo "❌ PR metadata not found in artifact"
+            exit 1
+          fi
+
+          # Read head branch
+          if [ -f ".github/review-output/head-branch.txt" ]; then
+            HEAD_BRANCH=$(cat .github/review-output/head-branch.txt)
+            echo "head_branch=${HEAD_BRANCH}" >> $GITHUB_OUTPUT
+            echo "📋 Head branch: ${HEAD_BRANCH}"
+          fi
 
       - name: Check if review JSON exists
         id: check
@@ -115,7 +123,7 @@ jobs:
           steps.iteration.outputs.limit_reached != 'true'
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ steps.pr.outputs.head_branch }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -126,6 +134,17 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Restore review artifact after checkout
+        if: |
+          steps.verdict.outputs.verdict == 'request_changes' &&
+          steps.iteration.outputs.limit_reached != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: review-output
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .github/review-output
 
       - name: Apply fixes with Claude
         if: |

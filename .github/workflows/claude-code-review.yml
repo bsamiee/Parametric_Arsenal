@@ -16,6 +16,7 @@ concurrency:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -120,11 +121,17 @@ jobs:
             --max-turns 8
             --allowedTools Read,Write,Grep,Glob,Bash(dotnet:*),Bash(git diff:*),Bash(gh pr:*)
 
+      - name: Save PR metadata for downstream workflows
+        if: always()
+        run: |
+          echo '${{ github.event.pull_request.number }}' > .github/review-output/pr-number.txt
+          echo '${{ github.event.pull_request.head.ref }}' > .github/review-output/head-branch.txt
+
       - name: Upload review output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: review-output-pr-${{ github.event.pull_request.number }}
-          path: .github/review-output/pr-${{ github.event.pull_request.number }}.json
+          name: review-output
+          path: .github/review-output/
           if-no-files-found: warn
           retention-days: 30
