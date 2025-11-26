@@ -6,15 +6,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-// Get the repository root
-// Use current working directory as starting point, go up 2 levels from tools/standards
+// Algorithmic repository root finder - walks up until solution file found
+static string FindRepositoryRoot(string startPath) {
+    string current = startPath;
+    while (current != null && !File.Exists(Path.Combine(current, "Parametric_Arsenal.sln"))) {
+        DirectoryInfo parent = Directory.GetParent(current);
+        current = parent?.FullName;
+    }
+    return current ?? throw new InvalidOperationException($"Repository root not found from {startPath}");
+}
+
 string currentDir = Directory.GetCurrentDirectory();
-string repoRoot = currentDir.Contains("tools/standards") || currentDir.Contains("tools\\standards")
-    ? Path.GetFullPath(Path.Combine(currentDir, "..", ".."))
-    : currentDir;
+string repoRoot = FindRepositoryRoot(currentDir);
 
 Console.WriteLine($"[INFO] Repository root: {repoRoot}");
 Console.WriteLine($"[INFO] Current directory: {currentDir}");
@@ -86,7 +93,7 @@ string GenerateCriticalRulesSection() {
 string GenerateImmediateBlockers() {
     StringBuilder sb = new();
     
-    sb.AppendLine("## 🚫 IMMEDIATE BLOCKERS (Fix Before Proceeding)");
+    sb.AppendLine("## [BLOCKERS] IMMEDIATE BLOCKERS (Fix Before Proceeding)");
     sb.AppendLine();
     sb.AppendLine("These violations fail the build. Check for and fix immediately:");
     sb.AppendLine();
@@ -130,6 +137,38 @@ string GenerateImmediateBlockers() {
     return sb.ToString();
 }
 
+// Polymorphic section replacer - works for any markdown section
+static string ReplaceMark downSection(string content, string sectionHeader, string newSectionContent) {
+    string pattern = $@"({Regex.Escape(sectionHeader)}.*?)(\n# \[|$)";
+    return Regex.Replace(content, pattern, m => newSectionContent + m.Groups[2].Value, RegexOptions.Singleline);
+}
+
+// Parameterized file updater with error handling
+static bool UpdateFileSection(string filePath, string sectionHeader, string newContent, string displayName) {
+    try {
+        string content = File.ReadAllText(filePath);
+        
+        if (!content.Contains(sectionHeader)) {
+            Console.WriteLine($"[WARN] Skipping {displayName} - section '{sectionHeader}' not found");
+            return false;
+        }
+        
+        string updatedContent = ReplaceMarkdownSection(content, sectionHeader, newContent);
+        
+        if (updatedContent == content) {
+            Console.WriteLine($"[WARN] No changes for {displayName}");
+            return false;
+        }
+        
+        File.WriteAllText(filePath, updatedContent);
+        Console.WriteLine($"   [PASS] Updated {displayName}");
+        return true;
+    } catch (Exception ex) {
+        Console.WriteLine($"[ERROR] Failed to update {displayName}: {ex.Message}");
+        return false;
+    }
+}
+
 // Generate CRITICAL RULES section for all agent files
 Console.WriteLine("[INFO] Updating [CRITICAL RULES] sections in agent files...");
 string agentDir = Path.Combine(repoRoot, ".github", "agents");
@@ -137,62 +176,20 @@ string[] agentFiles = Directory.GetFiles(agentDir, "*.agent.md");
 
 string criticalRulesSection = GenerateCriticalRulesSection();
 
-int updatedAgents = 0;
-foreach (string agentFile in agentFiles) {
-    string content = File.ReadAllText(agentFile);
-    
-    // Find the [CRITICAL RULES] section
-    int startIdx = content.IndexOf("# [CRITICAL RULES]");
-    if (startIdx == -1) {
-        Console.WriteLine($"[WARN] Skipping {Path.GetFileName(agentFile)} - no [CRITICAL RULES] section found");
-        continue;
-    }
-    
-    // Find the next section (starts with # [
-    int endIdx = content.IndexOf("\n# [", startIdx + 1);
-    if (endIdx == -1) {
-        Console.WriteLine($"[WARN] Skipping {Path.GetFileName(agentFile)} - could not find end of section");
-        continue;
-    }
-    
-    // Replace the section
-    string before = content[..startIdx];
-    string after = content[endIdx..];
-    string newContent = before + criticalRulesSection + after;
-    
-    File.WriteAllText(agentFile, newContent);
-    Console.WriteLine($"   [PASS] Updated {Path.GetFileName(agentFile)}");
-    updatedAgents++;
-}
+int updatedAgents = agentFiles.Count(file => 
+    UpdateFileSection(file, "# [CRITICAL RULES]", criticalRulesSection, Path.GetFileName(file))
+);
 
-Console.WriteLine($"✅ Updated {updatedAgents} agent files");
+Console.WriteLine($"[PASS] Updated {updatedAgents} agent files");
 Console.WriteLine();
 
-// Update copilot-instructions.md IMMEDIATE BLOCKERS section
-Console.WriteLine("🔄 Updating copilot-instructions.md...");
+// Update copilot-instructions.md IMMEDIATE BLOCKERS section using algorithmic replacer
+Console.WriteLine("[INFO] Updating copilot-instructions.md...");
 string copilotPath = Path.Combine(repoRoot, ".github", "copilot-instructions.md");
 
 if (File.Exists(copilotPath)) {
-    string copilotContent = File.ReadAllText(copilotPath);
-    
-    int startIdx = copilotContent.IndexOf("## 🚫 IMMEDIATE BLOCKERS");
-    if (startIdx != -1) {
-        int endIdx = copilotContent.IndexOf("\n---", startIdx);
-        if (endIdx != -1) {
-            string before = copilotContent[..startIdx];
-            string after = copilotContent[endIdx..];
-            
-            string newBlockers = GenerateImmediateBlockers();
-            string newContent = before + newBlockers + "\n" + after;
-            
-            File.WriteAllText(copilotPath, newContent);
-            Console.WriteLine("   [PASS] Updated copilot-instructions.md");
-        } else {
-            Console.WriteLine("   [WARN] Could not find end marker (---) in copilot-instructions.md");
-        }
-    } else {
-        Console.WriteLine("   [WARN] Could not find IMMEDIATE BLOCKERS section in copilot-instructions.md");
-    }
+    string blockersContent = GenerateImmediateBlockers() + "\n";
+    UpdateFileSection(copilotPath, "## [BLOCKERS] IMMEDIATE BLOCKERS", blockersContent, "copilot-instructions.md");
 } else {
     Console.WriteLine("   [WARN] copilot-instructions.md not found");
 }

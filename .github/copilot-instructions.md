@@ -6,7 +6,7 @@
 
 ---
 
-## 🚫 IMMEDIATE BLOCKERS (Fix Before Proceeding)
+## [BLOCKERS] IMMEDIATE BLOCKERS (Fix Before Proceeding)
 
 These violations fail the build. Check for and fix immediately:
 
