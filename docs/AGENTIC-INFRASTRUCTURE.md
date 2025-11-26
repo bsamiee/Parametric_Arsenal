@@ -12,7 +12,7 @@
 - `.claude/settings.json` — Model config, permissions, agent registry, session hooks
 - `.claude/commands/*.md` — 4 slash commands (implement, refactor, review-csharp, test)
 - `AGENTS.md` — Primary agent instructions (405 LOC)
-- `.github/copilot-instructions.md` — IDE Copilot instructions (323 LOC, condensed from AGENTS.md)
+- `.github/copilot-instructions.md` — IDE Copilot instructions (25 LOC, condensed from AGENTS.md)
 
 ### Automation Workflows (`.github/workflows/`)
 - `ci.yml` — Build, format, test, coverage (all PRs/branches)
