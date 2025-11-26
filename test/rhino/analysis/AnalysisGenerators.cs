@@ -7,7 +7,6 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Tests.Analysis;
 
 /// <summary>Analysis-specific generators for property-based testing with Rhino headless.</summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1515:Consider making public types internal", Justification = "Test generators used for property-based testing")]
 public static class AnalysisGenerators {
     private static readonly int[] ValidVertexIndices = [0, 1, 2, 3, 4,];
     private static readonly int[] ValidFaceIndices = [0, 1, 2,];
