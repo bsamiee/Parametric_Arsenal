@@ -9,7 +9,7 @@
     <!-- Disable strict analyzers for utility tool -->
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <NoWarn>CA1031,MA0004,MA0001,MA0006,MA0074,MA0032,IDE0305,RCS1007</NoWarn>
+    <NoWarn>CA1031,MA0004,MA0001,MA0006,MA0074,MA0032,MA0045,IDE0305,RCS1007,RCS1036</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

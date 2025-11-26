@@ -72,9 +72,17 @@ static async Task GenerateArchitectureJson(Solution solution, string outputDir, 
         Compilation? compilation = await project.GetCompilationAsync();
         if (compilation is null) continue;
 
-        INamedTypeSymbol[] types = compilation.GlobalNamespace
-            .GetNamespaceMembers()
-            .SelectMany(GetAllTypes)
+        // Only get types from source files in THIS project, not referenced assemblies
+        INamedTypeSymbol[] types = compilation.SyntaxTrees
+            .SelectMany(tree => {
+                SemanticModel model = compilation.GetSemanticModel(tree);
+                return tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax>()
+                    .Select(node => model.GetDeclaredSymbol(node))
+                    .OfType<INamedTypeSymbol>();
+            })
+            .Where(t => t.ContainingNamespace.ToDisplayString().StartsWith("Arsenal"))
             .ToArray();
 
         projects.Add(new {
@@ -96,8 +104,7 @@ static async Task GenerateArchitectureJson(Solution solution, string outputDir, 
     await File.WriteAllTextAsync(Path.Combine(outputDir, "architecture.json"), json);
 }
 
-static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns) =>
-    ns.GetTypeMembers().Concat(ns.GetNamespaceMembers().SelectMany(GetAllTypes));
+
 
 static async Task GenerateErrorCatalogJson(string baseDir, string outputDir, JsonSerializerOptions jsonOptions) {
     string ecsPath = Path.Combine(baseDir, "libs", "core", "errors", "E.cs");
