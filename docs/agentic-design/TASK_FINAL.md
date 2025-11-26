@@ -208,9 +208,9 @@ Run `dotnet build` to verify analyzer compliance before verdict.
 - CD-2 to parse violations correctly
 
 **VERIFY**:
-- [ ] Schema validates against JSON Schema Draft-07
-- [ ] All fields documented with descriptions
-- [ ] Example violations included
+- [x] Schema validates against JSON Schema Draft-07
+- [x] All fields documented with descriptions
+- [x] Example violations included
 
 ---
 
