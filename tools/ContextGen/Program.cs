@@ -79,7 +79,7 @@ static async Task GenerateArchitectureJson(Solution solution, string outputDir, 
                 return tree.GetRoot()
                     .DescendantNodes()
                     .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax>()
-                    .Select(node => model.GetDeclaredSymbol(node))
+                    .Select(typeDeclaration => model.GetDeclaredSymbol(typeDeclaration))
                     .OfType<INamedTypeSymbol>();
             })
             .Where(t => t.ContainingNamespace.ToDisplayString().StartsWith("Arsenal"))
