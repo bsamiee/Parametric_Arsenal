@@ -1,828 +1,275 @@
-# ANALYSIS.md — Agentic Monorepo Architecture Strategy
+# ANALYSIS.md — Agentic Infrastructure Strategy
 
-**Principal Architect**: Claude (Opus 4)
-**Date**: 2025-11-26
-**Scope**: Self-Describing Agentic Environment for Parametric Arsenal
+> **Document Type**: Strategic Analysis
+> **Target Audience**: Principal Architects, Agentic Systems
+> **Scope**: Self-Describing Agentic Environment for Parametric Arsenal
 
 ---
 
 ## Executive Summary
 
-The Parametric Arsenal repository is **70% ready** for autonomous agent operation. Its sophisticated Result monad architecture, expression tree compilation, and event-driven workflows provide a strong foundation. However, critical gaps in protocol synchronization, structured metadata, and automated context generation prevent true autonomy.
+| Metric | Current | Target | Gap |
+|--------|---------|--------|-----|
+| **Autonomy Rate** | ~30% | >70% | Protocol fragmentation, no review loop |
+| **Agent Files** | 5/11 exist | 11/11 | 6 MISSING files block specialization |
+| **Context Freshness** | Manual | <24h auto | No JSON generation pipeline |
+| **Review→Fix→Merge** | Manual | Automated | No agentic handshake workflow |
 
-This analysis identifies **12 impediments** to agent autonomy and proposes a **4-pillar infrastructure upgrade** to achieve a self-describing agentic environment.
+**Critical Path**: `D (Handshake) → C (Context) → A (Protocol) → B (Templates)`
 
 ---
 
 ## 1. Infrastructure Audit
 
-### 1.1 Protocol Layer Assessment
-
-#### Current State: **Fragmented Multi-Document System**
-
-| Document | Location | LOC | Audience | Issue |
-|----------|----------|-----|----------|-------|
-| CLAUDE.md | `/` | 1000+ | Claude AI | **Canonical but monolithic** |
-| AGENTS.md | `/` | 405 | Task runners | **95% duplicates CLAUDE.md** |
-| copilot-instructions.md | `.github/` | 323 | GitHub Copilot | **Condensed but drifts** |
-| 5x agent files | `.github/agents/` | ~350 avg | Specialized agents | **6 missing files** |
-| 4x command files | `.claude/commands/` | ~50 avg | Slash commands | **Stubs only** |
-
-**Critical Finding**: `.claude/settings.json` references **11 agents** but only **5 `.agent.md` files exist**:
-- ✅ `csharp-advanced.agent.md`
-- ✅ `testing-specialist.agent.md`
-- ✅ `refactoring-architect.agent.md`
-- ✅ `rhino-implementation.agent.md`
-- ✅ `performance-analyst.agent.md`
-- ❌ `cleanup-specialist.agent.md` (MISSING)
-- ❌ `library-planner.agent.md` (MISSING)
-- ❌ `documentation-specialist.agent.md` (MISSING)
-- ❌ `integration-specialist.agent.md` (MISSING)
-- ❌ `grasshopper-implementation.agent.md` (MISSING)
-- ❌ `plugin-architect.agent.md` (MISSING)
-
-**Impact**: Agent invocation will fail or use stale 1-3 sentence inline prompts from JSON.
-
-#### Synchronization Failure Matrix
-
-| Rule | CLAUDE.md | AGENTS.md | copilot-instructions | Agents | Status |
-|------|-----------|-----------|---------------------|--------|--------|
-| No `var` | ✅ Line 21 | ✅ Line 21 | ✅ Line 48 | ✅ All | **SYNC** |
-| No if/else | ✅ Line 22 | ✅ Line 22 | ✅ Line 50 | ✅ All | **SYNC** |
-| 300 LOC limit | ✅ "ABSOLUTE" | ✅ "ABSOLUTE" | ❌ "300 lines" | Varies | **DRIFT** |
-| 4 files/folder | ✅ "per folder" | ❌ Unclear | ❌ Missing | Varies | **AMBIGUOUS** |
-| Exemplar LOC | 202 lines | 202 lines | Not listed | 202 lines | **STALE RISK** |
-
-**Root Cause**: No single-source-of-truth with automated propagation.
-
----
-
-### 1.2 CI/CD Fabric Assessment
-
-#### Current Workflow Architecture
+### 1.1 Protocol Layer: FRAGMENTED
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                     AGENTIC WORKFLOW TOPOLOGY                        │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ISSUE LABELED                    COMMENT @claude                    │
-│       │                                │                             │
-│       ▼                                ▼                             │
-│  ┌─────────────────┐            ┌─────────────────┐                 │
-│  │ claude-issues   │            │    claude       │                 │
-│  │ (Sonnet, 20t)   │            │ (Opus, 15t)     │                 │
-│  │ MCP: github,    │            │ MCP: github,    │                 │
-│  │      context7   │            │ tavily, context7│                 │
-│  │ Agents: NONE    │            │ perplexity, exa │                 │
-│  └────────┬────────┘            │ Agents: 5       │                 │
-│           │                     └────────┬────────┘                 │
-│           │ Creates PR                   │                          │
-│           ▼                              ▼                          │
-│  ┌─────────────────┐            ┌─────────────────┐                 │
-│  │ claude-code-    │◄───────────│ PR OPENED       │                 │
-│  │ review          │            │ (any trigger)   │                 │
-│  │ (Opus, 8t)      │            └────────┬────────┘                 │
-│  │ MCP: NONE       │                     │                          │
-│  │ Tools: Read-only│                     ▼                          │
-│  └────────┬────────┘            ┌─────────────────┐                 │
-│           │                     │     ci.yml      │                 │
-│           │ gh pr review        │ (Build gates)   │                 │
-│           ▼                     │ EditorConfig    │                 │
-│  ┌─────────────────┐            │ dotnet format   │                 │
-│  │ APPROVE or      │            │ Analyzers       │                 │
-│  │ REQUEST_CHANGES │            │ Tests           │                 │
-│  └─────────────────┘            └────────┬────────┘                 │
-│                                          │                          │
-│                                          ▼                          │
-│                                 ┌─────────────────┐                 │
-│                                 │ rhino-tests     │ (Windows only)  │
-│                                 │ NUnit + Rhino   │                 │
-│                                 └────────┬────────┘                 │
-│                                          │                          │
-│                                          ▼                          │
-│                                 ┌─────────────────┐                 │
-│                                 │  MANUAL MERGE   │ ← GAP: No auto  │
-│                                 └─────────────────┘                 │
-│                                                                      │
-│  SCHEDULED (Monday 9 AM)                                            │
-│       │                                                             │
-│       ▼                                                             │
-│  ┌─────────────────┐                                                │
-│  │ claude-         │                                                │
-│  │ maintenance     │                                                │
-│  │ (Sonnet, 10t)   │                                                │
-│  │ MCP: NONE       │ ← GAP: Cannot access context7                  │
-│  │ Tools: Read-only│                                                │
-│  └─────────────────┘                                                │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+SYNCHRONIZATION STATUS
+┌────────────────────────────────────────────────────┐
+│  STANDARDS.yaml (MISSING - proposed)               │
+│       ↓ should generate ↓                          │
+│  ┌──────────┐  ┌──────────────────┐  ┌──────────┐ │
+│  │CLAUDE.md │  │copilot-instruct. │  │*.agent.md│ │
+│  │ 1000 LOC │  │    323 LOC       │  │ 5 exist  │ │
+│  │ CANONICAL│  │   CONDENSED      │  │ 6 MISSING│ │
+│  └──────────┘  └──────────────────┘  └──────────┘ │
+│       ↑              ↑                    ↑        │
+│       └──── 95% DUPLICATION ──────────────┘        │
+└────────────────────────────────────────────────────┘
 ```
 
-#### Identified Gaps
+**CRITICAL**: `.claude/settings.json` references 11 agents, only 5 exist:
+- ✅ csharp-advanced, testing-specialist, refactoring-architect, rhino-implementation, performance-analyst
+- ❌ **MISSING**: cleanup-specialist, library-planner, documentation-specialist, integration-specialist, grasshopper-implementation, plugin-architect
 
-| Gap ID | Description | Impact | Priority |
-|--------|-------------|--------|----------|
-| **CI-1** | No auto-merge workflow | Human bottleneck after all gates pass | HIGH |
-| **CI-2** | `claude-issues` lacks agent specialization | Generic Sonnet vs. specialized agents | MEDIUM |
-| **CI-3** | `claude-maintenance` cannot access MCP | No historical context for trend analysis | MEDIUM |
-| **CI-4** | `claude-code-review` is read-only | Cannot auto-apply fixes | HIGH |
-| **CI-5** | No explicit test coverage gate | Implementation PRs may lack tests | MEDIUM |
-| **CI-6** | Different concurrency strategies | Inconsistent queue behavior | LOW |
+**Impact**: Agent invocation fails or uses stale 1-sentence inline prompts.
 
----
+### 1.2 CI/CD Fabric: INCOMPLETE LOOP
 
-### 1.3 Gatekeeper Analysis
+```
+CURRENT FLOW (manual bottleneck)
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│  ISSUE ──▶ claude-issues ──▶ PR ──▶ claude-review  │
+│  (label)   (Sonnet,20t)          (Opus,8t)         │
+│                                       │             │
+│                              ┌────────▼────────┐   │
+│                              │ REQUEST_CHANGES │   │
+│                              └────────┬────────┘   │
+│                                       │             │
+│                              ╔════════▼════════╗   │
+│                              ║  HUMAN FIXES    ║ ← BOTTLENECK
+│                              ╚════════╤════════╝   │
+│                                       │             │
+│                              ┌────────▼────────┐   │
+│                              │  MANUAL MERGE   │ ← BOTTLENECK
+│                              └─────────────────┘   │
+└─────────────────────────────────────────────────────┘
 
-#### Pre-Commit Hooks (`.pre-commit-config.yaml`)
-
-```yaml
-# Current enforcement chain:
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    hooks: [trailing-whitespace, end-of-file-fixer, mixed-line-ending,
-            check-yaml, check-json, check-toml]
-
-  - repo: local
-    hooks:
-      - id: dotnet-build        # TreatWarningsAsErrors=true
-      - id: dotnet-format       # --verify-no-changes
+TARGET FLOW (automated)
+┌─────────────────────────────────────────────────────┐
+│  ISSUE ──▶ claude-issues ──▶ PR ──▶ claude-review  │
+│                                       │             │
+│                              ┌────────▼────────┐   │
+│                              │ REQUEST_CHANGES │   │
+│                              └────────┬────────┘   │
+│                                       │             │
+│                              ┌────────▼────────┐   │
+│                              │ claude-autofix  │ ← NEW
+│                              │ (reads JSON,    │   │
+│                              │  applies fixes) │   │
+│                              └────────┬────────┘   │
+│                                       │ max 3 iter │
+│                              ┌────────▼────────┐   │
+│                              │   auto-merge    │ ← NEW
+│                              └─────────────────┘   │
+└─────────────────────────────────────────────────────┘
 ```
 
-**Strength**: Any analyzer violation blocks commit locally.
-**Gap**: Agents bypass pre-commit (CI is the real gate).
+**Gaps Identified**:
+| ID | Gap | Impact | Priority |
+|----|-----|--------|----------|
+| CI-1 | No auto-merge | Human bottleneck | **VERY HIGH** |
+| CI-2 | No auto-fix | Human bottleneck | **VERY HIGH** |
+| CI-3 | No agent selection in issues | Generic implementation | HIGH |
+| CI-4 | Review is read-only | Cannot suggest fixes | HIGH |
+| CI-5 | No coverage gate | PRs may lack tests | MEDIUM |
 
-#### Analyzer Enforcement (`Directory.Build.props`)
+### 1.3 Gatekeepers: PRODUCTION-READY ✅
 
-| Analyzer | Version | Key Rules |
-|----------|---------|-----------|
-| Roslynator | 4.14.1 | RCS* (refactoring patterns) |
-| Meziantou | 2.0.256 | MA* (trailing commas, async patterns) |
-| NetAnalyzers | 10.0.100 | CA*, IDE* (primary constructors, collections) |
-| AsyncFixer | 1.6.0 | Async/await correctness |
-| ReflectionAnalyzers | 0.3.1 | Reflection safety |
-| Nullable.Extended | 1.15.6581 | Null safety |
+Analyzer stack is mature:
+- **6 packages**: Roslynator, Meziantou, NetAnalyzers, AsyncFixer, ReflectionAnalyzers, Nullable.Extended
+- **TreatWarningsAsErrors=true** in `Directory.Build.props`
+- **Pre-commit**: `dotnet build` + `dotnet format --verify-no-changes`
 
-**Critical Rules Enforced as Errors**:
-- `CA1050`: One type per file
-- `IDE0290`: Primary constructors required
-- `IDE0300-0305`: Collection expressions required
-- `IDE0007-0009`: No `var` keyword
-- `IDE0048`: Pattern matching required
-- `IDE0055`: K&R brace style
+Critical rules enforced: CA1050 (one type/file), IDE0007 (no var), IDE0290 (primary constructors), IDE0300-305 (collections).
 
-**Assessment**: ✅ **Production-ready** gatekeeper configuration.
+### 1.4 Interface Layer: UNSTRUCTURED
 
----
+**Current**: Zero issue/PR templates. Workflows receive freeform text.
 
-### 1.4 Interface Layer Assessment (Templates)
-
-#### Current State: **No Traditional Templates**
-
-The repository has **zero** issue or PR templates in the standard locations:
-- ❌ `.github/ISSUE_TEMPLATE/` (directory does not exist)
-- ❌ `.github/PULL_REQUEST_TEMPLATE.md` (file does not exist)
-
-Instead, the system uses **event-driven workflows** that consume raw issue/PR bodies.
-
-#### Problem: Unstructured Input
-
-When `claude-issues.yml` triggers on label `claude-implement`:
-```yaml
-prompt: |
-  Implement issue #${{ github.event.issue.number }}
-  Title: ${{ github.event.issue.title }}
-  Body: ${{ github.event.issue.body }}  # ← UNSTRUCTURED TEXT
-```
-
-**Agents receive freeform text** without:
-- Explicit scope (which libs/ folder?)
-- Complexity classification (trivial/medium/hard)
+**Problem**: Agent cannot parse:
+- Scope (which `libs/` folder?)
+- Complexity (trivial/medium/hard)
 - Required context files
-- Success criteria
-- Validation requirements
+- Validation mode requirements
 
-#### Opportunity: Semantic Hooks
+**Solution**: Semantic templates with structured YAML dropdowns + hidden JSON metadata.
 
-Templates can embed **invisible structured metadata** that agents parse:
+### 1.5 Context Layer: MANUAL DISCOVERY
 
-```markdown
-## Feature Request
+**Current**: Agents must `grep` raw source to understand:
+- Project structure
+- Error codes (E.*)
+- Validation modes (V.*)
+- Exemplar metrics (LOC counts)
 
-<!-- AGENT_METADATA
-{
-  "scope": "libs/rhino/spatial",
-  "complexity": "hard",
-  "required_context": ["Spatial.cs", "SpatialCore.cs"],
-  "validation_mode": "V.Standard | V.Topology",
-  "success_criteria": ["Tests pass", "Coverage > 80%"],
-  "estimated_files_touched": 3
-}
--->
-
-### Description
-[Human-readable description here]
-```
+**Solution**: Generated JSON context files via Roslyn reflection.
 
 ---
 
-### 1.5 Codebase Architecture Assessment
+## 2. Implementation Strategy: 4 Pillars
 
-#### Strengths Enabling Autonomy
+```mermaid
+graph TD
+    D[Pillar D: Agentic Handshake] --> C[Pillar C: Active Context]
+    C --> A[Pillar A: Dual-Protocol]
+    A --> B[Pillar B: Semantic Templates]
 
-| Pattern | Location | Why It Helps Agents |
-|---------|----------|---------------------|
-| Result Monad | `libs/core/results/` | Explicit error handling, no exceptions |
-| UnifiedOperation | `libs/core/operations/` | Polymorphic dispatch with configuration |
-| FrozenDictionary | Throughout | O(1) lookups, compile-time verification |
-| Expression Trees | `ValidationRules.cs` | Zero-allocation validation |
-| 4-file Domain Pattern | `libs/rhino/*/` | Predictable structure |
-| Error Registry | `E.cs` | Centralized, discoverable error codes |
-
-#### Weaknesses Impeding Autonomy
-
-| Issue | Location | Impact |
-|-------|----------|--------|
-| Exemplar LOC counts stale | CLAUDE.md, AGENTS.md | Agents may reference wrong metrics |
-| No architecture.json | N/A | Agents must grep to understand structure |
-| No error-catalog.json | N/A | Agents must read E.cs to find codes |
-| No validation-modes.json | N/A | Agents must read V.cs for flags |
-| Missing agent files | `.github/agents/` | 6 agents will fail to specialize |
-
----
-
-## 2. Bleeding Edge Implementation Strategy
-
-### 2.1 Pillar A: Dual-Protocol Standard
-
-**Principle**: Retain both protocols but eliminate duplication via single-source generation.
-
-#### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      STANDARDS.yaml                             │
-│                  (Single Source of Truth)                       │
-├─────────────────────────────────────────────────────────────────┤
-│ rules:                                                          │
-│   - id: NO_VAR                                                  │
-│     severity: error                                             │
-│     analyzer: IDE0007                                           │
-│     description: "No var keyword - explicit types always"       │
-│   - id: NO_IF_ELSE                                              │
-│     severity: error                                             │
-│     description: "Use expressions: ternary, switch, patterns"   │
-│   ...                                                           │
-│                                                                 │
-│ limits:                                                         │
-│   files_per_folder: 4                                           │
-│   types_per_folder: 10                                          │
-│   loc_per_member: 300                                           │
-│                                                                 │
-│ exemplars:                                                      │
-│   - path: libs/core/results/Result.cs                          │
-│     purpose: "Monadic composition with lazy evaluation"         │
-│   ...                                                           │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           │ tools/StandardsGen.csx
-           │
-           ▼
-     ┌─────┴─────┐
-     │           │
-     ▼           ▼
-CLAUDE.md   copilot-instructions.md
-(Full)           (Condensed)
-     │
-     ▼
-.github/agents/*.agent.md
-(Generated: [CRITICAL RULES] section)
+    D -->|enables| AutoMerge[Auto-Merge]
+    C -->|enables| AgentRAG[Agent RAG]
+    A -->|eliminates| Drift[Protocol Drift]
+    B -->|provides| Metadata[Structured Input]
 ```
 
-#### Implementation
+### Pillar A: Dual-Protocol Standard
 
-1. **Create** `tools/standards/STANDARDS.yaml` as canonical source
-2. **Create** `tools/StandardsGen.csx` (C# Script) to generate:
-   - Full CLAUDE.md from STANDARDS.yaml + prose templates
-   - Condensed copilot-instructions.md (rules + limits only)
-   - [CRITICAL RULES] sections for agent files
-3. **Add CI step** to verify generated files match source
-4. **Synchronization rule**: Edit STANDARDS.yaml → run generator → commit all
+**Principle**: Single source (`STANDARDS.yaml`) generates all protocol files.
 
----
+**Deliverables**:
+- `tools/standards/STANDARDS.yaml` — Canonical rules, limits, exemplars
+- `tools/standards/StandardsGen.csx` — Generator script
+- CI workflow to verify sync
 
-### 2.2 Pillar B: Semantic Hooks in Templates
+**Eliminates**: 95% rule duplication, drift risk.
 
-**Principle**: Templates are machine-readable first, human-readable second.
+### Pillar B: Semantic Templates
 
-#### Issue Template Schema
+**Principle**: Machine-readable first, human-readable second.
 
+**Deliverables**:
+- `.github/ISSUE_TEMPLATE/feature-claude.yml` — Dropdowns for scope, complexity, agent
+- `.github/PULL_REQUEST_TEMPLATE.md` — JSON metadata block, verification checklist
+
+**Key Fields**:
 ```yaml
-# .github/ISSUE_TEMPLATE/feature-claude.yml
-name: "Feature Request (Claude Implementable)"
-description: "Request a feature for autonomous implementation"
-labels: ["enhancement", "claude-implement"]
-assignees: ["claude[bot]"]
-
-body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Agent Metadata (parsed automatically)
-
-  - type: dropdown
-    id: scope
-    attributes:
-      label: "Target Scope"
-      description: "Which library domain?"
-      options:
-        - libs/core/results
-        - libs/core/validation
-        - libs/core/operations
-        - libs/rhino/analysis
-        - libs/rhino/spatial
-        - libs/rhino/extraction
-        - libs/rhino/intersection
-        - libs/rhino/topology
-        - libs/rhino/transformation
-        - libs/rhino/morphology
-        - libs/rhino/orientation
-        - libs/grasshopper
-    validations:
-      required: true
-
-  - type: dropdown
-    id: complexity
-    attributes:
-      label: "Complexity Estimate"
-      options:
-        - trivial (< 50 LOC, single file)
-        - medium (50-150 LOC, 2-3 files)
-        - hard (150-300 LOC, 3-4 files)
-        - expert (requires new domain)
-    validations:
-      required: true
-
-  - type: input
-    id: context_files
-    attributes:
-      label: "Required Context Files"
-      description: "Comma-separated paths agents should read first"
-      placeholder: "Spatial.cs, SpatialCore.cs"
-
-  - type: dropdown
-    id: validation_mode
-    attributes:
-      label: "Validation Requirements"
-      options:
-        - V.None
-        - V.Standard
-        - V.Standard | V.Topology
-        - V.Standard | V.Degeneracy
-        - V.All
-
-  - type: textarea
-    id: specification
-    attributes:
-      label: "Feature Specification"
-      description: "What should this feature do?"
-    validations:
-      required: true
-
-  - type: textarea
-    id: success_criteria
-    attributes:
-      label: "Success Criteria"
-      description: "How will we know this is done?"
-      placeholder: |
-        - [ ] Tests pass (dotnet test)
-        - [ ] Coverage verified
-        - [ ] CLAUDE.md compliant
-    validations:
-      required: true
+# Structured metadata agents can parse
+scope: libs/rhino/spatial
+complexity: hard
+agent: csharp-advanced
+context_files: [Spatial.cs, SpatialCore.cs]
+validation_mode: V.Standard | V.Topology
 ```
 
-#### PR Template with Agent Review Hooks
+### Pillar C: Active Context Generation
 
-```markdown
-<!-- .github/PULL_REQUEST_TEMPLATE.md -->
+**Principle**: Agents consume generated JSON, not raw source.
 
-## Summary
-<!-- Brief description of changes -->
+**Deliverables** (`docs/agent-context/`):
+| File | Source | Content |
+|------|--------|---------|
+| `architecture.json` | Roslyn parse of .sln | Projects, namespaces, types, LOC |
+| `error-catalog.json` | Parse E.cs | Domains, codes, messages |
+| `validation-modes.json` | Parse V.cs | Flags, combinations, checks |
+| `exemplar-metrics.json` | Parse exemplar files | LOC, methods, patterns |
+| `domain-map.json` | Parse libs/rhino/* | 4-file pattern, API types |
 
-## Agent Metadata
-<!-- AGENT_REVIEW_CONFIG
+**CI**: Regenerate on `libs/**/*.cs` changes, commit to repo.
+
+### Pillar D: Agentic Handshake
+
+**Principle**: Structured JSON interchange between reviewer and fixer agents.
+
+**Protocol**:
+1. `claude-code-review` outputs `.github/review-output/pr-{N}.json`
+2. `claude-autofix` reads JSON, applies fixes per violation
+3. Loop until `verdict: approve` OR iteration limit (3)
+4. `auto-merge` triggers on all gates pass
+
+**Review Output Schema**:
+```json
 {
-  "require_agents": ["claude-code-review"],
-  "auto_merge_eligible": true,
-  "coverage_threshold": 75,
-  "validation_modes_used": [],
-  "files_touched_count": 0
-}
--->
-
-## Verification Checklist
-<!-- Agents parse these checkboxes -->
-- [ ] `dotnet build` passes (zero warnings)
-- [ ] `dotnet test` passes (all tests)
-- [ ] No `var` keyword usage
-- [ ] No `if`/`else` statements
-- [ ] Named parameters for non-obvious args
-- [ ] Trailing commas on multi-line collections
-- [ ] One type per file (CA1050)
-- [ ] Method length ≤ 300 LOC
-- [ ] Result<T> for failable operations
-- [ ] E.* error constants (no direct SystemError)
-
-## Test Plan
-<!-- How to verify this change -->
-```
-
----
-
-### 2.3 Pillar C: Active Context Generation
-
-**Principle**: Agents consume generated JSON maps, not raw source code.
-
-#### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      tools/ContextGen/                          │
-│                                                                 │
-│  ContextGen.csproj                                              │
-│  ├── Generators/                                                │
-│  │   ├── ArchitectureGenerator.cs    → architecture.json        │
-│  │   ├── ErrorCatalogGenerator.cs    → error-catalog.json       │
-│  │   ├── ExemplarMetricsGenerator.cs → exemplar-metrics.json    │
-│  │   ├── ValidationModesGenerator.cs → validation-modes.json    │
-│  │   └── DomainMapGenerator.cs       → domain-map.json          │
-│  │                                                              │
-│  └── Program.cs (orchestrator)                                  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ dotnet run
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   docs/agent-context/                           │
-│                                                                 │
-│  architecture.json                                              │
-│  {                                                              │
-│    "projects": [                                                │
-│      {                                                          │
-│        "name": "Arsenal.Core",                                  │
-│        "path": "libs/core/Core.csproj",                        │
-│        "namespaces": ["Arsenal.Core.Results", ...],            │
-│        "types": [                                               │
-│          {"name": "Result<T>", "kind": "struct", "loc": 202}   │
-│        ]                                                        │
-│      }                                                          │
-│    ]                                                            │
-│  }                                                              │
-│                                                                 │
-│  error-catalog.json                                             │
-│  {                                                              │
-│    "domains": [                                                 │
-│      {                                                          │
-│        "name": "Results",                                       │
-│        "id": 1,                                                 │
-│        "range": [1000, 1999],                                   │
-│        "errors": [                                              │
-│          {"code": 1001, "name": "InvalidCreate", "message": ...}│
-│        ]                                                        │
-│      }                                                          │
-│    ]                                                            │
-│  }                                                              │
-│                                                                 │
-│  exemplar-metrics.json                                          │
-│  {                                                              │
-│    "exemplars": [                                               │
-│      {                                                          │
-│        "path": "libs/core/results/Result.cs",                  │
-│        "loc": 202,                                              │
-│        "types": 1,                                              │
-│        "methods": 18,                                           │
-│        "complexity": 42,                                        │
-│        "last_verified": "2025-11-26"                           │
-│      }                                                          │
-│    ]                                                            │
-│  }                                                              │
-│                                                                 │
-│  validation-modes.json                                          │
-│  {                                                              │
-│    "modes": [                                                   │
-│      {"name": "V.None", "value": 0, "checks": []},             │
-│      {"name": "V.Standard", "value": 1, "checks": ["IsValid"]} │
-│    ],                                                           │
-│    "combinations": [...]                                        │
-│  }                                                              │
-│                                                                 │
-│  domain-map.json                                                │
-│  {                                                              │
-│    "domains": [                                                 │
-│      {                                                          │
-│        "name": "spatial",                                       │
-│        "path": "libs/rhino/spatial",                           │
-│        "files": ["Spatial.cs", "SpatialCore.cs", ...],         │
-│        "api_types": ["RangeAnalysis", "ProximityAnalysis"],    │
-│        "patterns": ["FrozenDictionary dispatch", "RTree"]      │
-│      }                                                          │
-│    ]                                                            │
-│  }                                                              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Implementation via .NET Reflection
-
-```csharp
-// tools/ContextGen/Generators/ArchitectureGenerator.cs
-public static class ArchitectureGenerator {
-    public static ArchitectureMap Generate(string solutionPath) {
-        // Use Roslyn to parse without loading assemblies
-        MSBuildWorkspace workspace = MSBuildWorkspace.Create();
-        Solution solution = workspace.OpenSolutionAsync(solutionPath).Result;
-
-        return new ArchitectureMap {
-            Projects = [.. solution.Projects.Select(p => new ProjectInfo {
-                Name = p.Name,
-                Path = p.FilePath,
-                Namespaces = [.. p.Documents
-                    .SelectMany(d => d.GetSyntaxRootAsync().Result?
-                        .DescendantNodes()
-                        .OfType<NamespaceDeclarationSyntax>()
-                        .Select(ns => ns.Name.ToString()) ?? [])
-                    .Distinct()],
-                Types = [.. p.Documents
-                    .SelectMany(d => ExtractTypes(d))],
-            }),],
-            GeneratedAt = DateTime.UtcNow,
-        };
-    }
-}
-```
-
-#### CI Integration
-
-```yaml
-# .github/workflows/context-gen.yml
-name: Generate Agent Context
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'libs/**/*.cs'
-      - 'libs/**/*.csproj'
-
-jobs:
-  generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Generate Context
-        run: dotnet run --project tools/ContextGen/ContextGen.csproj
-
-      - name: Commit Context Files
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/agent-context/*.json
-          git diff --staged --quiet || git commit -m "chore: regenerate agent context"
-          git push
-```
-
----
-
-### 2.4 Pillar D: Agentic Handshake
-
-**Principle**: Agents review agents via structured JSON interchange.
-
-#### Review Protocol
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    AGENTIC REVIEW FLOW                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. PR CREATED (by claude-issues workflow)                      │
-│       │                                                         │
-│       ▼                                                         │
-│  2. claude-code-review (Opus) generates:                        │
-│       │                                                         │
-│       │  .github/review-output/pr-{number}.json                │
-│       │  {                                                      │
-│       │    "pr_number": 42,                                     │
-│       │    "verdict": "request_changes",                        │
-│       │    "violations": [                                      │
-│       │      {                                                  │
-│       │        "rule": "NO_VAR",                                │
-│       │        "file": "libs/rhino/spatial/Spatial.cs",        │
-│       │        "line": 127,                                     │
-│       │        "current": "var tree = new RTree();",           │
-│       │        "suggested": "RTree tree = new();"              │
-│       │      }                                                  │
-│       │    ],                                                   │
-│       │    "passed_checks": ["NO_IF_ELSE", "TRAILING_COMMAS"], │
-│       │    "coverage_delta": -2.3,                              │
-│       │    "complexity_delta": +5                               │
-│       │  }                                                      │
-│       │                                                         │
-│       ▼                                                         │
-│  3. claude-autofix (triggered by review output)                 │
-│       │                                                         │
-│       │  Reads pr-{number}.json                                 │
-│       │  Applies fixes per violation                            │
-│       │  Commits with message:                                  │
-│       │    "fix(review): apply agentic review fixes"            │
-│       │                                                         │
-│       ▼                                                         │
-│  4. LOOP: Re-run review until:                                  │
-│       - verdict == "approve"                                    │
-│       - OR max_iterations (3) reached                           │
-│       │                                                         │
-│       ▼                                                         │
-│  5. auto-merge (if all gates pass)                              │
-│       - ci.yml ✅                                                │
-│       - rhino-tests ✅ (if applicable)                          │
-│       - claude-code-review verdict == "approve"                 │
-│       │                                                         │
-│       ▼                                                         │
-│  6. MERGED TO MAIN                                              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Review Output Schema
-
-```typescript
-// Schema for .github/review-output/pr-{number}.json
-interface AgentReviewOutput {
-  pr_number: number;
-  reviewer: "claude-code-review" | "copilot-review" | "gemini-review";
-  timestamp: string;  // ISO 8601
-  verdict: "approve" | "request_changes" | "comment";
-
-  violations: Array<{
-    rule: string;           // Rule ID from STANDARDS.yaml
-    severity: "error" | "warning";
-    file: string;           // Relative path
-    line: number;
-    column?: number;
-    current: string;        // Current code snippet
-    suggested: string;      // Suggested fix
-    explanation?: string;   // Why this violates
-  }>;
-
-  passed_checks: string[];  // Rules that passed
-
-  metrics: {
-    files_reviewed: number;
-    lines_added: number;
-    lines_removed: number;
-    coverage_delta: number;
-    complexity_delta: number;
-  };
-
-  recommendations?: string[];  // Non-blocking suggestions
+  "verdict": "approve | request_changes",
+  "violations": [{
+    "rule": "NO_VAR",
+    "file": "path",
+    "line": 127,
+    "current": "var x = ...",
+    "suggested": "int x = ..."
+  }]
 }
 ```
 
 ---
 
-## 3. Tooling Decisions
+## 3. Tooling Decision
 
-### 3.1 gh-aw (GitHub Agentic Workflows) Assessment
+**Question**: `gh-aw` (GitHub Agentic Workflows) vs. custom actions?
 
-**Question**: Should we integrate `gh-aw` or stick to custom actions?
+**Decision**: **Hybrid** — Keep `anthropics/claude-code-action@v1`, add custom composite actions.
 
-#### Current `claude-*.yml` Maturity
-
-| Capability | claude-issues | claude-code-review | claude-maintenance | claude |
-|------------|---------------|-------------------|-------------------|--------|
-| Trigger variety | ✅ Label-based | ✅ PR event | ✅ Schedule + dispatch | ✅ 5 triggers |
-| MCP integration | ✅ 2 servers | ❌ None | ❌ None | ✅ 5 servers |
-| Agent specialization | ❌ None | ❌ None | ❌ None | ✅ 5 agents |
-| Error handling | ✅ Fallback comment | ❌ None | ❌ None | ✅ Comment |
-| Max turns | 20 | 8 | 10 | 15 |
-
-**Assessment**: The current `anthropics/claude-code-action@v1` integration is **mature** for:
-- Issue-to-PR automation
-- Code review
-- Scheduled maintenance
-
-**Gaps** that `gh-aw` or custom enhancement could address:
-- ❌ Review → Fix → Re-review loop (not automated)
-- ❌ Auto-merge orchestration
-- ❌ Multi-agent coordination (coder + reviewer + tester)
-
-#### Recommendation
-
-**Hybrid approach**:
-1. **Keep** `claude-code-action@v1` for core Claude interactions
-2. **Add** custom composite actions for:
-   - Agentic handshake (review → fix loop)
-   - Auto-merge orchestration
-   - Context generation
-3. **Defer** `gh-aw` adoption until it supports:
-   - MCP server configuration
-   - Multi-model coordination (Claude + Copilot)
-   - Review output schemas
+**Rationale**:
+- claude-code-action is mature for Claude interactions
+- gh-aw lacks MCP server config, multi-model coordination
+- Custom actions fill gaps: review→fix loop, auto-merge, context gen
 
 ---
 
-### 3.2 Context Generation Tooling
-
-**Options**:
-
-| Tool | Pros | Cons | Recommendation |
-|------|------|------|----------------|
-| Roslyn Workspace | Full semantic analysis, accurate LOC | Requires solution load | ✅ **Primary** |
-| `dotnet format --report` | Built-in, fast | Limited metadata | Supplement |
-| `csharp-ls` | Language server protocol | Overkill for JSON gen | ❌ |
-| Custom regex parsing | Fast, no dependencies | Brittle, inaccurate | ❌ |
-
-**Decision**: Use **Roslyn MSBuildWorkspace** for accurate reflection:
-- Parse `.sln` to enumerate projects
-- Parse syntax trees for type/member extraction
-- Calculate LOC, complexity, method counts
-- Output to `docs/agent-context/*.json`
-
----
-
-## 4. Risk Assessment
-
-### 4.1 Implementation Risks
+## 4. Risk Matrix
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| Standards drift | HIGH | HIGH | Single-source YAML + generation |
+| Standards drift | HIGH | HIGH | Single-source YAML + CI sync check |
+| Agent file missing | **CONFIRMED** | HIGH | Create 6 files immediately |
+| Review loop infinite | LOW | HIGH | Max 3 iterations |
 | Context staleness | MEDIUM | MEDIUM | CI-triggered regeneration |
-| Review loop infinite | LOW | HIGH | Max iteration limit (3) |
-| Agent file missing | CONFIRMED | HIGH | Create 6 missing files |
-| Template adoption | MEDIUM | LOW | Keep workflows as fallback |
-
-### 4.2 Security Considerations
-
-| Concern | Current State | Required Action |
-|---------|--------------|-----------------|
-| Secrets in context | ❌ Not scanned | Add `.gitignore` for `agent-context/` if needed |
-| PR permissions | `contents: write` | Acceptable for auto-fix |
-| MCP server access | Restricted per workflow | Maintain granularity |
-| Auto-merge | Not implemented | Require branch protection |
 
 ---
 
 ## 5. Success Metrics
 
-### 5.1 Autonomy Indicators
-
 | Metric | Current | Target | Measurement |
 |--------|---------|--------|-------------|
-| Issue → Merged PR (no human) | ~30% | >70% | Track PRs with only bot commits |
-| Review iterations before approve | N/A | <2 avg | Review JSON aggregation |
-| Time from issue to merge | ~4 hours | <1 hour | GitHub API timing |
-| Agent specialization accuracy | 0% | >80% | Agent invocation logs |
-| Context JSON freshness | N/A | <24h | File timestamps |
-
-### 5.2 Quality Indicators
-
-| Metric | Current | Target | Measurement |
-|--------|---------|--------|-------------|
-| Build success rate | ~95% | >99% | CI analytics |
-| Analyzer violations in PRs | ~10/PR | <2/PR | Review JSON aggregation |
-| Test coverage | Unknown | >75% | Coverlet reports |
-| CLAUDE.md compliance | ~80% | >95% | Automated scan |
+| Issue→Merge (no human) | ~30% | >70% | Bot-only PRs |
+| Review iterations avg | N/A | <2 | JSON aggregation |
+| Time to merge | ~4h | <1h | GitHub API |
+| Agent specialization | 0% | >80% | Invocation logs |
+| Context freshness | N/A | <24h | File timestamps |
 
 ---
 
-## 6. Conclusion
+## 6. Critical Path — Immediate Actions
 
-The Parametric Arsenal repository has **strong foundational architecture** (Result monad, expression trees, FrozenDictionary patterns) that enables dense, algebraic code. However, the **agent infrastructure** suffers from:
+```
+PHASE 1 (CRITICAL) — Unblock agent autonomy
+├── P-3: Create 6 missing agent files
+├── CD-2: Create claude-autofix.yml workflow
+├── CD-3: Create auto-merge.yml workflow
+└── CD-4: Add JSON output to claude-code-review
 
-1. **Fragmented protocols** with 95% duplication and drift risk
-2. **Missing agent files** (6 of 11 referenced agents)
-3. **Unstructured interfaces** (no semantic templates)
-4. **No automated context** (agents must grep raw source)
-5. **No agentic handshake** (review → fix is manual)
+PHASE 2 (HIGH) — Enable structured input
+├── C-1/C-2/C-7: ContextGen tool + CI workflow
+├── P-1/P-2: STANDARDS.yaml + generator
+└── I-1/I-3: Issue + PR templates
 
-The proposed **4-pillar implementation** addresses each gap:
+PHASE 3 (MEDIUM) — Polish
+├── Remaining context generators (C-3 to C-6)
+├── Additional templates (I-2, I-4, I-6)
+└── Documentation (P-6, CONTRIBUTING.md)
+```
 
-| Pillar | Gap Addressed | Effort | Impact |
-|--------|---------------|--------|--------|
-| A. Dual-Protocol Standard | Fragmentation | 2-3 days | HIGH |
-| B. Semantic Hooks | Unstructured input | 1-2 days | MEDIUM |
-| C. Active Context | No JSON maps | 3-5 days | HIGH |
-| D. Agentic Handshake | Manual review loop | 3-4 days | VERY HIGH |
-
-**Total estimated effort**: 10-14 days to full autonomy.
-
-**Priority order**: D → C → A → B (impact per effort)
+**Total Effort**: ~73 hours → 70% autonomy target
 
 ---
 
-*Document generated by Claude (Opus 4) for Parametric Arsenal agentic infrastructure design.*
+*Strategic analysis complete. Proceed to TASK_FINAL.md for execution checklist.*
