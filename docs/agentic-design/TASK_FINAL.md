@@ -4,7 +4,20 @@
 
 > **Objective**: Transform Parametric Arsenal into Self-Describing Agentic Environment
 > **Target**: >70% issue-to-merge autonomy
-> **Total Effort**: ~44 hours
+> **Total Effort**: ~46 hours
+
+---
+
+## Layer → Task Mapping
+
+| Layer | Tasks | Purpose |
+|-------|-------|---------|
+| **Protocol** | P-1 → P-8 | Standardizing AGENTS.md, copilot-instructions.md, agent files |
+| **Interface** | I-1 → I-6 | Semantic Templates, JSON Schemas for Issues/PRs |
+| **Context** | C-1 → C-8 | Reflection Scripts, Map Generation, Agent Context |
+| **CI/CD** | CD-1 → CD-9 | Orchestration, Review-Repair-Merge Loops |
+
+> **Organization Note**: Tasks are grouped by execution phase (below) rather than layer to optimize for dependency ordering. Layer prefixes (P-, I-, C-, CD-) indicate conceptual grouping.
 
 ---
 
@@ -13,8 +26,8 @@
 | Phase | Priority | Tasks | Effort | Autonomy Gain |
 |-------|----------|-------|--------|---------------|
 | **1** | CRITICAL | CD-2, CD-3, CD-4, I-5 | 8h | +25% |
-| **2** | HIGH | P-1, P-2, C-1, C-7, I-1, I-3 | 16h | +25% |
-| **3** | MEDIUM | C-2→C-6, CD-1, CD-5→CD-7 | 14h | +15% |
+| **2** | HIGH | P-1, P-2, P-3, C-1, C-7, I-1, I-3 | 17h | +25% |
+| **3** | MEDIUM | C-2→C-8, CD-1, CD-5→CD-7 | 15h | +15% |
 | **4** | LOW | P-4→P-8, I-2, I-4, I-6, CD-8→CD-9 | 6h | +5% |
 
 ---
@@ -82,8 +95,10 @@ IF review-output/pr-{N}.json exists:
 |-------|-------|
 | **Priority** | CRITICAL |
 | **Effort** | 2h |
-| **Requires** | CD-2 |
+| **Requires** | Branch protection on `main`, CD-4 (for approval verdict) |
 | **Blocks** | Full autonomy |
+
+> **Dependency Note**: CD-3 is independent of CD-2. Auto-merge triggers when review approves; auto-fix triggers when review requests changes. These are parallel capabilities in the review loop.
 
 **INPUT**: PR with all checks passing
 
@@ -133,6 +148,21 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
 2. Create `.github/review-output/pr-{number}.json`
 3. Upload as artifact with `actions/upload-artifact@v4`
 
+**PROMPT TEMPLATE** (XML-tagged per TASK_PROMPT.md):
+<claude_review_prompt>
+Review PR #{{pr_number}} against CLAUDE.md standards.
+
+OUTPUT structured JSON to `.github/review-output/pr-{{pr_number}}.json`:
+- verdict: "approve" if ALL checks pass, "request_changes" if ANY violation
+- violations: array with rule, file, start_line, end_line, current, suggested
+- passed_checks: array of rule IDs that passed
+
+MANDATORY CHECKS: var usage, if/else statements, trailing commas, named parameters,
+target-typed new, collection expressions, file-scoped namespaces, one type per file.
+
+Run `dotnet build` to verify analyzer compliance before verdict.
+</claude_review_prompt>
+
 **JSON SCHEMA**:
 ```json
 {
@@ -162,6 +192,7 @@ IF pr.author == "claude[bot]" OR pr.labels.contains("auto-merge"):
 
 ### I-5: Review Output Schema
 <!-- DIRECTIVE: Must complete before CD-2 implementation -->
+<!-- NOTE: I-5 and I-6 are schema/documentation tasks grouped with Interface layer for organizational convenience -->
 
 | Field | Value |
 |-------|-------|
@@ -259,6 +290,49 @@ exemplars:
 
 ---
 
+### P-3: Sync Agent Critical Rules
+
+| Field | Value |
+|-------|-------|
+| **Priority** | HIGH |
+| **Effort** | 1h |
+| **Requires** | P-2 (StandardsGen) |
+| **Blocks** | Agent file consistency |
+
+**INPUT**: StandardsGen.csx execution output
+
+**OUTPUT**: Updated `[CRITICAL RULES]` sections in all 11 `.agent.md` files
+
+**PROCESS**:
+1. Run `dotnet script tools/standards/StandardsGen.csx`
+2. Generator reads STANDARDS.yaml
+3. Generator produces identical `[CRITICAL RULES]` blocks
+4. Each agent file gets updated rules section
+
+**AGENT FILES TO UPDATE** (11 total):
+```
+.github/agents/
+├── csharp-advanced.agent.md
+├── testing-specialist.agent.md
+├── refactoring-architect.agent.md
+├── rhino-implementation.agent.md
+├── grasshopper-implementation.agent.md
+├── performance-analyst.agent.md
+├── documentation-specialist.agent.md
+├── integration-specialist.agent.md
+├── cleanup-specialist.agent.md
+├── library-planner.agent.md
+└── plugin-architect.agent.md
+```
+
+**VERIFY**:
+- [ ] All 11 agent files have identical `[CRITICAL RULES]` content
+- [ ] Rules match STANDARDS.yaml source of truth
+- [ ] No manual edits to `[CRITICAL RULES]` sections (generated only)
+- [ ] CI workflow validates sync on PR
+
+---
+
 ### C-1 + C-7: ContextGen Tool + CI
 <!-- DIRECTIVE: Implement together as single unit -->
 
@@ -308,7 +382,29 @@ System.Text.Json
 **KEY DROPDOWNS**:
 - `scope`: All libs/* domains (13 options)
 - `complexity`: trivial/medium/hard/expert
-- `agent`: All 11 agents + auto-detect
+- `agent`: Recommended specialist agent (required for CD-1 integration)
+
+**AGENT DROPDOWN** (required for CD-1 to work):
+```yaml
+- type: dropdown
+  id: agent
+  attributes:
+    label: Recommended Agent
+    description: Which specialist agent should handle this?
+    options:
+      - auto-detect
+      - csharp-advanced
+      - testing-specialist
+      - refactoring-architect
+      - rhino-implementation
+      - grasshopper-implementation
+      - performance-analyst
+      - documentation-specialist
+      - integration-specialist
+      - cleanup-specialist
+      - library-planner
+      - plugin-architect
+```
 - `validation_mode`: V.None through V.All
 
 **VERIFY**:
@@ -343,9 +439,42 @@ System.Text.Json
 ## Test Plan
 ```
 
+**SEMANTIC HOOKS SPECIFICATION**:
+
+```html
+<!-- AGENT_REVIEW_CONFIG
+{
+  "auto_merge_eligible": true,
+  "required_reviewers": 0,
+  "skip_checks": [],
+  "max_autofix_iterations": 3
+}
+-->
+```
+
+```html
+<!-- ISSUE_METADATA
+{
+  "scope": "libs/rhino/spatial",
+  "complexity": "hard",
+  "agent": "rhino-implementation",
+  "context_files": ["Spatial.cs", "SpatialCore.cs"],
+  "validation_mode": "V.Standard | V.Topology"
+}
+-->
+```
+
+**Parsing Strategy** (workflow step):
+```javascript
+const regex = /<!-- (AGENT_REVIEW_CONFIG|ISSUE_METADATA)\n([\s\S]*?)\n-->/;
+const match = body.match(regex);
+const metadata = match ? JSON.parse(match[2]) : null;
+```
+
 **VERIFY**:
 - [ ] JSON metadata parseable
 - [ ] Checkboxes machine-readable
+- [ ] Semantic hooks validated by workflow
 
 ---
 
@@ -475,6 +604,51 @@ System.Text.Json
 | I-6 | Prompts README | 30m |
 | CD-8 | Status dashboard workflow | 1h |
 | CD-9 | Add timeouts to all workflows | 30m |
+
+### CD-8: Status Dashboard Workflow
+
+**OUTPUT**: `.github/workflows/status-dashboard.yml`
+
+**TRIGGER**: Daily schedule (cron)
+
+**DELIVERABLE**: GitHub Issue titled "Autonomy Dashboard - [DATE]" with metrics:
+- Bot-only PRs merged (count and %)
+- Average review iterations
+- Average time-to-merge
+- Agent invocation counts by type
+- Context file freshness
+
+---
+
+### CD-9: Workflow Timeouts
+
+**CHANGES**: Add `timeout-minutes` to all workflow jobs:
+| Workflow | Timeout |
+|----------|---------|
+| claude.yml | 15 min |
+| claude-issues.yml | 30 min |
+| claude-code-review.yml | 10 min |
+| claude-maintenance.yml | 15 min |
+| claude-autofix.yml | 15 min |
+
+---
+
+### C-8: Dashboard Data Generator
+
+| Field | Value |
+|-------|-------|
+| **Effort** | 1h |
+| **Requires** | C-1 |
+
+**OUTPUT**: `docs/agent-context/dashboard.json`
+
+**CONTENT**:
+- Workflow run statistics (last 30 days)
+- PR velocity metrics (open, merged, avg time)
+- Agent invocation counts by type
+- Context file timestamps
+
+> **Integration**: CD-8 (Status Dashboard) consumes this file for daily reports. Both tasks work together: C-8 generates static data, CD-8 formats and posts to GitHub Issues.
 
 ---
 

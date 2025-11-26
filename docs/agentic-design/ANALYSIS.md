@@ -42,6 +42,26 @@ SYNCHRONIZATION STATUS
 
 **Improvement Opportunity**: Standardize agent file structure and sync `[CRITICAL RULES]` sections via STANDARDS.yaml.
 
+#### Protocol File Comparison
+
+| Aspect | AGENTS.md (405 LOC) | copilot-instructions.md (323 LOC) |
+|--------|---------------------|-----------------------------------|
+| **Purpose** | Autonomous agents (CLI/CI) | IDE assist (Copilot) |
+| **Critical Rules** | 5 prohibitions + 5 requirements | 10 immediate blockers |
+| **Architecture** | Result, UnifiedOperation, V.*, E.* | Same (condensed) |
+| **Decision Trees** | 4 detailed trees | None (reference to CLAUDE.md) |
+| **Task Patterns** | 4 patterns with code | Reference only |
+| **Learning Path** | 5 exemplar files | 5 exemplar files (same) |
+| **Workflow** | Build/test commands | Build commands + Python |
+
+**Duplication Analysis**:
+- ~95% semantic overlap in critical rules
+- copilot-instructions.md adds Python section (Ruff, mypy)
+- AGENTS.md has richer inline examples and decision trees
+- Both reference CLAUDE.md as canonical source
+
+**Synchronization Risk**: HIGH — Manual sync required, no automated verification. Drift occurs when one file is updated without the other.
+
 ### 1.2 CI/CD Fabric: INCOMPLETE LOOP
 
 ```
@@ -93,14 +113,71 @@ TARGET FLOW (automated)
 | CI-4 | Review is read-only | Cannot suggest fixes | HIGH |
 | CI-5 | No coverage gate | PRs may lack tests | MEDIUM |
 
+#### rhino-tests.yml Analysis
+
+**Path**: `.github/workflows/rhino-tests.yml`
+
+| Aspect | Configuration |
+|--------|---------------|
+| **Trigger** | Push/PR to `main` when `libs/rhino/**` or `test/rhino/**` changes |
+| **Platform** | Windows-only (`net8.0-windows` TFM) |
+| **Runtime** | Rhino 8 via `mcneel/setup-rhino3d@v2` |
+| **Secrets** | `RHINO_TOKEN`, `RHINO_EMAIL` required |
+| **Timeout** | 20 minutes |
+
+**Diagnostic Capability**:
+- Optional CoreCLR trace (`COREHOST_TRACE`) via `enable_diagnostics` input
+- VSTest diagnostics on failure (last 200/100 lines)
+
+**Integration Gap**: Rhino tests run independently of `claude-code-review.yml`. Consider:
+- Adding test results to review JSON output
+- Including Rhino test status in auto-merge gate
+
 ### 1.3 Gatekeepers: PRODUCTION-READY ✅
 
-Analyzer stack is mature:
-- **6 packages**: Roslynator, Meziantou, NetAnalyzers, AsyncFixer, ReflectionAnalyzers, Nullable.Extended
-- **TreatWarningsAsErrors=true** in `Directory.Build.props`
-- **Pre-commit**: `dotnet build` + `dotnet format --verify-no-changes`
+**Analyzer Stack** (6 packages in `Directory.Build.props`):
+- Roslynator.Analyzers (4.14.1)
+- Meziantou.Analyzer (2.0.256)
+- Microsoft.CodeAnalysis.NetAnalyzers (10.0.100)
+- AsyncFixer (1.6.0)
+- ReflectionAnalyzers (0.3.1)
+- Nullable.Extended.Analyzer (1.15.6581)
 
-Critical rules enforced: CA1050 (one type/file), IDE0007 (no var), IDE0290 (primary constructors), IDE0300-305 (collections).
+**Build Enforcement**:
+- `TreatWarningsAsErrors=true`
+- `EnforceCodeStyleInBuild=true`
+- `AnalysisLevel=latest-all`
+
+**Critical Rules Enforced**:
+- CA1050 (one type/file)
+- IDE0007-0009 (no var, explicit types)
+- IDE0290 (primary constructors)
+- IDE0300-305 (collection expressions)
+
+#### Pre-commit Configuration Details
+
+**Path**: `.pre-commit-config.yaml`
+
+**Standard Hooks** (pre-commit/pre-commit-hooks v5.0.0):
+| Hook | Purpose |
+|------|---------|
+| `trailing-whitespace` | Remove trailing whitespace (markdown preserved) |
+| `end-of-file-fixer` | Ensure files end with newline |
+| `mixed-line-ending` | Enforce LF line endings |
+| `check-yaml` | Validate YAML syntax |
+| `check-json` | Validate JSON syntax |
+| `check-toml` | Validate TOML syntax |
+
+**Custom Hooks**:
+1. **dotnet-build**: `dotnet build -c Release` with `EnforceCodeStyleInBuild=true`, `TreatWarningsAsErrors=true`
+2. **dotnet-format**: `dotnet format --verify-no-changes --verbosity quiet`
+
+**CI Integration**: pre-commit.ci enabled with:
+- Auto-fix commits with message: `style: auto-fix pre-commit hooks`
+- Monthly auto-update schedule
+- Auto-fix PRs enabled
+
+**Assessment**: ✅ Production-ready — enforces identical analyzers as CI pipeline.
 
 ### 1.4 Interface Layer: UNSTRUCTURED
 
@@ -184,6 +261,87 @@ validation_mode: V.Standard | V.Topology
 
 **CI**: Regenerate on `libs/**/*.cs` changes, create PR (not direct commit to prevent infinite loops).
 
+#### .NET 8 Implementation Patterns
+
+**Required NuGet Packages** (`tools/ContextGen/ContextGen.csproj`):
+```xml
+<PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.12.0" />
+<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.12.0" />
+<PackageReference Include="System.Text.Json" Version="8.0.5" />
+```
+
+**Architecture Generator** (~30 lines):
+```csharp
+using Microsoft.Build.Locator;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.MSBuild;
+
+MSBuildLocator.RegisterDefaults();
+using MSBuildWorkspace workspace = MSBuildWorkspace.Create();
+Solution solution = await workspace.OpenSolutionAsync("Parametric_Arsenal.sln");
+
+List<ProjectInfo> projects = [];
+foreach (Project project in solution.Projects) {
+    Compilation? compilation = await project.GetCompilationAsync();
+    if (compilation is null) continue;
+
+    INamedTypeSymbol[] types = compilation.GlobalNamespace
+        .GetNamespaceMembers()
+        .SelectMany(ns => GetAllTypes(ns))
+        .ToArray();
+
+    projects.Add(new ProjectInfo(
+        Name: project.AssemblyName,
+        Path: project.FilePath ?? "",
+        Types: types.Select(t => new TypeInfo(
+            Name: t.Name,
+            Namespace: t.ContainingNamespace.ToDisplayString(),
+            Kind: t.TypeKind.ToString(),
+            Members: t.GetMembers().Length
+        )).ToArray()
+    ));
+}
+
+await File.WriteAllTextAsync("docs/agent-context/architecture.json",
+    JsonSerializer.Serialize(projects, new JsonSerializerOptions { WriteIndented = true }));
+
+static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol ns) =>
+    ns.GetTypeMembers().Concat(ns.GetNamespaceMembers().SelectMany(GetAllTypes));
+```
+
+**Error Catalog Generator** (~25 lines):
+```csharp
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+string ecsPath = "libs/core/errors/E.cs";
+SyntaxTree tree = CSharpSyntaxTree.ParseText(await File.ReadAllTextAsync(ecsPath));
+CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
+
+ClassDeclarationSyntax? eClass = root.DescendantNodes()
+    .OfType<ClassDeclarationSyntax>()
+    .FirstOrDefault(c => c.Identifier.Text == "E");
+
+Dictionary<string, List<ErrorEntry>> catalog = [];
+foreach (ClassDeclarationSyntax domain in eClass?.Members.OfType<ClassDeclarationSyntax>() ?? []) {
+    string domainName = domain.Identifier.Text;
+    List<ErrorEntry> errors = domain.Members
+        .OfType<FieldDeclarationSyntax>()
+        .Where(f => f.Declaration.Type.ToString() == "SystemError")
+        .Select(f => new ErrorEntry(
+            Name: f.Declaration.Variables.First().Identifier.Text,
+            Code: ExtractErrorCode(f)
+        )).ToList();
+    catalog[domainName] = errors;
+}
+
+await File.WriteAllTextAsync("docs/agent-context/error-catalog.json",
+    JsonSerializer.Serialize(catalog, new JsonSerializerOptions { WriteIndented = true }));
+```
+
+> **Note**: These patterns use current .NET 8 / Roslyn 4.12.0 APIs. `MSBuildLocator.RegisterDefaults()` must be called before creating `MSBuildWorkspace`.
+
 ### Pillar D: Agentic Handshake
 
 **Principle**: Structured JSON interchange between reviewer and fixer agents.
@@ -261,12 +419,12 @@ PHASE 1 (CRITICAL) — Unblock agent autonomy
 └── CD-3: Create auto-merge.yml workflow
 
 PHASE 2 (HIGH) — Enable structured input
-├── C-1/C-7: ContextGen tool + CI workflow (creates PRs, not direct commits)
-├── P-1/P-2: STANDARDS.yaml + generator
+├── P-1/P-2/P-3: STANDARDS.yaml + generator + agent sync
+├── C-1/C-7: ContextGen tool + CI workflow
 └── I-1/I-3: Issue + PR templates
 
 PHASE 3 (MEDIUM) — Complete context layer
-├── C-2→C-6: Context generators
+├── C-2→C-8: Context generators
 ├── CD-1/CD-5→CD-7: Workflow enhancements
 └── Additional templates (I-2, I-4, I-6)
 
@@ -274,7 +432,7 @@ PHASE 4 (LOW) — Polish
 └── P-4→P-8, CD-8→CD-9, CONTRIBUTING.md
 ```
 
-**Total Effort**: ~44 hours → 70% autonomy target
+**Total Effort**: ~46 hours → 70% autonomy target
 
 ---
 
