@@ -6,8 +6,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Topology;
 
 /// <summary>Operation types, validation dispatch, and healing configuration for topology.</summary>
-[Pure]
-internal static class TopologyConfig {
+[Pure] internal static class TopologyConfig {
     /// <summary>Strategy type to tolerance multiplier mapping for healing operations.</summary>
     internal static readonly FrozenDictionary<Type, double> StrategyToleranceMultipliers =
         new Dictionary<Type, double> {

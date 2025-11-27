@@ -78,8 +78,7 @@ internal static class ValidationRules {
         };
 
     /// <summary>Compiles zero-allocation validator via expression trees.</summary>
-    [Pure]
-    private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
+    [Pure] private static Func<object, IGeometryContext, SystemError[]> CompileValidator(Type runtimeType, V mode) {
         (ParameterExpression geometry, ParameterExpression context, ParameterExpression error) = (Expression.Parameter(typeof(object), "g"), Expression.Parameter(typeof(IGeometryContext), "c"), Expression.Parameter(typeof(SystemError?), "e"));
         (MemberInfo Member, SystemError Error, string Name, byte Kind)[] memberValidations = [.. V.AllFlags.Where(flag => mode.Has(flag) && _validationRules.ContainsKey(flag)).SelectMany(flag => {
             ((string Member, SystemError Error)[] properties, (string Member, SystemError Error)[] methods) = _validationRules[flag];

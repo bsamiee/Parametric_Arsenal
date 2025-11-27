@@ -23,8 +23,7 @@ public readonly struct Result<T> : IEquatable<Result<T>> {
     [Pure] public SystemError Error => this.Eval switch { { _errors: [SystemError head, ..] } => head, _ => default };
     [Pure] private Result<T> Eval => this._deferred is not null ? this._deferred().Eval : this;
 
-    [Pure]
-    private string DebuggerDisplay => (this._deferred is not null, this._isSuccess, this._errors) switch {
+    [Pure] private string DebuggerDisplay => (this._deferred is not null, this._isSuccess, this._errors) switch {
         (true, _, _) => string.Create(CultureInfo.InvariantCulture, $"Deferred<{typeof(T).Name}>"),
         (false, true, _) => string.Create(CultureInfo.InvariantCulture, $"Success: {this._value?.ToString() ?? "null"}"),
         (false, false, [SystemError single]) => string.Create(CultureInfo.InvariantCulture, $"Error: {single}"),

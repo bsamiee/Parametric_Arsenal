@@ -144,11 +144,9 @@ public static class Orientation {
         SymmetryType Symmetry,
         RelationshipType Relationship) {
         /// <summary>Twist angle in degrees for display purposes.</summary>
-        [Pure]
-        public double TwistDegrees => RhinoMath.ToDegrees(this.Twist);
+        [Pure] public double TwistDegrees => RhinoMath.ToDegrees(this.Twist);
         /// <summary>Tilt angle in degrees for display purposes.</summary>
-        [Pure]
-        public double TiltDegrees => RhinoMath.ToDegrees(this.Tilt);
+        [Pure] public double TiltDegrees => RhinoMath.ToDegrees(this.Tilt);
     }
 
     /// <summary>Execute orientation operation on geometry.</summary>

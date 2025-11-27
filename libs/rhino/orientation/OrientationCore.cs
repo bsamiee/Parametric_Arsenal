@@ -8,8 +8,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Orchestration layer for orientation operations via UnifiedOperation.</summary>
-[Pure]
-internal static class OrientationCore {
+[Pure] internal static class OrientationCore {
     internal static Result<Orientation.RelativeOrientationResult> ExecuteRelative(GeometryBase geometryA, GeometryBase geometryB, IGeometryContext context) =>
         OrientationCompute.ComputeRelative(geometryA: geometryA, geometryB: geometryB, symmetryTolerance: context.AbsoluteTolerance, angleTolerance: context.AngleToleranceRadians);
 

@@ -11,16 +11,14 @@ namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Dense spatial algorithm implementations.</summary>
 internal static class SpatialCompute {
-    [Pure]
-    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterKMeans<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase {
+    [Pure] internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterKMeans<T>(T[] geometry, int k, IGeometryContext context) where T : GeometryBase {
         Point3d[] points = ExtractCentroids(geometry: geometry);
         return k > points.Length
             ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
             : ResultFactory.Create(value: ComputeClusterResults(assignments: KMeansAssign(pts: points, k: k, tol: context.AbsoluteTolerance, maxIter: SpatialConfig.KMeansMaxIterations), allPoints: points));
     }
 
-    [Pure]
-    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterDBSCAN<T>(T[] geometry, double epsilon, int minPoints) where T : GeometryBase {
+    [Pure] internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterDBSCAN<T>(T[] geometry, double epsilon, int minPoints) where T : GeometryBase {
         Point3d[] points = ExtractCentroids(geometry: geometry);
         int[] assignments = DBSCANAssign(pts: points, eps: epsilon, minPts: minPoints);
         int clusterCount = assignments.Where(static a => a >= 0).DefaultIfEmpty(-1).Max() + 1;
@@ -29,16 +27,14 @@ internal static class SpatialCompute {
             : ResultFactory.Create(value: ComputeClusterResults(assignments: assignments, allPoints: points));
     }
 
-    [Pure]
-    internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterHierarchical<T>(T[] geometry, int k) where T : GeometryBase {
+    [Pure] internal static Result<(Point3d Centroid, double[] Radii)[]> ClusterHierarchical<T>(T[] geometry, int k) where T : GeometryBase {
         Point3d[] points = ExtractCentroids(geometry: geometry);
         return k > points.Length
             ? ResultFactory.Create<(Point3d, double[])[]>(error: E.Spatial.KExceedsPointCount)
             : ResultFactory.Create(value: ComputeClusterResults(assignments: HierarchicalAssign(pts: points, k: k), allPoints: points));
     }
 
-    [Pure]
-    private static Point3d[] ExtractCentroids<T>(T[] geometry) where T : GeometryBase {
+    [Pure] private static Point3d[] ExtractCentroids<T>(T[] geometry) where T : GeometryBase {
         Point3d[] centroids = new Point3d[geometry.Length];
         for (int i = 0; i < geometry.Length; i++) {
             centroids[i] = geometry[i] switch {
@@ -60,8 +56,7 @@ internal static class SpatialCompute {
         return centroids;
     }
 
-    [Pure]
-    private static (Point3d Centroid, double[] Radii)[] ComputeClusterResults(int[] assignments, Point3d[] allPoints) {
+    [Pure] private static (Point3d Centroid, double[] Radii)[] ComputeClusterResults(int[] assignments, Point3d[] allPoints) {
         int clusterCount = assignments.Max() + 1;
         // Build member lists once O(n) instead of O(k*n) filtering per cluster
         List<int>[] memberLists = new List<int>[clusterCount];
@@ -223,8 +218,7 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    [Pure]
-    internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
+    [Pure] internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
         int n = pts.Length;
         int[] assignments = [.. Enumerable.Range(0, n),];
         HashSet<int> activeClusters = [.. Enumerable.Range(0, n),];
@@ -267,8 +261,7 @@ internal static class SpatialCompute {
         return assignments;
     }
 
-    [Pure]
-    internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
+    [Pure] internal static Result<(Curve[], double[])> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
         brep.Faces.Count is 0
             ? ResultFactory.Create<(Curve[], double[])>(error: E.Geometry.InvalidCount.WithContext("MedialAxis requires at least one face"))
             : (brep.Faces.Count is 1 && brep.Faces[0].IsPlanar(tolerance: context.AbsoluteTolerance), brep.Edges.Where(static e => e.Valence == EdgeAdjacency.Naked).Select(static e => e.DuplicateCurve()).Where(static c => c is not null).ToArray()) switch {
@@ -311,8 +304,7 @@ internal static class SpatialCompute {
             };
 
     /// <summary>Computes 2D convex hull of XY-coplanar points using Andrew's monotone chain algorithm.</summary>
-    [Pure]
-    internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
+    [Pure] internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
             : points.Length > 1 && points[0].Z is double z0 && !points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
@@ -341,8 +333,7 @@ internal static class SpatialCompute {
                 }))();
 
     /// <summary>Computes 3D convex hull using incremental algorithm, returning mesh faces as vertex index triples.</summary>
-    [Pure]
-    internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
+    [Pure] internal static Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context) =>
         points.Length < 4
             ? ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull3D requires at least 4 points"))
             : points.Select((p, i) => (Point: p, Index: i)).ToArray() is (Point3d Point, int Index)[] indexed && ComputeInitialTetrahedron(indexed, context) is (bool Success, (int, int, int)[] Faces) initial && initial.Success
@@ -395,8 +386,7 @@ internal static class SpatialCompute {
     }
 
     /// <summary>Computes 2D Delaunay triangulation using Bowyer-Watson algorithm, returning triangle vertex indices as triples.</summary>
-    [Pure]
-    internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) {
+    [Pure] internal static Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context) {
         if (points.Length < 3) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidCount.WithContext("DelaunayTriangulation2D requires at least 3 points")); }
 
         (double z0, double minX, double minY, double maxX, double maxY) = (points[0].Z, points[0].X, points[0].Y, points[0].X, points[0].Y);
@@ -453,8 +443,7 @@ internal static class SpatialCompute {
     }
 
     /// <summary>Computes 2D Voronoi diagram from Delaunay triangulation, returning cell vertices for each input point.</summary>
-    [Pure]
-    internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
+    [Pure] internal static Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => {

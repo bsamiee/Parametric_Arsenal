@@ -12,16 +12,14 @@ namespace Arsenal.Rhino.Extraction;
 internal static class ExtractionCompute {
     private static readonly double[] _zeroResidual = [0.0,];
 
-    [Pure]
-    internal static Result<Extraction.FeatureExtractionResult> ExtractFeatures(Brep brep, IGeometryContext context) =>
+    [Pure] internal static Result<Extraction.FeatureExtractionResult> ExtractFeatures(Brep brep, IGeometryContext context) =>
         ResultFactory.Create(value: brep)
             .Validate(args: [context, ExtractionConfig.FeatureMetadata.ValidationMode,])
             .Ensure(b => b.Faces.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no faces"))
             .Ensure(b => b.Edges.Count > 0, error: E.Geometry.FeatureExtractionFailed.WithContext("Brep has no edges"))
             .Bind(validBrep => ExtractFeaturesInternal(brep: validBrep, context: context));
 
-    [Pure]
-    private static Extraction.Feature ClassifyEdge(BrepEdge edge, Brep brep) =>
+    [Pure] private static Extraction.Feature ClassifyEdge(BrepEdge edge, Brep brep) =>
         (edge.Domain.Min, edge.Domain.Max, Enumerable.Range(0, ExtractionConfig.FilletCurvatureSampleCount)
             .Select(i => edge.EdgeCurve.CurvatureAt(edge.Domain.ParameterAt(i / (ExtractionConfig.FilletCurvatureSampleCount - 1.0))))
             .Where(v => v.IsValid)
@@ -37,8 +35,7 @@ internal static class ExtractionCompute {
                 ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.GridPattern(SymmetryTransform: Transform.PlaneToPlane(Plane.WorldXY, new Plane(origin, u, v))), Confidence: 0.9))
                 : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
 
-    [Pure]
-    internal static Result<Extraction.PatternDetectionResult> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
+    [Pure] internal static Result<Extraction.PatternDetectionResult> ExtractPatterns(GeometryBase[] geometries, IGeometryContext context) =>
         ResultFactory.Create(value: geometries)
             .Ensure(gs => gs.Length >= ExtractionConfig.PatternMinInstances, error: E.Geometry.NoPatternDetected.WithContext($"Need at least {ExtractionConfig.PatternMinInstances.ToString(System.Globalization.CultureInfo.InvariantCulture)} instances"))
             .Ensure(gs => gs.All(g => g is not null), error: E.Validation.GeometryInvalid.WithContext("Array contains null geometries"))
@@ -48,8 +45,7 @@ internal static class ExtractionCompute {
                     .Map(validated => validated.GetBoundingBox(accurate: false).Center))
                 .Bind(centers => DetectPatternType(centers: [.. centers], context: context)));
 
-    [Pure]
-    private static Extraction.Feature ClassifyEdgeFromCurvature(
+    [Pure] private static Extraction.Feature ClassifyEdgeFromCurvature(
         BrepEdge edge,
         Brep brep,
         double[] curvatures,
@@ -86,8 +82,7 @@ internal static class ExtractionCompute {
                 ? ResultFactory.Create(value: new Extraction.PatternDetectionResult(Pattern: new Extraction.ScalingPattern(SymmetryTransform: Transform.Scale(anchor: centroid, scaleFactor: validRatios.Average())), Confidence: 0.7))
                 : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
 
-    [Pure]
-    private static Extraction.Feature ClassifyEdgeByDihedral(BrepEdge edge, Brep brep, double mean) {
+    [Pure] private static Extraction.Feature ClassifyEdgeByDihedral(BrepEdge edge, Brep brep, double mean) {
         int[] adjacentFaces = edge.AdjacentFaces();
 
         return adjacentFaces.Length is 2
@@ -120,8 +115,7 @@ internal static class ExtractionCompute {
                         : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected.WithContext("No linear, radial, grid, or scaling pattern detected"));
     }
 
-    [Pure]
-    private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop, IGeometryContext context) {
+    [Pure] private static (bool IsHole, double Area) ClassifyHole(BrepLoop loop, IGeometryContext context) {
         using Curve? c = loop.To3dCurve();
 
         return c switch {
@@ -139,8 +133,7 @@ internal static class ExtractionCompute {
         };
     }
 
-    [Pure]
-    private static Extraction.Feature ClassifyEdgeByAngle(
+    [Pure] private static Extraction.Feature ClassifyEdgeByAngle(
         BrepEdge edge,
         Vector3d normal0,
         Vector3d normal1,
@@ -159,8 +152,7 @@ internal static class ExtractionCompute {
         };
     }
 
-    [Pure]
-    internal static Result<Extraction.PrimitiveDecompositionResult> DecomposeToPrimitives(GeometryBase geometry, IGeometryContext context) =>
+    [Pure] internal static Result<Extraction.PrimitiveDecompositionResult> DecomposeToPrimitives(GeometryBase geometry, IGeometryContext context) =>
         ResultFactory.Create(value: geometry)
             .Validate(args: [context, ExtractionConfig.PrimitiveMetadata.ValidationMode,])
             .Bind(validGeometry => validGeometry switch {
@@ -180,8 +172,7 @@ internal static class ExtractionCompute {
                     error: E.Geometry.DecompositionFailed.WithContext($"Unsupported geometry type: {other.GetType().Name}")),
             });
 
-    [Pure]
-    private static Result<Extraction.FeatureExtractionResult> ExtractFeaturesInternal(Brep brep, IGeometryContext context) {
+    [Pure] private static Result<Extraction.FeatureExtractionResult> ExtractFeaturesInternal(Brep brep, IGeometryContext context) {
         BrepEdge[] validEdges = [.. brep.Edges.Where(e => e.EdgeCurve is not null),];
         Extraction.Feature[] edgeFeatures = new Extraction.Feature[validEdges.Length];
 
@@ -204,8 +195,7 @@ internal static class ExtractionCompute {
         return ResultFactory.Create(value: new Extraction.FeatureExtractionResult(Features: allFeatures, Confidence: confidence));
     }
 
-    [Pure]
-    private static Extraction.Primitive ClassifySurface(Surface surface, IGeometryContext context) =>
+    [Pure] private static Extraction.Primitive ClassifySurface(Surface surface, IGeometryContext context) =>
         surface.TryGetPlane(out Plane pl, tolerance: context.AbsoluteTolerance)
             ? new Extraction.PlanarPrimitive(Frame: pl, Origin: pl.Origin)
             : surface.TryGetCylinder(out Cylinder cyl, tolerance: context.AbsoluteTolerance)
@@ -229,8 +219,7 @@ internal static class ExtractionCompute {
                                 _ => ClassifySurfaceByCurvature(surface: surface),
                             };
 
-    [Pure]
-    private static Extraction.Primitive ClassifySurfaceByCurvature(Surface surface) {
+    [Pure] private static Extraction.Primitive ClassifySurfaceByCurvature(Surface surface) {
         (Interval u, Interval v) = (surface.Domain(0), surface.Domain(1));
         int sampleCount = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.CurvatureSampleCount));
         int maxSamples = sampleCount * sampleCount;
@@ -311,8 +300,7 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<Extraction.PatternDetectionResult>(error: E.Geometry.NoPatternDetected);
     }
 
-    [Pure]
-    private static Result<Extraction.PrimitiveDecompositionResult> DecomposeBrepFaces(Brep brep, IGeometryContext context) =>
+    [Pure] private static Result<Extraction.PrimitiveDecompositionResult> DecomposeBrepFaces(Brep brep, IGeometryContext context) =>
         Enumerable.Range(0, brep.Faces.Count)
             .Select(i => brep.Faces[i].DuplicateSurface() switch {
                 null => (false, null, 0.0,
@@ -346,8 +334,7 @@ internal static class ExtractionCompute {
                 : ResultFactory.Create<Extraction.PrimitiveDecompositionResult>(
                     error: E.Geometry.NoPrimitivesDetected.WithContext("No faces classified as primitives")));
 
-    [Pure]
-    private static Extraction.Primitive TestPrincipalCurvatureConstancy(
+    [Pure] private static Extraction.Primitive TestPrincipalCurvatureConstancy(
         Surface surface,
         SurfaceCurvature[] curvatures) {
         int n = curvatures.Length;
@@ -388,8 +375,7 @@ internal static class ExtractionCompute {
         };
     }
 
-    [Pure]
-    private static double ComputeSurfaceResidual(Surface surface, Extraction.Primitive primitive) {
+    [Pure] private static double ComputeSurfaceResidual(Surface surface, Extraction.Primitive primitive) {
         (Interval u, Interval v) = (surface.Domain(0), surface.Domain(1));
         int samplesPerDir = (int)Math.Ceiling(Math.Sqrt(ExtractionConfig.PrimitiveResidualSampleCount));
         int totalSamples = samplesPerDir * samplesPerDir;

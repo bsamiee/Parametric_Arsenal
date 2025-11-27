@@ -112,8 +112,7 @@ public static class Morphology {
         BoundingBox OriginalBounds,
         BoundingBox DeformedBounds,
         double VolumeRatio) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"CageDeform | MaxDisp={this.MaxDisplacement:F3} | VolumeΔ={this.VolumeRatio:F2}x");
     }
@@ -127,8 +126,7 @@ public static class Morphology {
         double MaxVertexDisplacement,
         double QualityScore,
         bool Converged) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"Smoothing | Iterations={this.IterationsPerformed} | RMS={this.RMSDisplacement:E2} | Quality={this.QualityScore:F3} | {(this.Converged ? "✓" : "diverged")}");
     }
@@ -143,8 +141,7 @@ public static class Morphology {
         int OffsetVertexCount,
         int OriginalFaceCount,
         int OffsetFaceCount) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshOffset | Dist={this.ActualDistance:F3} | V: {this.OriginalVertexCount}→{this.OffsetVertexCount} | F: {this.OriginalFaceCount}→{this.OffsetFaceCount}{(this.HasDegeneracies ? " [degenerate]" : "")}");
     }
@@ -160,8 +157,7 @@ public static class Morphology {
         double MeanEdgeLength,
         double MeanAspectRatio,
         double MinTriangleAngleRadians) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"Subdivision | Faces: {this.OriginalFaceCount}→{this.SubdividedFaceCount} | AspectRatio={this.MeanAspectRatio:F2} | MinAngle={RhinoMath.ToDegrees(this.MinTriangleAngleRadians):F1}°");
     }
@@ -177,8 +173,7 @@ public static class Morphology {
         double MeanAspectRatio,
         double MinEdgeLength,
         double MaxEdgeLength) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshReduce | Faces: {this.OriginalFaceCount}→{this.ReducedFaceCount} ({this.ReductionRatio * 100.0:F1}%) | Quality={this.QualityScore:F3} | AspectRatio={this.MeanAspectRatio:F2}");
     }
@@ -195,8 +190,7 @@ public static class Morphology {
         bool Converged,
         int OriginalFaceCount,
         int RemeshedFaceCount) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"Remesh | Target={this.TargetEdgeLength:F3} | Mean={this.MeanEdgeLength:F3} | StdDev={this.EdgeLengthStdDev:F3} | Uniformity={this.UniformityScore:F3} | Iter={this.IterationsPerformed} | {(this.Converged ? "✓" : "diverged")}");
     }
@@ -213,8 +207,7 @@ public static class Morphology {
         double QualityScore,
         bool HadHoles,
         bool HadBadNormals) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshRepair | V: {this.OriginalVertexCount}→{this.RepairedVertexCount} | F: {this.OriginalFaceCount}→{this.RepairedFaceCount} | Ops=0x{this.OperationsPerformed:X2} | Quality={this.QualityScore:F3}");
     }
@@ -229,8 +222,7 @@ public static class Morphology {
         int[] VertexCountPerComponent,
         int[] FaceCountPerComponent,
         BoundingBox[] BoundsPerComponent) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshSeparate | Components={this.ComponentCount} | TotalV={this.TotalVertexCount} | TotalF={this.TotalFaceCount}");
     }
@@ -246,8 +238,7 @@ public static class Morphology {
         double MeanVertexDisplacement,
         double MaxVertexDisplacement,
         bool NormalsRecalculated) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshWeld | V: {this.OriginalVertexCount}→{this.WeldedVertexCount} (-{this.VerticesRemoved}) | Tol={this.WeldTolerance:E2} | MaxDisp={this.MaxVertexDisplacement:F3}");
     }
@@ -268,8 +259,7 @@ public static class Morphology {
         double MeanTriangleAngleRadians,
         int DegenerateFaceCount,
         double QualityScore) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"BrepToMesh | BrepFaces={this.BrepFaceCount} | MeshFaces={this.MeshFaceCount} | MeanEdge={this.MeanEdgeLength:F3} | AspectRatio={this.MeanAspectRatio:F2} | Quality={this.QualityScore:F3}");
     }
@@ -287,8 +277,7 @@ public static class Morphology {
         int WallFaceCount,
         BoundingBox OriginalBounds,
         BoundingBox ThickenedBounds) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshThicken | Dist={this.OffsetDistance:F3} | Solid={this.IsSolid} | V: {this.OriginalVertexCount}→{this.ThickenedVertexCount} | F: {this.OriginalFaceCount}→{this.ThickenedFaceCount} | WallFaces={this.WallFaceCount}");
     }
@@ -305,8 +294,7 @@ public static class Morphology {
         double MinV,
         double MaxV,
         double UVCoverage) : IMorphologyResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"MeshUnwrap | UV={this.HasTextureCoordinates} | F={this.OriginalFaceCount} | TC={this.TextureCoordinateCount} | U:[{this.MinU:F3}, {this.MaxU:F3}] | V:[{this.MinV:F3}, {this.MaxV:F3}] | Coverage={this.UVCoverage:P1}");
     }

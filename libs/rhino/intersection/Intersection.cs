@@ -104,8 +104,7 @@ public static class Intersection {
         IntersectionCore.ExecuteRequest(request: request, context: context);
 
     /// <summary>Classifies intersection type (tangent/transverse/unknown) via approach angle analysis.</summary>
-    [Pure]
-    public static Result<ClassificationResult> Classify(
+    [Pure] public static Result<ClassificationResult> Classify(
         IntersectionOutput output,
         GeometryBase geometryA,
         GeometryBase geometryB,
@@ -117,8 +116,7 @@ public static class Intersection {
             context: context);
 
     /// <summary>Finds near-miss locations within tolerance band via closest point sampling.</summary>
-    [Pure]
-    public static Result<NearMissResult> FindNearMisses(
+    [Pure] public static Result<NearMissResult> FindNearMisses(
         GeometryBase geometryA,
         GeometryBase geometryB,
         double searchRadius,
@@ -130,8 +128,7 @@ public static class Intersection {
             context: context);
 
     /// <summary>Analyzes intersection stability via spherical perturbation sampling.</summary>
-    [Pure]
-    public static Result<StabilityResult> AnalyzeStability(
+    [Pure] public static Result<StabilityResult> AnalyzeStability(
         IntersectionOutput baseIntersection,
         GeometryBase geometryA,
         GeometryBase geometryB,

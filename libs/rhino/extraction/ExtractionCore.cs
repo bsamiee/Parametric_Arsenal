@@ -12,8 +12,7 @@ using Rhino.Geometry.Collections;
 namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Orchestration layer for extraction operations via UnifiedOperation.</summary>
-[Pure]
-internal static class ExtractionCore {
+[Pure] internal static class ExtractionCore {
     private static Result<IReadOnlyList<Point3d>> ExtractByLength(GeometryBase geometry, double length, bool includeEnds) =>
         geometry switch {
             Curve c when length > 0 && c.DivideByLength(length, includeEnds) is double[] pars =>

@@ -6,8 +6,7 @@ using Rhino;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Unified metadata, constants, and dispatch tables for differential and quality analysis.</summary>
-[Pure]
-internal static class AnalysisConfig {
+[Pure] internal static class AnalysisConfig {
     /// <summary>Differential geometry dispatch table: request type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, DifferentialMetadata> DifferentialOperations =
         new Dictionary<Type, DifferentialMetadata> {

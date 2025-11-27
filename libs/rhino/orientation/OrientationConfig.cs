@@ -8,8 +8,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Unified metadata, constants, and dispatch tables for orientation operations.</summary>
-[Pure]
-internal static class OrientationConfig {
+[Pure] internal static class OrientationConfig {
     /// <summary>Centroid mode validation modes.</summary>
     internal static readonly FrozenDictionary<Type, V> CentroidModeValidation =
         new Dictionary<Type, V> {

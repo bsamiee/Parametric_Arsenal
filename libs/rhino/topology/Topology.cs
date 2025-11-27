@@ -62,8 +62,7 @@ public static class Topology {
         IReadOnlyList<double> EdgeGaps,
         IReadOnlyList<(int EdgeA, int EdgeB, double Distance)> NearMisses,
         IReadOnlyList<Strategy> SuggestedStrategies) : IResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"TopologyDiagnosis: Gaps={this.EdgeGaps.Count} | NearMisses={this.NearMisses.Count} | Strategies={this.SuggestedStrategies.Count}");
     }
@@ -74,8 +73,7 @@ public static class Topology {
         Brep Healed,
         Strategy AppliedStrategy,
         bool Success) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.Success
+        [Pure] private string DebuggerDisplay => this.Success
             ? string.Create(CultureInfo.InvariantCulture, $"HealingResult: Success | Strategy={this.AppliedStrategy.GetType().Name}")
             : string.Create(CultureInfo.InvariantCulture, $"HealingResult: Failed | Strategy={this.AppliedStrategy.GetType().Name}");
     }
@@ -89,8 +87,7 @@ public static class Topology {
         bool IsOrdered,
         int TotalEdgeCount,
         double TotalLength) : IResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"NakedEdges: {this.EdgeCurves.Count}/{this.TotalEdgeCount} | L={this.TotalLength:F3} | Ordered={this.IsOrdered}");
     }
@@ -102,8 +99,7 @@ public static class Topology {
         IReadOnlyList<(int LoopIndex, bool IsHole)> Loops,
         bool IsSolid,
         int HandleCount) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.IsSolid
+        [Pure] private string DebuggerDisplay => this.IsSolid
             ? string.Create(CultureInfo.InvariantCulture, $"TopologicalFeatures: Solid | Genus={this.Genus} | Handles={this.HandleCount}")
             : string.Create(CultureInfo.InvariantCulture, $"TopologicalFeatures: NonSolid | Loops={this.Loops.Count}");
     }
@@ -116,8 +112,7 @@ public static class Topology {
         IReadOnlyList<double> ContinuityMeasures,
         FrozenDictionary<EdgeContinuityType, IReadOnlyList<int>> GroupedByType,
         Continuity MinimumContinuity) : IResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"EdgeClassification: Total={this.EdgeIndices.Count} | Sharp={this.GroupedByType.GetValueOrDefault(EdgeContinuityType.Sharp, []).Count}");
     }
@@ -131,8 +126,7 @@ public static class Topology {
         IReadOnlyList<bool> IsClosedPerLoop,
         double JoinTolerance,
         int FailedJoins) : IResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"BoundaryLoops: {this.Loops.Count} | FailedJoins={this.FailedJoins} | Tol={this.JoinTolerance:E2}");
     }
@@ -147,8 +141,7 @@ public static class Topology {
         int Valence,
         bool IsBoundary,
         bool IsManifold) : IResult {
-        [Pure]
-        private string DebuggerDisplay => string.Create(
+        [Pure] private string DebuggerDisplay => string.Create(
             CultureInfo.InvariantCulture,
             $"Vertex[{this.VertexIndex}]: Valence={this.Valence} | {(this.IsBoundary ? "Boundary" : "Interior")} | {(this.IsManifold ? "Manifold" : "NonManifold")}");
     }
@@ -162,8 +155,7 @@ public static class Topology {
         int TotalComponents,
         bool IsFullyConnected,
         FrozenDictionary<int, IReadOnlyList<int>> AdjacencyGraph) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.IsFullyConnected
+        [Pure] private string DebuggerDisplay => this.IsFullyConnected
             ? "Connectivity: Single connected component"
             : string.Create(
                 CultureInfo.InvariantCulture,
@@ -180,8 +172,7 @@ public static class Topology {
         bool IsManifold,
         bool IsOrientable,
         int MaxValence) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.IsManifold
+        [Pure] private string DebuggerDisplay => this.IsManifold
             ? "Manifold: No issues detected"
             : string.Create(
                 CultureInfo.InvariantCulture,
@@ -198,8 +189,7 @@ public static class Topology {
         IReadOnlyList<int> EdgeCountPerNgon,
         int TotalNgons,
         int TotalFaces) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.TotalNgons == 0
+        [Pure] private string DebuggerDisplay => this.TotalNgons == 0
             ? "NgonTopology: No ngons detected"
             : string.Create(
                 CultureInfo.InvariantCulture,
@@ -215,8 +205,7 @@ public static class Topology {
         double DihedralAngle,
         bool IsManifold,
         bool IsBoundary) : IResult {
-        [Pure]
-        private string DebuggerDisplay => this.IsBoundary
+        [Pure] private string DebuggerDisplay => this.IsBoundary
             ? string.Create(CultureInfo.InvariantCulture, $"Edge[{this.EdgeIndex}]: Boundary (valence=1)")
             : this.IsManifold
                 ? string.Create(

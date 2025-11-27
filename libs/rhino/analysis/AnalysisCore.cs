@@ -9,8 +9,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Orchestration layer for differential and quality analysis via UnifiedOperation.</summary>
-[Pure]
-internal static class AnalysisCore {
+[Pure] internal static class AnalysisCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> ExecuteQuality<T>(Analysis.QualityRequest request, IGeometryContext context) =>
         !AnalysisConfig.QualityOperations.TryGetValue(request.GetType(), out AnalysisConfig.QualityMetadata? meta)

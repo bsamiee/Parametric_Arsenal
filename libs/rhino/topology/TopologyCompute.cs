@@ -9,8 +9,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Topology;
 
 /// <summary>Topology diagnosis, progressive healing, and topological feature extraction.</summary>
-[Pure]
-internal static class TopologyCompute {
+[Pure] internal static class TopologyCompute {
     internal static Result<Topology.TopologicalFeatures> ExtractFeatures(
         Brep validBrep,
         IGeometryContext context) =>

@@ -16,8 +16,7 @@ internal static class DiagnosticCapture {
 #endif
 
     /// <summary>True if diagnostics enabled (DEBUG only).</summary>
-    [Pure]
-    internal static bool IsEnabled =>
+    [Pure] internal static bool IsEnabled =>
 #if DEBUG
         true;
 #else
