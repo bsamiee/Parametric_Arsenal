@@ -58,31 +58,19 @@ internal static class SpatialCompute {
 
     [Pure] private static (Point3d Centroid, double[] Radii)[] ComputeClusterResults(int[] assignments, Point3d[] allPoints) {
         int clusterCount = assignments.Max() + 1;
-        // Build member lists once O(n) instead of O(k*n) filtering per cluster
         List<int>[] memberLists = new List<int>[clusterCount];
-        for (int i = 0; i < clusterCount; i++) {
-            memberLists[i] = [];
-        }
-        for (int i = 0; i < allPoints.Length; i++) {
-            memberLists[assignments[i]].Add(i);
-        }
+        for (int i = 0; i < clusterCount; i++) { memberLists[i] = []; }
+        for (int i = 0; i < allPoints.Length; i++) { memberLists[assignments[i]].Add(i); }
         (Point3d Centroid, double[] Radii)[] results = new (Point3d, double[])[clusterCount];
         for (int c = 0; c < clusterCount; c++) {
-            results[c] = memberLists[c].Count is 0
-                ? (Point3d.Origin, [])
-                : ((Func<(Point3d, double[])>)(() => {
-                    Vector3d sum = Vector3d.Zero;
-                    int count = memberLists[c].Count;
-                    for (int mi = 0; mi < count; mi++) {
-                        sum += new Vector3d(allPoints[memberLists[c][mi]]);
-                    }
-                    Point3d centroid = Point3d.Origin + (sum / count);
-                    double[] radii = new double[count];
-                    for (int mi = 0; mi < count; mi++) {
-                        radii[mi] = allPoints[memberLists[c][mi]].DistanceTo(centroid);
-                    }
-                    return (centroid, radii);
-                }))();
+            List<int> members = memberLists[c];
+            if (members.Count is 0) { results[c] = (Point3d.Origin, []); continue; }
+            Vector3d sum = Vector3d.Zero;
+            for (int mi = 0; mi < members.Count; mi++) { sum += new Vector3d(allPoints[members[mi]]); }
+            Point3d centroid = Point3d.Origin + (sum / members.Count);
+            double[] radii = new double[members.Count];
+            for (int mi = 0; mi < members.Count; mi++) { radii[mi] = allPoints[members[mi]].DistanceTo(centroid); }
+            results[c] = (centroid, radii);
         }
         return results;
     }
@@ -94,42 +82,28 @@ internal static class SpatialCompute {
         double[] distSq = ArrayPool<double>.Shared.Rent(pts.Length);
 
         try {
-            // K-means++ initialization - fused distance calculation and sum
             centroids[0] = pts[rng.Next(pts.Length)];
             for (int i = 1; i < k; i++) {
                 double sum = 0.0;
                 for (int j = 0; j < pts.Length; j++) {
                     double minDist = pts[j].DistanceTo(centroids[0]);
-                    for (int c = 1; c < i; c++) {
-                        double dist = pts[j].DistanceTo(centroids[c]);
-                        minDist = dist < minDist ? dist : minDist;
-                    }
+                    for (int c = 1; c < i; c++) { minDist = Math.Min(minDist, pts[j].DistanceTo(centroids[c])); }
                     distSq[j] = minDist * minDist;
                     sum += distSq[j];
                 }
-                centroids[i] = sum <= tol || sum <= 0.0
-                    ? pts[rng.Next(pts.Length)]
-                    : ((Func<Point3d>)(() => {
-                        double target = rng.NextDouble() * sum;
-                        double cumulative = 0.0;
-                        Point3d? selected = null;
-                        for (int j = 0; j < pts.Length && selected is null; j++) {
-                            cumulative += distSq[j];
-                            selected = cumulative >= target ? pts[j] : null;
-                        }
-                        return selected ?? pts[^1];
-                    }))();
+                if (sum <= tol || sum <= 0.0) { centroids[i] = pts[rng.Next(pts.Length)]; continue; }
+                double target = rng.NextDouble() * sum;
+                double cumulative = 0.0;
+                centroids[i] = pts[^1];
+                for (int j = 0; j < pts.Length; j++) {
+                    cumulative += distSq[j];
+                    if (cumulative >= target) { centroids[i] = pts[j]; break; }
+                }
             }
 
-            // Lloyd's algorithm - reset then assign with inline accumulation
             (Vector3d Sum, int Count)[] clusters = new (Vector3d, int)[k];
             for (int iter = 0; iter < maxIter; iter++) {
-                // Reset cluster accumulators
-                for (int i = 0; i < k; i++) {
-                    clusters[i] = (Vector3d.Zero, 0);
-                }
-
-                // Assign points to nearest centroid with inline accumulation
+                for (int i = 0; i < k; i++) { clusters[i] = (Vector3d.Zero, 0); }
                 for (int i = 0; i < pts.Length; i++) {
                     int nearest = 0;
                     double minDist = pts[i].DistanceTo(centroids[0]);
@@ -141,19 +115,14 @@ internal static class SpatialCompute {
                     clusters[nearest] = (clusters[nearest].Sum + new Vector3d(pts[i]), clusters[nearest].Count + 1);
                 }
 
-                // Recompute centroids and check convergence
                 double maxShift = 0.0;
                 for (int i = 0; i < k; i++) {
                     Point3d newCentroid = clusters[i].Count > 0 ? (Point3d)(clusters[i].Sum / clusters[i].Count) : centroids[i];
                     maxShift = Math.Max(maxShift, centroids[i].DistanceTo(newCentroid));
                     centroids[i] = newCentroid;
                 }
-
-                if (maxShift <= tol) {
-                    break;
-                }
+                if (maxShift <= tol) { break; }
             }
-
             return assignments;
         } finally {
             ArrayPool<double>.Shared.Return(distSq, clearArray: false);
@@ -161,18 +130,18 @@ internal static class SpatialCompute {
     }
 
     internal static int[] DBSCANAssign(Point3d[] pts, double eps, int minPts) {
-        int[] assignments = [.. Enumerable.Repeat(-1, pts.Length),];
+        int[] assignments = new int[pts.Length];
+        Array.Fill(assignments, -1);
         bool[] visited = new bool[pts.Length];
         int clusterId = 0;
         using RTree? tree = pts.Length > SpatialConfig.DBSCANRTreeThreshold ? RTree.CreateFromPointArray(pts) : null;
 
-        int[] GetNeighbors(int idx) => tree is not null
-            ? ((Func<int[]>)(() => {
-                List<int> buffer = [];
-                _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => _ = args.Id != idx && ((Func<bool>)(() => { buffer.Add(args.Id); return true; }))());
-                return [.. buffer,];
-            }))()
-            : [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),];
+        int[] GetNeighbors(int idx) {
+            if (tree is null) { return [.. Enumerable.Range(0, pts.Length).Where(j => j != idx && pts[idx].DistanceTo(pts[j]) <= eps),]; }
+            List<int> buffer = [];
+            _ = tree.Search(new Sphere(pts[idx], eps), (_, args) => { if (args.Id != idx) { buffer.Add(args.Id); } });
+            return [.. buffer,];
+        }
 
         for (int i = 0; i < pts.Length; i++) {
             if (visited[i]) {
@@ -180,84 +149,50 @@ internal static class SpatialCompute {
             }
 
             int[] neighbors = GetNeighbors(i);
-
-            if ((neighbors.Length + 1) < minPts) {
-                continue;
-            }
-
+            if ((neighbors.Length + 1) < minPts) { continue; }
             visited[i] = true;
             assignments[i] = clusterId;
             Queue<int> queue = new(neighbors);
-
             while (queue.Count > 0) {
                 int cur = queue.Dequeue();
-                if (visited[cur]) {
-                    continue;
-                }
-
+                if (visited[cur]) { continue; }
                 visited[cur] = true;
                 int[] curNeighbors = GetNeighbors(cur);
-
                 if ((curNeighbors.Length + 1) >= minPts) {
-                    for (int ni = 0; ni < curNeighbors.Length; ni++) {
-                        int nb = curNeighbors[ni];
-                        if (assignments[nb] == -1) {
-                            queue.Enqueue(nb);
-                        }
-                    }
+                    foreach (int nb in curNeighbors) { if (assignments[nb] == -1) { queue.Enqueue(nb); } }
                 }
-
-                if (assignments[cur] == -1) {
-                    assignments[cur] = clusterId;
-                }
+                if (assignments[cur] == -1) { assignments[cur] = clusterId; }
             }
-
             clusterId++;
         }
-
         return assignments;
     }
 
     [Pure] internal static int[] HierarchicalAssign(Point3d[] pts, int k) {
         int n = pts.Length;
-        int[] assignments = [.. Enumerable.Range(0, n),];
+        int[] assignments = new int[n];
+        for (int i = 0; i < n; i++) { assignments[i] = i; }
         HashSet<int> activeClusters = [.. Enumerable.Range(0, n),];
-
         for (int mergeIteration = 0; mergeIteration < n - k; mergeIteration++) {
             (int cluster1, int cluster2, double minDist) = (0, 1, double.MaxValue);
             int[] activeArray = [.. activeClusters.Order(),];
-
             for (int i = 0; i < activeArray.Length; i++) {
                 int c1 = activeArray[i];
                 int repr1 = Array.FindIndex(assignments, idx => assignments[idx] == c1);
-                if (repr1 == -1) {
-                    continue;
-                }
-
+                if (repr1 == -1) { continue; }
                 for (int j = i + 1; j < activeArray.Length; j++) {
                     int c2 = activeArray[j];
                     int repr2 = Array.FindIndex(assignments, idx => assignments[idx] == c2);
-                    if (repr2 == -1) {
-                        continue;
-                    }
-
+                    if (repr2 == -1) { continue; }
                     double dist = pts[repr1].DistanceTo(pts[repr2]);
                     (cluster1, cluster2, minDist) = dist < minDist ? (c1, c2, dist) : (cluster1, cluster2, minDist);
                 }
             }
-
-            for (int i = 0; i < n; i++) {
-                assignments[i] = assignments[i] == cluster2 ? cluster1 : assignments[i];
-            }
+            for (int i = 0; i < n; i++) { assignments[i] = assignments[i] == cluster2 ? cluster1 : assignments[i]; }
             _ = activeClusters.Remove(cluster2);
         }
-
-        // Normalize cluster IDs to [0, k-1] to prevent gaps that cause empty clusters in ComputeClusterResults.
         int[] uniqueClusters = [.. activeClusters.Order(),];
-        for (int i = 0; i < n; i++) {
-            assignments[i] = Array.IndexOf(uniqueClusters, assignments[i]);
-        }
-
+        for (int i = 0; i < n; i++) { assignments[i] = Array.IndexOf(uniqueClusters, assignments[i]); }
         return assignments;
     }
 
@@ -448,41 +383,26 @@ internal static class SpatialCompute {
             ? ResultFactory.Create<Point3d[][]>(error: E.Geometry.InvalidCount.WithContext("VoronoiDiagram2D requires at least 3 points"))
             : DelaunayTriangulation2D(points: points, context: context).Bind(triangles => {
                 Point3d[] circumcenters = new Point3d[triangles.Length];
+                double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
                 for (int ti = 0; ti < triangles.Length; ti++) {
                     (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
                     double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
-                    double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
-                    // Use Point3d.Unset as sentinel for degenerate/collinear triangles; filtered by IsValid check below
-                    circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance
-                        ? Point3d.Unset
-                        : new Point3d(
-                            ((((a.X * a.X) + (a.Y * a.Y)) * (b.Y - c.Y)) +
-                             (((b.X * b.X) + (b.Y * b.Y)) * (c.Y - a.Y)) +
-                             (((c.X * c.X) + (c.Y * c.Y)) * (a.Y - b.Y))) / (2.0 * orientation),
-                            ((((a.X * a.X) + (a.Y * a.Y)) * (c.X - b.X)) +
-                             (((b.X * b.X) + (b.Y * b.Y)) * (a.X - c.X)) +
-                             (((c.X * c.X) + (c.Y * c.Y)) * (b.X - a.X))) / (2.0 * orientation),
-                            a.Z);
+                    circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance ? Point3d.Unset : new Point3d(
+                        ((((a.X * a.X) + (a.Y * a.Y)) * (b.Y - c.Y)) + (((b.X * b.X) + (b.Y * b.Y)) * (c.Y - a.Y)) + (((c.X * c.X) + (c.Y * c.Y)) * (a.Y - b.Y))) / (2.0 * orientation),
+                        ((((a.X * a.X) + (a.Y * a.Y)) * (c.X - b.X)) + (((b.X * b.X) + (b.Y * b.Y)) * (a.X - c.X)) + (((c.X * c.X) + (c.Y * c.Y)) * (b.X - a.X))) / (2.0 * orientation),
+                        a.Z);
                 }
                 Point3d[][] cells = new Point3d[points.Length][];
                 for (int i = 0; i < points.Length; i++) {
                     List<Point3d> cell = [];
-                    for (int ti = 0; ti < triangles.Length; ti++) {
-                        _ = circumcenters[ti].IsValid && triangles[ti].Contains(i) && ((Func<bool>)(() => { cell.Add(circumcenters[ti]); return true; }))();
-                    }
-                    cells[i] = cell.Count is 0
-                        ? []
-                        : ((Func<Point3d[]>)(() => {
-                            double centerX = 0.0;
-                            double centerY = 0.0;
-                            for (int ci = 0; ci < cell.Count; ci++) {
-                                centerX += cell[ci].X;
-                                centerY += cell[ci].Y;
-                            }
-                            centerX /= cell.Count;
-                            centerY /= cell.Count;
-                            return [.. cell.OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX)),];
-                        }))();
+                    for (int ti = 0; ti < triangles.Length; ti++) { if (circumcenters[ti].IsValid && triangles[ti].Contains(i)) { cell.Add(circumcenters[ti]); } }
+                    if (cell.Count is 0) { cells[i] = []; continue; }
+                    double centerX = 0.0;
+                    double centerY = 0.0;
+                    for (int ci = 0; ci < cell.Count; ci++) { centerX += cell[ci].X; centerY += cell[ci].Y; }
+                    centerX /= cell.Count;
+                    centerY /= cell.Count;
+                    cells[i] = [.. cell.OrderBy(p => Math.Atan2(p.Y - centerY, p.X - centerX)),];
                 }
                 return ResultFactory.Create(value: cells);
             });
