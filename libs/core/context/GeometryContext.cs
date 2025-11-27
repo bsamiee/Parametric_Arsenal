@@ -25,12 +25,10 @@ public sealed record GeometryContext(
     [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture, $"Abs={this.AbsoluteTolerance:g6}, Rel={this.RelativeTolerance:g6}, AngRad={this.AngleToleranceRadians:g6}, Units={this.Units}");
 
     /// <summary>Squared absolute tolerance for fast distance checks.</summary>
-    [Pure]
-    public double AbsoluteToleranceSquared => this.AbsoluteTolerance * this.AbsoluteTolerance;
+    [Pure] public double AbsoluteToleranceSquared => this.AbsoluteTolerance * this.AbsoluteTolerance;
 
     /// <summary>Angular tolerance in degrees.</summary>
-    [Pure]
-    public double AngleToleranceDegrees => RhinoMath.ToDegrees(this.AngleToleranceRadians);
+    [Pure] public double AngleToleranceDegrees => RhinoMath.ToDegrees(this.AngleToleranceRadians);
 
     /// <summary>True if values differ within absolute tolerance.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

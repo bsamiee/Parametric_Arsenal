@@ -12,8 +12,7 @@ namespace Arsenal.Rhino.Morphology;
 
 /// <summary>Morphology algorithm implementations.</summary>
 internal static class MorphologyCompute {
-    [Pure]
-    internal static Result<GeometryBase> CageDeform(
+    [Pure] internal static Result<GeometryBase> CageDeform(
         GeometryBase geometry,
         GeometryBase _,
         Point3d[] originalControlPoints,
@@ -76,8 +75,7 @@ internal static class MorphologyCompute {
         };
     }
 
-    [Pure]
-    internal static Result<Mesh> SubdivideIterative(
+    [Pure] internal static Result<Mesh> SubdivideIterative(
         Mesh mesh,
         byte algorithm,
         int levels,
@@ -107,8 +105,7 @@ internal static class MorphologyCompute {
                         return ResultFactory.Create(value: next);
                     }));
 
-    [Pure]
-    private static Mesh? SubdivideLoop(Mesh mesh) =>
+    [Pure] private static Mesh? SubdivideLoop(Mesh mesh) =>
         mesh.Faces.TriangleCount != mesh.Faces.Count
             ? null
             : ((Func<Mesh?>)(() => {
@@ -167,8 +164,7 @@ internal static class MorphologyCompute {
                 return subdivided.Normals.ComputeNormals() && subdivided.Compact() ? subdivided : null;
             }))();
 
-    [Pure]
-    private static Mesh? SubdivideButterfly(Mesh mesh) =>
+    [Pure] private static Mesh? SubdivideButterfly(Mesh mesh) =>
         mesh.Faces.TriangleCount != mesh.Faces.Count
             ? null
             : ((Func<Mesh?>)(() => {
@@ -245,8 +241,7 @@ internal static class MorphologyCompute {
                     : state;
             });
 
-    [Pure]
-    internal static Result<Mesh> SmoothWithConvergence(
+    [Pure] internal static Result<Mesh> SmoothWithConvergence(
         Mesh mesh,
         int maxIterations,
         bool lockBoundary,
@@ -312,8 +307,7 @@ internal static class MorphologyCompute {
                 }
             }))();
 
-    [Pure]
-    internal static Result<Mesh> OffsetMesh(
+    [Pure] internal static Result<Mesh> OffsetMesh(
         Mesh mesh,
         double distance,
         bool bothSides,
@@ -328,8 +322,7 @@ internal static class MorphologyCompute {
                     ? ResultFactory.Create(value: offset)
                     : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.MeshOffsetFailed.WithContext("Offset operation returned null or invalid mesh"));
 
-    [Pure]
-    internal static Result<Mesh> ReduceMesh(
+    [Pure] internal static Result<Mesh> ReduceMesh(
         Mesh mesh,
         int targetFaceCount,
         bool _,
@@ -363,8 +356,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure]
-    internal static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropic(
+    [Pure] internal static Result<(Mesh Remeshed, int IterationsPerformed)> RemeshIsotropic(
         Mesh mesh,
         double targetEdgeLength,
         int maxIterations,
@@ -457,8 +449,7 @@ internal static class MorphologyCompute {
             };
         }))();
 
-    [Pure]
-    internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
+    [Pure] internal static Result<Mesh> ValidateMeshQuality(Mesh mesh, IGeometryContext context) =>
         MorphologyCore.ComputeMeshMetrics(mesh, context) switch {
             (_, [], _) or (_, _, []) => ResultFactory.Create(value: mesh),
             (_, double[] aspectRatios, double[] minAngles) when aspectRatios.Max() > MorphologyConfig.AspectRatioThreshold =>
@@ -470,8 +461,7 @@ internal static class MorphologyCompute {
             _ => ResultFactory.Create(value: mesh),
         };
 
-    [Pure]
-    internal static Result<Mesh> RepairMesh(
+    [Pure] internal static Result<Mesh> RepairMesh(
         Mesh mesh,
         byte flags,
         double weldTolerance,
@@ -500,16 +490,14 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure]
-    internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
+    [Pure] internal static Result<Mesh[]> SeparateMeshComponents(Mesh mesh, IGeometryContext _) =>
         mesh.DisjointMeshCount <= 0
             ? ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Disjoint mesh count invalid"))
             : mesh.SplitDisjointPieces() is { Length: > 0 } components
                 ? ResultFactory.Create(value: components)
                 : ResultFactory.Create<Mesh[]>(error: E.Geometry.Morphology.MeshRepairFailed.WithContext("Component separation failed"));
 
-    [Pure]
-    internal static Result<Mesh> WeldMeshVertices(
+    [Pure] internal static Result<Mesh> WeldMeshVertices(
         Mesh mesh,
         double tolerance,
         bool weldNormals,
@@ -528,8 +516,7 @@ internal static class MorphologyCompute {
             }))(),
         };
 
-    [Pure]
-    internal static Result<Mesh> BrepToMesh(
+    [Pure] internal static Result<Mesh> BrepToMesh(
         Brep brep,
         MeshingParameters? meshParams,
         bool joinMeshes,
@@ -556,8 +543,7 @@ internal static class MorphologyCompute {
                         : ResultFactory.Create<Mesh>(error: E.Geometry.Morphology.BrepToMeshFailed.WithContext("Result mesh invalid"));
                 }))();
 
-    [Pure]
-    internal static Result<(Mesh Thickened, int WallFaceCount)> ThickenMesh(
+    [Pure] internal static Result<(Mesh Thickened, int WallFaceCount)> ThickenMesh(
         Mesh mesh,
         double thickness,
         bool solidify,
@@ -570,8 +556,7 @@ internal static class MorphologyCompute {
                 ? ResultFactory.Create(value: (thickened, wallFaces?.Count ?? 0))
                 : ResultFactory.Create<(Mesh, int)>(error: E.Geometry.Morphology.MeshThickenFailed.WithContext("Offset operation returned null or invalid mesh"));
 
-    [Pure]
-    internal static Result<Mesh> UnwrapMesh(
+    [Pure] internal static Result<Mesh> UnwrapMesh(
         Mesh mesh,
         byte unwrapMethod,
         Vector3d? axis,

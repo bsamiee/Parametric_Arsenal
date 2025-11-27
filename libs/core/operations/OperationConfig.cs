@@ -58,7 +58,6 @@ public sealed record OperationConfig<TIn, TOut> {
     /// <summary>Capture diagnostics (DEBUG only).</summary>
     public bool EnableDiagnostics { get; init; }
 
-    [Pure]
-    private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
+    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
         $"Op:{this.OperationName ?? "unnamed"} | Val:{this.ValidationMode}{(this.EnableCache ? " [cached]" : string.Empty)}{(this.EnableParallel ? " [parallel]" : string.Empty)}{(this.EnableDiagnostics ? " [diag]" : string.Empty)}");
 }

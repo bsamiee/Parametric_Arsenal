@@ -171,7 +171,6 @@ public static class Fields {
     public sealed record CriticalPointsRequest(double[] ScalarField, Vector3d[] GradientField, double[,][] Hessian, Point3d[] GridPoints, FieldSampling Sampling) : FieldOperation;
 
     /// <summary>Execute field operation and return discriminated union result.</summary>
-    [Pure]
-    public static Result<FieldResult> Execute(FieldOperation operation, IGeometryContext context) =>
+    [Pure] public static Result<FieldResult> Execute(FieldOperation operation, IGeometryContext context) =>
         FieldsCore.Execute(operation: operation, context: context);
 }

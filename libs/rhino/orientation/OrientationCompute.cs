@@ -7,8 +7,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Orientation;
 
 /// <summary>Dense algorithmic implementations for orientation operations.</summary>
-[Pure]
-internal static class OrientationCompute {
+[Pure] internal static class OrientationCompute {
     internal static Result<IReadOnlyList<T>> ApplyTransform<T>(T geometry, Transform transform) where T : GeometryBase =>
         (T)geometry.Duplicate() switch {
             T dup when dup.Transform(transform) => ResultFactory.Create(value: (IReadOnlyList<T>)[dup,]),

@@ -16,7 +16,6 @@ internal readonly record struct DiagnosticContext(
     V? ValidationApplied = null,
     bool? CacheHit = null,
     int? ErrorCount = null) {
-    [Pure]
-    private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
+    [Pure] private string DebuggerDisplay => string.Create(CultureInfo.InvariantCulture,
         $"{this.Operation} | {this.Elapsed.TotalMilliseconds:F3}ms | {this.Allocations.ToString(CultureInfo.InvariantCulture)}b{(this.CacheHit is true ? " [cached]" : this.CacheHit is false ? " [computed]" : string.Empty)}{(this.ValidationApplied.HasValue ? $" | Val:{this.ValidationApplied.Value}" : string.Empty)}{(this.ErrorCount.HasValue ? $" | Err:{this.ErrorCount.Value.ToString(CultureInfo.InvariantCulture)}" : string.Empty)}");
 }

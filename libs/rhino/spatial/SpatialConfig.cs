@@ -6,8 +6,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Spatial configuration: algorithmic constants and unified polymorphic dispatch table.</summary>
-[Pure]
-internal static class SpatialConfig {
+[Pure] internal static class SpatialConfig {
     /// <summary>Operation type discriminators for dispatch table keys.</summary>
     internal const string OperationTypeRange = "Range";
     internal const string OperationTypeProximity = "Proximity";

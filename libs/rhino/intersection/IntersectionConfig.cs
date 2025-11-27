@@ -7,8 +7,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Unified metadata, constants, and dispatch tables for intersection operations.</summary>
-[Pure]
-internal static class IntersectionConfig {
+[Pure] internal static class IntersectionConfig {
     /// <summary>Singular unified intersection pair dispatch table: (TypeA, TypeB) → metadata.</summary>
     internal static readonly FrozenDictionary<(Type, Type), IntersectionPairMetadata> PairOperations =
         new (Type TypeA, Type TypeB, V ModeA, V ModeB, string OpName)[] {

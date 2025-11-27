@@ -26,8 +26,7 @@ public static class ValidationGenerators {
     ];
 
     /// <summary>Generates V flags with uniform distribution across None, single flags, combinations, and All.</summary>
-    [Pure]
-    public static Gen<V> VGen => Gen.Frequency([
+    [Pure] public static Gen<V> VGen => Gen.Frequency([
         (1, Gen.Const(V.None)),
         (3, Gen.OneOfConst(SingleFlags)),
         (2, CombinedVFlagGen),
@@ -35,12 +34,10 @@ public static class ValidationGenerators {
     ]);
 
     /// <summary>Generates single V flags (excluding None and All).</summary>
-    [Pure]
-    public static Gen<V> SingleVFlagGen => Gen.OneOfConst(SingleFlags);
+    [Pure] public static Gen<V> SingleVFlagGen => Gen.OneOfConst(SingleFlags);
 
     /// <summary>Generates combined V flags via bitwise OR of 2-5 random flags.</summary>
-    [Pure]
-    public static Gen<V> CombinedVFlagGen =>
+    [Pure] public static Gen<V> CombinedVFlagGen =>
         Gen.Int[2, 5].SelectMany(count =>
             Gen.Shuffle(SingleFlags, count).Select(static flags => {
                 V result = V.None;
@@ -51,6 +48,5 @@ public static class ValidationGenerators {
             }));
 
     /// <summary>Generates V flags from raw ushort values for edge case testing.</summary>
-    [Pure]
-    public static Gen<V> RawVFlagGen => Gen.UShort.Select(static flags => new V(flags));
+    [Pure] public static Gen<V> RawVFlagGen => Gen.UShort.Select(static flags => new V(flags));
 }

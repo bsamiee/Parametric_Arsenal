@@ -15,8 +15,7 @@ using RhinoIntersect = Rhino.Geometry.Intersect.Intersection;
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Orchestration layer for intersection operations via UnifiedOperation.</summary>
-[Pure]
-internal static class IntersectionCore {
+[Pure] internal static class IntersectionCore {
     /// <summary>Intersection strategy metadata.</summary>
     internal readonly record struct IntersectionStrategy(
         Func<object, object, double, Intersection.IntersectionSettings, IGeometryContext, Result<Intersection.IntersectionOutput>> Executor,
@@ -314,8 +313,7 @@ internal static class IntersectionCore {
         });
 
     /// <summary>Resolves intersection strategy for type pair using inheritance chain and interface traversal.</summary>
-    [Pure]
-    internal static Result<(IntersectionStrategy Strategy, bool Swapped)> ResolveStrategy(Type typeA, Type typeB) {
+    [Pure] internal static Result<(IntersectionStrategy Strategy, bool Swapped)> ResolveStrategy(Type typeA, Type typeB) {
         static Type[] getTypeChain(Type type) {
             List<Type> chain = [];
             for (Type? current = type; current is not null; current = current.BaseType) {
@@ -336,8 +334,7 @@ internal static class IntersectionCore {
     }
 
     /// <summary>Normalizes intersection settings validating tolerance with context defaults.</summary>
-    [Pure]
-    internal static Result<(double Tolerance, Intersection.IntersectionSettings Settings)> NormalizeSettings(Intersection.IntersectionSettings settings, IGeometryContext context) =>
+    [Pure] internal static Result<(double Tolerance, Intersection.IntersectionSettings Settings)> NormalizeSettings(Intersection.IntersectionSettings settings, IGeometryContext context) =>
         ResultFactory.Create(value: settings)
             .Ensure(opt => !opt.Tolerance.HasValue || (RhinoMath.IsValidDouble(opt.Tolerance.Value) && opt.Tolerance.Value > RhinoMath.ZeroTolerance), E.Validation.ToleranceAbsoluteInvalid)
             .Map(opt => {
@@ -346,8 +343,7 @@ internal static class IntersectionCore {
             });
 
     /// <summary>Executes intersection with normalized settings resolving strategy and validating inputs.</summary>
-    [Pure]
-    internal static Result<Intersection.IntersectionOutput> ExecuteWithSettings(
+    [Pure] internal static Result<Intersection.IntersectionOutput> ExecuteWithSettings(
         object geometryA,
         object geometryB,
         IGeometryContext context,

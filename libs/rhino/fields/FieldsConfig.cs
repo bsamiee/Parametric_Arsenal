@@ -7,8 +7,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Fields;
 
 /// <summary>Configuration constants for fields operations.</summary>
-[Pure]
-internal static class FieldsConfig {
+[Pure] internal static class FieldsConfig {
     /// <summary>Distance field configuration by geometry type.</summary>
     internal static readonly FrozenDictionary<Type, DistanceFieldMetadata> DistanceFields =
         new Dictionary<Type, DistanceFieldMetadata> {

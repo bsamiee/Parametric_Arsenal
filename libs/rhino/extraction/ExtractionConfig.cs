@@ -7,8 +7,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Extraction;
 
 /// <summary>Unified metadata, constants, and dispatch tables for extraction operations.</summary>
-[Pure]
-internal static class ExtractionConfig {
+[Pure] internal static class ExtractionConfig {
     /// <summary>Point operation validation modes.</summary>
     internal static readonly FrozenDictionary<Type, ExtractionOperationMetadata> PointOperations =
         new Dictionary<Type, ExtractionOperationMetadata> {

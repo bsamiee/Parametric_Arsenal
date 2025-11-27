@@ -11,8 +11,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Topology;
 
 /// <summary>Topology execution via breadth-first search and edge classification algorithms.</summary>
-[Pure]
-internal static class TopologyCore {
+[Pure] internal static class TopologyCore {
     internal static Result<Topology.TopologyDiagnosis> ExecuteDiagnose(Brep input, IGeometryContext context) =>
         TopologyConfig.DiagnosticOps.TryGetValue(TopologyConfig.OpType.Diagnose, out TopologyConfig.DiagnosticMetadata? diagMeta)
             ? input.IsValidTopology(out string topologyLog)

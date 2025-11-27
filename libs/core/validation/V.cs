@@ -95,8 +95,7 @@ public readonly struct V(ushort flags) : IEquatable<V> {
     public bool Has(V other) =>
         (other._flags == 0) || ((this._flags & other._flags) == other._flags);
 
-    [Pure]
-    public override string ToString() =>
+    [Pure] public override string ToString() =>
         this._flags == All._flags
             ? nameof(All)
             : _names.TryGetValue(this._flags, out string? name)

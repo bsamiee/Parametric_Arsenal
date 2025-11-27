@@ -10,8 +10,7 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Spatial;
 
 /// <summary>Internal orchestration with UnifiedOperation for algebraic spatial operations.</summary>
-[Pure]
-internal static class SpatialCore {
+[Pure] internal static class SpatialCore {
     /// <summary>Algebraic Cluster dispatcher routing to specific algorithms.</summary>
     internal static Result<Spatial.ClusteringResult[]> Cluster<T>(T[] geometry, Spatial.ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
         (geometry.Length, request) switch {

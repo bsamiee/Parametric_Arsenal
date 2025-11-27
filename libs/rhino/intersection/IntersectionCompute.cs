@@ -10,11 +10,9 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Intersection;
 
 /// <summary>Dense intersection analysis algorithms.</summary>
-[Pure]
-internal static class IntersectionCompute {
+[Pure] internal static class IntersectionCompute {
     /// <summary>Classifies intersection type using tangent angle analysis and circular mean calculation.</summary>
-    [Pure]
-    internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
+    [Pure] internal static Result<(Intersection.IntersectionType Type, double[] ApproachAngles, bool IsGrazing, double BlendScore)> Classify(Intersection.IntersectionOutput output, GeometryBase geomA, GeometryBase geomB, IGeometryContext context) {
         static double minAngleToParallel(double angle) => Math.Min(Math.Abs(angle), Math.Abs(Math.PI - angle));
         // Curve-surface: angle between curve tangent and surface normal
         // Parallel (0° or 180°) → tangent intersection (smooth blend)
@@ -81,8 +79,7 @@ internal static class IntersectionCompute {
     }
 
     /// <summary>Finds near-miss locations between geometries within search radius using closest point sampling.</summary>
-    [Pure]
-    internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
+    [Pure] internal static Result<(Point3d[], Point3d[], double[])> FindNearMisses(GeometryBase geomA, GeometryBase geomB, double searchRadius, IGeometryContext context) {
         static (Point3d[], Point3d[], double[]) unpackPairs((Point3d PointA, Point3d PointB, double Distance)[] pairs) {
             int n = pairs.Length;
             Point3d[] pointsA = new Point3d[n];
@@ -206,8 +203,7 @@ internal static class IntersectionCompute {
     }
 
     /// <summary>Analyzes intersection stability using spherical perturbation sampling and count variation.</summary>
-    [Pure]
-    internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersection.IntersectionOutput baseOutput, IGeometryContext context) =>
+    [Pure] internal static Result<(double Score, double Sensitivity, bool[] UnstableFlags)> AnalyzeStability(GeometryBase geomA, GeometryBase geomB, Intersection.IntersectionOutput baseOutput, IGeometryContext context) =>
         baseOutput.Points.Count switch {
             0 => ResultFactory.Create<(double, double, bool[])>(value: (1.0, 0.0, [])),
             int count => IntersectionCore.ResolveStrategy(geomA.GetType(), geomB.GetType())
