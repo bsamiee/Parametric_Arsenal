@@ -307,11 +307,11 @@ internal static class SpatialCompute {
     [Pure] internal static Result<Point3d[]> ConvexHull2D(Point3d[] points, IGeometryContext context) =>
         points.Length < 3
             ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidCount.WithContext("ConvexHull2D requires at least 3 points"))
-            : points.Length > 1 && points[0].Z is double z0 && !points.Skip(1).All(p => RhinoMath.EpsilonEquals(p.Z, z0, epsilon: context.AbsoluteTolerance))
+            : points.Length > 1 && points[0].Z is double z0 && !points.Skip(1).All(p => context.IsWithinAbsoluteTolerance(p.Z, z0))
                 ? ResultFactory.Create<Point3d[]>(error: E.Geometry.InvalidOrientationPlane.WithContext("ConvexHull2D requires all points to have the same Z coordinate (coplanar in XY plane)"))
                 : ((Func<Result<Point3d[]>>)(() => {
                     Point3d[] pts = [.. points.OrderBy(static p => p.X).ThenBy(static p => p.Y),];
-                    double crossProductTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+                    double crossProductTolerance = context.AbsoluteToleranceSquared;
                     List<Point3d> lower = [];
                     for (int i = 0; i < pts.Length; i++) {
                         while (lower.Count >= 2 && (((lower[^1].X - lower[^2].X) * (pts[i].Y - lower[^2].Y)) - ((lower[^1].Y - lower[^2].Y) * (pts[i].X - lower[^2].X))) <= crossProductTolerance) {
@@ -393,7 +393,7 @@ internal static class SpatialCompute {
         for (int i = 1; i < points.Length; i++) {
             double x = points[i].X;
             double y = points[i].Y;
-            if (!RhinoMath.EpsilonEquals(points[i].Z, z0, epsilon: context.AbsoluteTolerance)) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate")); }
+            if (!context.IsWithinAbsoluteTolerance(points[i].Z, z0)) { return ResultFactory.Create<int[][]>(error: E.Geometry.InvalidOrientationPlane.WithContext("DelaunayTriangulation2D requires all points to have the same Z coordinate")); }
 
             (minX, minY, maxX, maxY) = (x < minX ? x : minX, y < minY ? y : minY, x > maxX ? x : maxX, y > maxY ? y : maxY);
         }
@@ -432,7 +432,7 @@ internal static class SpatialCompute {
         double cy = c.Y - p.Y;
         // Compute twice the signed area of triangle (a,b,c) to check for degeneracy
         double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
-        double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+        double orientationTolerance = context.AbsoluteToleranceSquared;
         // Incircle determinant test using squared distances
         double det = (((ax * ax) + (ay * ay)) * ((bx * cy) - (by * cx))) + (((bx * bx) + (by * by)) * ((cx * ay) - (cy * ax))) + (((cx * cx) + (cy * cy)) * ((ax * by) - (ay * bx)));
         // Adjust determinant sign for counter-clockwise orientation to maintain consistent incircle test semantics
@@ -451,7 +451,7 @@ internal static class SpatialCompute {
                 for (int ti = 0; ti < triangles.Length; ti++) {
                     (Point3d a, Point3d b, Point3d c) = (points[triangles[ti][0]], points[triangles[ti][1]], points[triangles[ti][2]]);
                     double orientation = ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
-                    double orientationTolerance = context.AbsoluteTolerance * context.AbsoluteTolerance;
+                    double orientationTolerance = context.AbsoluteToleranceSquared;
                     // Use Point3d.Unset as sentinel for degenerate/collinear triangles; filtered by IsValid check below
                     circumcenters[ti] = Math.Abs(orientation) <= orientationTolerance
                         ? Point3d.Unset
