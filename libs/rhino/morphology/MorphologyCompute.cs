@@ -47,8 +47,8 @@ internal static class MorphologyCompute {
             + ((1 - u) * v * w * (deformedControlPoints[6] - Point3d.Origin))
             + (u * v * w * (deformedControlPoints[7] - Point3d.Origin));
 
-        switch (geometry) {
-            case Mesh m:
+        return geometry switch {
+            Mesh m => ((Func<bool>)(() => {
                 for (int i = 0; i < m.Vertices.Count; i++) {
                     Vector3d local = (Point3d)m.Vertices[i] - cageBounds.Min;
                     (double u, double v, double w) = (
@@ -59,7 +59,8 @@ internal static class MorphologyCompute {
                     m.Vertices[i] = new Point3f((float)deformed.X, (float)deformed.Y, (float)deformed.Z);
                 }
                 return m.Normals.ComputeNormals() && m.Compact();
-            case Brep b:
+            }))(),
+            Brep b => ((Func<bool>)(() => {
                 for (int i = 0; i < b.Vertices.Count; i++) {
                     Vector3d local = b.Vertices[i].Location - cageBounds.Min;
                     (double u, double v, double w) = (
@@ -69,9 +70,9 @@ internal static class MorphologyCompute {
                     b.Vertices[i].Location = Point3d.Origin + ComputeTrilinear(u, v, w);
                 }
                 return b.IsValid;
-            default:
-                return false;
-        }
+            }))(),
+            _ => false,
+        };
     }
 
     [Pure] internal static Result<Mesh> SubdivideIterative(
