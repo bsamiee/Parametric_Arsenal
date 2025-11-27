@@ -177,12 +177,17 @@ public static class AnalysisGenerators {
     /// <summary>Combines meshes into single mesh.</summary>
     private static Mesh? CombineMeshes(Mesh[]? meshes) {
         Mesh? combined = meshes is not null && meshes.Length > 0 ? new() : null;
-        _ = combined is null || ExecuteAppend(combined, meshes!);
+        AppendAllMeshes(combined, meshes);
         return combined;
     }
 
-    /// <summary>Appends all meshes to target.</summary>
-    private static bool ExecuteAppend(Mesh target, Mesh[] meshes) {
+    /// <summary>Appends all meshes to target (no-op if target is null).</summary>
+    private static void AppendAllMeshes(Mesh? target, Mesh[]? meshes) {
+        _ = target is null || meshes is null || AppendMeshes(target, meshes);
+    }
+
+    /// <summary>Appends meshes to target mesh.</summary>
+    private static bool AppendMeshes(Mesh target, Mesh[] meshes) {
         foreach (Mesh mesh in meshes) {
             target.Append(mesh);
         }

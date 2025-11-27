@@ -104,9 +104,9 @@ public sealed class AnalysisTests {
             Vector3d tangent = curve.TangentAt(t);
             Vector3d firstDerivative = data.Derivatives[1];
             double derivLength = firstDerivative.Length;
-            Vector3d normalizedDeriv = derivLength > RhinoMath.ZeroTolerance
-                ? firstDerivative / derivLength
-                : firstDerivative;
+            _ = derivLength > RhinoMath.ZeroTolerance
+                || throw new InvalidOperationException("First derivative has zero length - curve may be degenerate");
+            Vector3d normalizedDeriv = firstDerivative / derivLength;
             Test.EqualWithin(Math.Abs(normalizedDeriv * tangent), right: 1.0, tolerance: DefaultContext.AbsoluteTolerance * 10);
             return true;
         });
