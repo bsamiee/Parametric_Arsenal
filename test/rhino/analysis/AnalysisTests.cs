@@ -310,24 +310,26 @@ public sealed class AnalysisTests {
         });
     });
 
-    /// <summary>Verifies mesh normal is unit vector at vertex (MeshGen guarantees Vertices.Count > 0).</summary>
+    /// <summary>Verifies mesh normal is unit vector at random vertex index.</summary>
     [Test]
-    public void MeshNormal_IsUnitVector() => AnalysisGenerators.MeshGen.Run((Mesh mesh) => {
-        const int vertexIndex = 0;
-        Result<Analysis.MeshData> result = Analysis.Analyze(mesh: mesh, context: DefaultContext, vertexIndex: vertexIndex);
-        Test.Success(result, data => {
-            Test.EqualWithin(data.Normal.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
-            return true;
-        });
-    });
+    public void MeshNormal_IsUnitVector() =>
+        AnalysisGenerators.MeshGen
+            .SelectMany(mesh => Gen.Int[0, mesh.Vertices.Count - 1].Select(i => (mesh, i)))
+            .Run(((Mesh mesh, int vertexIndex) input) => {
+                Result<Analysis.MeshData> result = Analysis.Analyze(mesh: input.mesh, context: DefaultContext, vertexIndex: input.vertexIndex);
+                Test.Success(result, data => {
+                    Test.EqualWithin(data.Normal.Length, right: 1.0, tolerance: DefaultContext.AbsoluteTolerance);
+                    return true;
+                });
+            });
 
-    /// <summary>Verifies mesh topology edges count is consistent (fundamental: mesh topology consistency).</summary>
+    /// <summary>Verifies mesh topology edges and vertices match actual mesh topology counts.</summary>
     [Test]
     public void MeshTopologyEdges_AreConsistent() => AnalysisGenerators.MeshGen.Run((Mesh mesh) => {
         Result<Analysis.MeshData> result = Analysis.Analyze(mesh: mesh, context: DefaultContext);
         Test.Success(result, data => {
-            Assert.That(data.TopologyEdges.Length, Is.GreaterThan(0));
-            Assert.That(data.TopologyVertices.Length, Is.GreaterThan(0));
+            Assert.That(data.TopologyVertices.Length, Is.EqualTo(mesh.TopologyVertices.Count));
+            Assert.That(data.TopologyEdges.Length, Is.EqualTo(mesh.TopologyEdges.Count));
             return true;
         });
     });
