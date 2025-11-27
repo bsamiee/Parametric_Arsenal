@@ -174,11 +174,19 @@ public static class AnalysisGenerators {
         .Where(static m => m is not null && m.IsValid && m.Vertices.Count > 0 && m.Faces.Count > 0)
         .Select(static m => m!);
 
-    /// <summary>Combines meshes into single mesh without mutation (pure operation).</summary>
+    /// <summary>Combines meshes into single mesh.</summary>
     private static Mesh? CombineMeshes(Mesh[]? meshes) {
         Mesh? combined = meshes is not null && meshes.Length > 0 ? new() : null;
-        _ = combined is null || meshes!.Select((m, _) => { combined.Append(m); return 0; }).ToArray();
+        _ = combined is null || ExecuteAppend(combined, meshes!);
         return combined;
+    }
+
+    /// <summary>Appends all meshes to target.</summary>
+    private static bool ExecuteAppend(Mesh target, Mesh[] meshes) {
+        foreach (Mesh mesh in meshes) {
+            target.Append(mesh);
+        }
+        return true;
     }
 
     /// <summary>Generates any valid mesh type polymorphically.</summary>

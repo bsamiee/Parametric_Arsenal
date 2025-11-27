@@ -416,7 +416,7 @@ public sealed class AnalysisTests {
     [Test]
     public void BatchCurveAnalysis_ProcessesAllItems() => AnalysisGenerators.CurveGen.List[3, 6].Run((List<Curve> curves) => {
         Result<IReadOnlyList<Analysis.IResult>> result = Analysis.AnalyzeMultiple(
-            geometries: [.. curves,],
+            geometries: curves,
             context: DefaultContext);
         Test.Success(result, data => {
             Assert.That(data.Count, Is.EqualTo(curves.Count));
@@ -429,7 +429,7 @@ public sealed class AnalysisTests {
     [Test]
     public void BatchSurfaceAnalysis_ProcessesAllItems() => AnalysisGenerators.SurfaceGen.List[2, 4].Run((List<Surface> surfaces) => {
         Result<IReadOnlyList<Analysis.IResult>> result = Analysis.AnalyzeMultiple(
-            geometries: [.. surfaces,],
+            geometries: surfaces,
             context: DefaultContext);
         Test.Success(result, data => {
             Assert.That(data.Count, Is.EqualTo(surfaces.Count));
@@ -442,7 +442,7 @@ public sealed class AnalysisTests {
     [Test]
     public void BatchBrepAnalysis_ProcessesAllItems() => AnalysisGenerators.BrepGen.List[2, 3].Run((List<Brep> breps) => {
         Result<IReadOnlyList<Analysis.IResult>> result = Analysis.AnalyzeMultiple(
-            geometries: [.. breps,],
+            geometries: breps,
             context: DefaultContext);
         Test.Success(result, data => {
             Assert.That(data.Count, Is.EqualTo(breps.Count));
