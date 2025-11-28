@@ -32,7 +32,7 @@ jobs:
 
       - name: Collect Workflow Metrics
         id: metrics
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const today = new Date();
@@ -98,7 +98,7 @@ jobs:
 
       - name: Collect PR Metrics
         id: pr_metrics
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const today = new Date();
@@ -148,7 +148,7 @@ jobs:
 
       - name: Count Autofix Iterations
         id: autofix
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const today = new Date();
@@ -203,7 +203,7 @@ jobs:
 
       - name: Generate Dashboard Issue Body
         id: dashboard
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           WORKFLOW_METRICS: ${{ steps.metrics.outputs.metrics }}
           PR_METRICS: ${{ steps.pr_metrics.outputs.pr_metrics }}
@@ -291,7 +291,7 @@ jobs:
             return body;
 
       - name: Create Dashboard Issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const body = ${{ steps.dashboard.outputs.result }};
