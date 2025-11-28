@@ -678,7 +678,7 @@ internal static class AnalysisCompute {
         Curve curve,
         int sampleCount) {
         Polyline? polyline = null;
-        bool isLinear = curve.IsLinear(RhinoMath.ZeroTolerance) && curve.TryGetPolyline(out polyline) && polyline?.Count >= 2;
+        bool isLinear = curve.IsLinear(RhinoMath.ZeroTolerance) && curve.TryGetPolyline(out polyline) && polyline.Count >= 2;
         bool isArc = curve.TryGetArc(out Arc arc);
         return (isLinear, isArc, polyline) switch {
             (true, _, Polyline pl) when pl.Count >= 2 => ((Func<(Analysis.CurveShapeTarget, object, double[])?>)(() => {
@@ -702,7 +702,7 @@ internal static class AnalysisCompute {
             double t = curve.Domain.ParameterAt(i / divisor);
             Point3d pt = curve.PointAt(t);
             deviations[i] = primitive switch {
-                Line ln => pt.DistanceTo(ln.ClosestPoint(pt, limitToFiniteSegment: true)),
+                Line ln => pt.DistanceTo(ln.ClosestPoint(pt, limitToFiniteSegment: false)),
                 Arc a => pt.DistanceTo(a.ClosestPoint(pt)),
                 _ => 0.0,
             };
