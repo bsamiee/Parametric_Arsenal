@@ -2,8 +2,6 @@
 
 Polymorphic differential geometry and quality analysis for curves, surfaces, Breps, and meshes.
 
-> **Related Modules**: For topological analysis (edges, vertices, connectivity), see [`Topology`](../topology/README.md). For point/curve extraction (control points, isocurves), see [`Extraction`](../extraction/README.md).
-
 ---
 
 ## API

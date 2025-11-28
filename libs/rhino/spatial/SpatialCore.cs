@@ -101,9 +101,9 @@ namespace Arsenal.Rhino.Spatial;
     internal static Result<Spatial.ComputationalGeometryResult> ExecuteComputationalGeometry(Point3d[] points, Spatial.ComputationalGeometryOperation operation, IGeometryContext context) =>
         operation switch {
             null => ResultFactory.Create<Spatial.ComputationalGeometryResult>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Operation cannot be null")),
-            Spatial.ConvexHull3DOperation => SpatialCompute.ConvexHull3D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(faces => new Spatial.ComputationalGeometryResult.ConvexHull(FaceIndices: faces)),
-            Spatial.Delaunay2DOperation => SpatialCompute.DelaunayTriangulation2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(triangles => new Spatial.ComputationalGeometryResult.Delaunay(TriangleIndices: triangles)),
-            Spatial.Voronoi2DOperation => SpatialCompute.VoronoiDiagram2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(cells => new Spatial.ComputationalGeometryResult.Voronoi(CellVertices: cells)),
+            Spatial.ConvexHull3D => SpatialCompute.ConvexHull3D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(faces => new Spatial.ComputationalGeometryResult.ConvexHull(FaceIndices: faces)),
+            Spatial.Delaunay2D => SpatialCompute.DelaunayTriangulation2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(triangles => new Spatial.ComputationalGeometryResult.Delaunay(TriangleIndices: triangles)),
+            Spatial.Voronoi2D => SpatialCompute.VoronoiDiagram2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(cells => new Spatial.ComputationalGeometryResult.Voronoi(CellVertices: cells)),
             _ => ResultFactory.Create<Spatial.ComputationalGeometryResult>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported operation: {operation.GetType().Name}")),
         };
 

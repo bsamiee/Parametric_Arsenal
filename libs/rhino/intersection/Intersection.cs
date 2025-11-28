@@ -63,7 +63,6 @@ public static class Intersection {
     }
 
     /// <summary>Intersection operation result containing points, curves, parameters, and topology indices.</summary>
-    /// <remarks>Consumers must dispose Curves collection elements as they implement IDisposable.</remarks>
     [DebuggerDisplay("Points={Points.Count}, Curves={Curves.Count}")]
     public readonly record struct IntersectionOutput(
         IReadOnlyList<Point3d> Points,

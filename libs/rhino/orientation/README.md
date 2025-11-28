@@ -2,8 +2,6 @@
 
 Polymorphic orientation with canonical alignment, best-fit computation, pattern detection, and optimization.
 
-> **Related Module**: For basic transforms (mirror, translate, rotate, scale), see [`Transformation`](../transformation/README.md). Use `Orientation` for derived transforms computed from geometry analysis (best-fit planes, canonical positioning, relative orientation between geometries).
-
 ---
 
 ## API

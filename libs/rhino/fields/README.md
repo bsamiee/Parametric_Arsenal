@@ -2,8 +2,6 @@
 
 Computational field analysis: distance fields, differential operators, streamlines, isosurfaces, and critical points.
 
-> **Related Module**: For geometry-based analysis (curvature, quality metrics), see [`Analysis`](../analysis/README.md). Use `Fields` for computational field operations on scalar/vector data sampled on grids.
-
 ---
 
 ## API

@@ -2,8 +2,6 @@
 
 Unified polymorphic dispatch for affine transformations, array operations, and SpaceMorph deformations.
 
-> **Related Module**: For derived transforms computed from geometry analysis (best-fit planes, canonical positioning, relative orientation), see [`Orientation`](../orientation/README.md). Use `Transformation` when you know the specific transform to apply (matrix, scale, rotate, mirror).
-
 ---
 
 ## API
@@ -19,7 +17,7 @@ Result<DecomposedTransform> Decompose(Transform matrix, IGeometryContext context
 
 ## Operations/Types
 
-**TransformOperation**: `MirrorTransform`, `Translation`, `ProjectionTransform`, `BasisChange`, `PlaneTransform`, `MatrixTransform`, `UniformScale`, `NonUniformScale`, `AxisRotation`, `VectorRotation`, `ShearTransform`, `CompoundTransform`, `BlendedTransform`, `InterpolatedTransform`
+**TransformOperation**: `Mirror`, `Translation`, `Projection`, `BasisChange`, `PlaneToPlane`, `Matrix`, `UniformScale`, `NonUniformScale`, `AxisRotation`, `VectorRotation`, `Shear`, `Compound`, `Blended`, `Interpolated`
 
 **ArrayOperation**: `LinearArray(Vector3d, int, double)`, `PolarArray(Point3d, Vector3d, int, double)`, `PathArray(Curve, int, bool)`, `RectangularArray(int, int, int, double, double, double)`
 
@@ -35,19 +33,19 @@ Result<DecomposedTransform> Decompose(Transform matrix, IGeometryContext context
 IGeometryContext context = new GeometryContext(absoluteTolerance: 0.001);
 
 // Transform operations via algebraic types
-Result<Brep> mirrored = Transformation.Apply(brep, new Transformation.MirrorTransform(Plane.WorldXY), context);
+Result<Brep> mirrored = Transformation.Apply(brep, new Transformation.Mirror(Plane.WorldXY), context);
 Result<Mesh> rotated = Transformation.Apply(mesh, new Transformation.AxisRotation(Math.PI / 4, Vector3d.ZAxis, Point3d.Origin), context);
 Result<Curve> translated = Transformation.Apply(curve, new Transformation.Translation(Vector3d.XAxis * 10), context);
 Result<Surface> scaled = Transformation.Apply(surface, new Transformation.UniformScale(Point3d.Origin, 2.0), context);
 
 // Basis and plane transforms
 Result<Brep> basisChanged = Transformation.Apply(brep, new Transformation.BasisChange(Plane.WorldXY, Plane.WorldYZ), context);
-Result<Mesh> planeToPlane = Transformation.Apply(mesh, new Transformation.PlaneTransform(sourcePlane, targetPlane), context);
+Result<Mesh> planeToPlane = Transformation.Apply(mesh, new Transformation.PlaneToPlane(sourcePlane, targetPlane), context);
 
 // Compound, blended, and interpolated transforms
 Result<Curve> compound = Transformation.Apply(
     curve,
-    new Transformation.CompoundTransform([
+    new Transformation.Compound([
         new Transformation.Translation(Vector3d.XAxis),
         new Transformation.AxisRotation(Math.PI / 2, Vector3d.ZAxis, Point3d.Origin),
     ]),
@@ -55,7 +53,7 @@ Result<Curve> compound = Transformation.Apply(
 
 Result<Surface> blended = Transformation.Apply(
     surface,
-    new Transformation.BlendedTransform(
+    new Transformation.Blended(
         new Transformation.Translation(Vector3d.XAxis),
         new Transformation.Translation(Vector3d.YAxis),
         BlendFactor: 0.5),

@@ -252,7 +252,7 @@ internal static class TransformationCore {
         Transformation.TransformOperation operation,
         IGeometryContext context) =>
         operation switch {
-            Transformation.MatrixTransform m => ValidateMatrix(matrix: m.Value, context: context),
+            Transformation.Matrix m => ValidateMatrix(matrix: m.Value, context: context),
             Transformation.UniformScale s => ValidateScaleFactor(factor: s.Factor)
                 .Map(_ => Transform.Scale(anchor: s.Anchor, scaleFactor: s.Factor)),
             Transformation.NonUniformScale ns => ValidateScaleFactors(x: ns.XScale, y: ns.YScale, z: ns.ZScale)
@@ -262,20 +262,20 @@ internal static class TransformationCore {
                 .Map(_ => Transform.Rotation(angleRadians: ar.AngleRadians, rotationAxis: ar.Axis, rotationCenter: ar.Center)),
             Transformation.VectorRotation vr => ValidateRotationVectors(start: vr.Start, end: vr.End, context: context)
                 .Map(_ => Transform.Rotation(startDirection: vr.Start, endDirection: vr.End, rotationCenter: vr.Center)),
-            Transformation.MirrorTransform mt => ValidatePlane(plane: mt.Plane)
+            Transformation.Mirror mt => ValidatePlane(plane: mt.Plane)
                 .Map(_ => Transform.Mirror(mirrorPlane: mt.Plane)),
             Transformation.Translation t => ResultFactory.Create(value: Transform.Translation(motion: t.Motion)),
-            Transformation.ShearTransform sh => ValidateShear(plane: sh.Plane, direction: sh.Direction, context: context)
+            Transformation.Shear sh => ValidateShear(plane: sh.Plane, direction: sh.Direction, context: context)
                 .Map(_ => Transform.Shear(plane: sh.Plane, x: sh.Direction * Math.Tan(sh.AngleRadians), y: Vector3d.Zero, z: Vector3d.Zero)),
-            Transformation.ProjectionTransform p => ValidatePlane(plane: p.Plane)
+            Transformation.Projection p => ValidatePlane(plane: p.Plane)
                 .Map(_ => Transform.PlanarProjection(plane: p.Plane)),
             Transformation.BasisChange cb => ValidatePlanes(from: cb.From, to: cb.To)
                 .Map(_ => Transform.ChangeBasis(plane0: cb.From, plane1: cb.To)),
-            Transformation.PlaneTransform ptp => ValidatePlanes(from: ptp.From, to: ptp.To)
+            Transformation.PlaneToPlane ptp => ValidatePlanes(from: ptp.From, to: ptp.To)
                 .Map(_ => Transform.PlaneToPlane(ptp.From, ptp.To)),
-            Transformation.CompoundTransform ct => BuildCompoundMatrix(operations: ct.Operations, context: context),
-            Transformation.BlendedTransform bt => BuildBlendedMatrix(first: bt.First, second: bt.Second, blendFactor: bt.BlendFactor, context: context),
-            Transformation.InterpolatedTransform it => BuildInterpolatedMatrix(start: it.Start, end: it.End, parameter: it.Parameter, context: context),
+            Transformation.Compound ct => BuildCompoundMatrix(operations: ct.Operations, context: context),
+            Transformation.Blended bt => BuildBlendedMatrix(first: bt.First, second: bt.Second, blendFactor: bt.BlendFactor, context: context),
+            Transformation.Interpolated it => BuildInterpolatedMatrix(start: it.Start, end: it.End, parameter: it.Parameter, context: context),
             _ => ResultFactory.Create<Transform>(error: E.Geometry.Transformation.InvalidTransformSpec),
         };
 
@@ -295,7 +295,7 @@ internal static class TransformationCore {
     private static int CountCompoundDepth(Transformation.TransformOperation[] operations, int depth) =>
         operations.Aggregate(
             seed: depth + 1,
-            func: (maxDepth, op) => op is Transformation.CompoundTransform ct
+            func: (maxDepth, op) => op is Transformation.Compound ct
                 ? Math.Max(maxDepth, CountCompoundDepth(operations: ct.Operations, depth: depth + 1))
                 : maxDepth);
 

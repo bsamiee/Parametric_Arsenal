@@ -2,8 +2,6 @@
 
 RTree-based spatial indexing for proximity queries, range analysis, clustering, and computational geometry algorithms.
 
-> **Related Module**: For geometry-to-geometry intersections, see [`Intersection`](../intersection/README.md). Use `Spatial` for point-based proximity queries, clustering, and computational geometry (Delaunay, Voronoi, convex hull).
-
 ---
 
 ## API
@@ -30,7 +28,7 @@ Result<ComputationalGeometryResult> Compute(Point3d[] points, ComputationalGeome
 
 **Mesh Overlap**: `MeshOverlapAnalysis(Mesh, Mesh, double, int?)`
 
-**Computational Geometry**: `ConvexHull3DOperation`, `Delaunay2DOperation`, `Voronoi2DOperation`
+**Computational Geometry**: `ConvexHull3D`, `Delaunay2D`, `Voronoi2D`
 
 **Results**: `ClusteringResult(Point3d, double[])`, `ProximityFieldResult(int, double, double, double)`, `ComputationalGeometryResult.ConvexHull(int[][])`, `ComputationalGeometryResult.Delaunay(int[][])`, `ComputationalGeometryResult.Voronoi(Point3d[][])`
 
@@ -56,7 +54,7 @@ Result<Spatial.ClusteringResult[]> clusters = Spatial.Cluster(
 // Delaunay triangulation via unified Compute
 Result<Spatial.ComputationalGeometryResult> result = Spatial.Compute(
     points: planarPoints,
-    operation: new Spatial.Delaunay2DOperation(),
+    operation: new Spatial.Delaunay2D(),
     context: context);
 // Pattern match result: result.Map(r => r is ComputationalGeometryResult.Delaunay d ? d.TriangleIndices : null)
 ```

@@ -58,14 +58,14 @@ public static class Spatial {
     public sealed record DirectionalProximityRequest(Vector3d Direction, double MaxDistance, double AngleWeight);
     /// <summary>Proximity field result entry.</summary>
     public sealed record ProximityFieldResult(int Index, double Distance, double Angle, double WeightedDistance);
-    /// <summary>Computational geometry operations on point clouds: ConvexHull3DOperation, Delaunay2DOperation, Voronoi2DOperation.</summary>
+    /// <summary>Computational geometry operations on point clouds.</summary>
     public abstract record ComputationalGeometryOperation;
     /// <summary>Compute 3D convex hull.</summary>
-    public sealed record ConvexHull3DOperation() : ComputationalGeometryOperation;
+    public sealed record ConvexHull3D() : ComputationalGeometryOperation;
     /// <summary>Compute 2D Delaunay triangulation.</summary>
-    public sealed record Delaunay2DOperation() : ComputationalGeometryOperation;
+    public sealed record Delaunay2D() : ComputationalGeometryOperation;
     /// <summary>Compute 2D Voronoi diagram.</summary>
-    public sealed record Voronoi2DOperation() : ComputationalGeometryOperation;
+    public sealed record Voronoi2D() : ComputationalGeometryOperation;
     /// <summary>Computational geometry results: ConvexHull(int[][]), Delaunay(int[][]), Voronoi(Point3d[][]).</summary>
     public abstract record ComputationalGeometryResult {
         private ComputationalGeometryResult() { }

@@ -19,22 +19,22 @@ public static class Transformation {
     public abstract record MorphOperation;
 
     /// <summary>Mirror reflection across plane.</summary>
-    public sealed record MirrorTransform(Plane Plane) : TransformOperation;
+    public sealed record Mirror(Plane Plane) : TransformOperation;
 
     /// <summary>Translation by motion vector.</summary>
     public sealed record Translation(Vector3d Motion) : TransformOperation;
 
     /// <summary>Orthogonal projection to plane.</summary>
-    public sealed record ProjectionTransform(Plane Plane) : TransformOperation;
+    public sealed record Projection(Plane Plane) : TransformOperation;
 
     /// <summary>Change of coordinate basis.</summary>
     public sealed record BasisChange(Plane From, Plane To) : TransformOperation;
 
     /// <summary>Plane-to-plane orientation transform.</summary>
-    public sealed record PlaneTransform(Plane From, Plane To) : TransformOperation;
+    public sealed record PlaneToPlane(Plane From, Plane To) : TransformOperation;
 
     /// <summary>Direct transform matrix application.</summary>
-    public sealed record MatrixTransform(Transform Value) : TransformOperation;
+    public sealed record Matrix(Transform Value) : TransformOperation;
 
     /// <summary>Uniform scale from anchor point.</summary>
     public sealed record UniformScale(Point3d Anchor, double Factor) : TransformOperation;
@@ -70,7 +70,7 @@ public static class Transformation {
     public sealed record NonUniformScale(Plane Plane, double XScale, double YScale, double ZScale) : TransformOperation;
 
     /// <summary>Shear deformation.</summary>
-    public sealed record ShearTransform(Plane Plane, Vector3d Direction, double AngleRadians) : TransformOperation;
+    public sealed record Shear(Plane Plane, Vector3d Direction, double AngleRadians) : TransformOperation;
 
     /// <summary>Flow geometry from base curve to target curve.</summary>
     public sealed record FlowMorph(Curve BaseCurve, Curve TargetCurve, bool PreserveStructure) : MorphOperation;
@@ -88,13 +88,13 @@ public static class Transformation {
     public sealed record RectangularArray(int XCount, int YCount, int ZCount, double XSpacing, double YSpacing, double ZSpacing) : ArrayOperation;
 
     /// <summary>Sequential composition of multiple transforms.</summary>
-    public sealed record CompoundTransform(TransformOperation[] Operations) : TransformOperation;
+    public sealed record Compound(TransformOperation[] Operations) : TransformOperation;
 
     /// <summary>Weighted blend between two transforms.</summary>
-    public sealed record BlendedTransform(TransformOperation First, TransformOperation Second, double BlendFactor) : TransformOperation;
+    public sealed record Blended(TransformOperation First, TransformOperation Second, double BlendFactor) : TransformOperation;
 
     /// <summary>Interpolated transform between start and end with parameter t ∈ [0,1].</summary>
-    public sealed record InterpolatedTransform(TransformOperation Start, TransformOperation End, double Parameter) : TransformOperation;
+    public sealed record Interpolated(TransformOperation Start, TransformOperation End, double Parameter) : TransformOperation;
 
     /// <summary>Result of transform decomposition into TRS components.</summary>
     public sealed record DecomposedTransform(

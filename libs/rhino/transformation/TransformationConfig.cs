@@ -12,20 +12,20 @@ internal static class TransformationConfig {
     /// <summary>Unified transform operations dispatch table: operation type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, TransformOperationMetadata> TransformOperations =
         new Dictionary<Type, TransformOperationMetadata> {
-            [typeof(Transformation.MatrixTransform)] = new(V.Standard, "Transformation.MatrixTransform"),
+            [typeof(Transformation.Matrix)] = new(V.Standard, "Transformation.Matrix"),
             [typeof(Transformation.UniformScale)] = new(V.Standard, "Transformation.UniformScale"),
             [typeof(Transformation.NonUniformScale)] = new(V.Standard, "Transformation.NonUniformScale"),
             [typeof(Transformation.AxisRotation)] = new(V.Standard, "Transformation.AxisRotation"),
             [typeof(Transformation.VectorRotation)] = new(V.Standard, "Transformation.VectorRotation"),
-            [typeof(Transformation.MirrorTransform)] = new(V.Standard, "Transformation.MirrorTransform"),
+            [typeof(Transformation.Mirror)] = new(V.Standard, "Transformation.Mirror"),
             [typeof(Transformation.Translation)] = new(V.Standard, "Transformation.Translation"),
-            [typeof(Transformation.ShearTransform)] = new(V.Standard, "Transformation.ShearTransform"),
-            [typeof(Transformation.ProjectionTransform)] = new(V.Standard, "Transformation.ProjectionTransform"),
+            [typeof(Transformation.Shear)] = new(V.Standard, "Transformation.Shear"),
+            [typeof(Transformation.Projection)] = new(V.Standard, "Transformation.Projection"),
             [typeof(Transformation.BasisChange)] = new(V.Standard, "Transformation.BasisChange"),
-            [typeof(Transformation.PlaneTransform)] = new(V.Standard, "Transformation.PlaneTransform"),
-            [typeof(Transformation.CompoundTransform)] = new(V.Standard, "Transformation.CompoundTransform"),
-            [typeof(Transformation.BlendedTransform)] = new(V.Standard, "Transformation.BlendedTransform"),
-            [typeof(Transformation.InterpolatedTransform)] = new(V.Standard, "Transformation.InterpolatedTransform"),
+            [typeof(Transformation.PlaneToPlane)] = new(V.Standard, "Transformation.PlaneToPlane"),
+            [typeof(Transformation.Compound)] = new(V.Standard, "Transformation.Compound"),
+            [typeof(Transformation.Blended)] = new(V.Standard, "Transformation.Blended"),
+            [typeof(Transformation.Interpolated)] = new(V.Standard, "Transformation.Interpolated"),
         }.ToFrozenDictionary();
 
     /// <summary>Unified array operations dispatch table: operation type → metadata.</summary>
