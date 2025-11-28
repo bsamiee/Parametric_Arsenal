@@ -9,15 +9,20 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Orchestration layer for differential and quality analysis via UnifiedOperation.</summary>
-[Pure] internal static class AnalysisCore {
+[Pure]
+internal static class AnalysisCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> ExecuteQuality<T>(Analysis.QualityRequest request, IGeometryContext context) =>
         !AnalysisConfig.QualityOperations.TryGetValue(request.GetType(), out AnalysisConfig.QualityMetadata? meta)
-            ? ResultFactory.Create<T>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown quality request type: {request.GetType().Name}. Supported types: SurfaceQualityAnalysis, CurveFairnessAnalysis, MeshQualityAnalysis"))
+            ? ResultFactory.Create<T>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown quality request type: {request.GetType().Name}. Supported types: {string.Join(", ", AnalysisConfig.QualityOperations.Keys.Select(t => t.Name))}"))
             : request switch {
                 Analysis.SurfaceQualityAnalysis r => (Result<T>)(object)ExecuteSurfaceQuality(surface: r.Surface, meta: meta, context: context),
                 Analysis.CurveFairnessAnalysis r => (Result<T>)(object)ExecuteCurveFairness(curve: r.Curve, meta: meta, context: context),
                 Analysis.MeshQualityAnalysis r => (Result<T>)(object)ExecuteMeshQuality(mesh: r.Mesh, meta: meta, context: context),
+                Analysis.CurvatureProfileAnalysis r => (Result<T>)(object)ExecuteCurvatureProfile(curve: r.Curve, sampleCount: r.SampleCount, includeTorsion: r.IncludeTorsion, meta: meta, context: context),
+                Analysis.SurfaceCurvatureProfileAnalysis r => (Result<T>)(object)ExecuteSurfaceCurvatureProfile(surface: r.Surface, sampleCountU: r.SampleCountU, sampleCountV: r.SampleCountV, direction: r.Direction, meta: meta, context: context),
+                Analysis.ShapeConformanceAnalysis r => (Result<T>)(object)ExecuteShapeConformance(surface: r.Surface, target: r.Target, meta: meta, context: context),
+                Analysis.CurveConformanceAnalysis r => (Result<T>)(object)ExecuteCurveConformance(curve: r.Curve, target: r.Target, meta: meta, context: context),
                 _ => ResultFactory.Create<T>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unhandled quality request: {request.GetType().Name}")),
             };
 
@@ -231,6 +236,90 @@ namespace Arsenal.Rhino.Analysis;
                     curvatureMultiplier: meta.CurvatureMultiplier,
                     context: context).Map(r => (IReadOnlyList<Analysis.SurfaceQualityResult>)[r,])),
             config: new OperationConfig<Surface, Analysis.SurfaceQualityResult> {
+                Context = context,
+                ValidationMode = meta.ValidationMode,
+                OperationName = meta.OperationName,
+            }).Map(static r => r[0]);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Analysis.CurvatureProfileResult> ExecuteCurvatureProfile(
+        Curve curve,
+        int sampleCount,
+        bool includeTorsion,
+        AnalysisConfig.QualityMetadata meta,
+        IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: curve,
+            operation: (Func<Curve, Result<IReadOnlyList<Analysis.CurvatureProfileResult>>>)(c =>
+                AnalysisCompute.ComputeCurvatureProfile(
+                    curve: c,
+                    sampleCount: sampleCount,
+                    includeTorsion: includeTorsion,
+                    __: context).Map(r => (IReadOnlyList<Analysis.CurvatureProfileResult>)[r,])),
+            config: new OperationConfig<Curve, Analysis.CurvatureProfileResult> {
+                Context = context,
+                ValidationMode = meta.ValidationMode,
+                OperationName = meta.OperationName,
+            }).Map(static r => r[0]);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Analysis.SurfaceCurvatureProfileResult> ExecuteSurfaceCurvatureProfile(
+        Surface surface,
+        int sampleCountU,
+        int sampleCountV,
+        Analysis.CurvatureProfileDirection direction,
+        AnalysisConfig.QualityMetadata meta,
+        IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: surface,
+            operation: (Func<Surface, Result<IReadOnlyList<Analysis.SurfaceCurvatureProfileResult>>>)(s =>
+                AnalysisCompute.ComputeSurfaceCurvatureProfile(
+                    surface: s,
+                    sampleCountU: sampleCountU,
+                    sampleCountV: sampleCountV,
+                    direction: direction,
+                    context: context).Map(r => (IReadOnlyList<Analysis.SurfaceCurvatureProfileResult>)[r,])),
+            config: new OperationConfig<Surface, Analysis.SurfaceCurvatureProfileResult> {
+                Context = context,
+                ValidationMode = meta.ValidationMode,
+                OperationName = meta.OperationName,
+            }).Map(static r => r[0]);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Analysis.ShapeConformanceResult> ExecuteShapeConformance(
+        Surface surface,
+        Analysis.ShapeTarget target,
+        AnalysisConfig.QualityMetadata meta,
+        IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: surface,
+            operation: (Func<Surface, Result<IReadOnlyList<Analysis.ShapeConformanceResult>>>)(s =>
+                AnalysisCompute.ComputeShapeConformance(
+                    surface: s,
+                    target: target,
+                    sampleCount: meta.SampleCount,
+                    context: context).Map(r => (IReadOnlyList<Analysis.ShapeConformanceResult>)[r,])),
+            config: new OperationConfig<Surface, Analysis.ShapeConformanceResult> {
+                Context = context,
+                ValidationMode = meta.ValidationMode,
+                OperationName = meta.OperationName,
+            }).Map(static r => r[0]);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Result<Analysis.CurveConformanceResult> ExecuteCurveConformance(
+        Curve curve,
+        Analysis.CurveShapeTarget target,
+        AnalysisConfig.QualityMetadata meta,
+        IGeometryContext context) =>
+        UnifiedOperation.Apply(
+            input: curve,
+            operation: (Func<Curve, Result<IReadOnlyList<Analysis.CurveConformanceResult>>>)(c =>
+                AnalysisCompute.ComputeCurveConformance(
+                    curve: c,
+                    target: target,
+                    sampleCount: meta.SampleCount,
+                    context: context).Map(r => (IReadOnlyList<Analysis.CurveConformanceResult>)[r,])),
+            config: new OperationConfig<Curve, Analysis.CurveConformanceResult> {
                 Context = context,
                 ValidationMode = meta.ValidationMode,
                 OperationName = meta.OperationName,

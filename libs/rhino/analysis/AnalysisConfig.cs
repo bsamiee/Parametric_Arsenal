@@ -6,7 +6,8 @@ using Rhino;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Unified metadata, constants, and dispatch tables for differential and quality analysis.</summary>
-[Pure] internal static class AnalysisConfig {
+[Pure]
+internal static class AnalysisConfig {
     /// <summary>Differential geometry dispatch table: request type → metadata.</summary>
     internal static readonly FrozenDictionary<Type, DifferentialMetadata> DifferentialOperations =
         new Dictionary<Type, DifferentialMetadata> {
@@ -69,6 +70,46 @@ namespace Arsenal.Rhino.Analysis;
                 ValidationMode: V.Standard | V.MeshSpecific,
                 OperationName: "Analysis.MeshQuality",
                 SampleCount: 0,
+                GridDimension: 0,
+                BoundaryFraction: 0.0,
+                ProximityFactor: 0.0,
+                CurvatureMultiplier: 0.0,
+                InflectionThreshold: 0.0,
+                SmoothnessSensitivity: 0.0),
+            [typeof(Analysis.CurvatureProfileAnalysis)] = new(
+                ValidationMode: V.Standard | V.Degeneracy,
+                OperationName: "Analysis.CurvatureProfile",
+                SampleCount: 50,
+                GridDimension: 0,
+                BoundaryFraction: 0.0,
+                ProximityFactor: 0.0,
+                CurvatureMultiplier: 0.0,
+                InflectionThreshold: 0.0,
+                SmoothnessSensitivity: 0.0),
+            [typeof(Analysis.SurfaceCurvatureProfileAnalysis)] = new(
+                ValidationMode: V.Standard | V.UVDomain,
+                OperationName: "Analysis.SurfaceCurvatureProfile",
+                SampleCount: 100,
+                GridDimension: 10,
+                BoundaryFraction: 0.0,
+                ProximityFactor: 0.0,
+                CurvatureMultiplier: 0.0,
+                InflectionThreshold: 0.0,
+                SmoothnessSensitivity: 0.0),
+            [typeof(Analysis.ShapeConformanceAnalysis)] = new(
+                ValidationMode: V.Standard | V.BoundingBox,
+                OperationName: "Analysis.ShapeConformance",
+                SampleCount: 100,
+                GridDimension: 10,
+                BoundaryFraction: 0.0,
+                ProximityFactor: 0.0,
+                CurvatureMultiplier: 0.0,
+                InflectionThreshold: 0.0,
+                SmoothnessSensitivity: 0.0),
+            [typeof(Analysis.CurveConformanceAnalysis)] = new(
+                ValidationMode: V.Standard | V.Degeneracy,
+                OperationName: "Analysis.CurveConformance",
+                SampleCount: 50,
                 GridDimension: 0,
                 BoundaryFraction: 0.0,
                 ProximityFactor: 0.0,
