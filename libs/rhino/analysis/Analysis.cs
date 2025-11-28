@@ -35,6 +35,74 @@ public static class Analysis {
     /// <summary>Mesh quality analysis request (FEA metrics: aspect ratio, skewness, Jacobian).</summary>
     public sealed record MeshQualityAnalysis(Mesh Mesh) : QualityRequest(Mesh);
 
+    /// <summary>Curvature profile analysis along curve parameter space.</summary>
+    public sealed record CurvatureProfileAnalysis(
+        Curve Curve,
+        int SampleCount,
+        bool IncludeTorsion) : QualityRequest(Curve);
+
+    /// <summary>Curvature profile analysis across surface parameter space.</summary>
+    public sealed record SurfaceCurvatureProfileAnalysis(
+        Surface Surface,
+        int SampleCountU,
+        int SampleCountV,
+        CurvatureProfileDirection Direction) : QualityRequest(Surface);
+
+    /// <summary>Shape conformance analysis against ideal primitives.</summary>
+    public sealed record ShapeConformanceAnalysis(
+        Surface Surface,
+        ShapeTarget Target) : QualityRequest(Surface);
+
+    /// <summary>Curve conformance analysis (linearity, circularity).</summary>
+    public sealed record CurveConformanceAnalysis(
+        Curve Curve,
+        CurveShapeTarget Target) : QualityRequest(Curve);
+
+    /// <summary>Curvature profile direction for surface sampling.</summary>
+    public abstract record CurvatureProfileDirection;
+
+    /// <summary>Sample curvature along U direction only.</summary>
+    public sealed record UDirection : CurvatureProfileDirection;
+
+    /// <summary>Sample curvature along V direction only.</summary>
+    public sealed record VDirection : CurvatureProfileDirection;
+
+    /// <summary>Sample curvature along both U and V directions.</summary>
+    public sealed record BothDirections : CurvatureProfileDirection;
+
+    /// <summary>Target shape for conformance analysis.</summary>
+    public abstract record ShapeTarget;
+
+    /// <summary>Target planar shape.</summary>
+    public sealed record PlanarTarget : ShapeTarget;
+
+    /// <summary>Target cylindrical shape.</summary>
+    public sealed record CylindricalTarget : ShapeTarget;
+
+    /// <summary>Target spherical shape.</summary>
+    public sealed record SphericalTarget : ShapeTarget;
+
+    /// <summary>Target conical shape.</summary>
+    public sealed record ConicalTarget : ShapeTarget;
+
+    /// <summary>Target toroidal shape.</summary>
+    public sealed record ToroidalTarget : ShapeTarget;
+
+    /// <summary>Auto-detect best fit primitive.</summary>
+    public sealed record AnyTarget : ShapeTarget;
+
+    /// <summary>Target shape for curve conformance.</summary>
+    public abstract record CurveShapeTarget;
+
+    /// <summary>Target linear shape.</summary>
+    public sealed record LinearTarget : CurveShapeTarget;
+
+    /// <summary>Target circular/arc shape.</summary>
+    public sealed record CircularTarget : CurveShapeTarget;
+
+    /// <summary>Auto-detect best curve primitive.</summary>
+    public sealed record AnyCurveTarget : CurveShapeTarget;
+
     /// <summary>Mesh topology analysis request.</summary>
     public sealed record MeshAnalysis(Mesh Mesh, int VertexIndex) : DifferentialRequest(Mesh, 0) {
         public MeshAnalysis(Mesh mesh) : this(mesh, 0) { }
@@ -88,6 +156,53 @@ public static class Analysis {
         double[] Jacobians,
         int[] ProblematicFaceIndices,
         (int Warning, int Critical) QualityFlags) : IResult;
+
+    /// <summary>Curvature profile along curve: sampled values with statistics.</summary>
+    [DebuggerDisplay("CurvatureProfile | Samples={CurvatureValues.Length} | Max={MaxCurvature:F4}")]
+    public sealed record CurvatureProfileResult(
+        double[] Parameters,
+        double[] CurvatureValues,
+        double[]? TorsionValues,
+        (double Parameter, double Value)[] ExtremaLocations,
+        double MinCurvature,
+        double MaxCurvature,
+        double MeanCurvature,
+        double Variance) : IResult;
+
+    /// <summary>Surface curvature profile: sampled grid with statistics.</summary>
+    [DebuggerDisplay("SurfaceCurvatureProfile | Samples={GaussianValues.Length} | GaussRange={GaussianRange:F4}")]
+    public sealed record SurfaceCurvatureProfileResult(
+        (double U, double V)[] SampleLocations,
+        double[] GaussianValues,
+        double[] MeanValues,
+        (double U, double V, double Value)[] GaussianExtrema,
+        (double U, double V, double Value)[] MeanExtrema,
+        double GaussianRange,
+        double MeanRange,
+        double UniformityScore) : IResult;
+
+    /// <summary>Shape conformance result with deviation metrics.</summary>
+    [DebuggerDisplay("Conformance | MaxDev={MaxDeviation:F6} | Score={ConformanceScore:F3}")]
+    public sealed record ShapeConformanceResult(
+        ShapeTarget DetectedShape,
+        object? IdealPrimitive,
+        double MaxDeviation,
+        double MinDeviation,
+        double MeanDeviation,
+        double RmsDeviation,
+        Point3d MaxDeviationLocation,
+        double ConformanceScore,
+        bool WithinTolerance) : IResult;
+
+    /// <summary>Curve conformance result.</summary>
+    [DebuggerDisplay("CurveConformance | MaxDev={MaxDeviation:F6} | Score={ConformanceScore:F3}")]
+    public sealed record CurveConformanceResult(
+        CurveShapeTarget DetectedShape,
+        object? IdealPrimitive,
+        double MaxDeviation,
+        double MeanDeviation,
+        double RmsDeviation,
+        double ConformanceScore) : IResult;
 
     /// <summary>Mesh topology: vertices, edges, manifold state, closure, area, volume.</summary>
     [DebuggerDisplay("Mesh @ {Location} | V={Volume:F3} | A={Area:F3}{(IsClosed ? \" [closed]\" : \"\")}{(IsManifold ? \" [manifold]\" : \"\")}")]
@@ -179,6 +294,60 @@ public static class Analysis {
         Mesh mesh,
         IGeometryContext context) =>
         AnalysisCore.ExecuteQuality<MeshQualityResult>(request: new MeshQualityAnalysis(Mesh: mesh), context: context);
+
+    /// <summary>Analyzes curvature profile along curve parameter space.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<CurvatureProfileResult> AnalyzeCurvatureProfile(
+        Curve curve,
+        IGeometryContext context,
+        int sampleCount = 50,
+        bool includeTorsion = false) =>
+        AnalysisCore.ExecuteQuality<CurvatureProfileResult>(
+            request: new CurvatureProfileAnalysis(
+                Curve: curve,
+                SampleCount: sampleCount,
+                IncludeTorsion: includeTorsion),
+            context: context);
+
+    /// <summary>Analyzes curvature profile across surface parameter space.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<SurfaceCurvatureProfileResult> AnalyzeSurfaceCurvatureProfile(
+        Surface surface,
+        IGeometryContext context,
+        int sampleCountU = 10,
+        int sampleCountV = 10,
+        CurvatureProfileDirection? direction = null) =>
+        AnalysisCore.ExecuteQuality<SurfaceCurvatureProfileResult>(
+            request: new SurfaceCurvatureProfileAnalysis(
+                Surface: surface,
+                SampleCountU: sampleCountU,
+                SampleCountV: sampleCountV,
+                Direction: direction ?? new BothDirections()),
+            context: context);
+
+    /// <summary>Analyzes shape conformance against ideal primitives.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<ShapeConformanceResult> AnalyzeShapeConformance(
+        Surface surface,
+        IGeometryContext context,
+        ShapeTarget? target = null) =>
+        AnalysisCore.ExecuteQuality<ShapeConformanceResult>(
+            request: new ShapeConformanceAnalysis(
+                Surface: surface,
+                Target: target ?? new AnyTarget()),
+            context: context);
+
+    /// <summary>Analyzes curve conformance to line or arc.</summary>
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Result<CurveConformanceResult> AnalyzeCurveConformance(
+        Curve curve,
+        IGeometryContext context,
+        CurveShapeTarget? target = null) =>
+        AnalysisCore.ExecuteQuality<CurveConformanceResult>(
+            request: new CurveConformanceAnalysis(
+                Curve: curve,
+                Target: target ?? new AnyCurveTarget()),
+            context: context);
 
     /// <summary>Analyzes mesh topology and manifold properties at vertex.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

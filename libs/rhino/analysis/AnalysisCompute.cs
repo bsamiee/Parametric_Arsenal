@@ -363,4 +363,360 @@ internal static class AnalysisCompute {
                     ArrayPool<Point3d>.Shared.Return(vertices, clearArray: true);
                 }
             }))();
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.CurvatureProfileResult> ComputeCurvatureProfile(
+        Curve curve,
+        int sampleCount,
+        bool includeTorsion,
+        IGeometryContext __) {
+        int count = Math.Max(2, sampleCount);
+        double[] parameters = new double[count];
+        double[] curvatures = new double[count];
+        double[]? torsions = includeTorsion ? new double[count] : null;
+        double divisor = count - 1.0;
+        double sum = 0.0;
+        double min = double.MaxValue;
+        double max = double.MinValue;
+        int minIdx = 0;
+        int maxIdx = 0;
+        for (int i = 0; i < count; i++) {
+            double t = curve.Domain.ParameterAt(i / divisor);
+            parameters[i] = t;
+            Vector3d curvatureVec = curve.CurvatureAt(t);
+            double k = curvatureVec.IsValid ? curvatureVec.Length : 0.0;
+            curvatures[i] = k;
+            sum += k;
+            (min, minIdx) = k < min ? (k, i) : (min, minIdx);
+            (max, maxIdx) = k > max ? (k, i) : (max, maxIdx);
+            torsions = torsions is double[] arr ? (arr[i] = curve.TorsionAt(t), arr).arr : null;
+        }
+        double mean = sum / count;
+        double varianceSum = 0.0;
+        for (int i = 0; i < count; i++) {
+            double diff = curvatures[i] - mean;
+            varianceSum += diff * diff;
+        }
+        return ResultFactory.Create(value: new Analysis.CurvatureProfileResult(
+            Parameters: parameters,
+            CurvatureValues: curvatures,
+            TorsionValues: torsions,
+            ExtremaLocations: [
+                (parameters[minIdx], min),
+                (parameters[maxIdx], max),
+            ],
+            MinCurvature: min,
+            MaxCurvature: max,
+            MeanCurvature: mean,
+            Variance: varianceSum / count));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.SurfaceCurvatureProfileResult> ComputeSurfaceCurvatureProfile(
+        Surface surface,
+        int sampleCountU,
+        int sampleCountV,
+        Analysis.CurvatureProfileDirection direction,
+        IGeometryContext context) {
+        int countU = Math.Max(2, sampleCountU);
+        int countV = Math.Max(2, sampleCountV);
+        (int effectiveU, int effectiveV) = direction switch {
+            Analysis.UDirection => (countU, 1),
+            Analysis.VDirection => (1, countV),
+            _ => (countU, countV),
+        };
+        int totalSamples = effectiveU * effectiveV;
+        (double U, double V)[] locations = new (double, double)[totalSamples];
+        double[] gaussianValues = new double[totalSamples];
+        double[] meanValues = new double[totalSamples];
+        double divisorU = effectiveU > 1 ? effectiveU - 1.0 : 1.0;
+        double divisorV = effectiveV > 1 ? effectiveV - 1.0 : 1.0;
+        double gaussianMin = double.MaxValue;
+        double gaussianMax = double.MinValue;
+        double meanMin = double.MaxValue;
+        double meanMax = double.MinValue;
+        int gaussianMinIdx = 0;
+        int gaussianMaxIdx = 0;
+        int meanMinIdx = 0;
+        int meanMaxIdx = 0;
+        double gaussianSum = 0.0;
+        int validCount = 0;
+        for (int i = 0; i < effectiveU; i++) {
+            for (int j = 0; j < effectiveV; j++) {
+                int idx = (i * effectiveV) + j;
+                double u = surface.Domain(0).ParameterAt(i / divisorU);
+                double v = surface.Domain(1).ParameterAt(j / divisorV);
+                locations[idx] = (u, v);
+                SurfaceCurvature sc = surface.CurvatureAt(u, v);
+                bool valid = RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean);
+                gaussianValues[idx] = valid ? sc.Gaussian : 0.0;
+                meanValues[idx] = valid ? sc.Mean : 0.0;
+                validCount += valid ? 1 : 0;
+                gaussianSum += valid ? Math.Abs(sc.Gaussian) : 0.0;
+                (gaussianMin, gaussianMinIdx) = valid && sc.Gaussian < gaussianMin ? (sc.Gaussian, idx) : (gaussianMin, gaussianMinIdx);
+                (gaussianMax, gaussianMaxIdx) = valid && sc.Gaussian > gaussianMax ? (sc.Gaussian, idx) : (gaussianMax, gaussianMaxIdx);
+                (meanMin, meanMinIdx) = valid && sc.Mean < meanMin ? (sc.Mean, idx) : (meanMin, meanMinIdx);
+                (meanMax, meanMaxIdx) = valid && sc.Mean > meanMax ? (sc.Mean, idx) : (meanMax, meanMaxIdx);
+            }
+        }
+        return validCount is 0
+            ? ResultFactory.Create<Analysis.SurfaceCurvatureProfileResult>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"))
+            : ResultFactory.Create(value: new Analysis.SurfaceCurvatureProfileResult(
+                SampleLocations: locations,
+                GaussianValues: gaussianValues,
+                MeanValues: meanValues,
+                GaussianExtrema: [
+                    (locations[gaussianMinIdx].U, locations[gaussianMinIdx].V, gaussianMin),
+                    (locations[gaussianMaxIdx].U, locations[gaussianMaxIdx].V, gaussianMax),
+                ],
+                MeanExtrema: [
+                    (locations[meanMinIdx].U, locations[meanMinIdx].V, meanMin),
+                    (locations[meanMaxIdx].U, locations[meanMaxIdx].V, meanMax),
+                ],
+                GaussianRange: gaussianMax - gaussianMin,
+                MeanRange: meanMax - meanMin,
+                UniformityScore: RhinoMath.Clamp(
+                    (gaussianSum / validCount) > context.AbsoluteTolerance
+                        ? 1.0 / (1.0 + ((gaussianMax - gaussianMin) / (gaussianSum / validCount)))
+                        : (gaussianMax - gaussianMin) < context.AbsoluteTolerance ? 1.0 : 0.0,
+                    0.0,
+                    1.0)));
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.ShapeConformanceResult> ComputeShapeConformance(
+        Surface surface,
+        Analysis.ShapeTarget target,
+        int sampleCount,
+        IGeometryContext context) =>
+        TryFitPrimitive(surface: surface, target: target, sampleCount: sampleCount, _: context) switch {
+            null => ResultFactory.Create<Analysis.ShapeConformanceResult>(
+                error: E.Geometry.SurfaceAnalysisFailed.WithContext("No conforming primitive detected")),
+            (Analysis.ShapeTarget detected, object primitive, double[] deviations, Point3d maxLoc) result =>
+                ResultFactory.Create(value: new Analysis.ShapeConformanceResult(
+                    DetectedShape: result.detected,
+                    IdealPrimitive: result.primitive,
+                    MaxDeviation: result.deviations.Max(),
+                    MinDeviation: result.deviations.Min(),
+                    MeanDeviation: result.deviations.Average(),
+                    RmsDeviation: Math.Sqrt(result.deviations.Sum(d => d * d) / result.deviations.Length),
+                    MaxDeviationLocation: result.maxLoc,
+                    ConformanceScore: ComputeConformanceScore(deviations: result.deviations, tolerance: context.AbsoluteTolerance),
+                    WithinTolerance: result.deviations.Max() <= context.AbsoluteTolerance)),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Result<Analysis.CurveConformanceResult> ComputeCurveConformance(
+        Curve curve,
+        Analysis.CurveShapeTarget target,
+        int sampleCount,
+        IGeometryContext context) =>
+        TryFitCurvePrimitive(curve: curve, target: target, sampleCount: sampleCount) switch {
+            null => ResultFactory.Create<Analysis.CurveConformanceResult>(
+                error: E.Geometry.CurveAnalysisFailed.WithContext("No conforming curve primitive detected")),
+            (Analysis.CurveShapeTarget detected, object primitive, double[] deviations) result =>
+                ResultFactory.Create(value: new Analysis.CurveConformanceResult(
+                    DetectedShape: result.detected,
+                    IdealPrimitive: result.primitive,
+                    MaxDeviation: result.deviations.Max(),
+                    MeanDeviation: result.deviations.Average(),
+                    RmsDeviation: Math.Sqrt(result.deviations.Sum(d => d * d) / result.deviations.Length),
+                    ConformanceScore: ComputeConformanceScore(deviations: result.deviations, tolerance: context.AbsoluteTolerance))),
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (Analysis.ShapeTarget detected, object primitive, double[] deviations, Point3d maxLoc)? TryFitPrimitive(
+        Surface surface,
+        Analysis.ShapeTarget target,
+        int sampleCount,
+        IGeometryContext _) =>
+        target switch {
+            Analysis.PlanarTarget => surface.TryGetPlane(out Plane plane)
+                ? ComputeSurfaceDeviations(surface: surface, primitive: plane, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                    ? (new Analysis.PlanarTarget(), plane, devs, maxPt)
+                    : null
+                : null,
+            Analysis.CylindricalTarget => surface.TryGetCylinder(out Cylinder cyl)
+                ? ComputeSurfaceDeviations(surface: surface, primitive: cyl, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                    ? (new Analysis.CylindricalTarget(), cyl, devs, maxPt)
+                    : null
+                : null,
+            Analysis.SphericalTarget => surface.TryGetSphere(out Sphere sph)
+                ? ComputeSurfaceDeviations(surface: surface, primitive: sph, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                    ? (new Analysis.SphericalTarget(), sph, devs, maxPt)
+                    : null
+                : null,
+            Analysis.ConicalTarget => surface.TryGetCone(out Cone cone)
+                ? ComputeSurfaceDeviations(surface: surface, primitive: cone, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                    ? (new Analysis.ConicalTarget(), cone, devs, maxPt)
+                    : null
+                : null,
+            Analysis.ToroidalTarget => surface.TryGetTorus(out Torus torus)
+                ? ComputeSurfaceDeviations(surface: surface, primitive: torus, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                    ? (new Analysis.ToroidalTarget(), torus, devs, maxPt)
+                    : null
+                : null,
+            Analysis.AnyTarget => TryFitBestPrimitive(surface: surface, sampleCount: sampleCount),
+            _ => null,
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (Analysis.ShapeTarget, object, double[], Point3d)? TryFitBestPrimitive(
+        Surface surface,
+        int sampleCount) =>
+        (surface.TryGetPlane(out Plane plane),
+         surface.TryGetCylinder(out Cylinder cyl),
+         surface.TryGetSphere(out Sphere sph),
+         surface.TryGetCone(out Cone cone),
+         surface.TryGetTorus(out Torus torus)) switch {
+            (true, _, _, _, _) => ComputeSurfaceDeviations(surface: surface, primitive: plane, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                ? (new Analysis.PlanarTarget(), plane, devs, maxPt)
+                : null,
+            (_, true, _, _, _) => ComputeSurfaceDeviations(surface: surface, primitive: cyl, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                ? (new Analysis.CylindricalTarget(), cyl, devs, maxPt)
+                : null,
+            (_, _, true, _, _) => ComputeSurfaceDeviations(surface: surface, primitive: sph, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                ? (new Analysis.SphericalTarget(), sph, devs, maxPt)
+                : null,
+            (_, _, _, true, _) => ComputeSurfaceDeviations(surface: surface, primitive: cone, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                ? (new Analysis.ConicalTarget(), cone, devs, maxPt)
+                : null,
+            (_, _, _, _, true) => ComputeSurfaceDeviations(surface: surface, primitive: torus, sampleCount: sampleCount) is (double[] devs, Point3d maxPt)
+                ? (new Analysis.ToroidalTarget(), torus, devs, maxPt)
+                : null,
+            _ => null,
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (double[] deviations, Point3d maxDeviationPoint)? ComputeSurfaceDeviations(
+        Surface surface,
+        object primitive,
+        int sampleCount) {
+        int gridSize = Math.Max(3, (int)Math.Sqrt(sampleCount));
+        double divisor = gridSize - 1.0;
+        double[] deviations = new double[gridSize * gridSize];
+        double maxDeviation = 0.0;
+        Point3d maxPoint = Point3d.Origin;
+        for (int i = 0; i < gridSize; i++) {
+            for (int j = 0; j < gridSize; j++) {
+                int idx = (i * gridSize) + j;
+                double u = surface.Domain(0).ParameterAt(i / divisor);
+                double v = surface.Domain(1).ParameterAt(j / divisor);
+                Point3d pt = surface.PointAt(u, v);
+                double deviation = primitive switch {
+                    Plane p => Math.Abs(p.DistanceTo(pt)),
+                    Cylinder c => ComputeCylinderDeviation(point: pt, cylinder: c),
+                    Sphere s => Math.Abs(pt.DistanceTo(s.ClosestPoint(pt))),
+                    Cone cn => ComputeConeDeviation(point: pt, cone: cn),
+                    Torus t => ComputeTorusDeviation(point: pt, torus: t),
+                    _ => 0.0,
+                };
+                deviations[idx] = deviation;
+                (maxDeviation, maxPoint) = deviation > maxDeviation ? (deviation, pt) : (maxDeviation, maxPoint);
+            }
+        }
+        return (deviations, maxPoint);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeCylinderDeviation(Point3d point, Cylinder cylinder) {
+        // Project point onto cylinder axis and compute radial distance
+        Circle baseCircle = cylinder.CircleAt(0.0);
+        Line axisLine = new(baseCircle.Center, baseCircle.Center + (cylinder.Axis * cylinder.TotalHeight));
+        Point3d closestOnAxis = axisLine.ClosestPoint(point, limitToFiniteSegment: false);
+        double radialDistance = point.DistanceTo(closestOnAxis);
+        return Math.Abs(radialDistance - baseCircle.Radius);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeConeDeviation(Point3d point, Cone cone) {
+        // Compute distance to cone surface using axis projection
+        Vector3d toPoint = point - cone.ApexPoint;
+        Vector3d axis = cone.Axis;
+        bool unitized = axis.Unitize();
+        double axialDistance = unitized ? toPoint * axis : 0.0;
+        double expectedRadius = axialDistance > 0 ? axialDistance * Math.Tan(cone.AngleInRadians()) : 0.0;
+        Point3d projectedOnAxis = cone.ApexPoint + (axis * axialDistance);
+        double radialDistance = point.DistanceTo(projectedOnAxis);
+        return Math.Abs(radialDistance - expectedRadius);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeTorusDeviation(Point3d point, Torus torus) {
+        // Project point to torus plane, compute distance to major radius, then minor radius
+        Point3d projectedOnPlane = torus.Plane.ClosestPoint(point);
+        Vector3d toProjected = projectedOnPlane - torus.Plane.Origin;
+        double majorDist = toProjected.Length;
+        Point3d closestOnMajorCircle = majorDist > RhinoMath.ZeroTolerance
+            ? torus.Plane.Origin + (toProjected * (torus.MajorRadius / majorDist))
+            : torus.Plane.Origin + (torus.Plane.XAxis * torus.MajorRadius);
+        double distanceToMinorCenter = point.DistanceTo(closestOnMajorCircle);
+        return Math.Abs(distanceToMinorCenter - torus.MinorRadius);
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (Analysis.CurveShapeTarget detected, object primitive, double[] deviations)? TryFitCurvePrimitive(
+        Curve curve,
+        Analysis.CurveShapeTarget target,
+        int sampleCount) =>
+        target switch {
+            Analysis.LinearTarget => curve.IsLinear(RhinoMath.ZeroTolerance) && curve.TryGetPolyline(out Polyline polyline) && polyline.Count >= 2
+                ? ((Func<(Analysis.CurveShapeTarget, object, double[])?>)(() => {
+                    Line line = new(polyline[0], polyline[^1]);
+                    return (new Analysis.LinearTarget(), line, ComputeCurveDeviations(curve: curve, primitive: line, sampleCount: sampleCount));
+                }))()
+                : null,
+            Analysis.CircularTarget => curve.TryGetArc(out Arc arc)
+                ? (new Analysis.CircularTarget(), arc, ComputeCurveDeviations(curve: curve, primitive: arc, sampleCount: sampleCount))
+                : null,
+            Analysis.AnyCurveTarget => TryFitBestCurvePrimitive(curve: curve, sampleCount: sampleCount),
+            _ => null,
+        };
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static (Analysis.CurveShapeTarget, object, double[])? TryFitBestCurvePrimitive(
+        Curve curve,
+        int sampleCount) {
+        Polyline? polyline = null;
+        bool isLinear = curve.IsLinear(RhinoMath.ZeroTolerance) && curve.TryGetPolyline(out polyline) && polyline?.Count >= 2;
+        bool isArc = curve.TryGetArc(out Arc arc);
+        return (isLinear, isArc, polyline) switch {
+            (true, _, Polyline pl) when pl.Count >= 2 => ((Func<(Analysis.CurveShapeTarget, object, double[])?>)(() => {
+                Line line = new(pl[0], pl[^1]);
+                return (new Analysis.LinearTarget(), line, ComputeCurveDeviations(curve: curve, primitive: line, sampleCount: sampleCount));
+            }))(),
+            (_, true, _) => (new Analysis.CircularTarget(), arc, ComputeCurveDeviations(curve: curve, primitive: arc, sampleCount: sampleCount)),
+            _ => null,
+        };
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double[] ComputeCurveDeviations(
+        Curve curve,
+        object primitive,
+        int sampleCount) {
+        int count = Math.Max(3, sampleCount);
+        double[] deviations = new double[count];
+        double divisor = count - 1.0;
+        for (int i = 0; i < count; i++) {
+            double t = curve.Domain.ParameterAt(i / divisor);
+            Point3d pt = curve.PointAt(t);
+            deviations[i] = primitive switch {
+                Line ln => pt.DistanceTo(ln.ClosestPoint(pt, limitToFiniteSegment: true)),
+                Arc a => pt.DistanceTo(a.ClosestPoint(pt)),
+                _ => 0.0,
+            };
+        }
+        return deviations;
+    }
+
+    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeConformanceScore(
+        double[] deviations,
+        double tolerance) {
+        double maxDev = deviations.Max();
+        return maxDev <= tolerance
+            ? 1.0
+            : RhinoMath.Clamp(1.0 / (1.0 + (maxDev / tolerance)), 0.0, 1.0);
+    }
 }
