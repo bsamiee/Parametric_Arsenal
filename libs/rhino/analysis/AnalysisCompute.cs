@@ -386,7 +386,11 @@ internal static class AnalysisCompute {
             _ = torsions is double[] arr ? arr[i] = curve.TorsionAt(t) : 0.0;
         }
         double mean = sum / count;
-        double varianceSum = curvatures.Sum(k => (k - mean) * (k - mean));
+        double varianceSum = 0.0;
+        for (int i = 0; i < count; i++) {
+            double diff = curvatures[i] - mean;
+            varianceSum += diff * diff;
+        }
         return ResultFactory.Create(value: new Analysis.CurvatureProfileResult(
             Parameters: parameters, CurvatureValues: curvatures, TorsionValues: torsions,
             ExtremaLocations: [(parameters[minIdx], min), (parameters[maxIdx], max),],
@@ -406,16 +410,16 @@ internal static class AnalysisCompute {
         double[] gaussianValues = new double[total];
         double[] meanValues = new double[total];
         (double divisorU, double divisorV) = (effectiveU > 1 ? effectiveU - 1.0 : 1.0, effectiveV > 1 ? effectiveV - 1.0 : 1.0);
-        double gMin = double.MaxValue;
-        double gMax = double.MinValue;
-        double mMin = double.MaxValue;
-        double mMax = double.MinValue;
-        int gMinI = 0;
-        int gMaxI = 0;
-        int mMinI = 0;
-        int mMaxI = 0;
-        double gSum = 0.0;
-        int valid = 0;
+        double gaussianMin = double.MaxValue;
+        double gaussianMax = double.MinValue;
+        double meanMin = double.MaxValue;
+        double meanMax = double.MinValue;
+        int gaussianMinIdx = 0;
+        int gaussianMaxIdx = 0;
+        int meanMinIdx = 0;
+        int meanMaxIdx = 0;
+        double gaussianAbsSum = 0.0;
+        int validCount = 0;
         for (int i = 0; i < effectiveU; i++) {
             for (int j = 0; j < effectiveV; j++) {
                 int idx = (i * effectiveV) + j;
@@ -424,20 +428,20 @@ internal static class AnalysisCompute {
                 SurfaceCurvature sc = surface.CurvatureAt(u, v);
                 bool ok = RhinoMath.IsValidDouble(sc.Gaussian) && RhinoMath.IsValidDouble(sc.Mean);
                 (gaussianValues[idx], meanValues[idx]) = ok ? (sc.Gaussian, sc.Mean) : (0.0, 0.0);
-                valid += ok ? 1 : 0;
-                gSum += ok ? Math.Abs(sc.Gaussian) : 0.0;
-                (gMin, gMinI, gMax, gMaxI) = (ok && sc.Gaussian < gMin ? sc.Gaussian : gMin, ok && sc.Gaussian < gMin ? idx : gMinI, ok && sc.Gaussian > gMax ? sc.Gaussian : gMax, ok && sc.Gaussian > gMax ? idx : gMaxI);
-                (mMin, mMinI, mMax, mMaxI) = (ok && sc.Mean < mMin ? sc.Mean : mMin, ok && sc.Mean < mMin ? idx : mMinI, ok && sc.Mean > mMax ? sc.Mean : mMax, ok && sc.Mean > mMax ? idx : mMaxI);
+                validCount += ok ? 1 : 0;
+                gaussianAbsSum += ok ? Math.Abs(sc.Gaussian) : 0.0;
+                (gaussianMin, gaussianMinIdx, gaussianMax, gaussianMaxIdx) = (ok && sc.Gaussian < gaussianMin ? sc.Gaussian : gaussianMin, ok && sc.Gaussian < gaussianMin ? idx : gaussianMinIdx, ok && sc.Gaussian > gaussianMax ? sc.Gaussian : gaussianMax, ok && sc.Gaussian > gaussianMax ? idx : gaussianMaxIdx);
+                (meanMin, meanMinIdx, meanMax, meanMaxIdx) = (ok && sc.Mean < meanMin ? sc.Mean : meanMin, ok && sc.Mean < meanMin ? idx : meanMinIdx, ok && sc.Mean > meanMax ? sc.Mean : meanMax, ok && sc.Mean > meanMax ? idx : meanMaxIdx);
             }
         }
-        return valid is 0
+        return validCount is 0
             ? ResultFactory.Create<Analysis.SurfaceCurvatureProfileResult>(error: E.Geometry.SurfaceAnalysisFailed.WithContext("No valid curvature samples"))
             : ResultFactory.Create(value: new Analysis.SurfaceCurvatureProfileResult(
                 SampleLocations: locations, GaussianValues: gaussianValues, MeanValues: meanValues,
-                GaussianExtrema: [(locations[gMinI].U, locations[gMinI].V, gMin), (locations[gMaxI].U, locations[gMaxI].V, gMax),],
-                MeanExtrema: [(locations[mMinI].U, locations[mMinI].V, mMin), (locations[mMaxI].U, locations[mMaxI].V, mMax),],
-                GaussianRange: gMax - gMin, MeanRange: mMax - mMin,
-                UniformityScore: RhinoMath.Clamp((gSum / valid) > context.AbsoluteTolerance ? 1.0 / (1.0 + ((gMax - gMin) / (gSum / valid))) : (gMax - gMin) < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)));
+                GaussianExtrema: [(locations[gaussianMinIdx].U, locations[gaussianMinIdx].V, gaussianMin), (locations[gaussianMaxIdx].U, locations[gaussianMaxIdx].V, gaussianMax),],
+                MeanExtrema: [(locations[meanMinIdx].U, locations[meanMinIdx].V, meanMin), (locations[meanMaxIdx].U, locations[meanMaxIdx].V, meanMax),],
+                GaussianRange: gaussianMax - gaussianMin, MeanRange: meanMax - meanMin,
+                UniformityScore: RhinoMath.Clamp((gaussianAbsSum / validCount) > context.AbsoluteTolerance ? 1.0 / (1.0 + ((gaussianMax - gaussianMin) / (gaussianAbsSum / validCount))) : (gaussianMax - gaussianMin) < context.AbsoluteTolerance ? 1.0 : 0.0, 0.0, 1.0)));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -450,16 +454,16 @@ internal static class AnalysisCompute {
             null => ResultFactory.Create<Analysis.ShapeConformanceResult>(
                 error: E.Geometry.SurfaceAnalysisFailed.WithContext("No conforming primitive detected")),
             (Analysis.ShapeTarget detected, object primitive, double[] deviations, Point3d maxLoc) result =>
-                ResultFactory.Create(value: new Analysis.ShapeConformanceResult(
+                ((Func<double, Result<Analysis.ShapeConformanceResult>>)(maxDev => ResultFactory.Create(value: new Analysis.ShapeConformanceResult(
                     DetectedShape: result.detected,
                     IdealPrimitive: result.primitive,
-                    MaxDeviation: result.deviations.Max(),
+                    MaxDeviation: maxDev,
                     MinDeviation: result.deviations.Min(),
                     MeanDeviation: result.deviations.Average(),
                     RmsDeviation: Math.Sqrt(result.deviations.Sum(d => d * d) / result.deviations.Length),
                     MaxDeviationLocation: result.maxLoc,
-                    ConformanceScore: ComputeConformanceScore(deviations: result.deviations, tolerance: context.AbsoluteTolerance),
-                    WithinTolerance: result.deviations.Max() <= context.AbsoluteTolerance)),
+                    ConformanceScore: ComputeConformanceScore(maxDeviation: maxDev, tolerance: context.AbsoluteTolerance),
+                    WithinTolerance: maxDev <= context.AbsoluteTolerance))))(result.deviations.Max()),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -472,13 +476,13 @@ internal static class AnalysisCompute {
             null => ResultFactory.Create<Analysis.CurveConformanceResult>(
                 error: E.Geometry.CurveAnalysisFailed.WithContext("No conforming curve primitive detected")),
             (Analysis.CurveShapeTarget detected, object primitive, double[] deviations) result =>
-                ResultFactory.Create(value: new Analysis.CurveConformanceResult(
+                ((Func<double, Result<Analysis.CurveConformanceResult>>)(maxDev => ResultFactory.Create(value: new Analysis.CurveConformanceResult(
                     DetectedShape: result.detected,
                     IdealPrimitive: result.primitive,
-                    MaxDeviation: result.deviations.Max(),
+                    MaxDeviation: maxDev,
                     MeanDeviation: result.deviations.Average(),
                     RmsDeviation: Math.Sqrt(result.deviations.Sum(d => d * d) / result.deviations.Length),
-                    ConformanceScore: ComputeConformanceScore(deviations: result.deviations, tolerance: context.AbsoluteTolerance))),
+                    ConformanceScore: ComputeConformanceScore(maxDeviation: maxDev, tolerance: context.AbsoluteTolerance)))))(result.deviations.Max()),
         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -492,18 +496,18 @@ internal static class AnalysisCompute {
          surface.TryGetSphere(out Sphere sph, tolerance: context.AbsoluteTolerance),
          surface.TryGetCone(out Cone cone, tolerance: context.AbsoluteTolerance),
          surface.TryGetTorus(out Torus torus, tolerance: context.AbsoluteTolerance)) switch {
-            (Analysis.PlanarTarget, true, _, _, _, _) or (Analysis.AnyTarget, true, _, _, _, _) =>
-                ComputeSurfaceDeviations(surface, plane, sampleCount) is var (devs, maxPt) ? (new Analysis.PlanarTarget(), plane, devs, maxPt) : null,
-            (Analysis.CylindricalTarget, _, true, _, _, _) or (Analysis.AnyTarget, false, true, _, _, _) =>
-                ComputeSurfaceDeviations(surface, cyl, sampleCount) is var (devs, maxPt) ? (new Analysis.CylindricalTarget(), cyl, devs, maxPt) : null,
-            (Analysis.SphericalTarget, _, _, true, _, _) or (Analysis.AnyTarget, false, false, true, _, _) =>
-                ComputeSurfaceDeviations(surface, sph, sampleCount) is var (devs, maxPt) ? (new Analysis.SphericalTarget(), sph, devs, maxPt) : null,
-            (Analysis.ConicalTarget, _, _, _, true, _) or (Analysis.AnyTarget, false, false, false, true, _) =>
-                ComputeSurfaceDeviations(surface, cone, sampleCount) is var (devs, maxPt) ? (new Analysis.ConicalTarget(), cone, devs, maxPt) : null,
-            (Analysis.ToroidalTarget, _, _, _, _, true) or (Analysis.AnyTarget, false, false, false, false, true) =>
-                ComputeSurfaceDeviations(surface, torus, sampleCount) is var (devs, maxPt) ? (new Analysis.ToroidalTarget(), torus, devs, maxPt) : null,
-            _ => null,
-        };
+             (Analysis.PlanarTarget, true, _, _, _, _) or (Analysis.AnyTarget, true, _, _, _, _) =>
+                 ComputeSurfaceDeviations(surface, plane, sampleCount) is var (devs, maxPt) ? (new Analysis.PlanarTarget(), plane, devs, maxPt) : null,
+             (Analysis.CylindricalTarget, _, true, _, _, _) or (Analysis.AnyTarget, false, true, _, _, _) =>
+                 ComputeSurfaceDeviations(surface, cyl, sampleCount) is var (devs, maxPt) ? (new Analysis.CylindricalTarget(), cyl, devs, maxPt) : null,
+             (Analysis.SphericalTarget, _, _, true, _, _) or (Analysis.AnyTarget, false, false, true, _, _) =>
+                 ComputeSurfaceDeviations(surface, sph, sampleCount) is var (devs, maxPt) ? (new Analysis.SphericalTarget(), sph, devs, maxPt) : null,
+             (Analysis.ConicalTarget, _, _, _, true, _) or (Analysis.AnyTarget, false, false, false, true, _) =>
+                 ComputeSurfaceDeviations(surface, cone, sampleCount) is var (devs, maxPt) ? (new Analysis.ConicalTarget(), cone, devs, maxPt) : null,
+             (Analysis.ToroidalTarget, _, _, _, _, true) or (Analysis.AnyTarget, false, false, false, false, true) =>
+                 ComputeSurfaceDeviations(surface, torus, sampleCount) is var (devs, maxPt) ? (new Analysis.ToroidalTarget(), torus, devs, maxPt) : null,
+             _ => null,
+         };
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static (double[] deviations, Point3d maxDeviationPoint)? ComputeSurfaceDeviations(
@@ -539,16 +543,16 @@ internal static class AnalysisCompute {
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeCylinderDeviation(Point3d point, Cylinder cylinder) {
         Circle baseCircle = cylinder.CircleAt(0.0);
-        return Math.Abs(point.DistanceTo(new Line(baseCircle.Center, baseCircle.Center + (cylinder.Axis * cylinder.TotalHeight))
-            .ClosestPoint(point, limitToFiniteSegment: false)) - baseCircle.Radius);
+        Line axisLine = new(baseCircle.Center, baseCircle.Center + (cylinder.Axis * cylinder.TotalHeight));
+        return Math.Abs(point.DistanceTo(axisLine.ClosestPoint(point, limitToFiniteSegment: false)) - baseCircle.Radius);
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeConeDeviation(Point3d point, Cone cone) {
         Vector3d toPoint = point - cone.ApexPoint;
-        Vector3d axis = cone.Axis;
-        double axialDist = axis.Unitize() ? toPoint * axis : 0.0;
-        return Math.Abs(point.DistanceTo(cone.ApexPoint + (axis * axialDist)) - (axialDist > 0 ? axialDist * Math.Tan(cone.AngleInRadians()) : 0.0));
+        Vector3d unitAxis = cone.Axis;
+        double axialDist = unitAxis.Unitize() ? toPoint * unitAxis : 0.0;
+        return Math.Abs(point.DistanceTo(cone.ApexPoint + (unitAxis * axialDist)) - (axialDist > 0 ? axialDist * Math.Tan(cone.AngleInRadians()) : 0.0));
     }
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -570,7 +574,7 @@ internal static class AnalysisCompute {
         bool isArc = curve.TryGetArc(out Arc arc);
         return (target, isLinear, isArc, polyline) switch {
             (Analysis.LinearTarget or Analysis.AnyCurveTarget, true, _, Polyline pl) when pl.Count >= 2 =>
-                (new Analysis.LinearTarget(), new Line(pl[0], pl[^1]), ComputeCurveDeviations(curve, new Line(pl[0], pl[^1]), sampleCount)),
+                ((Func<Line, (Analysis.CurveShapeTarget, object, double[])>)(line => (new Analysis.LinearTarget(), line, ComputeCurveDeviations(curve, line, sampleCount))))(new Line(pl[0], pl[^1])),
             (Analysis.CircularTarget, _, true, _) or (Analysis.AnyCurveTarget, false, true, _) =>
                 (new Analysis.CircularTarget(), arc, ComputeCurveDeviations(curve, arc, sampleCount)),
             _ => null,
@@ -599,11 +603,9 @@ internal static class AnalysisCompute {
 
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeConformanceScore(
-        double[] deviations,
-        double tolerance) {
-        double maxDev = deviations.Max();
-        return maxDev <= tolerance
+        double maxDeviation,
+        double tolerance) =>
+        maxDeviation <= tolerance
             ? 1.0
-            : RhinoMath.Clamp(1.0 / (1.0 + (maxDev / tolerance)), 0.0, 1.0);
-    }
+            : RhinoMath.Clamp(1.0 / (1.0 + (maxDeviation / tolerance)), 0.0, 1.0);
 }

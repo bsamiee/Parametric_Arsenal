@@ -9,11 +9,12 @@ using Rhino.Geometry;
 namespace Arsenal.Rhino.Analysis;
 
 /// <summary>Orchestration layer for differential and quality analysis via UnifiedOperation.</summary>
-[Pure] internal static class AnalysisCore {
+[Pure]
+internal static class AnalysisCore {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Result<T> ExecuteQuality<T>(Analysis.QualityRequest request, IGeometryContext context) =>
         !AnalysisConfig.QualityOperations.TryGetValue(request.GetType(), out AnalysisConfig.QualityMetadata? meta)
-            ? ResultFactory.Create<T>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown quality request type: {request.GetType().Name}. Supported types: SurfaceQualityAnalysis, CurveFairnessAnalysis, MeshQualityAnalysis, CurvatureProfileAnalysis, SurfaceCurvatureProfileAnalysis, ShapeConformanceAnalysis, CurveConformanceAnalysis"))
+            ? ResultFactory.Create<T>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown quality request type: {request.GetType().Name}. Supported types: {string.Join(", ", AnalysisConfig.QualityOperations.Keys.Select(t => t.Name))}"))
             : request switch {
                 Analysis.SurfaceQualityAnalysis r => (Result<T>)(object)ExecuteSurfaceQuality(surface: r.Surface, meta: meta, context: context),
                 Analysis.CurveFairnessAnalysis r => (Result<T>)(object)ExecuteCurveFairness(curve: r.Curve, meta: meta, context: context),
