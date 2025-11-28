@@ -97,6 +97,16 @@ namespace Arsenal.Rhino.Spatial;
         return ResultFactory.Create<Spatial.ProximityFieldResult[]>(value: [.. results.OrderBy(static r => r.WeightedDistance),]);
     }
 
+    /// <summary>Execute computational geometry operation with algebraic dispatch.</summary>
+    internal static Result<Spatial.ComputationalGeometryResult> ExecuteComputationalGeometry(Point3d[] points, Spatial.ComputationalGeometryOperation operation, IGeometryContext context) =>
+        operation switch {
+            null => ResultFactory.Create<Spatial.ComputationalGeometryResult>(error: E.Spatial.UnsupportedTypeCombo.WithContext("Operation cannot be null")),
+            Spatial.ConvexHull3DOperation => SpatialCompute.ConvexHull3D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(faces => new Spatial.ComputationalGeometryResult.ConvexHull(FaceIndices: faces)),
+            Spatial.Delaunay2DOperation => SpatialCompute.DelaunayTriangulation2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(triangles => new Spatial.ComputationalGeometryResult.Delaunay(TriangleIndices: triangles)),
+            Spatial.Voronoi2DOperation => SpatialCompute.VoronoiDiagram2D(points: points, context: context).Map<Spatial.ComputationalGeometryResult>(cells => new Spatial.ComputationalGeometryResult.Voronoi(CellVertices: cells)),
+            _ => ResultFactory.Create<Spatial.ComputationalGeometryResult>(error: E.Spatial.UnsupportedTypeCombo.WithContext($"Unsupported operation: {operation.GetType().Name}")),
+        };
+
     private static Result<IReadOnlyList<int>> RunRangeAnalysis<TInput>(Spatial.RangeAnalysis<TInput> request, Func<TInput, RTree> factory, V validationMode, int defaultBuffer, string operationName, IGeometryContext context) where TInput : notnull =>
         UnifiedOperation.Apply(
             input: request.Input,
