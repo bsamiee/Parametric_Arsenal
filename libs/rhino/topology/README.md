@@ -9,28 +9,45 @@ Polymorphic topology analysis, diagnosis, and progressive healing for Brep and M
 ## API
 
 ```csharp
-Result<AdjacencyData> GetAdjacency<T>(T geometry, IGeometryContext context, int edgeIndex)
-Result<NakedEdgeData> GetNakedEdges<T>(T geometry, IGeometryContext context, bool orderLoops = false)
-Result<VertexData> GetVertexData<T>(T geometry, IGeometryContext context, int vertexIndex)
-Result<BoundaryLoopData> GetBoundaryLoops<T>(T geometry, IGeometryContext context, double? tolerance = null)
-Result<ConnectivityData> GetConnectivity<T>(T geometry, IGeometryContext context)
-Result<NonManifoldData> GetNonManifoldData<T>(T geometry, IGeometryContext context)
-Result<NgonTopologyData> GetNgonTopology<T>(T geometry, IGeometryContext context)
-Result<TopologyDiagnosis> DiagnoseTopology(Brep brep, IGeometryContext context)
-Result<EdgeClassificationData> ClassifyEdges<T>(T geometry, IGeometryContext context, Continuity minimumContinuity = Continuity.G1_continuous, double? angleThreshold = null)
-Result<TopologicalFeatures> ExtractTopologicalFeatures(Brep brep, IGeometryContext context)
-Result<HealingResult> HealTopology(Brep brep, IReadOnlyList<Strategy> strategies, IGeometryContext context)
+// Unified query for Brep/Mesh topology operations
+Result<TopologyResult> Query<T>(T geometry, QueryOperation operation, IGeometryContext context)
+
+// Brep-specific operations (diagnosis, healing)
+Result<TopologyResult> Execute(Brep brep, BrepOperation operation, IGeometryContext context)
 ```
 
 ---
 
-## Operations/Types
+## Query Operations (Brep/Mesh)
 
-**Strategies**: `ConservativeRepairStrategy` (0.1×), `ModerateJoinStrategy` (1.0×), `AggressiveJoinStrategy` (10.0×), `CombinedStrategy`, `TargetedJoinStrategy` (100 iter max), `ComponentJoinStrategy`
+| Operation | Description |
+|-----------|-------------|
+| `ConnectivityQuery()` | Connected components via BFS |
+| `NonManifoldQuery()` | Non-manifold edges/vertices |
+| `NgonQuery()` | Ngon topology (Mesh only) |
+| `AdjacencyQuery(edgeIndex)` | Edge-face adjacency |
+| `VertexQuery(vertexIndex)` | Vertex topology |
+| `NakedEdgesQuery(orderLoops)` | Naked boundary edges |
+| `BoundaryLoopsQuery(tolerance)` | Joined boundary loops |
+| `EdgeClassificationQuery(minContinuity, angleThreshold)` | G0/G1/G2 classification |
+
+## Brep Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `DiagnoseOperation()` | Gap analysis and repair suggestions |
+| `ExtractFeaturesOperation()` | Genus, loops, solid classification |
+| `HealOperation(strategies)` | Progressive healing with rollback |
+
+---
+
+## Result Types
+
+**TopologyResult** (discriminated union): `Connectivity`, `NonManifold`, `Ngon`, `Adjacency`, `Vertex`, `NakedEdges`, `BoundaryLoops`, `EdgeClassification`, `Diagnosis`, `Features`, `Healing`
+
+**Strategies**: `ConservativeRepairStrategy` (0.1×), `ModerateJoinStrategy` (1.0×), `AggressiveJoinStrategy` (10.0×), `CombinedStrategy`, `TargetedJoinStrategy`, `ComponentJoinStrategy`
 
 **EdgeContinuityType**: `Sharp` (G0), `Smooth` (G1), `Curvature` (G2), `Interior`, `Boundary`, `NonManifold`
-
-**Results** (`IResult`): `AdjacencyData`, `NakedEdgeData`, `VertexData`, `BoundaryLoopData`, `ConnectivityData`, `NonManifoldData`, `NgonTopologyData`, `TopologyDiagnosis`, `EdgeClassificationData`, `TopologicalFeatures`, `HealingResult`
 
 ---
 
@@ -38,41 +55,49 @@ Result<HealingResult> HealTopology(Brep brep, IReadOnlyList<Strategy> strategies
 
 ```csharp
 IGeometryContext context = new GeometryContext(absoluteTolerance: 0.001);
-// Edge classification
-Result<Topology.EdgeClassificationData> edges = Topology.ClassifyEdges(
-    geometry: brep,
-    context: context,
-    minimumContinuity: Continuity.G1_continuous);
 
-// Diagnosis and healing
-Result<Topology.HealingResult> healed = Topology.DiagnoseTopology(brep, context)
-    .Bind(diag => Topology.HealTopology(brep, diag.SuggestedStrategies, context));
+// Edge classification via unified query
+Result<Topology.TopologyResult> edges = Topology.Query(
+    geometry: brep,
+    operation: new Topology.EdgeClassificationQuery(MinimumContinuity: Continuity.G1_continuous),
+    context: context);
+
+// Pattern match on result
+_ = edges.Match(
+    onSuccess: result => result switch {
+        Topology.TopologyResult.EdgeClassification ec => ProcessEdges(ec.Data),
+        _ => default,
+    },
+    onFailure: errors => HandleErrors(errors));
+
+// Diagnosis and healing via Brep operations
+Result<Topology.TopologyResult> healed = Topology.Execute(brep, new Topology.DiagnoseOperation(), context)
+    .Bind(result => result switch {
+        Topology.TopologyResult.Diagnosis d => Topology.Execute(brep, new Topology.HealOperation(d.Data.SuggestedStrategies), context),
+        _ => ResultFactory.Create<Topology.TopologyResult>(error: E.Topology.DiagnosisFailed),
+    });
 
 // Ngon topology (Mesh only)
-Result<Topology.NgonTopologyData> ngons = Topology.GetNgonTopology(mesh, context);
+Result<Topology.TopologyResult> ngons = Topology.Query(mesh, new Topology.NgonQuery(), context);
 ```
 
 ---
 
 ## Integration
 
-- **Result monad**: `libs/core/results/Result.cs` - returns `Result<T>` implementing `IResult`
+- **Result monad**: `libs/core/results/Result.cs` - returns `Result<TopologyResult>`
 - **IGeometryContext**: `libs/core/context/IGeometryContext.cs` - tolerance resolution
-- **Validation**: `V.Standard | V.Topology` (Breps), `V.Standard | V.MeshSpecific` (meshes), `V.Standard | V.Topology | V.BrepGranular` (diagnosis)
-- **Errors**: `E.Topology.EdgeIndexOutOfRange`, `E.Topology.VertexIndexOutOfRange`, `E.Topology.NoNakedEdges`, `E.Topology.JoinFailed`, `E.Topology.HealingFailed`, `E.Topology.NoNgonsFound`
+- **Validation**: `V.Standard | V.Topology` (Breps), `V.Standard | V.MeshSpecific` (meshes)
+- **Errors**: `E.Topology.*`, `E.Geometry.UnsupportedAnalysis`
 
 ---
 
 ## Internals
 
-**Files**: `Topology.cs` (API, 311 LOC), `TopologyCore.cs` (dispatch, 328 LOC), `TopologyCompute.cs` (algorithms, 231 LOC), `TopologyConfig.cs` (config, 76 LOC)
+**Files**: `Topology.cs` (API + types), `TopologyCore.cs` (dispatch), `TopologyCompute.cs` (algorithms), `TopologyConfig.cs` (config)
 
-**Dispatch**: `FrozenDictionary<(Type, OpType), OperationMetadata>` mapping geometry type and operation to validation mode
+**Dispatch**: Pattern matching on `QueryOperation`/`BrepOperation` types, delegating to typed executors
 
 **Tolerance multipliers**: Conservative 0.1×, Moderate 1.0×, Aggressive 10.0×; targeted join 100 iterations max
 
-**Diagnosis**: Near-miss multiplier 100×, max 100 edges, curvature threshold 0.1 for G2 detection
-
-**Healing**: Progressive strategies with automatic rollback; BFS for connectivity; bidirectional edge search for near-misses
-
-**Supported operations by geometry**: Breps (all except NgonTopology), Meshes (all except Diagnose, ExtractFeatures, Heal)
+**Supported operations**: Breps (all except NgonQuery), Meshes (all except Diagnose, ExtractFeatures, Heal)
