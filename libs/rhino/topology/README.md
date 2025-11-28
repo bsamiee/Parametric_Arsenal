@@ -2,6 +2,8 @@
 
 Polymorphic topology analysis, diagnosis, and progressive healing for Brep and Mesh geometry.
 
+> **Related Modules**: For differential geometry (curvature, derivatives), see [`Analysis`](../analysis/README.md). For point/curve extraction, see [`Extraction`](../extraction/README.md).
+
 ---
 
 ## API

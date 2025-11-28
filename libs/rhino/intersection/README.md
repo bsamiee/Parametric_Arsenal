@@ -2,6 +2,8 @@
 
 Polymorphic geometry intersection with classification, near-miss detection, and stability analysis.
 
+> **Related Module**: For point-based proximity queries and spatial indexing, see [`Spatial`](../spatial/README.md). Use `Intersection` for geometry-to-geometry intersections (curve×curve, curve×surface, brep×brep, etc.).
+
 ---
 
 ## API

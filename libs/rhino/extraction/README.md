@@ -2,6 +2,8 @@
 
 Polymorphic extraction of points and curves from geometry with feature detection, primitive decomposition, and pattern recognition.
 
+> **Related Modules**: For differential geometry analysis (curvature, derivatives), see [`Analysis`](../analysis/README.md). For topological structure (edges, vertices), see [`Topology`](../topology/README.md).
+
 ---
 
 ## API

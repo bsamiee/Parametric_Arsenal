@@ -2,6 +2,8 @@
 
 Mesh repair, deformation, subdivision, smoothing, reduction, remeshing, unwrapping, and conversion.
 
+> **Related Module**: For topological analysis (edges, vertices, connectivity), see [`Topology`](../topology/README.md). Use `Morphology` for mesh-specific operations that modify geometry (repair, subdivision, smoothing).
+
 ---
 
 ## API

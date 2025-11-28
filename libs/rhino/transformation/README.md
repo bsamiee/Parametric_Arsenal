@@ -2,26 +2,14 @@
 
 Unified polymorphic dispatch for affine transformations, array operations, and SpaceMorph deformations.
 
+> **Related Module**: For derived transforms computed from geometry analysis (best-fit planes, canonical positioning, relative orientation), see [`Orientation`](../orientation/README.md). Use `Transformation` when you know the specific transform to apply (matrix, scale, rotate, mirror).
+
 ---
 
 ## API
 
 ```csharp
 Result<T> Apply<T>(T geometry, TransformOperation operation, IGeometryContext context, bool enableDiagnostics = false) where T : GeometryBase
-Result<T> Mirror<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase
-Result<T> Project<T>(T geometry, Plane plane, IGeometryContext context) where T : GeometryBase
-Result<T> Translate<T>(T geometry, Vector3d motion, IGeometryContext context) where T : GeometryBase
-Result<T> Translate<T>(T geometry, Point3d start, Point3d end, IGeometryContext context) where T : GeometryBase
-Result<T> Scale<T>(T geometry, Point3d anchor, double factor, IGeometryContext context) where T : GeometryBase
-Result<T> Scale<T>(T geometry, Plane plane, double xScale, double yScale, double zScale, IGeometryContext context) where T : GeometryBase
-Result<T> Rotate<T>(T geometry, double angleRadians, Vector3d axis, Point3d center, IGeometryContext context) where T : GeometryBase
-Result<T> Rotate<T>(T geometry, Vector3d startDirection, Vector3d endDirection, Point3d center, IGeometryContext context) where T : GeometryBase
-Result<T> ChangeBasis<T>(T geometry, Plane fromPlane, Plane toPlane, IGeometryContext context) where T : GeometryBase
-Result<T> PlaneToPlane<T>(T geometry, Plane fromPlane, Plane toPlane, IGeometryContext context) where T : GeometryBase
-Result<T> Shear<T>(T geometry, Plane plane, Vector3d direction, double angle, IGeometryContext context) where T : GeometryBase
-Result<T> Compound<T>(T geometry, TransformOperation[] operations, IGeometryContext context) where T : GeometryBase
-Result<T> Blend<T>(T geometry, TransformOperation first, TransformOperation second, double blendFactor, IGeometryContext context) where T : GeometryBase
-Result<T> Interpolate<T>(T geometry, TransformOperation start, TransformOperation end, double parameter, IGeometryContext context) where T : GeometryBase
 Result<IReadOnlyList<T>> ApplyArray<T>(T geometry, ArrayOperation operation, IGeometryContext context, bool enableDiagnostics = false) where T : GeometryBase
 Result<T> Morph<T>(T geometry, MorphOperation operation, IGeometryContext context) where T : GeometryBase
 Result<DecomposedTransform> Decompose(Transform matrix, IGeometryContext context)
@@ -46,9 +34,32 @@ Result<DecomposedTransform> Decompose(Transform matrix, IGeometryContext context
 ```csharp
 IGeometryContext context = new GeometryContext(absoluteTolerance: 0.001);
 
-// Transform operations
-Result<Brep> mirrored = Transformation.Mirror(brep, Plane.WorldXY, context);
-Result<Mesh> rotated = Transformation.Rotate(mesh, Math.PI / 4, Vector3d.ZAxis, Point3d.Origin, context);
+// Transform operations via algebraic types
+Result<Brep> mirrored = Transformation.Apply(brep, new Transformation.MirrorTransform(Plane.WorldXY), context);
+Result<Mesh> rotated = Transformation.Apply(mesh, new Transformation.AxisRotation(Math.PI / 4, Vector3d.ZAxis, Point3d.Origin), context);
+Result<Curve> translated = Transformation.Apply(curve, new Transformation.Translation(Vector3d.XAxis * 10), context);
+Result<Surface> scaled = Transformation.Apply(surface, new Transformation.UniformScale(Point3d.Origin, 2.0), context);
+
+// Basis and plane transforms
+Result<Brep> basisChanged = Transformation.Apply(brep, new Transformation.BasisChange(Plane.WorldXY, Plane.WorldYZ), context);
+Result<Mesh> planeToPlane = Transformation.Apply(mesh, new Transformation.PlaneTransform(sourcePlane, targetPlane), context);
+
+// Compound, blended, and interpolated transforms
+Result<Curve> compound = Transformation.Apply(
+    curve,
+    new Transformation.CompoundTransform([
+        new Transformation.Translation(Vector3d.XAxis),
+        new Transformation.AxisRotation(Math.PI / 2, Vector3d.ZAxis, Point3d.Origin),
+    ]),
+    context);
+
+Result<Surface> blended = Transformation.Apply(
+    surface,
+    new Transformation.BlendedTransform(
+        new Transformation.Translation(Vector3d.XAxis),
+        new Transformation.Translation(Vector3d.YAxis),
+        BlendFactor: 0.5),
+    context);
 
 // Array operations
 Result<IReadOnlyList<Curve>> polar = Transformation.ApplyArray(
@@ -56,10 +67,20 @@ Result<IReadOnlyList<Curve>> polar = Transformation.ApplyArray(
     new Transformation.PolarArray(Point3d.Origin, Vector3d.ZAxis, Count: 12, TotalAngleRadians: Math.PI * 2),
     context);
 
+Result<IReadOnlyList<Brep>> linear = Transformation.ApplyArray(
+    brep,
+    new Transformation.LinearArray(Vector3d.XAxis, Count: 5, Spacing: 10.0),
+    context);
+
 // Morph operations
 Result<Surface> twisted = Transformation.Morph(
     surface,
     new Transformation.TwistMorph(axis, AngleRadians: Math.PI, Infinite: false),
+    context);
+
+Result<Brep> bent = Transformation.Morph(
+    brep,
+    new Transformation.BendMorph(axis, AngleRadians: Math.PI / 4),
     context);
 
 // Decomposition
@@ -79,7 +100,7 @@ Result<Transformation.DecomposedTransform> trs = Transformation.Decompose(matrix
 
 ## Internals
 
-**Files**: `Transformation.cs` (API, 280 LOC), `TransformationCore.cs` (dispatch), `TransformationCompute.cs` (morph/decompose), `TransformationConfig.cs` (config, 131 LOC)
+**Files**: `Transformation.cs` (API, ~150 LOC), `TransformationCore.cs` (dispatch), `TransformationCompute.cs` (morph/decompose), `TransformationConfig.cs` (config, 131 LOC)
 
 **Dispatch**: Three `FrozenDictionary` tables: `TransformOperations`, `ArrayOperations`, `MorphOperations`
 

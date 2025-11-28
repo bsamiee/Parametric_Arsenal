@@ -2,6 +2,8 @@
 
 RTree-based spatial indexing for proximity queries, range analysis, clustering, and computational geometry algorithms.
 
+> **Related Module**: For geometry-to-geometry intersections, see [`Intersection`](../intersection/README.md). Use `Spatial` for point-based proximity queries, clustering, and computational geometry (Delaunay, Voronoi, convex hull).
+
 ---
 
 ## API

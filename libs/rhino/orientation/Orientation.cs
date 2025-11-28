@@ -99,10 +99,11 @@ public static class Orientation {
     /// <summary>Orient geometry to best-fit plane (PCA).</summary>
     public sealed record ToBestFit : Operation;
 
-    /// <summary>Mirror geometry across a plane.</summary>
+    /// <summary>Mirror geometry across a plane. Equivalent to `Transformation.Apply(geom, new Transformation.MirrorTransform(plane), ctx)`.</summary>
+    /// <remarks>Use this operation when chaining with other Orientation operations via <see cref="Execute{T}"/>.</remarks>
     public sealed record Mirror(Plane MirrorPlane) : Operation;
 
-    /// <summary>Flip curve direction or surface/mesh normals.</summary>
+    /// <summary>Flip curve direction or surface/mesh normals. This operation reverses direction without transforming position.</summary>
     public sealed record FlipDirection : Operation;
 
     /// <summary>Align geometry to canonical world orientation.</summary>
