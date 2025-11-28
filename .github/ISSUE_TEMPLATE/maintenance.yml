@@ -54,8 +54,6 @@ body:
         - libs/grasshopper
         - test/core
         - test/rhino
-        - tools/ContextGen
-        - tools/standards
         - .github/workflows
         - .github/agents
         - documentation

@@ -75,11 +75,7 @@ Parametric_Arsenal/
 ├── test/
 │   ├── core/                  # xUnit + CsCheck property-based tests
 │   └── rhino/                 # NUnit + Rhino.Testing integration tests
-├── tools/                     # Build and generation tools
-│   ├── ContextGen/            # Roslyn-based context generator
-│   └── standards/             # STANDARDS.yaml + generator script
-├── docs/                      # Documentation and agent context
-│   ├── agent-context/         # Generated JSON context files
+├── docs/                      # Documentation
 │   └── agentic-design/        # Strategic analysis documents
 ├── rhino/plugins/             # Python Rhino plugins
 ├── .github/
@@ -475,8 +471,6 @@ Parametric Arsenal uses GitHub Actions + Claude AI for autonomous development.
 | **claude-code-review** | PR opened/updated | Reviews code against CLAUDE.md |
 | **claude-autofix** | Review requests changes | Applies fixes automatically |
 | **auto-merge** | PR ready | Merges approved PRs |
-| **context-gen** | Push to `libs/` | Regenerates JSON context |
-| **standards-sync** | Push to STANDARDS.yaml | Syncs protocol files |
 
 ### Custom Agents
 
@@ -495,18 +489,6 @@ Parametric Arsenal uses GitHub Actions + Claude AI for autonomous development.
 11. **plugin-architect** - Rhino plugin architecture
 
 Agents are selected based on issue metadata or auto-detected from context.
-
-### Agent Context Files
-
-Generated JSON files in `docs/agent-context/`:
-
-- **architecture.json** - Project structure, namespaces, types
-- **error-catalog.json** - E.* error constants
-- **validation-modes.json** - V.* validation flags
-- **exemplar-metrics.json** - Exemplar file metrics
-- **domain-map.json** - libs/rhino/* domain mapping
-
-These files are regenerated automatically on code changes.
 
 ---
 

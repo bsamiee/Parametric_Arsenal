@@ -406,22 +406,10 @@ Combine specialist agents with relevant prompts:
 - **[AGENTS.md](../../AGENTS.md)** - Quick reference for agents
 - **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Developer onboarding guide
 - **[.github/agents/](../agents/)** - Custom agent definitions
-- **[docs/agent-context/](../../docs/agent-context/)** - Generated JSON context
 
 ---
 
 ## 🔄 Maintenance
-
-### Prompt Sync with STANDARDS.yaml
-
-Prompts are manually maintained but should stay synchronized with `tools/standards/STANDARDS.yaml`:
-
-1. **On STANDARDS.yaml update**: Review all prompts
-2. **Check critical rules**: Ensure prompts enforce all current rules
-3. **Update examples**: Reflect any pattern changes
-4. **Test prompts**: Verify they still work correctly
-
-**TODO**: Automate prompt validation via `standards-sync.yml` workflow.
 
 ### Deprecating Old Prompts
 

@@ -20,8 +20,6 @@
 - `claude-code-review.yml` — Automated code review with JSON output
 - `claude-autofix.yml` — Parse review JSON, apply fixes (max 3 iterations)
 - `auto-merge.yml` — Auto-merge PRs when checks pass
-- `context-gen.yml` — Regenerate agent context JSON files (triggers on libs/ changes)
-- `standards-sync.yml` — Validate STANDARDS.yaml sync with agent files
 - `status-dashboard.yml` — Daily autonomy metrics dashboard
 - `claude-maintenance.yml` — Maintenance task automation
 - `claude.yml` — General Claude automation (15 min timeout)
@@ -58,26 +56,6 @@
 - `sdk_and_logic.prompt.md` — RhinoCommon API usage patterns
 - `testing.prompt.md` — Property-based test generation
 
-### Standards Tooling (`tools/standards/`)
-- `STANDARDS.yaml` — Single source of truth for all coding standards (rules, limits, exemplars)
-- `StandardsGen.csx` — Generator script (C# Script) → produces CLAUDE.md, copilot-instructions.md, agent [CRITICAL RULES]
-- `agent-schema.json` — JSON Schema for agent file validation
-
-### Context Generation (`tools/ContextGen/`)
-- `ContextGen.csproj` — .NET 8 console app (Roslyn MSBuild API)
-- `Program.cs` — Main entry point, orchestrates 5 context generators
-- `packages.lock.json` — Locked dependencies (Microsoft.CodeAnalysis.*, MSBuild.Locator)
-
-### Generated Context (`docs/agent-context/*.json`)
-- `architecture.json` — Projects, namespaces, types, LOC, complexity
-- `error-catalog.json` — E.* error domains, codes, messages
-- `validation-modes.json` — V.* flags, binary values, check mappings
-- `exemplar-metrics.json` — LOC, methods, patterns per exemplar file
-- `domain-map.json` — libs/rhino/* domains, 4-file pattern, API types
-
-### Schemas (`tools/schemas/`)
-- `review-output.schema.json` — JSON Schema for code review output (agentic handshake protocol)
-
 ### Documentation (`docs/agentic-design/`)
 - `TASK_FINAL.md` — 4-phase execution checklist (all 32 tasks complete)
 - `ANALYSIS.md` — Strategic analysis (4 pillars, risk matrix, success metrics)
@@ -104,8 +82,7 @@
 │                   ISSUE → PR (claude-issues.yml)                    │
 │  1. Parse issue metadata (agent, scope, complexity)                 │
 │  2. Load agent file (.github/agents/{agent}.agent.md)               │
-│  3. Load context JSON (docs/agent-context/*.json)                   │
-│  4. Claude implements → creates PR                                  │
+│  3. Claude implements → creates PR                                  │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │ PR created
                            ↓
@@ -152,24 +129,6 @@
                            └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│              CONTEXT REFRESH (context-gen.yml)                      │
-│  Trigger: Push to main changes libs/**/*.cs                         │
-│  1. Build ContextGen tool                                           │
-│  2. Run Roslyn analysis on solution                                 │
-│  3. Generate 5 JSON files (architecture, errors, validation, etc)   │
-│  4. Create PR with updates (label: auto-merge)                      │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│           STANDARDS SYNC (standards-sync.yml)                       │
-│  Trigger: PR modifies STANDARDS.yaml or agent files                 │
-│  1. Run StandardsGen.csx                                            │
-│  2. Check if agent [CRITICAL RULES] sections match                  │
-│  3. Fail build if out of sync                                       │
-│  4. Comment on PR with fix instructions                             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
 │          DAILY METRICS (status-dashboard.yml)                       │
 │  Trigger: Daily cron (00:00 UTC)                                    │
 │  1. Query GitHub API (last 30 days)                                 │
@@ -194,7 +153,7 @@ Four reusable slash commands for common workflows in claude.ai/code interface. `
 Primary 405-line instruction manual for autonomous agents. Contains 5 critical prohibitions (NO var, NO if/else, NO helpers, NO multi-type files, NO old patterns), 5 always-required practices (named parameters, trailing commas, Result<T>, UnifiedOperation, K&R braces), organizational limits (4 files max, 10 types max, 300 LOC max per member), 4 decision trees (when to use if vs switch vs pattern matching), and 5 exemplar file paths agents must study before coding. Referenced by CLI/CI workflows.
 
 **`.github/copilot-instructions.md`**  
-Condensed 25-line version of AGENTS.md for IDE Copilot. Focuses on immediate blockers (10 quick-reference rules) with minimal prose. Generated from STANDARDS.yaml to maintain sync. Mentions Python only in the context line; contains no Python-specific content. Referenced by GitHub Copilot during in-editor assistance.
+Condensed 25-line version of AGENTS.md for IDE Copilot. Focuses on immediate blockers (10 quick-reference rules) with minimal prose. Mentions Python only in the context line; contains no Python-specific content. Referenced by GitHub Copilot during in-editor assistance.
 
 ### Automation Workflows
 
@@ -202,7 +161,7 @@ Condensed 25-line version of AGENTS.md for IDE Copilot. Focuses on immediate blo
 Runs on all pushes to any branch and PRs to main (10 min timeout). Build verification pipeline: checkout → .NET 8 setup → cache restore (bin/obj directories) → dotnet restore solution → EditorConfig compliance check → dotnet format verification (--verify-no-changes) → build with analyzers (Release config, TreatWarningsAsErrors=true, EnforceCodeStyleInBuild=true, -warnaserror) → run core tests with XPlat code coverage → collect test results (trx format) → report coverage. Build cache keyed on *.csproj and *.cs file hashes. Fails if any analyzer warning, format deviation, or test failure. Foundation quality gate before code review.
 
 **`claude-issues.yml`**  
-Issue-to-PR automation (30 min timeout). Triggers on label "claude-implement". Parses issue body for metadata (agent, scope, complexity) using regex extraction. Loads corresponding agent file from `.github/agents/{agent}.agent.md` if specified, otherwise uses auto-detect. Injects context JSON from `docs/agent-context/`. Invokes Claude via anthropics/claude-code-action@v1 with combined prompt (issue description + agent instructions + context files). Creates PR with changes. Enables agent specialization via issue templates.
+Issue-to-PR automation (30 min timeout). Triggers on label "claude-implement". Parses issue body for metadata (agent, scope, complexity) using regex extraction. Loads corresponding agent file from `.github/agents/{agent}.agent.md` if specified, otherwise uses auto-detect. Invokes Claude via anthropics/claude-code-action@v1 with combined prompt (issue description + agent instructions). Creates PR with changes. Enables agent specialization via issue templates.
 
 **`claude-code-review.yml`**  
 Automated code reviewer. Runs on PR events (opened, synchronize, reopened). Claude analyzes PR diff against CLAUDE.md standards (12+ critical rules). Executes 'dotnet build' to verify analyzer compliance before finalizing verdict. Outputs structured JSON to `.github/review-output/pr-{N}.json` with verdict (approve/request_changes), violations array (rule, file, line range, current code, suggested fix), passed_checks array. Also stores PR metadata (pr-number.txt, head-branch.txt) for fork PR support. Uploads JSON as artifact for autofix workflow. Critical handshake protocol enabler.
@@ -212,12 +171,6 @@ Review-to-fix loop (30 min timeout). Triggers on claude-code-review workflow com
 
 **`auto-merge.yml`**  
 Auto-merge orchestrator (5 min timeout). Two jobs: (1) auto-merge: triggers on PR opened/ready_for_review/labeled for claude[bot] author OR auto-merge label, uses 'gh pr merge --squash --auto --delete-branch' to enable GitHub's native auto-merge queue; (2) merge-on-approval: triggers on pull_request_review.submitted with state=approved for same PR criteria, attempts immediate merge (fails gracefully if other checks pending, continues in queue). Both jobs log PR metadata (author, labels). Relies on repository branch protection rules (required status checks: ci.yml, claude-code-review.yml; required reviews if configured). Completes autonomous review-fix-merge loop.
-
-**`context-gen.yml`**  
-Context refresh pipeline (10 min timeout). Triggers on push to main when libs/**/*.cs or tools/ContextGen/** changes, or manual workflow_dispatch. Builds ContextGen tool with 'dotnet build -c Release', runs Roslyn analysis on solution. Generates 5 JSON files (architecture, error-catalog, validation-modes, exemplar-metrics, domain-map) to `docs/agent-context/`. If changes detected via git diff: creates timestamped feature branch (context-gen/update-YYYYMMDD-HHMMSS), commits with detailed changelog and diff stats, creates PR with auto-merge and documentation labels. If no changes: exits cleanly. Keeps agent context fresh without manual intervention, prevents infinite loops by using PRs instead of direct commits.
-
-**`standards-sync.yml`**  
-Standards synchronization validator (5 min timeout). Triggers on PRs to main modifying STANDARDS.yaml, StandardsGen.csx, agent files, or copilot-instructions.md, or manual dispatch. Installs dotnet-script tool globally, runs StandardsGen.csx to regenerate [CRITICAL RULES] sections from STANDARDS.yaml. Compares git diff of agent files and copilot-instructions.md. If out of sync: creates PR comment with file list, diff (truncated if >60KB), and fix instructions ("run dotnet script tools/standards/StandardsGen.csx"), then fails build. If in sync: passes with success summary showing synchronized files. Prevents protocol drift across 11 agents + copilot-instructions.
 
 **`status-dashboard.yml`**  
 Daily autonomy metrics reporter (10 min timeout). Cron trigger at 00:00 UTC or manual dispatch. Queries GitHub API for last 30 days: workflow runs (total, success, failure, duration), PR metrics (open, merged, avg time-to-merge, bot-only percentage), agent invocation counts. Calculates success rates and average review iterations. Creates GitHub issue titled "Autonomy Dashboard - [DATE]" with formatted metrics. Tracks progress toward >70% autonomy target.
@@ -290,47 +243,6 @@ Comprehensive prompt library documentation. 7 reusable prompts for common tasks:
 **Individual Prompt Files**  
 Each prompt file contains: task description, scope, constraints (CLAUDE.md rules), step-by-step instructions, verification criteria, examples. Reusable across manual (claude.ai/code) and automated (workflows) contexts. Maintains consistency in common tasks. Reduces cognitive load by providing templates.
 
-### Standards Tooling
-
-**`STANDARDS.yaml`**  
-Single source of truth (1.0 version). Machine-readable standard definitions: rules section (syntax, architecture, performance categories), limits (files_per_folder: 4, types_per_folder: 10, loc_per_member: 300), exemplars (5 reference files with paths and purpose). Feeds StandardsGen.csx generator. Eliminates 95% rule duplication. Version-controlled source of truth prevents protocol drift.
-
-**`StandardsGen.csx`**  
-C# Script generator (requires dotnet-script global tool). Reads STANDARDS.yaml using YamlDotNet library. Parses rules (syntax, architecture, performance categories), limits (files, types, LOC), exemplars. Generates: CLAUDE.md (full 1000+ LOC expansion with prose, decision trees, examples), copilot-instructions.md ([BLOCKERS] section - 10 condensed rules), [CRITICAL RULES] sections in 11 agent files (identical content for synchronization). Uses string templates with rule interpolation. Writes files with UTF-8 encoding. Ensures 100% rule content synchronization across all protocol files, eliminating manual drift risk. Invoked by standards-sync.yml workflow validation. Single command: `dotnet script tools/standards/StandardsGen.csx` from repo root.
-
-**`agent-schema.json`**  
-JSON Schema Draft-07 for agent file validation. Validates frontmatter (name, description), section structure ([ROLE], [CRITICAL RULES], [EXEMPLARS], [PATTERNS]). Enables automated validation of agent file consistency. Future: integrate into standards-sync.yml as additional check.
-
-### Context Generation
-
-**`ContextGen.csproj`**  
-.NET 8 console application. Dependencies: Microsoft.Build.Locator (1.7.8), Microsoft.CodeAnalysis.Workspaces.MSBuild (4.12.0), Microsoft.CodeAnalysis.CSharp.Workspaces (4.12.0), System.Text.Json (8.0.5). Builds with Release configuration. Locked dependencies via packages.lock.json for reproducibility.
-
-**`Program.cs`**  
-Main orchestrator (280 LOC total with main entry point and 5 generator implementations). Pattern: MSBuildLocator.RegisterDefaults() (required before workspace) → navigate to repo root (../.. from tools/ContextGen) → MSBuildWorkspace.Create() → OpenSolutionAsync(Parametric_Arsenal.sln) → 5 generator calls → JSON serialization (WriteIndented: true) to docs/agent-context/. Generators: GenerateArchitectureJson (Roslyn Compilation.GlobalNamespace traversal), GenerateErrorCatalogJson (CSharpSyntaxTree parsing of E.cs class declarations), GenerateValidationModesJson (V.cs enum parsing), GenerateExemplarMetricsJson (LOC/method counts from 5 exemplar files), GenerateDomainMapJson (libs/rhino/* folder structure with 4-file pattern detection). Console logging with [INFO]/[PASS]/[ERROR] prefixes. Error handling with exit code 1 on exception.
-
-### Generated Context
-
-**`architecture.json`**  
-Roslyn-generated project metadata. Projects array: AssemblyName, FilePath, Types (Name, Namespace, Kind, Members count). Filtered to Arsenal/Core/Rhino/Grasshopper projects. Agents query for project structure, namespace organization, type counts. Updated automatically by context-gen.yml workflow.
-
-**`error-catalog.json`**  
-E.* error code catalog. Parsed from libs/core/errors/E.cs. Structure: domain name → error array (Name, Code, Message). Domains: Results, Validation, Geometry, Spatial, Analysis, Transform, Core. Agents query for available error codes when implementing operations. Ensures consistent error handling.
-
-**`validation-modes.json`**  
-V.* validation flag catalog. Parsed from libs/core/validation/V.cs. Flags: None (0), Standard (1), Topology (2), BoundingBox (4), Degeneracy (8), All (15). Binary combinations. Check mappings. Agents query for validation mode requirements. Ensures consistent validation across operations.
-
-**`exemplar-metrics.json`**  
-Exemplar file metrics. 5 reference files: Result.cs (202 LOC, 15 methods), UnifiedOperation.cs (108 LOC, 8 methods), ValidationRules.cs (144 LOC, expression trees), ResultFactory.cs (110 LOC, polymorphic parameters), E.cs (domain structure). Agents compare their code against these targets for LOC, method count, pattern usage.
-
-**`domain-map.json`**  
-libs/rhino/* domain structure. Maps domains (spatial, geometry, analysis, transform) to files, types, API patterns. Enforces 4-file pattern per domain. Agents query when implementing new domain functionality. Ensures architectural consistency.
-
-### Schemas
-
-**`review-output.schema.json`**  
-JSON Schema Draft-07 for agentic handshake protocol. Required fields: pr_number (integer ≥1), verdict (approve/request_changes enum), violations (array of Violation objects), passed_checks (array of RuleId strings). Violation object: rule (RuleId), file (relative path), start_line (integer), end_line (integer), current (code string), suggested (fix string). Optional metadata: review_timestamp (ISO 8601), iteration (1-3), build_status (success/failure). Validates claude-code-review output, consumed by claude-autofix.
-
 ### Quality Gates
 
 **`.pre-commit-config.yaml`**  
@@ -355,11 +267,10 @@ Automated dependency updates. NuGet ecosystem monitoring. Weekly update schedule
 | Review iterations | <2 avg | JSON log aggregation | 3-iteration limit enforced |
 | Time to merge | <1h avg | GitHub API timestamps | Auto-merge enabled |
 | Agent specialization | >80% | Invocation logs by type | 11 specialists active |
-| Context freshness | <24h | File timestamp checks | Auto-regeneration on change |
 | Build compliance | 100% | Zero warnings/errors | TreatWarningsAsErrors=true |
 | Test coverage | ≥80% | XPlat Code Coverage | Coverage gate in CI |
 
-**Autonomy Achievement**: All 32 planned tasks delivered (100% completion). Infrastructure supports >70% autonomous issue-to-merge via structured workflows, specialized agents, generated context, and agentic handshake protocols.
+**Autonomy Achievement**: All 32 planned tasks delivered (100% completion). Infrastructure supports >70% autonomous issue-to-merge via structured workflows, specialized agents, and agentic handshake protocols.
 
 ---
 
