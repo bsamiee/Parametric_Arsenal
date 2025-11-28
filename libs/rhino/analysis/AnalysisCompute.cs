@@ -446,7 +446,7 @@ internal static class AnalysisCompute {
         Analysis.ShapeTarget target,
         int sampleCount,
         IGeometryContext context) =>
-        TryFitPrimitive(surface: surface, target: target, sampleCount: sampleCount, _: context) switch {
+        TryFitPrimitive(surface: surface, target: target, sampleCount: sampleCount, context: context) switch {
             null => ResultFactory.Create<Analysis.ShapeConformanceResult>(
                 error: E.Geometry.SurfaceAnalysisFailed.WithContext("No conforming primitive detected")),
             (Analysis.ShapeTarget detected, object primitive, double[] deviations, Point3d maxLoc) result =>
@@ -486,9 +486,12 @@ internal static class AnalysisCompute {
         Surface surface,
         Analysis.ShapeTarget target,
         int sampleCount,
-        IGeometryContext _) =>
-        (target, surface.TryGetPlane(out Plane plane), surface.TryGetCylinder(out Cylinder cyl),
-         surface.TryGetSphere(out Sphere sph), surface.TryGetCone(out Cone cone), surface.TryGetTorus(out Torus torus)) switch {
+        IGeometryContext context) =>
+        (target, surface.TryGetPlane(out Plane plane, tolerance: context.AbsoluteTolerance),
+         surface.TryGetCylinder(out Cylinder cyl, tolerance: context.AbsoluteTolerance),
+         surface.TryGetSphere(out Sphere sph, tolerance: context.AbsoluteTolerance),
+         surface.TryGetCone(out Cone cone, tolerance: context.AbsoluteTolerance),
+         surface.TryGetTorus(out Torus torus, tolerance: context.AbsoluteTolerance)) switch {
             (Analysis.PlanarTarget, true, _, _, _, _) or (Analysis.AnyTarget, true, _, _, _, _) =>
                 ComputeSurfaceDeviations(surface, plane, sampleCount) is var (devs, maxPt) ? (new Analysis.PlanarTarget(), plane, devs, maxPt) : null,
             (Analysis.CylindricalTarget, _, true, _, _, _) or (Analysis.AnyTarget, false, true, _, _, _) =>
