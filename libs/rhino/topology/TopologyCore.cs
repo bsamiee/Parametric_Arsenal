@@ -12,7 +12,28 @@ namespace Arsenal.Rhino.Topology;
 
 /// <summary>Topology execution via breadth-first search and edge classification algorithms.</summary>
 [Pure] internal static class TopologyCore {
-    internal static Result<Topology.TopologyDiagnosis> ExecuteDiagnose(Brep input, IGeometryContext context) =>
+    internal static Result<Topology.TopologyResult> ExecuteQuery<T>(T input, Topology.QueryOperation operation, IGeometryContext context) where T : notnull =>
+        operation switch {
+            Topology.ConnectivityQuery => ExecuteConnectivity(input: input, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Connectivity(d)),
+            Topology.NonManifoldQuery => ExecuteNonManifold(input: input, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.NonManifold(d)),
+            Topology.NgonQuery => ExecuteNgonTopology(input: input, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Ngon(d)),
+            Topology.AdjacencyQuery q => ExecuteAdjacency(input: input, context: context, edgeIndex: q.EdgeIndex).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Adjacency(d)),
+            Topology.VertexQuery q => ExecuteVertexData(input: input, context: context, vertexIndex: q.VertexIndex).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Vertex(d)),
+            Topology.NakedEdgesQuery q => ExecuteNakedEdges(input: input, context: context, orderLoops: q.OrderLoops).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.NakedEdges(d)),
+            Topology.BoundaryLoopsQuery q => ExecuteBoundaryLoops(input: input, context: context, tolerance: q.Tolerance).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.BoundaryLoops(d)),
+            Topology.EdgeClassificationQuery q => ExecuteEdgeClassification(input: input, context: context, minimumContinuity: q.MinimumContinuity, angleThreshold: q.AngleThreshold).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.EdgeClassification(d)),
+            _ => ResultFactory.Create<Topology.TopologyResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown QueryOperation: {operation.GetType().Name}")),
+        };
+
+    internal static Result<Topology.TopologyResult> ExecuteBrepOperation(Brep brep, Topology.BrepOperation operation, IGeometryContext context) =>
+        operation switch {
+            Topology.DiagnoseOperation => ExecuteDiagnose(input: brep, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Diagnosis(d)),
+            Topology.ExtractFeaturesOperation => ExecuteExtractFeatures(input: brep, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Features(d)),
+            Topology.HealOperation h => ExecuteHeal(input: brep, strategies: h.Strategies, context: context).Map(static d => (Topology.TopologyResult)new Topology.TopologyResult.Healing(d)),
+            _ => ResultFactory.Create<Topology.TopologyResult>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Unknown BrepOperation: {operation.GetType().Name}")),
+        };
+
+    private static Result<Topology.TopologyDiagnosis> ExecuteDiagnose(Brep input, IGeometryContext context) =>
         TopologyConfig.DiagnosticOps.TryGetValue(TopologyConfig.OpType.Diagnose, out TopologyConfig.DiagnosticMetadata? diagMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
@@ -21,7 +42,7 @@ namespace Arsenal.Rhino.Topology;
                 : ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Topology.DiagnosisFailed.WithContext($"Topology validation failed: {topologyLog}"))
             : ResultFactory.Create<Topology.TopologyDiagnosis>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Diagnose"));
 
-    internal static Result<Topology.TopologicalFeatures> ExecuteExtractFeatures(Brep input, IGeometryContext context) =>
+    private static Result<Topology.TopologicalFeatures> ExecuteExtractFeatures(Brep input, IGeometryContext context) =>
         TopologyConfig.FeaturesOps.TryGetValue(TopologyConfig.OpType.ExtractFeatures, out TopologyConfig.FeaturesMetadata? featuresMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
@@ -30,7 +51,7 @@ namespace Arsenal.Rhino.Topology;
                 : ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid for feature extraction: {topologyLog}"))
             : ResultFactory.Create<Topology.TopologicalFeatures>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: ExtractFeatures"));
 
-    internal static Result<Topology.HealingResult> ExecuteHeal(Brep input, IReadOnlyList<Topology.Strategy> strategies, IGeometryContext context) =>
+    private static Result<Topology.HealingResult> ExecuteHeal(Brep input, IReadOnlyList<Topology.Strategy> strategies, IGeometryContext context) =>
         TopologyConfig.HealingOps.TryGetValue(TopologyConfig.OpType.Heal, out TopologyConfig.HealingMetadata? healMeta)
             ? input.IsValidTopology(out string topologyLog)
                 ? ResultFactory.Create(value: input)
@@ -39,7 +60,7 @@ namespace Arsenal.Rhino.Topology;
                 : ResultFactory.Create<Topology.HealingResult>(error: E.Topology.DiagnosisFailed.WithContext($"Topology invalid before healing: {topologyLog}"))
             : ResultFactory.Create<Topology.HealingResult>(error: E.Geometry.UnsupportedAnalysis.WithContext("Operation: Heal"));
 
-    internal static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context) where T : notnull =>
+    private static Result<Topology.ConnectivityData> ExecuteConnectivity<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.Connectivity,
             operation: g => g switch {
                 Brep brep => TopologyCompute.ComputeConnectivity(
@@ -60,7 +81,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.ConnectivityData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance) where T : notnull {
+    private static Result<Topology.BoundaryLoopData> ExecuteBoundaryLoops<T>(T input, IGeometryContext context, double? tolerance) where T : notnull {
         double tol = tolerance ?? context.AbsoluteTolerance;
         return Execute(input: input, context: context, opType: TopologyConfig.OpType.BoundaryLoops,
             operation: g => {
@@ -86,7 +107,7 @@ namespace Arsenal.Rhino.Topology;
             });
     }
 
-    internal static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context) where T : notnull =>
+    private static Result<Topology.NgonTopologyData> ExecuteNgonTopology<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NgonTopology,
             operation: g => g switch {
                 Mesh mesh when mesh.Ngons.Count == 0 => ResultFactory.Create(value: (IReadOnlyList<Topology.NgonTopologyData>)[new Topology.NgonTopologyData([], [], [], [], [], 0, mesh.Faces.Count),]),
@@ -114,7 +135,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NgonTopologyData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.VertexData> ExecuteVertexData<T>(T input, IGeometryContext context, int vertexIndex) where T : notnull =>
+    private static Result<Topology.VertexData> ExecuteVertexData<T>(T input, IGeometryContext context, int vertexIndex) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.VertexData,
             operation: g => (g, vertexIndex) switch {
                 (Brep brep, int idx) when idx >= 0 && idx < brep.Vertices.Count => ((Func<Result<IReadOnlyList<Topology.VertexData>>>)(() => {
@@ -148,7 +169,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.VertexData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops) where T : notnull =>
+    private static Result<Topology.NakedEdgeData> ExecuteNakedEdges<T>(T input, IGeometryContext context, bool orderLoops) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NakedEdges,
             operation: g => g switch {
                 Brep { Edges.Count: 0 } => ResultFactory.Create(value: (IReadOnlyList<Topology.NakedEdgeData>)[new Topology.NakedEdgeData(EdgeCurves: [], EdgeIndices: [], Valences: [], IsOrdered: orderLoops, TotalEdgeCount: 0, TotalLength: 0.0),]),
@@ -188,7 +209,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NakedEdgeData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context) where T : notnull =>
+    private static Result<Topology.NonManifoldData> ExecuteNonManifold<T>(T input, IGeometryContext context) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.NonManifold,
             operation: g => g switch {
                 Brep brep => ResultFactory.Create(value: (IReadOnlyList<Topology.NonManifoldData>)[
@@ -229,7 +250,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.NonManifoldData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(T input, IGeometryContext context, Continuity? minimumContinuity = null, double? angleThreshold = null) where T : notnull =>
+    private static Result<Topology.EdgeClassificationData> ExecuteEdgeClassification<T>(T input, IGeometryContext context, Continuity? minimumContinuity = null, double? angleThreshold = null) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.EdgeClassification,
             operation: g => g switch {
                 Brep brep => ((Func<Result<IReadOnlyList<Topology.EdgeClassificationData>>>)(() => {
@@ -276,7 +297,7 @@ namespace Arsenal.Rhino.Topology;
                 _ => ResultFactory.Create<IReadOnlyList<Topology.EdgeClassificationData>>(error: E.Geometry.UnsupportedAnalysis.WithContext($"Type: {typeof(T).Name}")),
             });
 
-    internal static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex) where T : notnull =>
+    private static Result<Topology.AdjacencyData> ExecuteAdjacency<T>(T input, IGeometryContext context, int edgeIndex) where T : notnull =>
         Execute(input: input, context: context, opType: TopologyConfig.OpType.Adjacency,
             operation: g => (g, edgeIndex) switch {
                 (Brep brep, int idx) when idx >= 0 && idx < brep.Edges.Count => ((Func<Result<IReadOnlyList<Topology.AdjacencyData>>>)(() => {

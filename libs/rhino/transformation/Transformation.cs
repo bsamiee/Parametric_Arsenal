@@ -19,22 +19,22 @@ public static class Transformation {
     public abstract record MorphOperation;
 
     /// <summary>Mirror reflection across plane.</summary>
-    public sealed record MirrorTransform(Plane Plane) : TransformOperation;
+    public sealed record Mirror(Plane Plane) : TransformOperation;
 
     /// <summary>Translation by motion vector.</summary>
     public sealed record Translation(Vector3d Motion) : TransformOperation;
 
     /// <summary>Orthogonal projection to plane.</summary>
-    public sealed record ProjectionTransform(Plane Plane) : TransformOperation;
+    public sealed record Projection(Plane Plane) : TransformOperation;
 
     /// <summary>Change of coordinate basis.</summary>
     public sealed record BasisChange(Plane From, Plane To) : TransformOperation;
 
     /// <summary>Plane-to-plane orientation transform.</summary>
-    public sealed record PlaneTransform(Plane From, Plane To) : TransformOperation;
+    public sealed record PlaneToPlane(Plane From, Plane To) : TransformOperation;
 
     /// <summary>Direct transform matrix application.</summary>
-    public sealed record MatrixTransform(Transform Value) : TransformOperation;
+    public sealed record Matrix(Transform Value) : TransformOperation;
 
     /// <summary>Uniform scale from anchor point.</summary>
     public sealed record UniformScale(Point3d Anchor, double Factor) : TransformOperation;
@@ -70,7 +70,7 @@ public static class Transformation {
     public sealed record NonUniformScale(Plane Plane, double XScale, double YScale, double ZScale) : TransformOperation;
 
     /// <summary>Shear deformation.</summary>
-    public sealed record ShearTransform(Plane Plane, Vector3d Direction, double AngleRadians) : TransformOperation;
+    public sealed record Shear(Plane Plane, Vector3d Direction, double AngleRadians) : TransformOperation;
 
     /// <summary>Flow geometry from base curve to target curve.</summary>
     public sealed record FlowMorph(Curve BaseCurve, Curve TargetCurve, bool PreserveStructure) : MorphOperation;
@@ -88,13 +88,13 @@ public static class Transformation {
     public sealed record RectangularArray(int XCount, int YCount, int ZCount, double XSpacing, double YSpacing, double ZSpacing) : ArrayOperation;
 
     /// <summary>Sequential composition of multiple transforms.</summary>
-    public sealed record CompoundTransform(TransformOperation[] Operations) : TransformOperation;
+    public sealed record Compound(TransformOperation[] Operations) : TransformOperation;
 
     /// <summary>Weighted blend between two transforms.</summary>
-    public sealed record BlendedTransform(TransformOperation First, TransformOperation Second, double BlendFactor) : TransformOperation;
+    public sealed record Blended(TransformOperation First, TransformOperation Second, double BlendFactor) : TransformOperation;
 
     /// <summary>Interpolated transform between start and end with parameter t ∈ [0,1].</summary>
-    public sealed record InterpolatedTransform(TransformOperation Start, TransformOperation End, double Parameter) : TransformOperation;
+    public sealed record Interpolated(TransformOperation Start, TransformOperation End, double Parameter) : TransformOperation;
 
     /// <summary>Result of transform decomposition into TRS components.</summary>
     public sealed record DecomposedTransform(
@@ -104,30 +104,6 @@ public static class Transformation {
         Transform Residual,
         bool IsOrthogonal,
         double OrthogonalityError);
-
-    /// <summary>Mirror geometry across plane.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Mirror<T>(
-        T geometry,
-        Plane plane,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new MirrorTransform(Plane: plane), context: context);
-
-    /// <summary>Project geometry orthogonally to plane.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Project<T>(
-        T geometry,
-        Plane plane,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new ProjectionTransform(Plane: plane), context: context);
-
-    /// <summary>Translate geometry by motion vector.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Translate<T>(
-        T geometry,
-        Vector3d motion,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new Translation(Motion: motion), context: context);
 
     /// <summary>Apply SpaceMorph deformation operation to geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -139,15 +115,6 @@ public static class Transformation {
             geometry: geometry,
             operation: operation,
             context: context);
-
-    /// <summary>Scale geometry uniformly about anchor point.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Scale<T>(
-        T geometry,
-        Point3d anchor,
-        double factor,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new UniformScale(Anchor: anchor, Factor: factor), context: context);
 
     /// <summary>Apply transform operation to geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -162,43 +129,6 @@ public static class Transformation {
             context: context,
             enableDiagnostics: enableDiagnostics);
 
-    /// <summary>Translate geometry from start point to end point.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Translate<T>(
-        T geometry,
-        Point3d start,
-        Point3d end,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new Translation(Motion: end - start), context: context);
-
-    /// <summary>Change coordinate system from one plane basis to another.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> ChangeBasis<T>(
-        T geometry,
-        Plane fromPlane,
-        Plane toPlane,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new BasisChange(From: fromPlane, To: toPlane), context: context);
-
-    /// <summary>Rotate geometry around axis by angle in radians.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Rotate<T>(
-        T geometry,
-        double angleRadians,
-        Vector3d axis,
-        Point3d center,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new AxisRotation(AngleRadians: angleRadians, Axis: axis, Center: center), context: context);
-
-    /// <summary>Transform geometry from one plane orientation to another.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> PlaneToPlane<T>(
-        T geometry,
-        Plane fromPlane,
-        Plane toPlane,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new PlaneTransform(From: fromPlane, To: toPlane), context: context);
-
     /// <summary>Apply array operation to geometry.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result<IReadOnlyList<T>> ApplyArray<T>(
@@ -211,65 +141,6 @@ public static class Transformation {
             operation: operation,
             context: context,
             enableDiagnostics: enableDiagnostics);
-
-    /// <summary>Shear geometry parallel to plane in given direction by angle.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Shear<T>(
-        T geometry,
-        Plane plane,
-        Vector3d direction,
-        double angle,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new ShearTransform(Plane: plane, Direction: direction, AngleRadians: angle), context: context);
-
-    /// <summary>Scale geometry non-uniformly along plane axes.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Scale<T>(
-        T geometry,
-        Plane plane,
-        double xScale,
-        double yScale,
-        double zScale,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new NonUniformScale(Plane: plane, XScale: xScale, YScale: yScale, ZScale: zScale), context: context);
-
-    /// <summary>Rotate geometry from start direction to end direction around center.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Rotate<T>(
-        T geometry,
-        Vector3d startDirection,
-        Vector3d endDirection,
-        Point3d center,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new VectorRotation(Start: startDirection, End: endDirection, Center: center), context: context);
-
-    /// <summary>Apply sequential composition of multiple transform operations.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Compound<T>(
-        T geometry,
-        TransformOperation[] operations,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new CompoundTransform(Operations: operations), context: context);
-
-    /// <summary>Apply weighted blend between two transform operations.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Blend<T>(
-        T geometry,
-        TransformOperation first,
-        TransformOperation second,
-        double blendFactor,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new BlendedTransform(First: first, Second: second, BlendFactor: blendFactor), context: context);
-
-    /// <summary>Apply interpolated transform between start and end operations with parameter t ∈ [0,1].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<T> Interpolate<T>(
-        T geometry,
-        TransformOperation start,
-        TransformOperation end,
-        double parameter,
-        IGeometryContext context) where T : GeometryBase =>
-        Apply(geometry: geometry, operation: new InterpolatedTransform(Start: start, End: end, Parameter: parameter), context: context);
 
     /// <summary>Decompose transform matrix into translation, rotation, scale components (TRS).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]

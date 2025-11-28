@@ -11,9 +11,7 @@ Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(TInput input, TQuery query, I
 Result<ClusteringResult[]> Cluster<T>(T[] geometry, ClusterRequest request, IGeometryContext context) where T : GeometryBase
 Result<ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, DirectionalProximityRequest request, IGeometryContext context)
 Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(Brep brep, double tolerance, IGeometryContext context)
-Result<int[][]> ConvexHull3D(Point3d[] points, IGeometryContext context)
-Result<int[][]> DelaunayTriangulation2D(Point3d[] points, IGeometryContext context)
-Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context)
+Result<ComputationalGeometryResult> Compute(Point3d[] points, ComputationalGeometryOperation operation, IGeometryContext context)
 ```
 
 ---
@@ -30,7 +28,9 @@ Result<Point3d[][]> VoronoiDiagram2D(Point3d[] points, IGeometryContext context)
 
 **Mesh Overlap**: `MeshOverlapAnalysis(Mesh, Mesh, double, int?)`
 
-**Results**: `ClusteringResult(Point3d, double[])`, `ProximityFieldResult(int, double, double, double)`
+**Computational Geometry**: `ConvexHull3D`, `Delaunay2D`, `Voronoi2D`
+
+**Results**: `ClusteringResult(Point3d, double[])`, `ProximityFieldResult(int, double, double, double)`, `ComputationalGeometryResult.ConvexHull(int[][])`, `ComputationalGeometryResult.Delaunay(int[][])`, `ComputationalGeometryResult.Voronoi(Point3d[][])`
 
 ---
 
@@ -51,10 +51,12 @@ Result<Spatial.ClusteringResult[]> clusters = Spatial.Cluster(
     request: new Spatial.KMeansRequest(K: 5),
     context: context);
 
-// Delaunay triangulation
-Result<int[][]> triangles = Spatial.DelaunayTriangulation2D(
+// Delaunay triangulation via unified Compute
+Result<Spatial.ComputationalGeometryResult> result = Spatial.Compute(
     points: planarPoints,
+    operation: new Spatial.Delaunay2D(),
     context: context);
+// Pattern match result: result.Map(r => r is ComputationalGeometryResult.Delaunay d ? d.TriangleIndices : null)
 ```
 
 ---
@@ -70,7 +72,7 @@ Result<int[][]> triangles = Spatial.DelaunayTriangulation2D(
 
 ## Internals
 
-**Files**: `Spatial.cs` (API, 116 LOC), `SpatialCore.cs` (dispatch, 201 LOC), `SpatialCompute.cs` (algorithms, 533 LOC), `SpatialConfig.cs` (config, 54 LOC)
+**Files**: `Spatial.cs` (API, 102 LOC), `SpatialCore.cs` (dispatch, 228 LOC), `SpatialCompute.cs` (algorithms, 489 LOC), `SpatialConfig.cs` (config, 53 LOC)
 
 **Dispatch**: `FrozenDictionary<(Type, string), SpatialOperationMetadata>` with operation types: Range, Proximity, Overlap, Clustering, ProximityField
 

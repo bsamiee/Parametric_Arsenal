@@ -56,61 +56,47 @@ public static class Spatial {
 
     /// <summary>Directional proximity field request for anisotropic proximity computation.</summary>
     public sealed record DirectionalProximityRequest(Vector3d Direction, double MaxDistance, double AngleWeight);
-
     /// <summary>Proximity field result entry.</summary>
     public sealed record ProximityFieldResult(int Index, double Distance, double Angle, double WeightedDistance);
+    /// <summary>Computational geometry operations on point clouds.</summary>
+    public abstract record ComputationalGeometryOperation;
+    /// <summary>Compute 3D convex hull.</summary>
+    public sealed record ConvexHull3D() : ComputationalGeometryOperation;
+    /// <summary>Compute 2D Delaunay triangulation.</summary>
+    public sealed record Delaunay2D() : ComputationalGeometryOperation;
+    /// <summary>Compute 2D Voronoi diagram.</summary>
+    public sealed record Voronoi2D() : ComputationalGeometryOperation;
+    /// <summary>Computational geometry results: ConvexHull(int[][]), Delaunay(int[][]), Voronoi(Point3d[][]).</summary>
+    public abstract record ComputationalGeometryResult {
+        private ComputationalGeometryResult() { }
+        public sealed record ConvexHull(int[][] FaceIndices) : ComputationalGeometryResult;
+        public sealed record Delaunay(int[][] TriangleIndices) : ComputationalGeometryResult;
+        public sealed record Voronoi(Point3d[][] CellVertices) : ComputationalGeometryResult;
+    }
 
     /// <summary>Cluster geometry by proximity using algebraic clustering request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<ClusteringResult[]> Cluster<T>(
-        T[] geometry,
-        ClusterRequest request,
-        IGeometryContext context) where T : GeometryBase =>
+    public static Result<ClusteringResult[]> Cluster<T>(T[] geometry, ClusterRequest request, IGeometryContext context) where T : GeometryBase =>
         SpatialCore.Cluster(geometry: geometry, request: request, context: context);
 
     /// <summary>Compute medial axis skeleton for planar Breps → (skeleton curves[], stability[]).</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(
-        Brep brep,
-        double tolerance,
-        IGeometryContext context) =>
+    public static Result<(Curve[] Skeleton, double[] Stability)> MedialAxis(Brep brep, double tolerance, IGeometryContext context) =>
         SpatialCompute.MedialAxis(brep: brep, tolerance: tolerance, context: context);
 
     /// <summary>Compute directional proximity field using algebraic request.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<ProximityFieldResult[]> ProximityField(
-        GeometryBase[] geometry,
-        DirectionalProximityRequest request,
-        IGeometryContext context) =>
+    public static Result<ProximityFieldResult[]> ProximityField(GeometryBase[] geometry, DirectionalProximityRequest request, IGeometryContext context) =>
         SpatialCore.ProximityField(geometry: geometry, request: request, context: context);
 
-    /// <summary>Compute 3D convex hull → mesh face vertex indices as int[][].</summary>
+    /// <summary>Execute computational geometry operation on point cloud.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<int[][]> ConvexHull3D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.ConvexHull3D(points: points, context: context);
-
-    /// <summary>Compute 2D Delaunay triangulation → triangle vertex indices as int[][].</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<int[][]> DelaunayTriangulation2D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.DelaunayTriangulation2D(points: points, context: context);
-
-    /// <summary>Compute 2D Voronoi diagram → cell vertices Point3d[][] for each input point.</summary>
-    [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<Point3d[][]> VoronoiDiagram2D(
-        Point3d[] points,
-        IGeometryContext context) =>
-        SpatialCompute.VoronoiDiagram2D(points: points, context: context);
+    public static Result<ComputationalGeometryResult> Compute(Point3d[] points, ComputationalGeometryOperation operation, IGeometryContext context) =>
+        SpatialCore.ExecuteComputationalGeometry(points: points, operation: operation, context: context);
 
     /// <summary>Spatial query via type-based dispatch and RTree.</summary>
     [Pure, MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(
-        TInput input,
-        TQuery query,
-        IGeometryContext context,
-        int? bufferSize = null) where TInput : notnull where TQuery : notnull =>
+    public static Result<IReadOnlyList<int>> Analyze<TInput, TQuery>(TInput input, TQuery query, IGeometryContext context, int? bufferSize = null)
+        where TInput : notnull where TQuery : notnull =>
         SpatialCore.Analyze(input: input, query: query, context: context, bufferSize: bufferSize);
 }

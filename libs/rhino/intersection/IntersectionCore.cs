@@ -174,7 +174,6 @@ namespace Arsenal.Rhino.Intersection;
         };
 
     /// <summary>Handles circle intersection results discriminating between arc curves and tangent points.</summary>
-    /// <remarks>ArcCurve instances in result are IDisposable and must be disposed by consumer.</remarks>
     private static readonly Func<int, Circle, Result<Intersection.IntersectionOutput>> CircleHandler = static (type, circle) => (type, circle) switch {
         (1, Circle arc) => ResultFactory.Create(value: new Intersection.IntersectionOutput([], [new ArcCurve(arc),], [], [], [], [])),
         (2, Circle tangent) => ResultFactory.Create(value: new Intersection.IntersectionOutput([tangent.Center,], [], [], [], [], [])),

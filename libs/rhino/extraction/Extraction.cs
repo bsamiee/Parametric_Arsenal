@@ -65,7 +65,7 @@ public static class Extraction {
     /// <summary>Isocurves at explicit parameters.</summary>
     public sealed record IsocurvesAt(IsocurveDirection Direction, double[] Parameters) : CurveOperation;
 
-    /// <summary>Isocurve direction specification.</summary>
+    /// <summary>Isocurve direction specification. Semantically similar to <see cref="Analysis.Analysis.CurvatureProfileDirection"/>.</summary>
     public abstract record IsocurveDirection;
 
     /// <summary>U-direction isocurves.</summary>

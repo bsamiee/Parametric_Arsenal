@@ -58,7 +58,7 @@ public static class Analysis {
         Curve Curve,
         CurveShapeTarget Target) : QualityRequest(Curve);
 
-    /// <summary>Curvature profile direction for surface sampling.</summary>
+    /// <summary>Curvature profile direction for surface sampling. Semantically similar to <see cref="Extraction.Extraction.IsocurveDirection"/>.</summary>
     public abstract record CurvatureProfileDirection;
 
     /// <summary>Sample curvature along U direction only.</summary>

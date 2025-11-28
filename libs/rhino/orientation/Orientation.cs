@@ -102,7 +102,7 @@ public static class Orientation {
     /// <summary>Mirror geometry across a plane.</summary>
     public sealed record Mirror(Plane MirrorPlane) : Operation;
 
-    /// <summary>Flip curve direction or surface/mesh normals.</summary>
+    /// <summary>Flip curve direction or surface/mesh normals. This operation reverses direction without transforming position.</summary>
     public sealed record FlipDirection : Operation;
 
     /// <summary>Align geometry to canonical world orientation.</summary>
