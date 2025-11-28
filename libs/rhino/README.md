@@ -14,8 +14,8 @@ Polymorphic geometry operations for RhinoCommon with unified algebraic dispatch,
 | **Intersection** | `Intersection.Execute()` | Geometry intersection and analysis |
 | **Morphology** | `Morphology.Apply()` | Mesh repair, subdivision, smoothing |
 | **Orientation** | `Orientation.Execute()` | Canonical alignment, best-fit planes |
-| **Spatial** | `Spatial.Analyze()`, `Spatial.Cluster()` | RTree queries, clustering, computational geometry |
-| **Topology** | `Topology.Get*()`, `Topology.HealTopology()` | Topology analysis and healing |
+| **Spatial** | `Spatial.Analyze()`, `Spatial.Compute()` | RTree queries, clustering, computational geometry |
+| **Topology** | `Topology.Query()`, `Topology.Execute()` | Topology analysis and healing |
 | **Transformation** | `Transformation.Apply()` | Affine transforms, arrays, morphs |
 
 ---
@@ -41,7 +41,7 @@ Result<T> Module.Analyze<TInput, TQuery>(TInput input, TQuery query, IGeometryCo
 
 **Analysis Operations**: `Analysis`, `Topology`, and `Extraction` all analyze geometry:
 - Use `Analysis.Analyze()` for differential geometry (curvature, derivatives)
-- Use `Topology.Get*()` for topological structure (edges, vertices, connectivity)
+- Use `Topology.Query()` for topological structure (edges, vertices, connectivity)
 - Use `Extraction.Points()/Curves()` for geometric extraction (control points, isocurves)
 
 **Spatial Operations**: `Spatial` and `Intersection` both handle geometric relationships:
@@ -159,28 +159,27 @@ Geometry orientation and canonical alignment.
 
 **Note**: For simple transforms (mirror, translate), prefer `Transformation.Apply()`.
 
-### Spatial (116 LOC API)
+### Spatial (~100 LOC API)
 
 RTree-based spatial indexing and computational geometry.
 
 **Key Methods**:
 - `Analyze<TInput, TQuery>(input, query, context)` - Range/proximity queries
 - `Cluster<T>(geometries, ClusterRequest, context)` - K-means, DBSCAN, hierarchical
-- `ConvexHull3D(points, context)` - 3D convex hull
-- `DelaunayTriangulation2D(points, context)` - 2D Delaunay
-- `VoronoiDiagram2D(points, context)` - 2D Voronoi
+- `Compute(points, ComputationalGeometryOperation, context)` - Unified computational geometry (ConvexHull3D, Delaunay2D, Voronoi2D)
 - `MedialAxis(brep, tolerance, context)` - Medial axis skeleton
 
-### Topology (300 LOC API)
+### Topology (~200 LOC API)
 
-Topology analysis and progressive healing.
+Topology analysis and progressive healing with unified algebraic dispatch.
 
 **Key Methods**:
-- `GetNakedEdges<T>(geometry, context)` - Boundary edges
-- `GetConnectivity<T>(geometry, context)` - Connected components
-- `ClassifyEdges<T>(geometry, context)` - G0/G1/G2 classification
-- `DiagnoseTopology(brep, context)` - Gap detection
-- `HealTopology(brep, strategies, context)` - Progressive healing
+- `Query<T>(geometry, QueryOperation, context)` - Unified topology queries (connectivity, naked edges, vertex data, adjacency, etc.)
+- `Execute(brep, BrepOperation, context)` - Brep-specific operations (diagnose, heal, extract features)
+
+**QueryOperation Types**: `ConnectivityQuery`, `NonManifoldQuery`, `NgonQuery`, `AdjacencyQuery(int)`, `VertexQuery(int)`, `NakedEdgesQuery(bool)`, `BoundaryLoopsQuery(double?)`, `EdgeClassificationQuery(Continuity, double?)`
+
+**BrepOperation Types**: `DiagnoseOperation`, `ExtractFeaturesOperation`, `HealOperation(Strategy[])`
 
 ### Transformation (~150 LOC API)
 
