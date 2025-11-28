@@ -44,8 +44,6 @@ jobs:
               'claude-code-review.yml',
               'claude-autofix.yml',
               'auto-merge.yml',
-              'context-gen.yml',
-              'standards-sync.yml'
             ];
             
             const metrics = {
@@ -203,44 +201,6 @@ jobs:
             core.setOutput('autofix_metrics', JSON.stringify(autofixMetrics));
             return autofixMetrics;
 
-      - name: Check Context Freshness
-        id: context
-        run: |
-          echo "Checking context file timestamps..."
-          
-          context_files=(
-            "docs/agent-context/architecture.json"
-            "docs/agent-context/error-catalog.json"
-            "docs/agent-context/validation-modes.json"
-            "docs/agent-context/exemplar-metrics.json"
-            "docs/agent-context/domain-map.json"
-          )
-          
-          oldest_age=0
-          stale_files=""
-          
-          for file in "${context_files[@]}"; do
-            if [ -f "$file" ]; then
-              age_seconds=$(( $(date +%s) - $(stat -c %Y "$file") ))
-              age_hours=$(( age_seconds / 3600 ))
-              
-              if [ $age_hours -gt $oldest_age ]; then
-                oldest_age=$age_hours
-              fi
-              
-              if [ $age_hours -gt 24 ]; then
-                stale_files="$stale_files\n- $file ($age_hours hours old)"
-              fi
-            else
-              stale_files="$stale_files\n- $file (MISSING)"
-            fi
-          done
-          
-          echo "oldest_age=$oldest_age" >> $GITHUB_OUTPUT
-          echo "stale_files<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$stale_files" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Generate Dashboard Issue Body
         id: dashboard
         uses: actions/github-script@v7
@@ -248,15 +208,11 @@ jobs:
           WORKFLOW_METRICS: ${{ steps.metrics.outputs.metrics }}
           PR_METRICS: ${{ steps.pr_metrics.outputs.pr_metrics }}
           AUTOFIX_METRICS: ${{ steps.autofix.outputs.autofix_metrics }}
-          CONTEXT_AGE: ${{ steps.context.outputs.oldest_age }}
-          STALE_FILES: ${{ steps.context.outputs.stale_files }}
         with:
           script: |
             const workflowMetrics = JSON.parse(process.env.WORKFLOW_METRICS);
             const prMetrics = JSON.parse(process.env.PR_METRICS);
             const autofixMetrics = JSON.parse(process.env.AUTOFIX_METRICS);
-            const contextAge = process.env.CONTEXT_AGE;
-            const staleFiles = process.env.STALE_FILES;
             
             const today = new Date().toISOString().split('T')[0];
             
@@ -275,7 +231,6 @@ jobs:
             | **Bot PRs Merged** | ${prMetrics.bot_merged_prs}/${prMetrics.merged_prs} | — | ${prMetrics.bot_merged_prs > 0 ? '✅' : '❌'} |
             | **Avg Time to Merge** | ${prMetrics.avg_time_to_merge_minutes} min | <60 min | ${prMetrics.avg_time_to_merge_minutes < 60 ? '✅ PASS' : '⚠️ SLOW'} |
             | **Avg Review Iterations** | ${autofixMetrics.avg_iterations} | <2.0 | ${autofixMetrics.avg_iterations < 2 ? '✅ PASS' : '⚠️ HIGH'} |
-            | **Context Freshness** | ${contextAge}h | <24h | ${contextAge < 24 ? '✅ FRESH' : '⚠️ STALE'} |
             
             ---
             
@@ -321,20 +276,13 @@ jobs:
             
             ---
             
-            ## 📁 Context File Status
-            
-            ${staleFiles ? `⚠️ **Stale Context Files Detected**:\n${staleFiles}\n\nRun \`context-gen\` workflow to refresh.` : '✅ All context files are fresh (<24h old).'}
-            
-            ---
-            
             ## 🎯 Recommendations
             
             ${prMetrics.autonomy_rate < 70 ? '- ⚠️ **Autonomy rate below target**: Review auto-merge gates and agent prompts.\n' : ''}
             ${prMetrics.avg_time_to_merge_minutes > 60 ? '- ⚠️ **Slow merge times**: Optimize workflow durations or increase parallelism.\n' : ''}
             ${autofixMetrics.avg_iterations > 2 ? '- ⚠️ **High iteration count**: Improve review prompts or agent instructions.\n' : ''}
-            ${contextAge > 24 ? '- ⚠️ **Stale context files**: Trigger \`context-gen\` workflow manually.\n' : ''}
             ${workflowMetrics.failed_runs > workflowMetrics.successful_runs * 0.1 ? '- ⚠️ **High workflow failure rate**: Investigate failing workflows.\n' : ''}
-            ${prMetrics.autonomy_rate >= 70 && prMetrics.avg_time_to_merge_minutes < 60 && autofixMetrics.avg_iterations < 2 && contextAge < 24 ? '✅ **All systems operating optimally!**' : ''}
+            ${prMetrics.autonomy_rate >= 70 && prMetrics.avg_time_to_merge_minutes < 60 && autofixMetrics.avg_iterations < 2 ? '✅ **All systems operating optimally!**' : ''}
             
             ---
             

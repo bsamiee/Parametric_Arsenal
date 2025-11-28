@@ -45,8 +45,6 @@ body:
         - libs/rhino/extraction
         - libs/rhino/intersection
         - libs/grasshopper
-        - tools/ContextGen
-        - tools/standards
         - .github/workflows
         - documentation
         - other (specify in description)
