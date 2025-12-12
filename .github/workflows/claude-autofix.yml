@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Download review artifact
         id: download
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: review-output
           run-id: ${{ github.event.workflow_run.id }}
@@ -30,7 +30,7 @@ jobs:
 
       - name: Retry artifact download if needed
         if: steps.download.outcome == 'failure'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: review-output
           run-id: ${{ github.event.workflow_run.id }}
@@ -153,7 +153,7 @@ jobs:
         if: |
           steps.verdict.outputs.verdict == 'request_changes' &&
           steps.iteration.outputs.limit_reached != 'true'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: review-output
           run-id: ${{ github.event.workflow_run.id }}
