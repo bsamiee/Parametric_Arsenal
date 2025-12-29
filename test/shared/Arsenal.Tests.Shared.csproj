@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="xunit.abstractions" Version="2.0.3" />
     <PackageReference Include="xunit.assert" Version="2.9.3" />
-    <PackageReference Include="CsCheck" Version="4.4.1" />
+    <PackageReference Include="CsCheck" Version="4.5.0" />
   </ItemGroup>
 
   <ItemGroup>
