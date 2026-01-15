@@ -77,9 +77,9 @@
   <!-- Code Analyzers (all projects)                -->
   <!-- ============================================ -->
   <ItemGroup>
-    <PackageReference Include="Roslynator.Analyzers" Version="4.14.1" PrivateAssets="all" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.256" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.100" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.278" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.102" PrivateAssets="all" />
     <PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" />
     <PackageReference Include="ReflectionAnalyzers" Version="0.3.1" PrivateAssets="all" />
     <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581" PrivateAssets="all" />
