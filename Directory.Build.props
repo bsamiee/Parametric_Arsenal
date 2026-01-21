@@ -89,7 +89,7 @@
   <!-- Rhino & Grasshopper SDK Configuration        -->
   <!-- ============================================ -->
   <PropertyGroup>
-    <RhinoVersion>8.25.25328.11001</RhinoVersion>
+    <RhinoVersion>8.27.26019.16021</RhinoVersion>
     <IsGrasshopperPlugin Condition="'$(IsGrasshopperPlugin)'==''">false</IsGrasshopperPlugin>
   </PropertyGroup>
 
