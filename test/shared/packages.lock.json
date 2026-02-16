@@ -10,9 +10,9 @@
       },
       "CsCheck": {
         "type": "Direct",
-        "requested": "[4.4.1, )",
-        "resolved": "4.4.1",
-        "contentHash": "9AnhoINTGlGRkJ2GOHpV8E4UiIiv46rTX3ssp0H2x29khh69Lli8q0c+LAxK9gVpckuXBo0Wq+NG2QQ44F8EHg=="
+        "requested": "[4.5.0, )",
+        "resolved": "4.5.0",
+        "contentHash": "yr4KUycAY+6Hx8r7BYyLjymHiFFOVoOTokS54f9y0tRrKdbQUEc+i1ojwdr/gjme8ZeZnRGP68XgfUFZfYO/MQ=="
       },
       "Meziantou.Analyzer": {
         "type": "Direct",
